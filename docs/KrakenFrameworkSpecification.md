@@ -1,0 +1,1975 @@
+# Kraken Framework Specification
+
+**Version**: v0.12
+**Status**: Authoritative
+**Basis**: Kernel Specification v0.9 (frozen)
+
+This is the single authoritative specification for framework execution semantics. All framework behavior — execution model, extension system, multi-agent orchestration, streaming, host contract, and tool dispatch — is defined in this document.
+
+---
+
+## 1. Shared Types
+
+All types used across the framework are defined here.
+
+### 1.1 Content Parts
+
+Atomic units of conversational content. Strict discriminated union on `type`.
+
+```
+TextPart
+├─ type: "text"
+├─ text: string
+└─ providerMetadata?: Record<string, unknown>
+
+ReasoningPart
+├─ type: "reasoning"
+├─ text: string                     // empty string when fully redacted
+├─ redacted: boolean
+└─ providerMetadata?: Record<string, unknown>
+
+ToolCallPart
+├─ type: "tool_call"
+├─ callId: string                   // framework-generated linking ID
+├─ name: string
+├─ input: unknown                   // always parsed, never JSON string
+└─ providerMetadata?: Record<string, unknown>
+
+ToolResultPart
+├─ type: "tool_result"
+├─ callId: string                   // links to ToolCallPart.callId
+├─ name: string
+├─ output: unknown
+├─ isError?: boolean
+└─ providerMetadata?: Record<string, unknown>
+
+FilePart
+├─ type: "file"
+├─ data: string | Uint8Array        // base64 or binary
+├─ mediaType: string                // IANA media type
+├─ filename?: string
+└─ providerMetadata?: Record<string, unknown>
+
+ContentPart = TextPart | ReasoningPart | ToolCallPart | ToolResultPart | FilePart
+```
+
+Design principles: one type per part (no bag-of-optional-fields). Tool call input is always parsed. `callId` is framework-owned (provider-native IDs in `providerMetadata`). `providerMetadata` is structural — carries opaque tokens needed for multi-turn continuity (Anthropic’s `signature`, OpenAI’s `encrypted_content`, Google’s `thoughtSignature`). No provider-specific content types in the canonical model. Streaming is not in the content model — these types represent complete, durable content.
+
+### 1.2 Messages
+
+```
+KrakenMessage =
+  | { role: "system",    content: string }
+  | { role: "user",      parts: ContentPart[] }
+  | { role: "assistant", parts: ContentPart[], providerMetadata?: Record<string, unknown> }
+  | { role: "tool",      parts: ToolResultPart[] }
+```
+
+Separate `tool` role even though some providers merge tool results into user messages. Each adapter handles the merge or split.
+
+### 1.3 InputSignal
+
+Canonical inbound signal accepted by the framework.
+
+```
+InputSignal
+└─ parts: ContentPart[]           // Canonical inbound user content.
+                                 // Extend only if a future extra is irreducible.
+```
+
+`InputSignal` is not a persisted message. The framework normalizes it into a `KrakenMessage` during input incorporation.
+
+### 1.4 Prompt and Response
+
+```
+RenderedToolDefinition
+├─ name: string
+├─ description: string
+└─ inputSchema: JSONSchema
+
+KrakenModelConfig
+├─ model?: string
+├─ provider?: string
+└─ settings?: Record<string, unknown>
+```
+
+`RenderedToolDefinition` is the provider-facing projection of a runtime tool definition. Runtime executable tool definitions do not cross the provider prompt boundary.
+
+```
+KrakenPrompt
+├─ messages: KrakenMessage[]
+├─ tools?: RenderedToolDefinition[]
+└─ config?: KrakenModelConfig
+
+KrakenModelResponse
+├─ parts: ContentPart[]
+├─ finishReason: "stop" | "tool_call" | "length" | "error" | "content_filter"
+├─ usage?: { inputTokens: number, outputTokens: number }
+└─ providerMetadata?: Record<string, unknown>
+```
+
+### 1.5 RuntimeResolution
+
+The exhaustive type for all framework control flow outcomes. Every framework control decision — loop policy, extension verdict, handoff, error — maps into this type.
+
+```
+RuntimeResolution =
+  | { type: "continue_iteration" }
+  | { type: "end_turn", reason: string }
+  | { type: "pause", reason: string, approval: ApprovalRequest }
+  | { type: "handoff", targetAgent: string, contextPlan: HandoffContextPlan }
+  | { type: "fail", error: Error, fatality: "hard" | "soft" }
+```
+
+```
+ContextEngineeringHelpers
+├─ loadMessage(hash: Hash) → KrakenMessage | null
+├─ storeMessage(message: KrakenMessage) → Hash
+└─ storeMessages(messages: KrakenMessage[]) → Hash[]
+
+ContextEngineeringContext
+├─ messageHashes: Hash[]
+├─ messages: KrakenMessage[]
+├─ manifest: ContextManifest
+└─ helpers: ContextEngineeringHelpers
+
+ContextEngineeringPlan
+├─ action: string
+└─ execute(ctx: ContextEngineeringContext) → Hash[]
+
+HandoffContextPlan
+├─ targetAgent: string
+├─ reason: string
+├─ mode: "preserve_trace" | "last_output_only" | string
+├─ builder: HandoffContextBuilder
+└─ sourceContext: HandoffSourceContext
+
+HandoffSourceContext
+├─ messages: KrakenMessage[]
+├─ handoffIntent: { targetAgent: string, reason?: string, payload?: unknown }
+├─ sourceAgent: AgentConfig
+├─ targetAgent: AgentConfig
+├─ manifest: ContextManifest
+└─ helpers: ContextEngineeringHelpers
+
+type HandoffContextBuilder = (ctx: HandoffSourceContext) → Hash[]
+```
+
+`ContextEngineeringPlan` is the framework contract for persistent transformation of the `messages` path. The framework owns the Run lifecycle, `tree.create`, checkpointing, manifest recomputation, and Turn/Branch advancement around the plan.
+
+The handoff builder returns the complete replacement hash array for the active `messages` path. RuntimeResolution carries the plan declaratively. The framework executes the builder during a dedicated handoff context engineering Run (§10.4), not at resolution time.
+
+**Mapping from control mechanisms:**
+
+| Source                                                 | Resolution                         |
+| ------------------------------------------------------ | ---------------------------------- |
+| Loop policy `continue: true, executeTools: true`       | `continue_iteration`               |
+| Loop policy `continue: false`                          | `end_turn`                         |
+| Extension verdict `"endTurn"`                          | `end_turn`                         |
+| Extension verdict `"hardFail"`                         | `fail(hard)`                       |
+| Extension verdict `"softFail"`                         | `fail(soft)`                       |
+| Tool approval required (via tool policy or aroundTool) | `pause(approval: ApprovalRequest)` |
+| Handoff intent detected                                | `handoff`                          |
+| Model call failure (retries exhausted)                 | `fail(hard)`                       |
+| Max iterations exceeded                                | `end_turn("max_iterations")`       |
+
+**Resolution precedence**: `fail(hard) > pause > handoff > end_turn > fail(soft) > continue_iteration`. `fail(soft)` is uniformly non-terminal: it records the error condition, may emit events and state effects, and does not by itself terminate the Turn or iteration loop. When extension verdicts, loop policy, and handoff detection all produce resolutions in the same iteration, the highest-precedence resolution wins.
+
+### 1.6 ContextManifest
+
+Lightweight index for O(1) context engineering decisions. Staged alongside messages on every checkpoint.
+
+```
+ContextManifest
+├─ messageCount: number
+├─ byRole:
+│    user: number
+│    assistant: number
+│    tool: number
+│    system: number
+├─ toolCalls:
+│    total: number
+│    byName: Record<string, number>
+├─ toolResults:
+│    total: number
+│    byName: Record<string, number>
+├─ lastUserMessageIndex: number
+├─ lastAssistantMessageIndex: number
+├─ turnBoundaries: number[]          // message indexes where user turns begin
+├─ tokenEstimate: number
+└─ extensions: Record<string, unknown>  // extension-owned persisted namespaces;
+                                        // sharedExports are projected from
+                                        // declared export keys over this state
+```
+
+Extensions own their namespace within `extensions`. The core manifest never reads extension data. The manifest is updated by the framework as a side effect of staging messages — computing deltas is arithmetic from data the framework already holds. Context engineering and handoff rebuild the manifest's core message-derived indexes, but preserve `extensions` unchanged unless an explicit context engineering action says otherwise.
+
+### 1.7 ApprovalRequest and ApprovalResponse
+
+```
+ApprovalRequest
+├─ toolCalls: PendingToolCall[]
+└─ completedResults: ToolResultPart[]
+
+PendingToolCall
+├─ callId: string
+├─ name: string
+├─ input: unknown
+├─ decisions: string[]
+└─ message: string
+
+ApprovalResponse
+└─ decisions: ApprovalDecision[]
+
+ApprovalDecision
+├─ callId: string                    // must match a PendingToolCall.callId
+├─ type: "approve" | "edit" | "reject" | string
+├─ editedInput?: unknown
+└─ message?: string
+```
+
+Each approval decision applies to exactly one pending tool call, linked by framework `callId`.
+
+| Decision  | Framework action                                                   |
+| --------- | ------------------------------------------------------------------ |
+| `approve` | Execute with original input                                        |
+| `edit`    | Execute with `editedInput`                                         |
+| `reject`  | Produce error ToolResultPart with message                          |
+| custom    | Treated as reject with decision type and message surfaced to model |
+
+### 1.8 KrakenStreamEvent
+
+The internal event vocabulary. Discriminated union on `type`. Every event carries `type`, `timestamp`, and optional `source` (for multi-agent attribution).
+
+```
+EventSource
+├─ agent: string
+├─ workerId?: string
+└─ threadId?: string
+```
+
+**Lifecycle events**: `turn.start`, `turn.end`, `iteration.start`, `iteration.end`
+
+**Model output events** (streaming): `message.start`, `text.delta`, `text.done`, `reasoning.delta`, `reasoning.done`, `tool_call.start`, `tool_call.args_delta`, `tool_call.done`, `message.done`
+
+**Tool execution events**: `tool.start`, `tool.result`
+
+**Control events**: `approval.requested`, `approval.resolved`, `steering.incorporated`, `error`
+
+**State events**: `state.snapshot`, `state.checkpoint`
+
+**Custom events**: `custom` (extension-defined `name` and `data`)
+
+Twenty-two event types in six groups. Complete type definitions:
+
+```
+TurnStartEvent         { type: "turn.start", turnId, threadId, resumedFrom?: string, timestamp }
+TurnEndEvent           { type: "turn.end", turnId, status: "completed"|"paused"|"failed", timestamp }
+IterationStartEvent    { type: "iteration.start", iterationCount, timestamp }
+IterationEndEvent      { type: "iteration.end", iterationCount, timestamp }
+
+MessageStartEvent      { type: "message.start", messageId, role: "assistant", timestamp }
+TextDeltaEvent         { type: "text.delta", messageId, delta: string, timestamp }
+TextDoneEvent          { type: "text.done", messageId, text: string, timestamp }
+ReasoningDeltaEvent    { type: "reasoning.delta", messageId, delta: string, timestamp }
+ReasoningDoneEvent     { type: "reasoning.done", messageId, timestamp }
+ToolCallStartEvent     { type: "tool_call.start", messageId, callId, name, timestamp }
+ToolCallArgsDeltaEvent { type: "tool_call.args_delta", callId, delta: string, timestamp }
+ToolCallDoneEvent      { type: "tool_call.done", callId, name, input: unknown, timestamp }
+MessageDoneEvent       { type: "message.done", messageId, finishReason, usage?, timestamp }
+
+ToolExecutionStartEvent  { type: "tool.start", callId, name, input: unknown, timestamp }
+ToolExecutionResultEvent { type: "tool.result", callId, name, output: unknown, isError, timestamp }
+
+ApprovalRequestedEvent   { type: "approval.requested", request: ApprovalRequest, timestamp }
+ApprovalResolvedEvent    { type: "approval.resolved", response: ApprovalResponse, timestamp }
+SteeringIncorporatedEvent { type: "steering.incorporated", messageId, timestamp }
+ErrorEvent               { type: "error", error: { message, code?, details? }, fatal: boolean, timestamp }
+
+StateSnapshotEvent     { type: "state.snapshot", manifest: ContextManifest, timestamp }
+StateCheckpointEvent   { type: "state.checkpoint", turnNodeHash, iterationCount, timestamp }
+
+CustomEvent            { type: "custom", name: string, data: unknown, timestamp }
+```
+
+`TurnStartEvent.resumedFrom`: When present, contains the TurnNode hash of the pause point. Protocol adapters use this to distinguish fresh Turns from resumed Turns. Absent means fresh Turn.
+
+**Ordering guarantees**: `message.start` precedes all deltas for that message. `text.delta` events arrive in order. `tool_call.start` precedes `tool_call.args_delta`. `message.done` follows all content events. Note: `tool_call.*` describes what the model requests (args streaming). `tool.*` describes what the framework executes. These are two different moments.
+
+**Contract tiers**: Kraken's internal event vocabulary is intentionally richer than any single external protocol. Protocol adapters consume this canonical stream and bridge it into AG-UI, ACP, OpenResponses-style transports, or any other host protocol.
+
+**Required core events**: `turn.start`, `turn.end`, `iteration.start`, `iteration.end`, `message.start`, `text.delta`, `text.done`, `reasoning.delta`, `reasoning.done`, `tool_call.start`, `tool_call.args_delta`, `tool_call.done`, `message.done`, `tool.start`, `tool.result`, `approval.requested`, `approval.resolved`, `steering.incorporated`, and `error`. When their corresponding runtime moments occur, the framework MUST emit them.
+
+**Optional standardized events**: `state.snapshot`, `state.checkpoint`, and `custom`. Their shapes and meanings are standardized, but hosts and protocol adapters MUST tolerate their absence. They are observability and integration affordances, not correctness dependencies.
+
+---
+
+## 2. State Schema
+
+### 2.1 Default Schema
+
+```
+DefaultAgentSchema
+├─ schemaId: "kraken.agent.v1"
+├─ paths:
+│    messages              ordered     // conversation in natural order
+│    context.manifest      single      // structural index
+│    runtime.status        single      // execution state metadata
+│
+└─ incorporationRules:
+     message               → messages
+     context_manifest      → context.manifest
+     runtime_status        → runtime.status
+```
+
+Three paths. Three objectTypes. Three incorporation rules.
+
+### 2.2 Messages Path (ordered)
+
+Each Object is a serialized `KrakenMessage`. Array order IS the conversation order.
+
+One message = one Object. A message with three tool calls is still one Object. Staged as `objectType: "message"`.
+
+### 2.3 Context Manifest Path (single)
+
+Staged as `objectType: "context_manifest"`. Each new manifest replaces the previous one. Cost: one extra Object per checkpoint. Maintained by the framework as a side effect of staging messages.
+
+When context engineering restructures the messages path via `tree.create`, the manifest is rebuilt from the new hash array and included in the new TurnTree.
+
+### 2.4 Runtime Status Path (single)
+
+```
+RuntimeStatus
+├─ state: "running" | "paused" | "completed" | "failed"
+├─ activeAgent?: string
+├─ currentProvider?: string
+├─ currentModel?: string
+├─ iterationCount?: number
+├─ pauseReason?: string
+├─ resumptionSchema?: unknown
+├─ partial?: boolean                 // true when assistant output was interrupted
+```
+
+**Lifecycle**: The framework stages an updated RuntimeStatus at Turn start (`running`), on pause (`paused`), on handoff (`running`, `activeAgent` updated), and at Turn end (`completed` or `failed`). It is not staged on every iteration — only on state transitions. Used by the framework for execution decisions, by the UI for status display, and by multi-agent orchestration for active agent tracking. Not consumed by context assembly for prompt construction.
+
+`runtime.status` is framework-owned Turn execution state. It is persisted through the schema, not stored as a Kernel Turn field. Turn-final `completed` / `failed` status is durably committed through a dedicated framework finalization checkpoint (§4.11).
+
+`partial`: Set to `true` when a cancellation or other recoverable interruption stages a partial assistant message before the Run fails. Hard process crashes during model streaming may still lose in-memory accumulator state and re-execute from scratch. Extensions and host code can use this flag to detect incomplete responses that were durably staged.
+
+### 2.5 Context Engineering Operations
+
+All produce new TurnTrees via `tree.create`. Original messages are never mutated.
+
+**Pruning**: Remove messages by index — filter the hash array, build new tree.
+
+**Summarization**: Replace message range with summary — insert summary hash, remove old hashes, build new tree.
+
+**Compaction**: Replace verbose tool results with compact versions.
+
+All operations use `tree.create` with a base tree. Only changed path hashes recompute. The kernel handles structural sharing.
+
+---
+
+## 3. Provider Contract
+
+### 3.1 Interface
+
+```
+KrakenProvider
+├─ id: string
+├─ generate(prompt: KrakenPrompt) → Promise<KrakenModelResponse>
+└─ stream(prompt: KrakenPrompt) → AsyncIterable<ProviderStreamChunk>
+```
+
+`generate` returns a complete response. `stream` yields normalized intermediate chunks. Authentication, retry, rate limiting, timeout, HTTP config are internal to each adapter.
+
+The provider never generates framework execution identity (`messageId`, `timestamp`). Those are driver concerns. The provider translates between its native wire format and the normalized `ProviderStreamChunk` / `KrakenModelResponse` types.
+
+### 3.2 ProviderStreamChunk
+
+The normalized intermediate type yielded by `provider.stream()`. Carries content deltas and tool call fragments without framework identity.
+
+```
+ProviderStreamChunk =
+  | { type: "text_delta", text: string }
+  | { type: "reasoning_delta", text: string, signature?: string }
+  | { type: "reasoning_done" }
+  | { type: "tool_call_start", providerCallId: string, name: string }
+  | { type: "tool_call_args_delta", providerCallId: string, delta: string }
+  | { type: "tool_call_done", providerCallId: string, name: string, input: unknown }
+  | { type: "finish", finishReason: string, usage?: { inputTokens: number, outputTokens: number },
+      providerMetadata?: Record<string, unknown> }
+  | { type: "error", error: unknown }
+```
+
+`providerCallId` is the provider’s native tool call ID (Anthropic’s `toolu_...`, OpenAI’s `call_...`, Google’s optional `id`). The driver maps this to a framework-generated `callId` and preserves the provider ID in `providerMetadata` on the resulting `ToolCallPart`.
+
+`signature` on `reasoning_delta` carries Anthropic’s thinking continuity token. The driver preserves it in `providerMetadata` on the resulting `ReasoningPart`.
+
+### 3.3 StreamAccumulator
+
+The accumulator builds a complete `KrakenModelResponse` from provider stream chunks. The driver uses it to bridge the live path (immediate events) and the durable path (complete response for staging).
+
+```
+StreamAccumulator
+├─ absorb(chunk: ProviderStreamChunk): void
+├─ finalize(): KrakenModelResponse
+├─ hasContent(): boolean
+```
+
+`absorb` processes one chunk: appends text deltas, accumulates tool call arguments, captures usage and metadata. `finalize` produces the complete `KrakenModelResponse` with all parts assembled, arguments parsed, and metadata merged. `hasContent` returns whether any chunks have been absorbed — used by the driver to detect aroundModel short-circuits that need synthetic event generation (§6.5).
+
+### 3.4 Adapter Strategy
+
+**Direct adapters** implement `KrakenProvider` by calling a provider’s API directly.
+
+**Bridge adapters** implement `KrakenProvider` by wrapping another framework’s provider integration (e.g., Vercel AI SDK).
+
+Both produce identical behavior from the framework’s perspective. Package topology:
+
+```
+@kraken/types                         zero dependencies, types only
+@kraken/provider-anthropic            direct, depends on @anthropic-ai/sdk
+@kraken/provider-openai               direct, depends on openai
+@kraken/provider-google               direct, depends on @google/genai
+@kraken/provider-vercel               bridge, depends on @ai-sdk/*
+@kraken/provider-langchain            bridge, depends on @langchain/*
+```
+
+Each adapter implements two conversion directions: outbound (`KrakenPrompt → provider payload`) and inbound (`provider response/stream → KrakenModelResponse/ProviderStreamChunk`). Typically 50–150 lines per direction.
+
+---
+
+## 4. Execution Model
+
+### 4.1 Turn Lifecycle
+
+```
+Signal arrives
+  │
+  ├─ Phase 1: Incorporate Input (always)
+  │    One Run, one checkpoint
+  │    User message + manifest enter the messages and manifest paths
+  │
+  ├─ beforeTurn hooks (once)
+  │
+  └─ Phase 2: Iteration Loop
+       │
+       for each iteration:
+       │
+       ├─ a. Steering check (inject user message if steering available)
+       ├─ b. beforeIteration hooks (may trigger context engineering)
+       ├─ c. Context engineering check (manifest → policy, or extension CE plan)
+       │    If action needed: separate Run with tree.create → completeStep(treeHash)
+       └─ d. Agent iteration
+            One Run, one checkpoint
+            Context assembly → systemPrompt collection →
+            aroundModel(model call) → [aroundTool(tool execution)] →
+            stage results → checkpoint → afterIteration hooks
+            │
+            └─ Resolution determines: continue, end, pause, handoff, or fail
+       │
+       Phase 3: Finalize Turn
+       afterTurn hooks (once, non-durable on terminal paths)
+       framework finalization checkpoint for runtime.status
+       turn.updateHead → return result via event stream
+```
+
+**Structural rules:**
+
+- One Run per iteration. The loop is the driver, not the step sequence.
+- One Run per context engineering action. Always separate from the iteration Run.
+- Input incorporation is always the first Run.
+- Context engineering is a per-iteration check, not a per-turn phase. The manifest drives the decision. O(1).
+- Extension hooks fire within existing framework phases — they do not create their own Runs or checkpoint boundaries.
+- `beforeTurn` fires exactly once per semantic Turn, after input incorporation and before the first iteration of the first handle.
+- `afterTurn` fires exactly once per semantic Turn, only after the Turn reaches a terminal non-paused resolution.
+- Approval resume continues the same Turn and MUST NOT re-run Turn-level hooks.
+- `pause` is approval-only. A paused Turn represents approval-gated continuation of already-requested tool work.
+- After any Run completion that produces a checkpointed TurnNode, the framework MUST advance the Turn head via `turn.updateHead(turnId, turnNodeHash)` before starting the next Run on that Turn.
+
+### 4.2 Phase 1: Incorporate Input
+
+```
+function incorporateInput(signal, turnId, branchId, schemaId):
+
+  inputRunId = generateId()
+  branch = kernel.branch.get(branchId)
+
+  kernel.run.create(inputRunId, turnId, branchId, schemaId,
+                    branch.headTurnNodeHash,
+                    [{ id: "incorporate_input", deterministic: false, sideEffects: false }])
+
+  kernel.run.beginStep(inputRunId, "incorporate_input")
+
+  userMsg = buildUserMessage(signal)
+  kernel.staging.stage(inputRunId, serialize(userMsg), "msg_user", "message", completed)
+
+  manifest = readManifest(branch.headTurnNodeHash)
+  manifest = updateManifest(manifest, [userMsg])
+  kernel.staging.stage(inputRunId, serialize(manifest), "manifest", "context_manifest", completed)
+
+  status = { state: "running" }
+  kernel.staging.stage(inputRunId, serialize(status), "runtime_status", "runtime_status", completed)
+
+  kernel.run.completeStep(inputRunId, "incorporate_input", storeEvent({ type: "input_received" }))
+  kernel.run.complete(inputRunId, completed)
+  kernel.turn.updateHead(turnId, latestHead())
+```
+
+### 4.3 Phase 2: Iteration Loop
+
+```
+function iterationLoop(turnId, branchId, schemaId, toolRegistry, config, steering?):
+
+  iterationCount = 0
+  activeConfig = config
+  activeToolRegistry = toolRegistry
+  carriedStateUpdates = {}
+
+  while true:
+    iterationCount++
+    yield { type: "iteration.start", iterationCount, timestamp: now() }
+
+    // ── Steering check ──
+    if steering && steering.hasNext():
+      incorporateSteering(steering.take(), turnId, branchId, schemaId)
+
+    manifest = readManifest(latestHead())
+
+    // ── beforeIteration hooks ──
+    iterResult = runBeforeIterationHooks(activeConfig.extensions, manifest, iterationCount)
+    pendingStateUpdates = mergeStateUpdates(carriedStateUpdates, iterResult.state ?? {})
+    carriedStateUpdates = {}
+    iterResolution = verdictToResolution(iterResult.verdict)
+    if iterResolution == end_turn or iterResolution == fail(hard):
+      return iterResolution
+    if iterResolution == fail(soft):
+      log soft failure and continue
+    if iterResult.cePlan:
+      executeCEAction(iterResult.cePlan, turnId, branchId, schemaId, pendingStateUpdates)
+      pendingStateUpdates = {}
+      manifest = readManifest(latestHead())
+
+    // ── Context engineering check (contract-level, after extension CE) ──
+    cePlan = activeConfig.contextPolicy.evaluate(manifest, iterationCount)
+    if cePlan.action != "none":
+      executeCEAction(cePlan, turnId, branchId, schemaId, pendingStateUpdates)
+      pendingStateUpdates = {}
+      manifest = readManifest(latestHead())
+
+    // ── Agent iteration ──
+    resolution = executeIteration(
+      turnId,
+      branchId,
+      schemaId,
+      activeToolRegistry,
+      activeConfig,
+      iterationCount,
+      pendingStateUpdates
+    )
+
+    manifest = readManifest(latestHead())
+
+    // ── afterIteration hooks ──
+    afterResult = runAfterIterationHooks(activeConfig.extensions, manifest, resolution, iterationCount)
+    if afterResult.verdict:
+      resolution = composeResolution(resolution, afterResult.verdict)
+    carriedStateUpdates = afterResult.state ?? {}
+
+    if iterationCount >= activeConfig.maxIterations && resolution.type == "continue_iteration":
+      resolution = { type: "end_turn", reason: "max_iterations" }
+
+    yield { type: "iteration.end", iterationCount, timestamp: now() }
+
+    match resolution:
+      continue_iteration → continue loop
+      end_turn           → break
+      pause              → break (Branch blocked)
+      handoff            → ({ activeConfig, activeToolRegistry } =
+                             applyHandoff(resolution.contextPlan, turnId, branchId, schemaId, carriedStateUpdates)),
+                             carriedStateUpdates = {},
+                             continue loop
+      fail(hard)         → break
+      fail(soft)         → log error, continue loop
+
+  return resolution
+```
+
+### 4.4 Steering Injection
+
+Steering allows user message injection between iterations without cancelling in-progress work.
+
+```
+function incorporateSteering(steerSignal, turnId, branchId, schemaId):
+  // Same pattern as incorporateInput: separate Run, stage user message + manifest, checkpoint
+```
+
+**Timing**: After previous iteration’s checkpoint, before beforeIteration hooks. **What the model sees**: Steering appears as a user message after the most recent tool results. **No cancellation**: Waits for current iteration to complete.
+
+**Validity**: Steering is only accepted while a Turn is running (between iterations). The host’s `steer()` call is rejected if the Turn is paused or completed.
+
+On successful incorporation, the framework MUST emit `steering.incorporated` after the steering checkpoint commits and before the next iteration proceeds.
+
+### 4.5 Context Engineering Action
+
+Same Run lifecycle pattern as §4.2. One Run with step `"context_engineering"` (deterministic: false, sideEffects: false).
+
+```
+function executeCEAction(plan, turnId, branchId, schemaId, pendingExtensionStateUpdates = {}):
+  // create Run, beginStep
+
+  branch = kernel.branch.get(branchId)
+  currentTreeHash = kernel.node.get(branch.headTurnNodeHash).turnTreeHash
+  msgHashes = kernel.tree.resolve(currentTreeHash, "messages")
+  messages = readMessages(branch.headTurnNodeHash)
+  manifest = readManifest(branch.headTurnNodeHash)
+
+  ceContext = {
+    messageHashes: msgHashes,
+    messages,
+    manifest,
+    helpers: {
+      loadMessage: (hash) => readMessageByHash(hash),
+      storeMessage: (message) => kernel.store.put(serialize(message)),
+      storeMessages: (messages) => messages.map(msg => kernel.store.put(serialize(msg)))
+    }
+  }
+
+  newMsgHashes = plan.execute(ceContext)
+
+  newManifest = rebuildManifest(newMsgHashes, kernel, {
+    preserveExtensionsFrom: manifest.extensions,
+    applyExtensionStateUpdates: pendingExtensionStateUpdates
+  })
+  manifestHash = kernel.store.put(serialize(newManifest))
+
+  newTreeHash = kernel.tree.create(schemaId, {
+    "messages": newMsgHashes,
+    "context.manifest": manifestHash
+  }, currentTreeHash)
+
+  eventHash = storeEvent({ type: "context_engineering_applied", action: plan.action })
+  kernel.run.completeStep(ceRunId, "context_engineering", eventHash, null, newTreeHash)
+  kernel.run.complete(ceRunId, completed)
+  kernel.turn.updateHead(turnId, latestHead())
+```
+
+### 4.6 Agent Iteration
+
+```
+function executeIteration(turnId, branchId, schemaId, toolRegistry, config, iterationCount, pendingExtensionStateUpdates = {}):
+
+  // create Run with step "iterate" (deterministic: false, sideEffects: true), beginStep
+
+  function failIteration(error, fatality = "hard"):
+    stageIterationErrorIfNeeded(iterRunId, error, fatality)
+    completion = kernel.run.complete(iterRunId, failed,
+      storeEvent({ type: "iteration_failed", message: error.message, fatality }))
+    if completion.turnNodeHash:
+      kernel.turn.updateHead(turnId, completion.turnNodeHash)
+    return { type: "fail", error, fatality }
+
+  // ── Context assembly ──
+  currentHead = kernel.branch.get(branchId).headTurnNodeHash
+  messages = readMessages(currentHead)
+  manifest = readManifest(currentHead)
+  stagedMessages = []
+
+  // ── System prompt collection (base + extension contributions) ──
+  systemPrompts = collectSystemPrompts(config.extensions, manifest, iterationCount)
+  renderedTools = toolRegistry.toDefinitions()
+  prompt = renderer.render(messages, renderedTools, config, systemPrompts)
+
+  // ── Model call through aroundModel chain (§6.2, §9.5) ──
+  response = await executeModelCall(iterRunId, prompt, config, iterationCount)
+
+  // ── Capture handoff intent before durable staging ──
+  handoffIntents = extractHandoffIntents(response.parts)
+  if handoffIntents.length > 1:
+    return failIteration(new Error("invalid_handoff_composition: multiple handoff intents in one response"))
+
+  if handoffIntents.length == 1 && extractNonHandoffToolCalls(response.parts).length > 0:
+    return failIteration(new Error("invalid_handoff_composition: handoff may not be combined with executable tool calls"))
+
+  handoffIntent = handoffIntents[0] ?? null
+  assistantParts = stripHandoffIntent(response.parts)
+
+  // ── Stage assistant message ──
+  if assistantParts.length > 0:
+    assistantMsg = { role: "assistant", parts: assistantParts,
+                     providerMetadata: response.providerMetadata }
+    kernel.staging.stage(iterRunId, serialize(assistantMsg),
+                        "msg_asst_" + iterationCount, "message", completed)
+    stagedMessages.push(assistantMsg)
+
+  // ── Loop policy → resolution composition ──
+  decision = config.loopPolicy.evaluate({ ...response, parts: assistantParts }, manifest, iterationCount)
+  toolCalls = extractToolCalls(response).filter(call => !isHandoffCall(call))
+  if toolCalls.length > 0 && decision.continue && !decision.executeTools:
+    return failIteration(new Error("invalid_loop_policy"))
+
+  resolution = handoffIntent
+    ? { type: "handoff", targetAgent: handoffIntent.targetAgent,
+        contextPlan: buildHandoffPlan(handoffIntent, messages, manifest, config) }
+    : decisionToResolution(decision)
+
+  if resolution.type == "fail" && resolution.fatality == "hard":
+    return failIteration(resolution.error, "hard")
+
+  // ── Tool execution (if resolution is continue_iteration and tools requested) ──
+  if resolution.type == "continue_iteration" && decision.executeTools:
+    dispatchContext = {
+      turnId,
+      branchId,
+      iterationCount,
+      runId: iterRunId,
+      stageResult: async (result) => {
+        const toolMsg = { role: "tool", parts: [result] }
+        await kernel.staging.stage(
+          iterRunId,
+          serialize(toolMsg),
+          "msg_tool_" + result.callId,
+          "message",
+          completed
+        )
+      }
+    }
+    executionResult = await toolExecutor.execute(toolCalls, dispatchContext)
+
+    if executionResult.approval:
+      emit { type: "approval.requested", request: executionResult.approval, timestamp: now() }
+      resolution = { type: "pause", reason: "approval_required",
+                     approval: executionResult.approval }
+
+    if executionResult.results.length > 0:
+      stagedMessages.push(...executionResult.results.map(result => ({
+        role: "tool",
+        parts: [result]
+      })))
+
+  if resolution.type == "pause":
+    status = { state: "paused", pauseReason: resolution.reason, iterationCount }
+    kernel.staging.stage(iterRunId, serialize(status), "runtime_status", "runtime_status", completed)
+
+  // ── Update manifest ──
+  manifest = updateManifest(manifest, stagedMessages, pendingExtensionStateUpdates)
+  kernel.staging.stage(iterRunId, serialize(manifest), "manifest", "context_manifest", completed)
+
+  // ── Checkpoint ──
+  kernel.run.completeStep(iterRunId, "iterate",
+    storeEvent({ type: "iteration_completed", iteration: iterationCount }))
+
+  if resolution.type == "pause":
+    kernel.run.complete(iterRunId, paused, storeEvent({ type: "paused", reason: resolution.reason }))
+  else:
+    kernel.run.complete(iterRunId, completed)
+
+  kernel.turn.updateHead(turnId, latestHead())
+
+  return resolution
+```
+
+### 4.7 Complete Turn Protocol
+
+```
+function executeTurn(signal, threadId, branchId, schemaId, tools, config, steering?, parentTurnId?):
+  → ExecutionHandle
+
+  turnId = generateId()
+
+  function* driver():
+    branch = kernel.branch.get(branchId)
+    resolvedParentTurnId = parentTurnId ?? resolveParentTurnId(threadId)
+    kernel.turn.create(turnId, threadId, resolvedParentTurnId, branch.headTurnNodeHash)
+    activeConfig = config
+    activeTools = tools ?? activeConfig.tools ?? []
+    toolRegistry = buildToolRegistry(activeTools, activeConfig.extensions)
+
+    yield { type: "turn.start", turnId, threadId, timestamp: now() }
+
+    incorporateInput(signal, turnId, branchId, schemaId)
+
+    turnHookResult = runBeforeTurnHooks(activeConfig.extensions)
+    turnHookResolution = verdictToResolution(turnHookResult?.verdict)
+    if turnHookResolution == end_turn or turnHookResolution == fail(hard):
+      resolution = turnHookResolution
+    else if turnHookResolution == fail(soft):
+      log soft failure
+      resolution = iterationLoop(turnId, branchId, schemaId, toolRegistry, activeConfig, steering)
+    else:
+      resolution = iterationLoop(turnId, branchId, schemaId, toolRegistry, activeConfig, steering)
+
+    if resolution.type != "pause":
+      runAfterTurnHooks(activeConfig.extensions)
+      finalizeTurnStatus(turnId, branchId, schemaId, resolution)
+
+    kernel.turn.updateHead(turnId, latestHead())
+    yield { type: "turn.end", turnId, status: resolutionToStatus(resolution), timestamp: now() }
+
+  return wrapAsHandle(driver(), turnId, branchId, steering)
+```
+
+`executeTurn` returns an `ExecutionHandle` (§7.1), not a bare `AsyncIterable`. The handle wraps the internal driver generator. The `events()` method on the handle provides the iterable that drives execution.
+
+For a Thread's first semantic Turn, `parentTurnId` is `null`. For every subsequent semantic Turn on that Thread, `parentTurnId` MUST identify the immediately previous Turn in the same Thread. Approval resumes stay within the existing Turn and do not create a new Turn.
+
+### 4.8 Pause and Resume
+
+**Pause trigger**: Tool approval. A Turn pauses only when one or more requested tool calls are pending approval, whether that approval requirement came from the tool definition’s `approval` policy or from `aroundTool`.
+
+Cancellation is not a pause trigger. User-initiated cancellation follows §6.10 and terminates the current Turn as `failed`.
+
+**Pause protocol**: Stage pending work (including completed tool results from a partial batch), `run.complete(runId, paused, eventHash)`. Reactive checkpoint captures all staged work. Branch is blocked until approval is resolved or the paused Run is explicitly failed.
+
+When a pause is triggered by tool approval, the framework MUST emit `approval.requested` before yielding `turn.end` with paused status.
+
+#### Approval Resume
+
+When a Turn is paused for tool approval, `resolveApproval` on the `ExecutionHandle` triggers the approval resume path. The `ApprovalResponse` is a control signal, not conversational content — no user message is incorporated.
+
+Approval resume continues the existing Turn. `beforeTurn` and `afterTurn` are not re-fired.
+
+```
+function resumeFromApproval(approvalResponse, turnId, branchId, ...):
+  → ExecutionHandle
+
+  1. Fail paused Run (unblock Branch)
+  2. Yield turn.start (with resumedFrom: pause TurnNode hash)
+  3. Yield approval.resolved
+  4. Create new Run with step "iterate"
+  5. Apply approval decisions → resume only unfinished tool calls through the full aroundTool chain;
+     approval wrappers observe the prior decision for the exact call and pass through without re-requesting approval
+  6. Stage tool results + manifest, checkpoint
+  7. Re-enter iterationLoop from current Branch Head
+  8. Yield turn.end
+
+  return wrapAsHandle(driver(), turnId, branchId, steering)
+```
+
+### 4.9 Recovery Protocol
+
+**Crash during input incorporation**: If TurnNode exists, input is durable — proceed. If not, re-incorporate from original signal.
+
+**Crash during context engineering**: If TurnNode exists (completeStep succeeded), restructured state is durable. If not, re-run from unchanged messages path.
+
+**Crash during iteration (before model call)**: Re-create iteration Run. Context assembly is deterministic.
+
+**Crash during iteration (during model stream)**: Partial accumulator state is lost. Stream events already emitted are lost. Re-execute the model call from scratch. Provider streams are not resumable.
+
+**Crash during iteration (after model call, before tools)**: Assistant output may survive as durable uncommitted staged work. If a TurnNode exists, the assistant message is committed history. If not, recovery reads staged results via `run.recover()` and either checkpoints them or re-executes from the last committed TurnNode. Unfulfilled tool calls are derived only from committed or recovered staged state, not assumed.
+
+**Crash during iteration (mid tool execution)**: Completed tool results that were incrementally staged before the crash may survive as durable uncommitted staged work for individual `tool` messages. If a TurnNode exists, those results are committed history. If not, recovery reads them from `run.recover()`, skips completed tool calls by `callId`, and resumes only unfinished calls. The framework MUST NOT assume they were already incorporated into the `messages` path unless the checkpoint succeeded.
+
+**Crash between iterations**: Clean state. Resume from current Branch Head.
+
+### 4.10 Error Handling
+
+**Model call failure**: Transport failures handled by provider adapter’s internal retry. If exhausted, produce `fail(hard)` resolution with error message staged.
+
+**Tool execution failure**: Individual tool failures produce error ToolResultParts. Model sees the error and reasons about it. Tool failures never fail the Run.
+
+**Max iterations exceeded**: Produces `end_turn("max_iterations")`. Run completes as `completed`, not `failed`.
+
+### 4.11 Final Turn Status Checkpoint
+
+Final Turn `completed` / `failed` status is durably committed by the framework through a dedicated finalization checkpoint. This is framework lifecycle behavior, not hook behavior. Paused Turns do not run this finalization step — `paused` status is already staged at the pause transition checkpoint inside the iteration Run.
+
+```
+function finalizeTurnStatus(turnId, branchId, schemaId, resolution):
+
+  if resolution.type == "pause":
+    return
+
+  statusRunId = generateId()
+  branch = kernel.branch.get(branchId)
+
+  kernel.run.create(statusRunId, turnId, branchId, schemaId,
+                    branch.headTurnNodeHash,
+                    [{ id: "finalize_turn_status", deterministic: false, sideEffects: false }])
+
+  kernel.run.beginStep(statusRunId, "finalize_turn_status")
+
+  status = {
+    state: resolutionToStatus(resolution)
+  }
+
+  kernel.staging.stage(statusRunId, serialize(status),
+                      "runtime_status_final", "runtime_status", completed)
+
+  kernel.run.completeStep(statusRunId, "finalize_turn_status",
+    storeEvent({ type: "turn_status_finalized", status: status.state }))
+  kernel.run.complete(statusRunId, completed)
+  kernel.turn.updateHead(turnId, latestHead())
+```
+
+This finalization step is independent of terminal hook outputs. `afterTurn` remains non-durable on terminal paths.
+
+---
+
+## 5. Contracts
+
+Five pluggable contracts called at defined points.
+
+### 5.1 Context Policy
+
+```
+contextPolicy.evaluate(manifest: ContextManifest, iterationCount: number)
+  → { action: "none" } | ContextEngineeringPlan
+```
+
+Called at top of every iteration, after beforeIteration hooks. O(1) via manifest. Default: no-op.
+
+If a `beforeIteration` hook returns a CE plan, the hook’s plan executes first. The contract-level context policy evaluates after, against the post-CE manifest. Both can trigger separate CE Runs in the same iteration.
+
+### 5.2 Renderer
+
+```
+renderer.render(messages: KrakenMessage[], tools: RenderedToolDefinition[],
+                config: KrakenModelConfig, systemPrompts: string[])
+  → KrakenPrompt
+```
+
+Pure function. Same inputs, same output. `systemPrompts` contains the final ordered system prompt sequence supplied to the model: extension contributions in registration order followed by the active agent’s base system prompt. Default: identity pass-through with system prompts prepended.
+
+### 5.3 Loop Policy
+
+```
+loopPolicy.evaluate(response: KrakenModelResponse, manifest: ContextManifest, iterationCount: number)
+  → IterationDecision
+
+IterationDecision
+├─ continue: boolean
+├─ executeTools: boolean
+└─ reason?: string
+```
+
+Default: `continue = true, executeTools = true` when `finishReason == "tool_call"`. `continue = false` otherwise.
+
+`IterationDecision` maps to `RuntimeResolution` during resolution composition.
+
+Invalid combinations are rejected. If the model response contains executable tool calls and the loop policy returns `continue: true` with `executeTools: false`, the framework MUST convert the decision to `fail(hard)` with error code `invalid_loop_policy`.
+
+### 5.4 Tool Executor
+
+```
+toolExecutor.execute(toolCalls: ToolCallPart[], context: ToolDispatchContext)
+  → Promise<ToolExecutionResult>
+
+ToolExecutionResult =
+  | { approval: undefined, results: ToolResultPart[] }           // all executed
+  | { approval: ApprovalRequest, results: ToolResultPart[] }     // partial: some executed, some pending
+```
+
+See §8 for tool dispatch details.
+
+### 5.5 Context Engineering Executor
+
+```
+plan.execute(ctx: ContextEngineeringContext)
+  → Hash[]
+```
+
+Default plans: `summarizeRange`, `dropIndices`, `compactToolResults`. Custom plans supported.
+
+---
+
+## 6. Streaming
+
+### 6.1 Layered Surfaces
+
+Three distinct surfaces exist for streaming. Each has one role.
+
+**Internal driver** (not public): A generator function that yields `KrakenStreamEvent`. Receives control signals (cancel, steer) through injected channels. The host never interacts with the generator directly.
+
+**Host-facing control surface** (public): The `ExecutionHandle` (§7.1). Wraps the internal driver. Exposes `events()` for iteration, plus `cancel()`, `steer()`, and `resolveApproval()` for control.
+
+**Protocol adapter consumption** (public): Adapters receive `AsyncIterable<KrakenStreamEvent>` from `handle.events()` and transform it into external formats. Adapters never touch the handle.
+
+```
+Internal driver (generator)
+  └─→ ExecutionHandle.events()  ←─ host iterates this
+        └─→ ProtocolAdapter(events)  ←─ transforms to AG-UI / ACP / SSE
+```
+
+Kraken's event stream plays the same architectural role on the outbound side that provider adapters play on the inbound side: one canonical internal interface, many bridges.
+
+### 6.2 Two Parallel Outputs
+
+During a model call, two consumers need different things simultaneously:
+
+**Live path**: Provider stream chunks are translated into `KrakenStreamEvent` and yielded to the output iterable. These reach protocol adapters immediately. The user sees tokens appearing in real time.
+
+**Durable path**: The same chunks are simultaneously accumulated into a complete `KrakenModelResponse` via the `StreamAccumulator` (§3.3). This complete response is what the aroundModel chain receives, what the loop policy evaluates, and what gets staged as a durable assistant message.
+
+```
+function executeModelCall(runId, prompt, config, iterationCount):
+  → KrakenModelResponse
+
+  messageId = generateId()
+  callIdMap = {}                    // providerCallId → framework callId
+  accumulator = createAccumulator()
+
+  yield { type: "message.start", messageId, role: "assistant", timestamp: now() }
+
+  response = await aroundModelChain(ctx, async (innerCtx) => {
+    for await (const chunk of provider.stream(innerCtx.prompt)) {
+      accumulator.absorb(chunk)
+      yield* toStreamEvents(chunk, messageId, callIdMap)
+    }
+    return accumulator.finalize()
+  })
+
+  // If aroundModel short-circuited (no chunks absorbed), synthesize events
+  if !accumulator.hasContent():
+    yield* synthesizeEvents(response, messageId)
+
+  yield { type: "message.done", messageId,
+          finishReason: response.finishReason,
+          usage: response.usage, timestamp: now() }
+
+  return response
+```
+
+`toStreamEvents` maps `ProviderStreamChunk` → `KrakenStreamEvent`, adding `messageId`, `timestamp`, and translating `providerCallId` → framework `callId` via `callIdMap`.
+
+### 6.3 Non-Streaming Fallback
+
+When `provider.generate()` is used instead of `provider.stream()`, the driver synthesizes events from the complete response: `message.start`, one delta+done pair per content part, then `message.done`. Protocol adapters see identical event shapes regardless of streaming mode — events arrive faster (all at once) but the structure is identical.
+
+This same synthesis mechanism is used when aroundModel short-circuits (§6.5).
+
+### 6.4 Tool Execution Events
+
+`tool.start` and `tool.result` events describe framework-side execution. A `tool.start` event is emitted only after approval has resolved and immediately before the framework enters the first executable aroundTool/execute step for that call. It is never emitted merely because the model requested the tool (that’s `tool_call.done`).
+
+**Sequential execution:**
+
+```
+for each toolCall in executingTools:
+  yield { type: "tool.start", callId, name, input, timestamp: now() }
+  result = await executeSingleTool(toolCall)
+  yield { type: "tool.result", callId, name, output, isError, timestamp: now() }
+```
+
+**Parallel execution:**
+
+All `tool.start` events for executing tools are yielded before any `tool.result`. This allows protocol adapters to show multiple tools executing concurrently.
+
+```
+for each toolCall in executingTools:
+  yield { type: "tool.start", callId, name, input, timestamp: now() }
+
+results = await Promise.all(executingTools.map(executeSingleTool))
+
+for each result in results:
+  yield { type: "tool.result", callId, name, output, isError, timestamp: now() }
+```
+
+**Mixed-approval batch ordering**: When a parallel batch contains both auto-approved and approval-gated tools, only auto-approved tools emit `tool.start`/`tool.result` events before the pause. Approval-gated tools do not emit `tool.start` until after approval, during the resume. The model’s request for the tool is already visible in `tool_call.done` events from the streaming phase.
+
+### 6.5 aroundModel Interaction with Streaming
+
+The `aroundModel` wrapper receives the complete `KrakenModelResponse` from `next()`. It does not see or control the event stream. Stream events are emitted by the driver as the provider stream progresses, before the around chain receives the complete response.
+
+**Short-circuit**: If aroundModel returns without calling `next()` (cache hit, static response), no streaming events were emitted during the call. The driver detects this via `accumulator.hasContent()` and synthesizes events from the returned response using the same mechanism as the non-streaming fallback (§6.3). The consumer sees one complete message sequence.
+
+**Replacement**: If aroundModel modifies the response after calling `next()`, stream events from `next()` are already emitted and cannot be recalled. The durable path uses the modified response. Minor inconsistency between live and durable paths — acceptable because modifications are typically metadata or minor adjustments, not content replacement.
+
+**Retry**: If aroundModel calls `next()` multiple times (fallback to different provider), each call produces its own stream event sequence with a new `messageId`. The consumer sees multiple message sequences. Only the final response (from the last `next()` call) is staged on the durable path.
+
+### 6.6 aroundTool Interaction with Streaming
+
+The driver emits `tool.start` immediately before the first executable aroundTool/execute entry for an approved or resumed tool call, and emits `tool.result` after the aroundTool chain returns. The around is invisible to the event stream.
+
+**Short-circuit** (cache hit): Both `tool.start` and `tool.result` are emitted. The result arrives instantly.
+
+**Retry**: If aroundTool calls `next()` multiple times, the consumer still sees one `tool.start` and one `tool.result`. Internal retries are invisible to the event stream. This differs from aroundModel retry because tool results are not user-facing streamed content.
+
+### 6.7 Custom Event Emission
+
+Extensions inject events into the output stream via two mechanisms:
+
+**`ctx.emit({ name, data })`** — creates a `CustomEvent` and injects it into the output stream at the point of emission, preserving temporal ordering. Available on all extension handler contexts (intercepts and arounds).
+
+**`ctx.forward(event, source)`** — injects any `KrakenStreamEvent` into the output stream with the `source` field set (§1.8). Available only on `AroundToolContext` and `ToolExecutionContext`. This is the mechanism for worker sub-agent streaming — a tool call that internally runs a sub-agent forwards its events with source attribution.
+
+```
+// Worker streaming from inside a tool's aroundTool or execute function:
+for await (const event of workerHandle.events()) {
+  ctx.forward(event, { agent: "research", workerId: "w_1", threadId: "thr_w1" })
+}
+```
+
+### 6.8 Stream-Level Observation
+
+Extensions that need to observe the raw event stream (for telemetry, logging, or diagnostics) do so at the host layer by wrapping `handle.events()`, not through the extension system. The extension system operates on complete responses and execution boundaries.
+
+### 6.9 Protocol Adapter Boundary
+
+```
+type ProtocolAdapter<T> = (events: AsyncIterable<KrakenStreamEvent>) → AsyncIterable<T>
+type ProtocolSink = (events: AsyncIterable<KrakenStreamEvent>) → Promise<void>
+```
+
+Package topology: `@kraken/stream-agui`, `@kraken/stream-acp`, `@kraken/stream-sse`. Multiple adapters can consume the same stream via tee or multicast at the host layer.
+
+### 6.10 Cancellation
+
+**User-initiated cancellation**: Host signals via `AbortSignal` through `handle.cancel()`. The driver aborts the provider stream, emits an `error` event with `fatal: true`, stages accumulated content as a partial assistant message (with `partial: true` on RuntimeStatus), completes the Run as `failed`, and yields `turn.end` with `"failed"`. The partial content is durable — on the next Turn, the model sees its own interrupted output.
+
+**Provider stream interruption**: The driver emits an `error` event, stages an error message, and yields `turn.end` with `"failed"`.
+
+### 6.11 Durability Boundary
+
+```
+                    EPHEMERAL                                   DURABLE
+
+ProviderStreamChunk → accumulator → KrakenModelResponse → staging.stage → checkpoint
+                         │
+                         ├─→ KrakenStreamEvent → adapter → UI
+                         │       (ephemeral)
+```
+
+Stream events are ephemeral — not stored, not replayed, not recovered after crashes. The durability boundary is `staging.stage`. If the process crashes mid-stream, the model call re-executes from scratch. Provider streams are not resumable.
+
+When optional state observability is enabled, the framework emits:
+
+- `state.checkpoint` after any Run completion that advances the Turn head via a new TurnNode.
+- `state.snapshot` after any checkpoint that writes a new manifest, using the manifest visible at the new head.
+
+---
+
+## 7. Host Contract
+
+The host is the process or service that embeds the Kraken framework and exposes it to external consumers (APIs, UIs, protocol endpoints).
+
+### 7.1 ExecutionHandle
+
+The control surface a host uses to drive and observe a Turn.
+
+```
+ExecutionHandle
+├─ events(): AsyncIterable<KrakenStreamEvent>
+├─ cancel(): void
+├─ steer(signal: InputSignal): void
+├─ resolveApproval(response: ApprovalResponse): ExecutionHandle
+└─ status(): ExecutionStatus
+```
+
+**`events()`** — the primary output. The host iterates this to receive all execution events. Iteration drives execution — the driver advances as the consumer pulls events.
+
+**`cancel()`** — triggers the AbortSignal. The driver handles staging partial content and failing the Run.
+
+**`steer(signal)`** — pushes a signal into the steering channel. The driver consumes it at the next iteration boundary. Only valid when `status().phase === "running"`. Rejected if the Turn is paused or completed.
+
+**`resolveApproval(response)`** — provides the human’s decision for a paused approval. Triggers the approval resume path (§4.8): fails the paused Run, applies decisions, executes approved tools, continues the iteration loop. Returns a **new** `ExecutionHandle` for the resumed Turn. Only valid when `status().phase === "paused"` and `status().approval` is present.
+
+The old handle’s `events()` iterable is already exhausted (it yielded `turn.end` with `paused` and returned). The new handle produces a fresh event sequence starting with `turn.start` (with `resumedFrom` set).
+
+**`status()`** — returns the current execution state:
+
+```
+ExecutionStatus
+├─ phase: "running" | "paused" | "completed" | "failed"
+├─ iterationCount: number
+├─ activeAgent?: string
+├─ manifest?: ContextManifest
+├─ pauseReason?: string
+└─ approval?: ApprovalRequest
+```
+
+### 7.2 Host Responsibilities
+
+The host is responsible for:
+
+- **Transport**: Connecting `events()` to client protocols (HTTP SSE, WebSocket, stdio).
+- **Fan-out**: Routing the same event stream to multiple consumers if needed (tee/multicast).
+- **State sync**: Optionally exposing `state.snapshot` events to clients for UI state.
+- **Steering channel**: Providing the concrete channel implementation that feeds `steer()`.
+- **Approval routing**: Surfacing `approval.requested` events to the human and collecting responses.
+- **Lifecycle management**: Starting Turns, managing Threads and Branches, handling long-lived execution.
+- **Stream observation**: Wrapping `events()` for telemetry, logging, or diagnostics if needed.
+
+### 7.3 Lifecycle
+
+```
+// Start a Turn
+handle = framework.executeTurn(signal, threadId, branchId, schemaId, tools, config)
+
+// Consume events (drives execution)
+while (handle) {
+  let resumed = false
+
+  for await (const event of handle.events()) {
+    adapter.send(event)
+
+    if (event.type === "approval.requested") {
+      // Surface to human, await decision
+      const response = await getHumanDecision(event.request)
+      handle = handle.resolveApproval(response)  // new handle for resumed Turn
+      resumed = true
+      break
+    }
+  }
+
+  if (!resumed) break
+}
+
+// Or cancel mid-stream
+handle.cancel()
+
+// Or inject steering (only while running)
+handle.steer({ parts: [{ type: "text", text: "Focus on the budget section" }] })
+```
+
+---
+
+## 8. Tool Dispatch
+
+### 8.1 KrakenToolDefinition
+
+```
+KrakenToolDefinition
+├─ name: string                           // unique within tool set
+├─ description: string
+├─ inputSchema: KrakenSchema
+├─ execute: ExecuteFunction
+├─ approval?: ApprovalPolicy
+├─ timeout?: number                       // ms, overrides default
+└─ metadata?: Record<string, unknown>
+```
+
+### 8.2 Schema Flexibility
+
+```
+KrakenSchema = JSONSchema | ZodSchema | TypeBoxSchema | CustomSchema
+
+ValidationResult =
+  | { valid: true, value: unknown }
+  | { valid: false, error: { message: string, details?: unknown } }
+
+CustomSchema
+├─ toJSONSchema(): JSONSchema             // for provider rendering
+└─ validate(input: unknown): ValidationResult
+```
+
+JSON Schema is the interchange format. Zod and TypeBox convert to JSON Schema for providers and validate natively.
+
+### 8.3 Execute Function
+
+```
+type ExecuteFunction = (input: unknown, context: ToolExecutionContext) → Promise<unknown> | unknown
+
+ToolDispatchContext
+├─ turnId: string
+├─ branchId: string
+├─ iterationCount: number
+├─ runId: string
+└─ stageResult?: (result: ToolResultPart) → Promise<void>
+
+ToolExecutionContext
+├─ callId: string
+├─ name: string
+├─ signal?: AbortSignal
+├─ emit?: (event: { name: string, data: unknown }) → void
+├─ forward?: (event: KrakenStreamEvent, source: EventSource) → void
+└─ metadata?: Record<string, unknown>
+```
+
+`emit` and `forward` are available when the tool executes within a streaming context. `emit` injects custom events. `forward` injects source-attributed events for worker streaming (see §6.7).
+
+### 8.4 Approval Policy
+
+```
+type ApprovalPolicy =
+  | boolean
+  | (input: unknown, context: ToolExecutionContext) → boolean | Promise<boolean>
+```
+
+The `approval` field on `KrakenToolDefinition` is a declarative shorthand. When `true` (or when the function returns `true`), the tool is marked as pending approval. The aroundTool chain in the extension system (§9.5) is the imperative mechanism for the same gating — an aroundTool handler can return a pause verdict with an `ApprovalRequest` for any tool, regardless of the tool’s own `approval` field.
+
+### 8.5 Tool Registry
+
+```
+ToolRegistry
+├─ register(tool: KrakenToolDefinition): void
+├─ get(name: string): KrakenToolDefinition | undefined
+├─ has(name: string): boolean
+├─ list(): KrakenToolDefinition[]
+└─ toDefinitions(): RenderedToolDefinition[]
+```
+
+Tools can be modified between Turns but not during normal execution of an active agent segment. Extension-contributed tools (§9.2) merge into the registry at Turn start. The active registry is rebuilt on handoff (§10.4); it is otherwise immutable for the duration of an active agent segment.
+
+### 8.6 Executor Flow
+
+For each tool call in the batch:
+
+```
+1. RESOLVE         tool = registry.get(name). Not found → error ToolResultPart.
+2. VALIDATE        tool.inputSchema.validate(input). Invalid → error ToolResultPart.
+3. APPROVAL CHECK  tool.approval field. If true → mark as pending.
+4. AROUND + EXEC   aroundTool chain wraps: tool.execute(validatedInput, context).
+                   aroundTool may also trigger approval (pause verdict).
+5. PRODUCE         ToolResultPart. Immediately after each ToolResultPart is produced,
+                   the executor MUST invoke `context.stageResult(result)` when available.
+                   The staged durable unit is `{ role: "tool", parts: [result] }`
+                   stored as `objectType: "message"`.
+```
+
+**Parallel execution** (default): Steps 1–3 synchronously for all calls. Split into approved and pending sets. Steps 4–5 concurrently for approved tools via aroundTool chain. If pending set is non-empty, return partial result with `ApprovalRequest` containing `completedResults` (from approved tools) and `toolCalls` (pending).
+
+**Sequential execution**: All steps one call at a time. First approval-gated tool encountered triggers pause with results from previously completed tools.
+
+Individual tool failures produce error ToolResultParts. Tool failures never fail the Run.
+
+Incremental staging is required for crash-safe partial progress. In a parallel or sequential batch, each completed tool result becomes durably recoverable before the batch as a whole returns. Recovery can therefore skip completed tool calls by `callId` and resume only unfinished calls.
+
+### 8.7 Approval Precedence
+
+```
+1. Tool definition's approval field (if true or function returns true)
+   → mark as pending
+2. aroundTool handler returning { verdict: "pause", approval: ApprovalRequest }
+   → mark as pending
+3. If nothing pauses → auto-approve, execute tool
+```
+
+---
+
+## 9. Extension System
+
+### 9.1 Extension Unit
+
+```
+createExtension({
+  name: string
+
+  // ── Contributions ──
+  tools?: KrakenToolDefinition[]
+  systemPrompt?: string | SystemPromptFn
+  exports?: string[]                           // state keys visible to other extensions via sharedExports
+
+  // ── Persistent State ──
+  state?: Record<string, unknown>
+
+  // ── Intercepts ──
+  beforeTurn?: InterceptHandler
+  afterTurn?: InterceptHandler
+  beforeIteration?: BeforeIterationHandler
+  afterIteration?: AfterIterationHandler
+
+  // ── Arounds ──
+  aroundModel?: AroundModelHandler
+  aroundTool?: AroundToolSpec
+
+  // ── Config ──
+  timeout?: number                               // ms, overrides agent default
+})
+```
+
+Six hooks, two shapes. A single Extension can use any combination. A budget tracker uses `state` + `afterIteration`. A model fallback uses `aroundModel`. A PII sanitizer uses `aroundTool`. A summarization extension uses `state` + `beforeIteration`.
+
+Extensions are registered on the agent configuration before execution begins. Registration order determines composition order (§9.6). Extensions cannot be added or removed during normal execution of an active agent segment. A handoff (§10.4) is the sole sanctioned mid-Turn reconfiguration boundary; on handoff the framework swaps AgentConfig and rebuilds the active tool registry, extension composition, renderer inputs, and contract bindings for subsequent iterations. Tools contributed by extensions merge into the tool registry at Turn start.
+
+If a tool name conflicts with an explicitly registered tool or another extension’s tool, registration fails with a duplicate name error.
+
+### 9.2 Contributions
+
+#### Tools
+
+Extension-contributed tools satisfy `KrakenToolDefinition` and merge into the tool registry at Turn start. The tool executor does not distinguish between explicit and extension-contributed tools.
+
+#### System Prompt
+
+```
+type SystemPromptFn = (ctx: SystemPromptContext) → string | undefined
+
+SystemPromptContext
+├─ extensionState: Record<string, unknown>
+├─ sharedExports: Record<string, Record<string, unknown>>
+├─ manifest: ContextManifest
+└─ iterationCount: number
+```
+
+String: injected as-is. Function: evaluated before each model call; `undefined` = no injection. Contributions from all extensions are collected in registration order and passed to the renderer (§5.2). System prompt contributions are transient — not persisted in the messages path.
+
+Dynamic system prompts may invalidate provider KV cache. The framework documents this tradeoff but does not prevent it.
+
+### 9.3 Extension State
+
+#### Declaration and Initialization
+
+The `state` field declares initial values. Stored in `manifest.extensions[name]`. On first Turn, initial values are written. On subsequent Turns, persisted values are read.
+
+The optional `exports` field declares which keys from that persisted namespace are visible to other extensions through `sharedExports`. Exported values are not stored separately — they are projected from the persisted namespace whenever the framework builds handler contexts.
+
+#### Reading and Updating
+
+All handlers receive `ctx.extensionState` (their own persisted extension namespace, deserialized from the manifest). Handler contexts also expose `sharedExports`, a read-only projection of other extensions' declared export keys over the latest persisted extension state. Intercepts and arounds return state updates via the generic `state` field in their return value. Updates are collected per phase and applied at the next checkpoint.
+
+When multiple state update maps are pending before the next checkpoint, the framework merges them deterministically by key, with the later update winning.
+
+#### Durability
+
+State is durable through the manifest checkpoint lifecycle. State updates from an around that crashes mid-execution are lost — consistent with “arounds are ephemeral” (§9.5).
+
+#### Namespace Isolation
+
+Each extension owns `manifest.extensions[name]`. The framework rejects duplicate names. Other extensions may read only the keys explicitly listed in that extension's `exports` declaration; they may not mutate another extension’s namespace. Core manifest fields are never affected by extension state updates.
+
+#### Three Storage Postures
+
+**Execution-affecting state** (budget counters, compression markers) — lives in `manifest.extensions[name]`. Durable through manifest checkpoint lifecycle.
+
+**Transient modifications** (system prompt rewrites, tool filtering) — lives nowhere durably. Applies to one iteration.
+
+**External operational data** (audit logs, traces, metrics) — extension owns its own storage. The framework provides observation points, not persistence.
+
+### 9.4 Intercept Hooks
+
+Intercepts observe execution at phase boundaries and return verdicts and state updates. They do not wrap execution and cannot call `next()`.
+
+#### Handler Signature
+
+```
+type InterceptHandler = (ctx: InterceptContext) → InterceptResult | void | Promise<...>
+
+InterceptContext
+├─ extensionState: Record<string, unknown>
+├─ sharedExports: Record<string, Record<string, unknown>>
+├─ manifest: ContextManifest
+├─ iterationCount: number
+├─ messages: KrakenMessage[]                   // read-only snapshot
+├─ turnId: string
+├─ runId: string
+└─ emit: (event: { name: string, data: unknown }) → void
+```
+
+#### InterceptResult
+
+```
+InterceptResult
+├─ state?: Record<string, unknown>
+├─ verdict?: "endTurn" | "softFail" | "hardFail"
+├─ reason?: string          // required for endTurn
+└─ error?: Error            // required for softFail and hardFail
+```
+
+Three verdicts mapping into RuntimeResolution:
+
+| Intercept verdict | RuntimeResolution |
+| ----------------- | ----------------- |
+| `undefined`       | (no effect)       |
+| `"endTurn"`       | `end_turn`        |
+| `"softFail"`      | `fail(soft)`      |
+| `"hardFail"`      | `fail(hard)`      |
+
+`InterceptResult` stays small and local. It is not a miniature `RuntimeResolution` object. The only extra payload carried is the irreducible payload required for clean lifting into runtime control.
+
+Validation rules: `reason` is required when `verdict` is `"endTurn"`. `error` is required when `verdict` is `"softFail"` or `"hardFail"`.
+
+Verdict composition follows RuntimeResolution precedence. When multiple extensions return verdicts, the highest-precedence resolution wins.
+
+#### beforeTurn
+
+Fires once before the first iteration. Used for precondition validation, one-time initialization, loading external configuration into extension state. Uses `InterceptHandler` / `InterceptResult`.
+
+#### afterTurn
+
+Fires once after the last iteration completes. Used for cleanup, turn-level accounting, final metrics emission. Uses `InterceptHandler` / `InterceptResult`. Verdicts from afterTurn do not affect the completed Turn — the Turn has already resolved. State updates from afterTurn are non-durable on terminal paths.
+
+#### beforeIteration
+
+```
+type BeforeIterationHandler = (ctx: InterceptContext) → BeforeIterationResult | void | Promise<...>
+
+BeforeIterationResult
+├─ state?: Record<string, unknown>
+├─ cePlan?: ContextEngineeringPlan
+├─ verdict?: "endTurn" | "softFail" | "hardFail"
+├─ reason?: string          // required for endTurn
+└─ error?: Error            // required for softFail and hardFail
+```
+
+When `cePlan` is returned, the framework executes the context engineering action as a separate Run before the iteration proceeds (§4.5). This is the only hook that can trigger context engineering.
+
+#### afterIteration
+
+```
+type AfterIterationHandler = (ctx: AfterIterationContext) → InterceptResult | void | Promise<...>
+
+AfterIterationContext extends InterceptContext
+├─ response: KrakenModelResponse               // the model's response this iteration
+├─ toolResults?: ToolResultPart[]               // if tools were executed
+└─ resolution: RuntimeResolution                // the iteration's current resolution
+```
+
+Fires after checkpoint. Sees the complete iteration: model response, tool results, and committed state. Used for budget tracking (token counting after seeing usage), metrics, and verdicts that should consider the full iteration outcome. `softFail` remains non-terminal here; `endTurn` and `hardFail` may still override continuation through RuntimeResolution precedence.
+
+State updates returned from afterIteration are durable only if a later checkpoint occurs. On terminal paths they are non-durable.
+
+### 9.5 Around Hooks
+
+Arounds wrap execution. They receive `next` and can call it zero times (short-circuit), once (normal), or multiple times (retry). Arounds are ephemeral — they do not survive crashes. On recovery, the framework re-enters the iteration loop from the last checkpoint. Arounds run again from scratch.
+
+#### aroundModel
+
+```
+type AroundModelHandler = (ctx: AroundModelContext, next: NextModelFn) → AroundModelResult | Promise<...>
+
+AroundModelContext
+├─ extensionState: Record<string, unknown>
+├─ sharedExports: Record<string, Record<string, unknown>>
+├─ manifest: ContextManifest
+├─ messages: KrakenMessage[]
+├─ prompt: KrakenPrompt                        // mutable
+├─ tools: RenderedToolDefinition[]             // mutable
+├─ config: KrakenModelConfig                   // mutable
+├─ iterationCount: number
+└─ emit: (event: { name: string, data: unknown }) → void
+
+type NextModelFn = (ctx?: AroundModelContext) → Promise<KrakenModelResponse>
+type AroundModelResult = KrakenModelResponse | { response: KrakenModelResponse, state?: Record<string, unknown> }
+```
+
+`next` accepts an optional modified context — this is how tool filtering, prompt modification, model swapping, and retry work. These are call-scoped execution mechanics, not persistent policy decisions. aroundModel is an execution wrapper, not a generic verdict surface.
+
+State updates returned from aroundModel are collected and applied at the next checkpoint. If the around crashes before returning, state updates are lost (ephemeral).
+
+#### aroundTool
+
+```
+type AroundToolSpec =
+  | AroundToolHandler
+  | { tools: string[], handler: AroundToolHandler }
+
+type AroundToolHandler = (ctx: AroundToolContext, next: NextToolFn) → AroundToolResult | Promise<...>
+
+AroundToolContext
+├─ extensionState: Record<string, unknown>
+├─ sharedExports: Record<string, Record<string, unknown>>
+├─ toolCall: ToolCallPart
+├─ tool: KrakenToolDefinition
+├─ input: unknown
+├─ callId: string
+├─ approvalDecision?: ApprovalDecision        // present when resuming this exact call after approval
+├─ emit: (event: { name: string, data: unknown }) → void
+└─ forward: (event: KrakenStreamEvent, source: EventSource) → void
+
+type NextToolFn = (ctx?: AroundToolContext) → Promise<ToolResultPart>
+type AroundToolResult =
+  | ToolResultPart
+  | { result: ToolResultPart, state?: Record<string, unknown> }
+  | { verdict: "pause", approval: ApprovalRequest, state?: Record<string, unknown> }
+```
+
+When filtered by tool name, the handler only runs for matching tools. When the handler returns `{ verdict: "pause", approval }`, it uses the same approval machinery as tool-level `approval` fields (§8.7). State updates returned with a pause verdict are applied at the pause checkpoint. On approval resume, only unfinished tool calls are resumed, and each resumed call re-enters the full aroundTool chain. Approval-aware wrappers use the prior decision for the exact call and pass through without re-requesting approval.
+
+`forward` is available on aroundTool — this is the mechanism for worker sub-agent streaming (§6.7, §10.2).
+
+### 9.6 Composition and Ordering
+
+#### Intercept Ordering
+
+**Before intercepts** (beforeTurn, beforeIteration): registration order (ext1 → ext2 → ext3).
+
+**After intercepts** (afterIteration, afterTurn): reverse registration order (ext3 → ext2 → ext1).
+
+#### Around Nesting
+
+First-registered is outermost:
+
+```
+ext1.aroundModel(ctx,
+  ext2.aroundModel(ctx,
+    ext3.aroundModel(ctx,
+      → actual model call)))
+```
+
+#### System Prompt Collection
+
+Registration order: `[ext1.systemPrompt, ext2.systemPrompt, ext3.systemPrompt, basePrompt]`.
+
+### 9.7 Interaction with Streaming
+
+aroundModel and aroundTool interact with the streaming system as defined in §6.5 and §6.6. The key rules:
+
+- aroundModel receives the complete `KrakenModelResponse`, not streaming events. Stream events are emitted by the driver during the provider stream, before aroundModel sees the response.
+- Short-circuit (no `next()` call): driver synthesizes events from the returned response.
+- Retry (multiple `next()` calls): each produces a stream sequence with a new `messageId`. Only the final response is durable.
+- aroundTool is invisible to the event stream. One `tool.start` and one `tool.result` regardless of internal retries.
+
+`emit` is available on all handler contexts. `forward` is available only on `AroundToolContext` and `ToolExecutionContext`.
+
+### 9.8 Interaction with Framework Contracts
+
+The extension system does not replace the five contracts. It provides an ergonomic layer that compiles into them.
+
+**Context policy**: `beforeIteration` returning `cePlan` triggers context engineering. If a developer also replaces the context policy contract directly, both can trigger CE in the same iteration — the extension’s plan runs first.
+
+**Renderer**: System prompt contributions modify the prompt input to the renderer, not the renderer itself.
+
+**Loop policy**: afterIteration verdicts compose with loop policy via RuntimeResolution precedence. An extension’s `"endTurn"` overrides the loop policy’s continuation decision.
+
+**Tool executor**: aroundTool integrates into the executor flow. Arounds wrap the tool execution step.
+
+**Two tiers**: Extensions cover the common case. Contract replacement covers deep structural intervention.
+
+### 9.9 Error Handling
+
+**Intercept errors**: Caught, treated as `fail(soft)`. Prevents a broken extension from crashing the agent.
+
+**Around errors**: Before `next()` — caught, produces error result (tools) or fails model call (model). After `next()` — framework uses `next()`’s result, logs the error.
+
+**System prompt errors**: Logged, that extension’s contribution omitted. Others unaffected.
+
+**Timeout**: All handlers subject to configurable timeout. Exceeded → treated as error per rules above.
+
+---
+
+## 10. Multi-Agent Orchestration
+
+Multi-agent orchestration is a framework pattern built on existing primitives: tools, steering, context engineering, and agent configuration. No new kernel concepts.
+
+### 10.1 Agent Configuration
+
+```
+AgentConfig
+├─ name: string
+├─ model?: string | KrakenProvider
+├─ systemPrompt?: string
+├─ tools?: KrakenToolDefinition[]
+├─ extensions?: Extension[]
+├─ loopPolicy?: LoopPolicy
+├─ contextPolicy?: ContextPolicy
+└─ maxIterations?: number
+```
+
+Agent configs are static for the lifetime of the orchestration. On handoff, the framework swaps the active config and continues on the same Branch.
+
+### 10.2 Synchronous Workers
+
+A tool call that internally runs a sub-agent. The parent blocks until the result.
+
+```
+tools: [{
+  name: "research",
+  description: "Delegate a research task to a specialized agent",
+  inputSchema: { query: "string", depth: "string" },
+  execute: async (input, ctx) => {
+    const { threadId, branchId } = kernel.thread.create(...)
+    const workerHandle = executeTurn(input, threadId, branchId, schemaId, researchConfig.tools, researchConfig)
+
+    let result = ""
+    for await (const event of workerHandle.events()) {
+      if (event.type === "text.done") result = event.text
+      ctx.forward(event, { agent: "research", workerId: threadId })  // opt-in
+    }
+    return { summary: result, workerId: threadId }
+  }
+}]
+```
+
+From the parent’s perspective: one tool call, one tool result. The sub-agent’s internal execution is opaque. The sub-agent runs on its own Thread with its own history. Forwarding worker events via `ctx.forward` is opt-in — omit it for silent workers.
+
+### 10.3 Asynchronous Workers
+
+The tool returns immediately with a worker pointer. Worker completion is delivered through the steering channel when the parent Turn is still running.
+
+```
+tools: [{
+  name: "delegate",
+  execute: async (input, ctx) => {
+    // OrchestrationRuntime (§10.6) handles launch + completion watching
+    const workerId = orchestration.launchWorker(input.agent, input.task)
+    return { workerId, status: "launched" }
+  }
+},
+{
+  name: "wait_for_worker",
+  execute: async (input) => await orchestration.awaitWorker(input.workerId)
+}]
+```
+
+**Steering payload format**: When a worker result is delivered through steering, the `OrchestrationRuntime` (§10.6) uses a structured message of this form:
+
+```
+[Worker Result: {workerId}]
+Agent: {agentName}
+Status: completed
+Output: {structured result}
+```
+
+When such a payload is delivered while the parent Turn is running, the parent sees it as a user message at the next iteration boundary. The model can reason about worker status (“I got vendor A’s results, still waiting on B and C”).
+
+**wait_for_worker**: Converts an async worker to sync mid-flight. The tool blocks until the specified worker completes and returns the result as a tool result. The developer chooses when to synchronize, not the framework.
+
+Async worker outputs enter parent context through exactly two mechanisms: explicit synchronization (`wait_for_worker`, or equivalent host-defined sync tooling) or steering during a running parent Turn. Worker completion alone does not mutate the parent’s context.
+
+**Edge case — parent Turn is paused when workers complete**: Steering is only valid while `status().phase === "running"`. If the parent Turn is paused awaiting approval, completed worker results are recorded in worker state but are not injected into the paused Turn. They may be delivered by steering only after the parent resumes running.
+
+**Edge case — parent Turn finishes before workers complete**: Steering is only valid while `status().phase === "running"`. If the parent Turn ends before workers finish, worker results cannot be steered into the completed Turn. The developer must decide:
+
+- **Option 1**: Worker results trigger a new Turn — the host calls `executeTurn(workerResult, ...)`. The agent sees it as new input on the same Branch with full history.
+- **Option 2**: Queue for next user message — the host stores results and injects them via steering immediately after the next user-initiated Turn starts.
+
+The framework provides primitives for both options. The policy choice is the developer’s.
+
+### 10.4 Handoffs
+
+#### Agent-Signaled Handoff
+
+Provider APIs may express handoff intent through a tool-like response, but the framework captures the intent and canonicalizes it into `RuntimeResolution.handoff`. Agent-signaled handoff is therefore a control transition, not ordinary tool execution.
+
+1. Detects handoff intent in the model response.
+1. Does **not** persist the literal handoff `tool_call` as conversation history.
+1. Stages any remaining assistant content that is still semantically conversational.
+1. Executes handoff context engineering as a separate Run.
+1. Rewrites the active `messages` path for the receiving agent.
+1. Updates `runtime.status` with the new `activeAgent`.
+1. Swaps the active `AgentConfig`.
+1. Continues the iteration loop with the new config on the same Branch.
+
+The Turn does not end. The Branch does not change. History is preserved.
+
+Before the next iteration begins, the framework MUST rebuild the active execution scope from the new `AgentConfig`: tool registry, extension composition, system prompt contributions, renderer inputs, loop policy, context policy, and any other per-agent framework contracts. The receiving agent MUST NOT continue with the previous agent’s tool or extension surface.
+
+The framework rejects multiple handoff intents in one response. A response that combines handoff intent with ordinary executable tool calls is rejected as invalid handoff composition.
+
+#### Handoff Context Engineering
+
+Every handoff replaces the entire active `messages` collection. Handoffs stay on the same Turn and same Branch; the framework rewrites the full active context window, swaps the active agent configuration, and continues execution. No raw prior context is preserved in-place for the receiving agent unless the selected handoff builder chooses to summarize or restate it.
+
+The framework provides two standard handoff modes:
+
+- **`preserve_trace`** — expected for agent-signaled handoffs. The receiving agent gets a rewritten request that preserves the prior agent trace in framework-defined form without exposing raw history or incompatible tool surfaces.
+- **`last_output_only`** — expected for pipeline/orchestrated handoffs. The receiving agent gets a clean-slate request containing only the previous agent’s final output (plus any developer-configured scaffolding).
+
+The handoff context builder (§1.5 `HandoffContextBuilder`) produces new message hashes. The framework executes it as a context engineering Run:
+
+```
+function applyHandoff(plan: HandoffContextPlan, turnId, branchId, schemaId, pendingExtensionStateUpdates = {}):
+  → { activeConfig, activeToolRegistry }
+  ceRunId = generateId()
+  // create Run with step "handoff_context"
+  branch = kernel.branch.get(branchId)
+  currentTreeHash = kernel.node.get(branch.headTurnNodeHash).turnTreeHash
+
+  newMsgHashes = plan.builder(plan.sourceContext)
+
+  newManifest = rebuildManifest(newMsgHashes, kernel, {
+    preserveExtensionsFrom: plan.sourceContext.manifest.extensions,
+    applyExtensionStateUpdates: pendingExtensionStateUpdates
+  })
+  manifestHash = kernel.store.put(serialize(newManifest))
+
+  runtimeStatus = {
+    state: "running",
+    activeAgent: plan.targetAgent
+  }
+  runtimeStatusHash = kernel.store.put(serialize(runtimeStatus))
+
+  newTreeHash = kernel.tree.create(schemaId, {
+    "messages": newMsgHashes,
+    "context.manifest": manifestHash,
+    "runtime.status": runtimeStatusHash
+  }, currentTreeHash)
+
+  eventHash = storeEvent({ type: "handoff_applied", targetAgent: plan.targetAgent })
+  kernel.run.completeStep(ceRunId, "handoff_context", eventHash, null, newTreeHash)
+  kernel.run.complete(ceRunId, completed)
+  kernel.turn.updateHead(turnId, latestHead())
+
+  // Swap active config
+  activeConfig = agents[plan.targetAgent]
+  activeTools = activeConfig.tools ?? []
+  activeToolRegistry = buildToolRegistry(activeTools, activeConfig.extensions)
+
+  return { activeConfig, activeToolRegistry }
+```
+
+#### Default Handoff Context Builder (`preserve_trace`)
+
+Deterministic, no model call:
+
+```
+function defaultHandoffContextBuilder(ctx: HandoffSourceContext) → Hash[]:
+  handoffMsg = {
+    role: "user",
+    parts: [{
+      type: "text",
+      text: [
+        `[Handoff from ${ctx.sourceAgent.name}]`,
+        `Reason: ${ctx.handoffIntent.reason ?? "unspecified"}`,
+        `--- User Messages ---`,
+        ...extractUserMessages(ctx.messages),
+        `--- Previous Agent's Work ---`,
+        ...extractAssistantSummary(ctx.messages),
+        `--- Key Outcomes ---`,
+        ...extractToolOutcomes(ctx.messages),
+        `Continue from where the previous agent left off.`
+      ].join('\n')
+    }]
+  }
+  return [ctx.helpers.storeMessage(handoffMsg)]
+```
+
+System instructions are never persisted by handoff context builders. The receiving agent’s base system prompt remains transient renderer input from the active `AgentConfig`.
+
+Developers may replace this builder with custom builders for domain-specific handoff formats. The default remains available.
+
+#### Sequence Handoff Context Builder (`last_output_only`)
+
+Deterministic, no model call:
+
+```
+function sequenceHandoffContextBuilder(ctx: HandoffSourceContext) → Hash[]:
+  handoffMsg = {
+    role: "user",
+    parts: [{
+      type: "text",
+      text: extractLastAssistantOutput(ctx.messages)
+    }]
+  }
+  return [ctx.helpers.storeMessage(handoffMsg)]
+```
+
+#### History Preservation
+
+Both handoff types use `tree.create` to build new TurnTrees. Previous TurnNodes with full history remain in the chain.
+
+- **Audit**: Complete raw conversation recoverable by walking TurnNode chain.
+- **Rollback**: `branch.setHead` to pre-handoff TurnNode restores original agent state.
+- **Debugging**: `tree.diff` between pre-handoff and post-handoff shows exactly what context engineering changed.
+
+### 10.5 Sequences
+
+A declarative pipeline of agents where each agent’s output becomes the next agent’s input.
+
+```
+createOrchestration({
+  agents: { research, writer, reviewer },
+  sequence: ["research", "writer", "reviewer"],
+  entrypoint: "research"
+})
+```
+
+When the current agent reaches a non-paused, non-failed completion and a next agent exists in the sequence, the orchestration layer converts that completion into a handoff transition before Turn finalization. The framework:
+
+1. Extracts final output (last assistant message text).
+1. Synthesizes a sequence handoff plan using mode `last_output_only`.
+1. Builds a sequence handoff context (only the previous agent’s output, no raw history).
+1. Swaps to next agent config.
+1. Re-enters iteration loop.
+
+Sequences are a specialized handoff with a simpler context builder. They reuse the same Turn, Branch, context-rewrite, and active-agent swap semantics as agent-signaled handoffs. Each agent sees only the previous agent’s output.
+
+### 10.6 OrchestrationRuntime
+
+The framework-provided runtime for multi-agent coordination. Owns worker lifecycle management, completion-to-steering bridging, cascading cancellation, and demuxed event streams.
+
+```
+OrchestrationRuntime
+├─ executeTurn(signal, threadId, branchId, schemaId) → OrchestrationHandle
+├─ launchWorker(agent: string, task: unknown) → string (workerId)
+├─ awaitWorker(workerId: string) → Promise<unknown>
+└─ cancel(): void
+```
+
+```
+OrchestrationHandle extends ExecutionHandle
+├─ parentEvents(): AsyncIterable<KrakenStreamEvent>
+├─ workerEvents(workerId: string): AsyncIterable<KrakenStreamEvent>
+├─ allEvents(): AsyncIterable<KrakenStreamEvent>
+└─ workers(): Map<string, WorkerStatus>
+```
+
+```
+WorkerStatus
+├─ workerId: string
+├─ agent: string
+├─ threadId: string
+├─ status: "running" | "completed" | "failed"
+└─ result?: unknown
+```
+
+**Construction**:
+
+```
+const orchestration = createOrchestrationRuntime({
+  framework,
+  agents: { primary, research, billing },
+  entrypoint: "primary",
+  handoffContextBuilder?: HandoffContextBuilder,
+  sequence?: string[]
+})
+```
+
+**Internal mechanics**: The runtime composes existing primitives:
+
+- `executeTurn` for both parent and worker Turns
+- `ExecutionHandle.steer()` for worker result delivery
+- `ExecutionHandle.events()` for stream consumption
+- `thread.create` for worker Thread creation
+- `ctx.forward` for worker event attribution
+
+No new kernel concepts. The runtime is a composition layer.
+
+**Event stream demuxing**: The runtime provides three consumption patterns:
+
+- `parentEvents()`: Only events from the parent agent’s execution. No `source` field.
+- `workerEvents(id)`: Only events from the specified worker. Source-attributed.
+- `allEvents()`: Merged stream with source attribution on all worker events. This is what protocol adapters consume.
+
+The frontend developer subscribes to the streams they need. Separate UI panels get separate streams. A unified view gets the merged stream. The contract is the same regardless of host implementation.
+
+**Cascading cancellation**: `cancel()` cancels the parent handle and all running worker handles.
+
+**Worker completion watching**: The runtime internally iterates each worker handle’s events. When a worker’s `turn.end` event arrives, the runtime extracts the final output and updates `WorkerStatus`.
+
+- If the parent Turn is `running`, the runtime calls `parentHandle.steer()` with a structured worker result message.
+- If the parent Turn is `paused`, the runtime queues the worker result for delivery at the next valid steering injection point after approval resume.
+- If the parent Turn has already ended, the runtime stores the result for host-level retrieval so the host can deliver it through a new Turn or alongside the next human-initiated Turn.
+
+### 10.7 Extension Scoping
+
+Extensions belong to their `AgentConfig`. On handoff, previous agent’s extensions deactivate, new agent’s extensions activate.
+
+Extension state in `manifest.extensions` persists across handoffs — it lives on the Branch. A budget tracker active on both agents sees cumulative usage. An extension active only on the first agent has state preserved but is not invoked after handoff.
+
+Workers run on separate Threads with their own `AgentConfig` and extensions. Parent extensions do not apply to workers.
+
+Cross-agent budget tracking: use a shared budget extension that both configs include, reading from a shared external store (extension-owned storage, not manifest state).
+
+### 10.8 Streaming Events for Orchestration
+
+Orchestration events are emitted as `custom` events with recommended default names:
+
+| Moment              | Event                                                                  |
+| ------------------- | ---------------------------------------------------------------------- |
+| Handoff initiated   | `custom: { name: "handoff.start", data: { from, to, reason } }`        |
+| Handoff committed   | `state.checkpoint`                                                     |
+| New agent starts    | `custom: { name: "agent.start", data: { agent } }`                     |
+| Sequence transition | `custom: { name: "sequence.step", data: { from, to, step } }`          |
+| Worker launched     | `custom: { name: "worker.launched", data: { workerId, agent, task } }` |
+| Worker completed    | `custom: { name: "worker.completed", data: { workerId, agent } }`      |
+| Worker streaming    | Standard event types with `source` field                               |
+
+These are framework-emitted defaults, not protocol-level guarantees. Protocol adapters translate them as appropriate.
+
+### 10.9 Boundaries
+
+This specification does not define:
+
+- **Worker process management**: Scheduling, monitoring, cleanup of worker OS processes. Host concern.
+- **Cross-thread state sharing**: Beyond tool results and steering. Deferred.
+- **Agent discovery**: Agents are statically configured.
+- **A2A protocol integration**: Adapter concern, not core orchestration.
+- **Worker Thread lifecycle / GC**: Deferred per kernel spec.
+- **Concurrent handoffs**: Multiple handoff intents in one response are rejected — one handoff per iteration.
+
+---
+
+_v0.12. This is the single authoritative framework specification. All framework behavior — execution model, extension system, multi-agent orchestration, streaming, host contract, and tool dispatch — is defined here. No companion documents._
