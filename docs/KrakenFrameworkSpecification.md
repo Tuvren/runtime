@@ -1,6 +1,6 @@
 # Kraken Framework Specification
 
-**Version**: v0.12
+**Version**: v0.13
 **Status**: Authoritative
 **Basis**: Kernel Specification v0.9 (frozen)
 
@@ -177,6 +177,8 @@ The handoff builder returns the complete replacement hash array for the active `
 
 **Resolution precedence**: `fail(hard) > pause > handoff > end_turn > fail(soft) > continue_iteration`. `fail(soft)` is uniformly non-terminal: it records the error condition, may emit events and state effects, and does not by itself terminate the Turn or iteration loop. When extension verdicts, loop policy, and handoff detection all produce resolutions in the same iteration, the highest-precedence resolution wins.
 
+**Kernel verdict algebra**: The kernel provides a five-verdict algebra (`Abort > Pause > Modify > Retry > Proceed`). The framework currently consumes three of these (`Abort` variants via intercept verdicts, `Pause` via tool approval, `Proceed` as the default). The kernel's `Modify` and `Retry` verdicts are reserved for future framework use.
+
 ### 1.6 ContextManifest
 
 Lightweight index for O(1) context engineering decisions. Staged alongside messages on every checkpoint.
@@ -352,7 +354,7 @@ RuntimeStatus
 ├─ partial?: boolean                 // true when assistant output was interrupted
 ```
 
-**Lifecycle**: The framework stages an updated RuntimeStatus at Turn start (`running`), on pause (`paused`), on handoff (`running`, `activeAgent` updated), and at Turn end (`completed` or `failed`). It is not staged on every iteration — only on state transitions. Used by the framework for execution decisions, by the UI for status display, and by multi-agent orchestration for active agent tracking. Not consumed by context assembly for prompt construction.
+**Lifecycle**: The framework stages an updated RuntimeStatus at Turn start (`running`, `activeAgent` set from active `AgentConfig`), on approval resume (`running` restaged before resumed work proceeds), on pause (`paused`), on handoff (`running`, `activeAgent` updated), and at Turn end (`completed` or `failed`). It is not staged on every iteration — only on state transitions. Used by the framework for execution decisions, by the UI for status display, and by multi-agent orchestration for active agent tracking. Not consumed by context assembly for prompt construction.
 
 `runtime.status` is framework-owned Turn execution state. It is persisted through the schema, not stored as a Kernel Turn field. Turn-final `completed` / `failed` status is durably committed through a dedicated framework finalization checkpoint (§4.11).
 
@@ -493,7 +495,7 @@ Signal arrives
 ### 4.2 Phase 1: Incorporate Input
 
 ```
-function incorporateInput(signal, turnId, branchId, schemaId):
+function incorporateInput(signal, turnId, branchId, schemaId, agentName?):
 
   inputRunId = generateId()
   branch = kernel.branch.get(branchId)
@@ -511,7 +513,7 @@ function incorporateInput(signal, turnId, branchId, schemaId):
   manifest = updateManifest(manifest, [userMsg])
   kernel.staging.stage(inputRunId, serialize(manifest), "manifest", "context_manifest", completed)
 
-  status = { state: "running" }
+  status = { state: "running", activeAgent: agentName }
   kernel.staging.stage(inputRunId, serialize(status), "runtime_status", "runtime_status", completed)
 
   kernel.run.completeStep(inputRunId, "incorporate_input", storeEvent({ type: "input_received" }))
@@ -795,7 +797,7 @@ function executeTurn(signal, threadId, branchId, schemaId, tools, config, steeri
 
     yield { type: "turn.start", turnId, threadId, timestamp: now() }
 
-    incorporateInput(signal, turnId, branchId, schemaId)
+    incorporateInput(signal, turnId, branchId, schemaId, activeConfig.name)
 
     turnHookResult = runBeforeTurnHooks(activeConfig.extensions)
     turnHookResolution = verdictToResolution(turnHookResult?.verdict)
@@ -811,6 +813,8 @@ function executeTurn(signal, threadId, branchId, schemaId, tools, config, steeri
 
     if enteredIterationLoop && resolution.type != "pause":
       runAfterTurnHooks(activeConfig.extensions)
+
+    if resolution.type != "pause":
       finalizeTurnStatus(turnId, branchId, schemaId, resolution)
 
     kernel.turn.updateHead(turnId, latestHead())
@@ -847,14 +851,17 @@ function resumeFromApproval(approvalResponse, turnId, branchId, ...):
   2. Yield turn.start (with resumedFrom: pause TurnNode hash)
   3. Yield approval.resolved
   4. Create new Run with step "iterate"
-  5. Apply approval decisions → resume only unfinished tool calls through the full aroundTool chain;
+  5. Stage runtime.status = { state: "running", iterationCount, activeAgent } before resumed work proceeds
+  6. Apply approval decisions → resume only unfinished tool calls through the full aroundTool chain;
      approval wrappers observe the prior decision for the exact call and pass through without re-requesting approval
-  6. Stage tool results + manifest, checkpoint
-  7. Re-enter iterationLoop from current Branch Head
-  8. Yield turn.end
+  7. Stage tool results + manifest, checkpoint
+  8. Re-enter iterationLoop from current Branch Head
+  9. Yield turn.end
 
   return wrapAsHandle(driver(), turnId, branchId, steering)
 ```
+
+Before resumed tool execution begins, the framework MUST durably restage `runtime.status` to `running` for the active Turn. This ensures the durable state surface reflects actual execution state throughout the resume path.
 
 ### 4.9 Recovery Protocol
 
@@ -912,7 +919,7 @@ function finalizeTurnStatus(turnId, branchId, schemaId, resolution):
   kernel.turn.updateHead(turnId, latestHead())
 ```
 
-This finalization step is independent of terminal hook outputs. `afterTurn` remains non-durable on terminal paths.
+This finalization step is independent of terminal hook outputs. `afterTurn` remains non-durable on terminal paths. The finalization checkpoint MUST commit and the Turn head MUST advance before `turn.end` is emitted. Any non-paused terminal Turn resolution — including `beforeTurn` short-circuits — MUST durably finalize `runtime.status` through this step before `turn.end` is emitted.
 
 ---
 
@@ -1280,7 +1287,7 @@ ToolDispatchContext
 ├─ branchId: string
 ├─ iterationCount: number
 ├─ runId: string
-└─ stageResult?: (result: ToolResultPart) → Promise<void>
+└─ stageResult: (result: ToolResultPart) → Promise<void>
 
 ToolExecutionContext
 ├─ callId: string
@@ -1329,7 +1336,7 @@ For each tool call in the batch:
                    Any `state` returned by aroundTool is merged into
                    `ToolExecutionResult.state` for the iteration checkpoint.
 5. PRODUCE         ToolResultPart. Immediately after each ToolResultPart is produced,
-                   the executor MUST invoke `context.stageResult(result)` when available.
+                   the executor MUST invoke `context.stageResult(result)`.
                    The staged durable unit is `{ role: "tool", parts: [result] }`
                    stored as `objectType: "message"`.
 ```
@@ -1494,7 +1501,7 @@ Fires once before the first iteration. Used for precondition validation, one-tim
 
 #### afterTurn
 
-Fires once after the iteration loop reaches a terminal non-paused stop. It is not fired for `beforeTurn` short-circuits because no iteration ran, and it is not fired for approval pauses because the Turn may resume. Used for cleanup, turn-level accounting, final metrics emission. Uses `InterceptHandler` / `InterceptResult`. Verdicts from afterTurn do not affect the completed Turn — the Turn has already resolved. State updates from afterTurn are non-durable on terminal paths.
+Fires once after the iteration loop reaches a terminal non-paused stop. It is not fired for `beforeTurn` short-circuits because no iteration ran, and it is not fired for approval pauses because the Turn may resume. Used for cleanup, turn-level accounting, final metrics emission. Uses `InterceptHandler` / `InterceptResult`. Verdicts from afterTurn do not affect the completed Turn — the Turn has already resolved. State updates from afterTurn are non-durable on terminal paths. Implementations MUST NOT assume a later persistence opportunity for those updates within the same Turn.
 
 #### beforeIteration
 
@@ -1988,4 +1995,4 @@ This specification does not define:
 
 ---
 
-_v0.12. This is the single authoritative framework specification. All framework behavior — execution model, extension system, multi-agent orchestration, streaming, host contract, and tool dispatch — is defined here. Companion rationale is explanatory only and non-contract._
+_v0.13. This is the single authoritative framework specification. All framework behavior — execution model, extension system, multi-agent orchestration, streaming, host contract, and tool dispatch — is defined here. Companion rationale is explanatory only and non-contract._
