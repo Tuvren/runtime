@@ -6,7 +6,7 @@
 
 ## 1. Executive Summary & Active Critical Path
 - **Total Active Story Points:** 39
-- **Critical Path:** `KRT-A001 -> KRT-A002 -> KRT-B002 -> KRT-C001 -> KRT-C003 -> KRT-D001 -> KRT-D002 -> KRT-E002`
+- **Critical Path:** `KRT-A001 -> KRT-A002 -> KRT-B002 -> KRT-C001 -> KRT-C003 -> KRT-D001 -> KRT-D002 -> KRT-E002` (Note: Parallel prerequisites `KRT-B001` and `KRT-C002` are required for `KRT-C003`)
 - **Planning Assumptions:** This planning version covers only the user-authorized lowest-dependency foundation slice; the broader TechSpec baseline remains valid but deferred to later `Tasks.md` revisions.
 - **Active-Scope Note:** `constitution/TechSpec.md` remains the authoritative full baseline for `v0.1`. This plan intentionally limits active execution to workspace setup and kernel-layer work that can stand on its own without framework, provider, stream, or host implementation dependencies.
 
