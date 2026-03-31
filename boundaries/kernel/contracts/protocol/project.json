@@ -1,0 +1,9 @@
+{
+  "name": "kernel-contract-protocol",
+  "$schema": "../../../../node_modules/nx/schemas/project-schema.json",
+  "root": "boundaries/kernel/contracts/protocol",
+  "sourceRoot": "boundaries/kernel/contracts/protocol/src",
+  "projectType": "library",
+  "tags": ["boundary:kernel", "layer:contract"],
+  "targets": {}
+}

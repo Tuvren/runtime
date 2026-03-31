@@ -1,0 +1,9 @@
+{
+  "name": "backend-memory",
+  "$schema": "../../../../../node_modules/nx/schemas/project-schema.json",
+  "root": "boundaries/kernel/implementations/typescript/backend-memory",
+  "sourceRoot": "boundaries/kernel/implementations/typescript/backend-memory/src",
+  "projectType": "library",
+  "tags": ["boundary:kernel", "layer:implementation"],
+  "targets": {}
+}
