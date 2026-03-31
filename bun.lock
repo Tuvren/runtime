@@ -17,14 +17,25 @@
     "boundaries/kernel/contracts/protocol": {
       "name": "@kraken/kernel-contract-protocol",
       "version": "0.0.0",
+      "dependencies": {
+        "@kraken/shared-core-types": "workspace:*",
+      },
     },
     "boundaries/kernel/implementations/typescript/backend-memory": {
       "name": "@kraken/backend-memory",
       "version": "0.0.0",
+      "dependencies": {
+        "@kraken/kernel-contract-protocol": "workspace:*",
+        "@kraken/shared-core-types": "workspace:*",
+      },
     },
     "boundaries/kernel/testkit": {
       "name": "@kraken/kernel-testkit",
       "version": "0.0.0",
+      "dependencies": {
+        "@kraken/kernel-contract-protocol": "workspace:*",
+        "@kraken/shared-core-types": "workspace:*",
+      },
     },
     "boundaries/shared/contracts/core-types": {
       "name": "@kraken/shared-core-types",

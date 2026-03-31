@@ -2,5 +2,9 @@
   "name": "@kraken/shared-core-types",
   "private": true,
   "version": "0.0.0",
-  "type": "module"
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "types": "./src/index.ts"
 }
