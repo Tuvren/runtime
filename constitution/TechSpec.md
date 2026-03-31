@@ -1,187 +1,235 @@
 # Technical Specification
 
 ## 0. Version History & Changelog
-- v0.1.0 - Initial TechSpec draft establishing the accepted baseline decisions, open kernel decisions, Kraken-owned persistence abstraction, bridge-first provider posture, and updated structured-output contracts.
+- v0.2.0 - Locked the authoritative implementation posture: protocol-first kernel, TypeScript first implementation, AI SDK bridge-only provider baseline, strict uniform backend contract, official `memory` and `sqlite` backends, deterministic CBOR plus SHA-256 identity rules, integer-only core record profile, path-granular TurnTree storage with threshold-based chunking for ordered paths, and an architecture-first `devenv + nx` monorepo layout grouped by boundary, contract, and implementation language.
+- v0.1.0 - Initial TechSpec draft establishing the baseline package layout, early provider posture, persistence abstraction, and framework-facing public surface.
+- ... [Older history truncated, refer to git logs]
 
 ## 1. Stack Specification (Bill of Materials)
-- **Primary Language / Runtime:** TypeScript 6.0.2 is the accepted baseline for the framework layer and for initial implementation work. The Kernel implementation language remains open; Rust is the leading native-core candidate.
-- **Primary Frameworks / Libraries:** `ai@6.0.141` and `@ai-sdk/provider@3.0.8` for the Vercel AI SDK bridge; `@langchain/core@1.1.38` for the LangChain bridge; `ajv@8.18.0` for JSON Schema validation; `@biomejs/biome@2.4.10` configured to follow the Ultracite standards profile; `tsup@8.5.1` for TypeScript package builds.
-- **State Stores / Persistence:** Kraken-owned persistence abstraction first. Built-in in-memory backend first for development and contract validation. At least one fully conformant persisted backend is still required before Kraken can claim the PRD's durable-runtime guarantees; the concrete persisted backend remains an open decision rather than a baked-in product truth.
-- **Infrastructure / Tooling:** Bun workspaces for local development, package management, and tests; root TypeScript project references; `tsup` for package builds; structured JSON logging; environment-variable based provider credentials at bridge boundaries.
-- **Testing / Quality Tooling:** `bun test`, `tsc --noEmit`, Biome via Ultracite conventions, golden event-sequence tests, persistence-contract test suites shared across backends, bridge contract fixtures for AI SDK and LangChain adapters.
-- **Version Pinning / Compatibility Policy:** Toolchain and bridge dependencies are pinned to exact versions in `package.json` and `bun.lock`. Public package APIs follow semantic versioning. Backend-specific persistence migrations are forward-only within each concrete backend implementation.
+- **Primary Language / Runtime:** TypeScript `6.0.2` is the first authoritative implementation language for the framework and kernel protocol implementation. The kernel protocol remains language-neutral by contract. Core TypeScript packages target portable ESM across Bun, Node.js, and Deno. Bun remains the preferred local development runtime and package manager.
+- **Primary Frameworks / Libraries:** `ai@6.0.142` and `@ai-sdk/provider@3.0.8` for the baseline AI SDK Providers bridge; `ajv@8.18.0` for JSON Schema validation; `cbor-x@1.6.4` for deterministic CBOR encoding and decoding in the TypeScript implementation; `@biomejs/biome@2.4.10` for formatting and linting; `tsup@8.5.1` for package builds.
+- **State Stores / Persistence:** Kraken-owned backend contract first. `@kraken/backend-memory` is the reference development and semantic test backend. `@kraken/backend-sqlite` is the first officially supported persistent backend adapter. Future backends such as PostgreSQL, MySQL/MariaDB, and MongoDB are peer adapters against the same kernel contract, not SQLite-shaped variants.
+- **Infrastructure / Tooling:** `devenv` for reproducible development environments, `nx@22.6.3` plus aligned `@nx/*` packages for TypeScript project orchestration, Bun workspaces, root TypeScript project references, `tsup` package builds, structured JSON logging, exact dependency pinning in `package.json` plus `bun.lock`, and environment-variable-based provider credentials at bridge boundaries.
+- **Testing / Quality Tooling:** `bun test`, `tsc --noEmit`, Biome, deterministic CBOR golden-byte tests, hash identity fixtures, shared backend conformance suites, checkpoint/recovery scenario tests, and AI SDK bridge contract fixtures.
+- **Version Pinning / Compatibility Policy:** Versions named in this TechSpec are authoritative for the baseline implementation line and must match the repository manifests. Public package APIs follow semantic versioning. Changes to kernel record encoding, hash algorithm, or durable identity rules are semver-major.
 
-### 1.1 Stack Posture
-- **Accepted baseline:** TypeScript-first implementation for the framework layer and for early project acceleration.
-- **Accepted portability goal:** Core TypeScript packages should be usable from Bun, Node.js, and Deno without changing Kraken semantics. React Native compatibility is a design consideration, not a v0.1 guarantee.
-- **Accepted constraint:** ESM-only for TypeScript packages in the JS-facing implementation path.
-- **Open P0 decision:** Whether the Kernel starts in TypeScript as a baseline implementation or begins immediately as a native Rust core exposed through FFI.
-- **Open P0 decision:** Which persisted backend becomes the first fully conformant durability implementation for Kraken.
-- **Accepted principle:** No concrete storage product defines Kraken’s persistence model. Backends are implementations of a Kraken-owned contract.
+### 1.1 Implementation Posture
+- **Authoritative center:** The kernel boundary is a protocol of serializable data, not an in-process callback API.
+- **First implementation choice:** TypeScript is the first authoritative implementation of that protocol for speed of validation, not a claim that the kernel is fundamentally JavaScript-bound.
+- **Portability posture:** Core packages stay runtime-portable where practical; backend packages and provider bridges may have narrower runtime support when their dependencies require it.
+- **Provider posture:** Kraken owns the canonical provider contract. The baseline bridge surface is AI SDK Providers only. LangChain is intentionally out of baseline scope. First-class Kraken provider packages for major providers are expected later.
+- **Backend posture:** All official backends implement one strict kernel-visible contract. Backend-specific optimizations may exist internally, but they must not change kernel semantics or require capability negotiation at the kernel layer in v0.1.
 
-### 1.2 Selection Notes
-- Bun is not treated as the mandatory runtime for all consumers. It is the development and build baseline because your repo instructions explicitly prefer it, but the framework-facing TypeScript packages must avoid unnecessary Bun-only APIs.
-- The LangChain and AI SDK bridge packages may have narrower runtime support than the core packages. Runtime portability applies primarily to `types`, `kernel-contract`, `kernel-memory`, `framework`, and `stream-*` packages.
-- Official provider SDKs are intentionally not part of the baseline bridge strategy.
+### 1.2 Current-State vs Target-State
+- **Current repository reality:** The repository currently contains governing documents only: `constitution/` and `docs/`.
+- **Target implementation state:** The package layout and interfaces defined below are the intended implementation target for the first authoritative code line.
+- **Drift rule:** The future codebase must conform to this TechSpec. The TechSpec must not be treated as a loose commentary on whatever structure happens to emerge.
 
 ## 2. Architecture Decision Records (ADRs)
-### ADR-001 TypeScript-First Baseline, Kernel Language Still Open
+### ADR-001 The Kernel Boundary Is Protocol-First and Data-Only
 - **Status:** accepted
-- **Context:** The project is starting from scratch and needs a practical implementation baseline. At the same time, the Kernel is intentionally language-agnostic and may later benefit from a native implementation.
-- **Decision:** Use TypeScript 6.0.2 as the accepted baseline for the framework layer and for initial implementation work. Keep the Kernel implementation language explicitly open, with Rust as the leading native-core candidate if native leverage becomes compelling.
-- **Consequences:** Early implementation work can begin quickly in one language, but the TechSpec must not pretend that this settles the long-term Kernel language. Kernel interfaces must remain explicit enough to support a future Rust FFI path.
+- **Context:** The frozen kernel specification explicitly defines the kernel-framework boundary as a protocol where everything crossing the boundary is serializable data. Future multi-language SDKs and future non-TypeScript kernel implementations depend on preserving this narrow waist.
+- **Decision:** The authoritative kernel boundary is a language-neutral protocol of concrete data structures and operations. No callbacks, framework types, or runtime-specific object identities cross the boundary.
+- **Consequences:** The TechSpec must define exact record shapes, byte encoding, hashing, and operation signatures. TypeScript APIs above the kernel are framework SDK surfaces, not substitutes for the kernel protocol.
 
-### ADR-002 JavaScript Runtime Portability Is a Product Requirement for Core TS Packages
+### ADR-002 TypeScript Is the First Authoritative Implementation, Not the Long-Term Kernel Monopoly
 - **Status:** accepted
-- **Context:** Kraken is intended to be meaningfully agnostic where it can be. The framework layer should not accidentally become Bun-only just because Bun is the preferred local tooling and runtime baseline.
-- **Decision:** Core TypeScript packages must target portable ESM and avoid unnecessary Bun-specific APIs. Bun remains the local development baseline, but the intended compatibility surface for core packages is Bun, Node.js, and Deno.
-- **Consequences:** Runtime-specific conveniences must stay behind adapters. Tests and packaging must verify that the core packages do not depend on Bun-only primitives. Some bridge packages may remain runtime-specific, which is acceptable if clearly documented.
+- **Context:** The project needs a fast path to validating the kernel and framework semantics, but the protocol must remain suitable for future Rust, Wasm, or other implementations.
+- **Decision:** Use TypeScript `6.0.2` for the first authoritative implementation of the framework and kernel protocol. Treat it as the reference implementation of the protocol, not as a license to collapse protocol boundaries into JavaScript-only assumptions.
+- **Consequences:** The implementation can progress quickly, while future Rust or Wasm implementations remain possible if they pass the same protocol fixtures and semantic test suites.
 
-### ADR-003 Ship as a Modular Monorepo, Not as Multiple Services
+### ADR-003 Ship as a Modular Monorepo of Boundary-Owned Projects, Not as Multiple Services
 - **Status:** accepted
-- **Context:** The architecture is explicitly modular, but the project posture is still solo-dev-friendly and library-first.
-- **Decision:** Realize the approved logical containers as packages in one monorepo rather than as separate deployable services.
-- **Consequences:** Boundary discipline is preserved without adding network, deployment, or service-coordination overhead. A later move to out-of-process components remains possible because the package boundaries stay explicit.
+- **Context:** The architecture is explicitly modular but intentionally in-process and solo-developer-friendly.
+- **Decision:** Realize the approved logical containers as projects in one monorepo, grouped first by architectural boundary and then by contract versus implementation, rather than as separate deployable services.
+- **Consequences:** Boundary discipline is preserved without adding network topology, deployment orchestration, or remote protocol complexity before it is justified. The repository structure mirrors the architecture docs instead of centering JavaScript package-manager conventions.
 
-### ADR-004 Kraken-Owned Persistence Abstraction Comes Before Any Opinionated Backend
+### ADR-004 The Framework Public Surface Remains Library-First
 - **Status:** accepted
-- **Context:** The updated Kernel specification now defines storage in terms of behavioral guarantees instead of naming or implying a preferred storage product.
-- **Decision:** The first persistence artifact is a Kraken-owned backend contract that expresses the required guarantees and operations. The built-in in-memory implementation is for early development, semantic prototyping, and non-persistent contract testing. The first fully conformant persisted backend remains intentionally undecided. SQLite, PostgreSQL, Supabase, Appwrite, MySQL, or other options are candidates, but none is yet treated as Kraken's default truth.
-- **Consequences:** The TechSpec cannot collapse Kraken persistence into SQLite schema design. Backend-specific schemas, migrations, and optimizations must sit behind the contract. The in-memory backend is useful immediately, but it cannot by itself satisfy the PRD and Kernel durability promises.
+- **Context:** Kraken is a framework for developers to embed, not a mandatory network service. The architecture’s host boundary is an embedding surface.
+- **Decision:** The primary TypeScript framework surface remains a library API centered on `KrakenRuntime`, `ExecutionHandle`, typed events, provider ports, and backend ports.
+- **Consequences:** HTTP, WebSocket, CLI, editor, and protocol adapters are secondary packages layered over the library API. This does not weaken the protocol-first kernel boundary because the library surface sits above it.
 
-### ADR-005 First Provider Integrations Use Bridge Packages, Not Official Provider SDK Dependencies
+### ADR-005 The Baseline Provider Strategy Is Kraken Contract Plus AI SDK Providers Bridge
 - **Status:** accepted
-- **Context:** You explicitly want the early provider effort to focus on bridges through the Vercel AI SDK and LangChain rather than on first-class provider packages or official provider SDK dependencies.
-- **Decision:** Initial provider integration packages are `provider-bridge-ai-sdk` and `provider-bridge-langchain`. The Kraken provider abstraction is owned by Kraken. Official provider SDKs are avoided in the baseline bridge packages.
-- **Consequences:** Early provider coverage can expand faster through bridge ecosystems. Kraken retains control of its own provider contract. First-class provider packages remain possible later, but they are not the initial focus.
+- **Context:** The framework owns the canonical provider contract. Supporting multiple bridge ecosystems before the core runtime is proven would add translation surface and semantic drift for little value.
+- **Decision:** The baseline provider integration package is `@kraken/provider-bridge-ai-sdk`, built on `ai@6.0.142` and `@ai-sdk/provider@3.0.8`. LangChain is not part of the baseline implementation. First-class Kraken provider packages are deferred but expected.
+- **Consequences:** The initial provider surface stays narrow and Kraken-native. Future packages such as `@kraken/provider-openai`, `@kraken/provider-anthropic`, and `@kraken/provider-google` can be added later without redefining the framework contract.
 
-### ADR-006 Library-First Host Contract
+### ADR-006 Official Backends Use One Strict Uniform Kernel Contract
 - **Status:** accepted
-- **Context:** The architecture defines the host boundary as an embedding surface, not a mandated network API.
-- **Decision:** The primary public surface is a TypeScript library contract centered on `KrakenRuntime`, `ExecutionHandle`, typed events, and backend/provider ports. Protocol adapters remain secondary packages.
-- **Consequences:** Kraken stays transport-agnostic and embeddable. HTTP, WebSocket, CLI, and editor integrations are built on the library contract instead of redefining runtime semantics.
+- **Context:** Kraken is a framework, not a storage product. Developers must be able to move between backends without kernel-semantic drift.
+- **Decision:** All official backends implement one strict kernel contract. Optional backend capabilities are not exposed at the kernel layer in v0.1.
+- **Consequences:** Shared backend conformance suites remain authoritative. Backend-specific performance tricks stay internal. The framework and future SDKs do not branch on backend feature flags.
 
-### ADR-007 TypeScript Tooling Uses Biome with Ultracite Conventions and tsup
+### ADR-007 Memory and SQLite Are the Official Initial Backends
 - **Status:** accepted
-- **Context:** You explicitly prefer Ultracite-style code standards through Biome and prefer `tsup` for the TypeScript build process.
-- **Decision:** Use Biome as the formatter/linter engine, configured to follow Ultracite-aligned standards, and use `tsup` for package builds.
-- **Consequences:** TypeScript-side code style and build behavior are no longer generic defaults. Generated config and package scripts must match this preference.
+- **Context:** The project needs a usable development backend immediately and a usable persistent backend package without pretending that one backend defines Kraken’s ontology.
+- **Decision:** `@kraken/backend-memory` is the reference non-persistent backend for development and semantic testing. `@kraken/backend-sqlite` is the first officially supported persistent backend adapter.
+- **Consequences:** SQLite is the first official persistent implementation, but not the canonical physical model for all future backends. PostgreSQL, MySQL/MariaDB, MongoDB, and others remain peer adapters against the same kernel contract.
 
-### ADR-008 Kernel Structural Sharing Model Is Still Open
-- **Status:** proposed
-- **Context:** The initial draft picked a path-granular `path_states` storage model too early. The correct decision depends on the Kraken-owned persistence contract and on how backend-neutral structural sharing should be.
-- **Decision:** Do not lock the implementation to a `path_states` model yet. Carry forward three viable options:
-  - path-granular structural sharing
-  - chunked path segments for large ordered collections
-  - more generic Merkle fragment/subtree representation
-- **Consequences:** The TechSpec must describe the semantic contract for TurnTree sharing without overcommitting to one physical realization before that choice is approved.
+### ADR-008 Structured Kernel Records Use Deterministic CBOR and Opaque Objects Hash Raw Bytes
+- **Status:** accepted
+- **Context:** Kernel identity needs a compact, deterministic, multi-language-friendly encoding. Canonical JSON is human-readable, but it carries JSON number and ECMAScript canonicalization constraints that are not ideal for durable kernel identity.
+- **Decision:** Structured kernel records are encoded as deterministic CBOR before hashing. Opaque stored objects are hashed from raw bytes without re-encoding.
+- **Consequences:** The kernel’s identity format is binary, deterministic, and language-neutral. JSON remains a debugging, export, and tooling format, not the canonical storage identity format.
 
-### ADR-009 Canonical Serialization and Hashing Strategy Is Still Open
-- **Status:** proposed
-- **Context:** The initial draft overcommitted to RFC 8785 canonical JSON plus SHA-256 without first confirming whether Kraken records should always be treated as JSON-shaped structured data.
-- **Decision:** Keep the hashing contract explicit but defer the concrete canonicalization strategy. Current candidates:
-  - raw bytes for binary objects plus RFC 8785 canonical JSON for structured records
-  - canonical CBOR for structured records
-  - custom canonical binary framing if native-kernel concerns dominate
-  Hashing candidates remain SHA-256 and BLAKE3 unless later analysis expands the set.
-- **Consequences:** The Kernel implementation must keep a clear “bytes to hash” boundary. A later approval is required before concrete durable identity code is finalized.
+### ADR-009 SHA-256 Is the Canonical Hash Algorithm
+- **Status:** accepted
+- **Context:** Durable identity must work cleanly across TypeScript, Python, Go, Rust, Bun, Node.js, Deno, and edge/Wasm-friendly environments with minimal dependency friction.
+- **Decision:** Kraken uses SHA-256 as the canonical hash algorithm for both opaque object bytes and deterministic-CBOR structured records.
+- **Consequences:** Hash identity uses ubiquitous primitives available in WebCrypto and standard libraries. Faster alternatives such as BLAKE3 are intentionally not used for canonical identity in v0.1.
+
+### ADR-010 Core Kernel Records Use a Restricted Integer-Oriented Data Model
+- **Status:** accepted
+- **Context:** Cross-language deterministic encoding gets riskier when floats, tags, and broad dynamic types are allowed into core kernel records.
+- **Decision:** Core kernel records are restricted to maps with string keys, arrays, text, byte strings, booleans, nulls, and integers. Floating-point values are not allowed in normative kernel records. Persisted timestamps are signed Unix epoch millisecond integers.
+- **Consequences:** Deterministic CBOR encoding remains simple and predictable. Float-bearing data, if ever needed, must live in opaque objects, extension state, or higher-layer provider/application payloads, not in core kernel records.
+
+### ADR-011 TurnTree Storage Is Path-Granular with Threshold-Based Chunking for Ordered Paths
+- **Status:** accepted
+- **Context:** The kernel contract is expressed in path values, not in generic subtree fragments. Ordered paths such as `messages` can grow large enough that flat rewrites become expensive, but a fully generic Merkle-fragment engine would overfit the problem.
+- **Decision:** TurnTree semantics remain path-granular. Ordered paths are logically `Hash[]`; single paths are logically `Hash | null`. Internally, ordered paths start flat and may promote to append-optimized fixed-size chunked storage after crossing an implementation-defined threshold. Chunking is invisible at the protocol layer.
+- **Consequences:** The public model stays simple while long ordered paths avoid pathological rewrite amplification. Numeric threshold and chunk-size values remain implementation constants, not protocol constants.
+
+### ADR-012 TypeScript Tooling Uses Biome and tsup
+- **Status:** accepted
+- **Context:** The project explicitly prefers Bun-based workflows, Biome, and `tsup`.
+- **Decision:** Use `@biomejs/biome@2.4.10` for linting and formatting and `tsup@8.5.1` for package builds.
+- **Consequences:** The implementation posture is no longer ambiguous or tool-default-driven. Config, scripts, and examples must reflect this choice directly.
+
+### ADR-013 Workspace Orchestration Uses devenv and Nx
+- **Status:** accepted
+- **Context:** The project explicitly fixed `devenv + nx` as non-negotiable workspace tooling and the repository now uses a boundary-grouped architecture-first layout.
+- **Decision:** Use `devenv` as the reproducible developer environment entry point and pin `nx@22.6.3` with aligned `@nx/workspace@22.6.3` and `@nx/js@22.6.3` for orchestration of the TypeScript subtree.
+- **Consequences:** Environment pinning lives in Nix/devenv configuration rather than npm manifests alone. Nx project orchestration is first-class, but limited to the TypeScript subtree and does not define the overall repository ontology.
 
 ### 2.1 Compatibility Record
-- **Public package compatibility:** Breaking changes to exported library contracts require a semver-major release.
-- **Canonical event compatibility:** New event types or optional fields may be introduced in minor releases; changes to existing event semantics are semver-major.
-- **Persistence compatibility:** The backend contract is stable across implementations. Each concrete persisted backend owns its own migration policy and versioning.
-- **Bridge compatibility:** AI SDK and LangChain bridge package upgrades may happen in minor releases only if the Kraken-owned contracts remain unchanged and bridge contract tests still pass.
+- **Kernel identity compatibility:** Changes to deterministic CBOR profile, SHA-256 usage, hash string representation, or durable record shapes are semver-major.
+- **Framework public API compatibility:** Breaking changes to exported TypeScript library contracts require a semver-major release.
+- **Backend compatibility:** All official backends must preserve the same kernel semantics. Physical schemas may differ by backend.
+- **Provider compatibility:** AI SDK bridge upgrades may happen in minor releases only if the Kraken-owned provider contract remains unchanged and contract fixtures still pass.
 
 ## 3. State & Data Modeling
-### 3.1 Canonical Persistence Model
-- **Purpose:** Define the Kraken-owned persistence surface independent of any specific backend product.
-- **Storage Shape:** Backend-neutral canonical entities with explicit IDs, hashes, lineage pointers, and state relationships. The first built-in implementation is in-memory for development. A separate persisted backend must later implement the same contract in order to satisfy Kraken's full durability requirements.
+### 3.1 Canonical Kernel Record Profile
+- **Purpose:** Define the durable data profile that all kernel implementations and backends must preserve.
+- **Storage Shape:** Structured kernel records are deterministic CBOR maps with string keys. Opaque objects remain raw bytes plus media type metadata.
 - **Constraints / Invariants:**
-  - Object identity is immutable and content-addressed.
-  - TurnNode lineage is append-only.
-  - One Branch has exactly one active Head.
-  - At most one `running` or `paused` Run may exist per Branch.
-  - Staged results are durable at the backend-contract level before checkpoint consumption.
-  - A backend must expose atomic semantics for `staging.stage`, checkpoint transactions, and backward branch archival.
-- **Indexes / Access Paths:**
-  - by `hash` for objects, TurnTrees, TurnNodes
-  - by `schemaId`
-  - by `threadId`, `branchId`, `turnId`, `runId`
-  - by `previousTurnNodeHash` for lineage walks
-  - by `(runId, taskId)` for staged-result recovery
-- **Migration Notes:** The in-memory backend has no persisted migration surface. Persisted backends must ship forward-only migration strategies local to their own packages and may not redefine Kraken semantics.
+  - Hashes are lowercase hex-encoded SHA-256 digests.
+  - Core kernel records do not use floating-point values.
+  - Persisted timestamps are signed Unix epoch milliseconds.
+  - Core kernel records do not use CBOR indefinite lengths.
+  - Core kernel records do not use CBOR tags in v0.1.
+  - TypeScript implementations must reject `NaN`, `Infinity`, non-safe integers, and non-canonical record shapes before persistence.
+- **Indexes / Access Paths:** Hash-addressable records for all immutable entities; lineage walks by `previousTurnNodeHash`; run-scoped staging by `(runId, taskId)`.
+- **Migration Notes:** Record profile changes are protocol changes and therefore semver-major.
 
-#### Canonical Entity Shapes
+#### Primitive Aliases
+- `HashString`
+  - lowercase hex string of a 32-byte SHA-256 digest
+- `EpochMs`
+  - signed integer Unix epoch milliseconds
+- `KernelRecord`
+  - deterministic-CBOR-encodable value using the restricted profile above
+
+### 3.2 Canonical Entity Shapes
+- **Purpose:** Define the exact logical records the TypeScript implementation persists and hashes.
+- **Storage Shape:** Immutable records encoded with deterministic CBOR unless the item is an opaque Object blob.
+- **Constraints / Invariants:**
+  - `StoredObject.bytes` are hashed as raw bytes.
+  - Every other record below is hashed from deterministic CBOR bytes.
+  - `schemaId`, `threadId`, `branchId`, `turnId`, `runId`, and `taskId` are opaque framework/kernel identifiers and are never derived from storage vendor internals.
+  - `StoredTurnTree.manifestCbor` is the immutable cached full-manifest representation of the logical TurnTree. `StoredTurnTreePath` rows are the backend-side indexed path realization used for efficient `resolve`, `diff`, and ordered-path chunking. Both must always describe the same logical TurnTree.
+- **Indexes / Access Paths:** As listed per entity below.
+- **Migration Notes:** Field additions require explicit compatibility handling; field removals or semantic changes are semver-major.
+
+#### Canonical Entity Definitions
 - `StoredObject`
-  - `hash: string`
+  - `hash: HashString`
   - `mediaType: string`
   - `bytes: Uint8Array`
   - `byteLength: number`
-  - `createdAt: number`
+  - `createdAtMs: EpochMs`
 - `StoredSchema`
   - `schemaId: string`
-  - `schema: TurnTreeSchema`
-  - `createdAt: number`
+  - `schemaCbor: Uint8Array`
+  - `createdAtMs: EpochMs`
 - `StoredTurnTree`
-  - `hash: string`
+  - `hash: HashString`
   - `schemaId: string`
-  - `pathValues: Record<string, string[] | string | null>`
-  - `createdAt: number`
+  - `manifestCbor: Uint8Array`
+  - `createdAtMs: EpochMs`
+- `StoredTurnTreePath`
+  - `turnTreeHash: HashString`
+  - `path: string`
+  - `collectionKind: "single" | "ordered"`
+  - `singleHash?: HashString | null`
+  - `orderedEncoding?: "flat" | "chunked"`
+  - `orderedCount?: number`
+  - `orderedInlineCbor?: Uint8Array`
+  - `orderedChunkListCbor?: Uint8Array`
+- `StoredOrderedPathChunk`
+  - `chunkHash: HashString`
+  - `itemCount: number`
+  - `itemsCbor: Uint8Array`
+  - `createdAtMs: EpochMs`
 - `StoredTurnNode`
-  - `hash: string`
-  - `previousTurnNodeHash: string | null`
-  - `turnTreeHash: string`
-  - `consumedStagedResults: StagedResult[]`
+  - `hash: HashString`
+  - `previousTurnNodeHash: HashString | null`
+  - `turnTreeHash: HashString`
+  - `consumedStagedResultsCbor: Uint8Array`
   - `schemaId: string`
-  - `eventHash: string | null`
-  - `createdAt: number`
+  - `eventHash: HashString | null`
+  - `createdAtMs: EpochMs`
 - `StoredThread`
   - `threadId: string`
   - `schemaId: string`
-  - `rootTurnNodeHash: string`
-  - `createdAt: number`
+  - `rootTurnNodeHash: HashString`
+  - `createdAtMs: EpochMs`
 - `StoredBranch`
   - `branchId: string`
   - `threadId: string`
-  - `headTurnNodeHash: string`
+  - `headTurnNodeHash: HashString`
   - `archivedFromBranchId?: string`
-  - `createdAt: number`
-  - `updatedAt: number`
+  - `createdAtMs: EpochMs`
+  - `updatedAtMs: EpochMs`
 - `StoredTurn`
   - `turnId: string`
   - `threadId: string`
   - `branchId: string`
   - `parentTurnId: string | null`
-  - `startTurnNodeHash: string`
-  - `headTurnNodeHash: string`
-  - `createdAt: number`
-  - `updatedAt: number`
+  - `startTurnNodeHash: HashString`
+  - `headTurnNodeHash: HashString`
+  - `createdAtMs: EpochMs`
+  - `updatedAtMs: EpochMs`
 - `StoredRun`
   - `runId: string`
   - `turnId: string`
   - `branchId: string`
   - `schemaId: string`
-  - `startTurnNodeHash: string`
+  - `startTurnNodeHash: HashString`
   - `status: "running" | "paused" | "completed" | "failed"`
   - `currentStepIndex: number`
-  - `stepSequence: StepDeclaration[]`
-  - `createdTurnNodes: string[]`
-  - `createdAt: number`
-  - `updatedAt: number`
+  - `stepSequenceCbor: Uint8Array`
+  - `createdTurnNodesCbor: Uint8Array`
+  - `createdAtMs: EpochMs`
+  - `updatedAtMs: EpochMs`
 - `StoredStagedResult`
   - `runId: string`
   - `taskId: string`
-  - `objectHash: string`
+  - `objectHash: HashString`
   - `objectType: string`
   - `status: "completed" | "failed" | "interrupted"`
-  - `interruptPayload?: unknown`
-  - `createdAt: number`
+  - `interruptPayloadCbor?: Uint8Array`
+  - `createdAtMs: EpochMs`
 
 ```mermaid
 erDiagram
   STORED_OBJECT ||--o{ STORED_STAGED_RESULT : referenced_by
   STORED_OBJECT ||--o{ STORED_TURN_NODE : event_hash
   STORED_SCHEMA ||--o{ STORED_TURN_TREE : constrains
+  STORED_TURN_TREE ||--o{ STORED_TURN_TREE_PATH : contains
+  STORED_ORDERED_PATH_CHUNK ||--o{ STORED_TURN_TREE_PATH : referenced_by
   STORED_TURN_TREE ||--o{ STORED_TURN_NODE : captured_by
   STORED_THREAD ||--o{ STORED_BRANCH : contains
   STORED_THREAD ||--o{ STORED_TURN : owns
@@ -190,66 +238,106 @@ erDiagram
   STORED_RUN ||--o{ STORED_STAGED_RESULT : stages
 ```
 
-### 3.2 Built-In In-Memory Backend
-- **Purpose:** Provide the first built-in implementation for early framework development, semantic prototyping, and non-persistent backend testing without coupling the project to a specific external store.
-- **Storage Shape:** In-process maps keyed by canonical IDs and hashes, wrapped by a transaction coordinator that applies mutations atomically through copy-on-write snapshots.
+### 3.3 TurnTree Physical Realization
+- **Purpose:** Concretize how the first implementation realizes path-granular TurnTrees without changing the frozen protocol.
+- **Storage Shape:** Path-granular manifests plus internal ordered-path chunk storage where needed.
 - **Constraints / Invariants:**
-  - One mutation coordinator serializes writes.
-  - Each transaction operates on a cloned mutable snapshot and swaps it into the live state only on commit.
-  - Failed transactions discard the staged snapshot entirely.
-  - Reads after commit observe the new snapshot immediately.
-  - This backend is intentionally non-durable across process restart and therefore is not a fully conformant persisted backend for the frozen Kernel storage guarantees.
+  - The protocol-facing meaning of an ordered path is always `Hash[]`.
+  - The protocol-facing meaning of a single path is always `Hash | null`.
+  - Ordered paths begin as flat inline sequences.
+  - Ordered paths may promote to chunked storage after crossing an implementation-defined threshold.
+  - Promotion is invisible to callers of `tree.resolve()` and `tree.manifest()`.
+  - Chunk storage is append-optimized, fixed-size, and uses whole-chunk structural sharing.
+  - Threshold and chunk-size numeric values are implementation constants, not protocol constants.
 - **Indexes / Access Paths:**
-  - `Map<string, StoredObject>` by `hash`
-  - `Map<string, StoredSchema>` by `schemaId`
-  - `Map<string, StoredTurnTree>` by `hash`
-  - `Map<string, StoredTurnNode>` by `hash`
-  - `Map<string, StoredThread>` by `threadId`
-  - `Map<string, StoredBranch>` by `branchId`
-  - `Map<string, StoredTurn>` by `turnId`
-  - `Map<string, StoredRun>` by `runId`
-  - `Map<string, Map<string, StoredStagedResult>>` by `(runId, taskId)`
-- **Migration Notes:** None. The in-memory backend is intentionally non-persistent.
+  - by `(turnTreeHash, path)` for path lookup
+  - by `chunkHash` for chunk reuse
+  - by `turnTreeHash` for manifest reconstruction
+- **Migration Notes:** Physical chunk policy may evolve without changing the protocol so long as `tree.create`, `tree.incorporate`, `tree.resolve`, `tree.diff`, and `tree.manifest` preserve the same behavior.
 
-### 3.3 Backend Implementation Contract
-- **Purpose:** Define what any concrete backend package must implement to qualify as a Kraken backend.
-- **Storage Shape:** Backend packages may use memory, relational storage, object storage, key-value stores, or coordinated multi-store designs so long as the observable contract is preserved.
+### 3.4 Backend Adapter Model
+- **Purpose:** Define what it means for a backend package to be an official Kraken backend.
+- **Storage Shape:** Each backend package is a concrete implementation of the kernel storage contract. Physical schema is backend-specific.
 - **Constraints / Invariants:**
-  - No backend package may weaken the atomicity required by the Kernel spec.
-  - No backend package may expose product-specific semantics into the Kernel surface.
-  - Backends must pass the shared persistence-contract test suite unchanged.
-- **Conformance note:** Persisted backends must pass the full persistence-contract suite, including restart durability. The built-in in-memory backend passes the semantic subset that excludes restart-durability assertions.
-- **Product note:** An in-memory-only deployment is useful for development and test scenarios, but it must not be described as satisfying CAP-P0-001, CAP-P0-005, or CAP-P0-006.
-- **Indexes / Access Paths:** Backend-specific, but must satisfy the canonical access paths listed in §3.1.
-- **Migration Notes:** Each persisted backend package owns its own migration mechanism and version record.
+  - Every official backend implements the full kernel contract.
+  - No official backend exposes kernel-visible optional capabilities in v0.1.
+  - No official backend may weaken the kernel’s required atomicity, lineage, or recovery guarantees.
+  - Backends may optimize internally, but optimization must not change semantics.
+- **Conformance note:** Shared backend contract tests are the authority for semantic conformance.
+- **Product note:** `@kraken/backend-memory` is intentionally non-persistent and must not be described as satisfying the durable-runtime guarantees of the PRD or kernel spec.
+- **Indexes / Access Paths:** Backend-specific, but all must satisfy the canonical access patterns named in §§3.1-3.3.
+- **Migration Notes:** Each backend package owns its own migration mechanism and version history.
 
-```ts
-export interface KrakenBackend {
-  transact<T>(work: (tx: KrakenBackendTx) => Promise<T>): Promise<T>;
-  health(): Promise<{ ok: true } | { ok: false; reason: string }>;
-}
+### 3.5 SQLite Backend Schema
+- **Purpose:** Specify the first official persistent backend package concretely enough to implement without guesswork.
+- **Storage Shape:** Embedded in-process SQLite database using WAL mode and `BEGIN IMMEDIATE` transactions for kernel writes.
+- **Constraints / Invariants:**
+  - Foreign keys enabled.
+  - WAL mode enabled.
+  - Kernel write transactions use `BEGIN IMMEDIATE` and commit atomically.
+  - The first SQLite backend implementation uses `better-sqlite3@12.8.0`.
+  - Because of that binding choice, the first SQLite backend implementation targets Node.js runtimes with local filesystem access and native addon support.
+  - SQLite backend is not an edge/serverless target in v0.1.
+  - SQLite is the first official persistent backend, not the canonical physical model for all future backends.
+- **Indexes / Access Paths:** Listed per table below.
+- **Migration Notes:** Forward-only SQL migrations owned by `@kraken/backend-sqlite`.
 
-export interface KrakenBackendTx {
-  objects: ObjectRepository;
-  schemas: SchemaRepository;
-  turnTrees: TurnTreeRepository;
-  turnNodes: TurnNodeRepository;
-  threads: ThreadRepository;
-  branches: BranchRepository;
-  turns: TurnRepository;
-  runs: RunRepository;
-  stagedResults: StagedResultRepository;
-}
-```
+#### SQLite Tables
+- `objects`
+  - columns: `hash TEXT PRIMARY KEY`, `media_type TEXT NOT NULL`, `bytes BLOB NOT NULL`, `byte_length INTEGER NOT NULL`, `created_at_ms INTEGER NOT NULL`
+  - indexes: primary key on `hash`
+- `schemas`
+  - columns: `schema_id TEXT PRIMARY KEY`, `schema_cbor BLOB NOT NULL`, `created_at_ms INTEGER NOT NULL`
+  - indexes: primary key on `schema_id`
+- `turn_trees`
+  - columns: `hash TEXT PRIMARY KEY`, `schema_id TEXT NOT NULL`, `manifest_cbor BLOB NOT NULL`, `created_at_ms INTEGER NOT NULL`
+  - foreign keys: `schema_id -> schemas(schema_id)`
+  - indexes: primary key on `hash`, secondary on `schema_id`
+- `turn_tree_paths`
+  - columns: `turn_tree_hash TEXT NOT NULL`, `path TEXT NOT NULL`, `collection_kind TEXT NOT NULL`, `single_hash TEXT NULL`, `ordered_encoding TEXT NULL`, `ordered_count INTEGER NULL`, `ordered_inline_cbor BLOB NULL`, `ordered_chunk_list_cbor BLOB NULL`
+  - primary key: `(turn_tree_hash, path)`
+  - foreign keys: `turn_tree_hash -> turn_trees(hash)`
+  - indexes: primary key, secondary on `(path, turn_tree_hash)`
+- `ordered_path_chunks`
+  - columns: `chunk_hash TEXT PRIMARY KEY`, `item_count INTEGER NOT NULL`, `items_cbor BLOB NOT NULL`, `created_at_ms INTEGER NOT NULL`
+  - indexes: primary key on `chunk_hash`
+- `turn_nodes`
+  - columns: `hash TEXT PRIMARY KEY`, `previous_turn_node_hash TEXT NULL`, `turn_tree_hash TEXT NOT NULL`, `consumed_staged_results_cbor BLOB NOT NULL`, `schema_id TEXT NOT NULL`, `event_hash TEXT NULL`, `created_at_ms INTEGER NOT NULL`
+  - foreign keys: `previous_turn_node_hash -> turn_nodes(hash)`, `turn_tree_hash -> turn_trees(hash)`, `schema_id -> schemas(schema_id)`, `event_hash -> objects(hash)`
+  - indexes: primary key on `hash`, secondary on `previous_turn_node_hash`, `turn_tree_hash`
+- `threads`
+  - columns: `thread_id TEXT PRIMARY KEY`, `schema_id TEXT NOT NULL`, `root_turn_node_hash TEXT NOT NULL`, `created_at_ms INTEGER NOT NULL`
+  - foreign keys: `schema_id -> schemas(schema_id)`, `root_turn_node_hash -> turn_nodes(hash)`
+  - indexes: primary key on `thread_id`
+- `branches`
+  - columns: `branch_id TEXT PRIMARY KEY`, `thread_id TEXT NOT NULL`, `head_turn_node_hash TEXT NOT NULL`, `archived_from_branch_id TEXT NULL`, `created_at_ms INTEGER NOT NULL`, `updated_at_ms INTEGER NOT NULL`
+  - foreign keys: `thread_id -> threads(thread_id)`, `head_turn_node_hash -> turn_nodes(hash)`, `archived_from_branch_id -> branches(branch_id)`
+  - indexes: primary key on `branch_id`, secondary on `thread_id`, `head_turn_node_hash`
+- `turns`
+  - columns: `turn_id TEXT PRIMARY KEY`, `thread_id TEXT NOT NULL`, `branch_id TEXT NOT NULL`, `parent_turn_id TEXT NULL`, `start_turn_node_hash TEXT NOT NULL`, `head_turn_node_hash TEXT NOT NULL`, `created_at_ms INTEGER NOT NULL`, `updated_at_ms INTEGER NOT NULL`
+  - foreign keys: `thread_id -> threads(thread_id)`, `branch_id -> branches(branch_id)`, `parent_turn_id -> turns(turn_id)`, `start_turn_node_hash -> turn_nodes(hash)`, `head_turn_node_hash -> turn_nodes(hash)`
+  - indexes: primary key on `turn_id`, secondary on `thread_id`, `branch_id`, `parent_turn_id`
+- `runs`
+  - columns: `run_id TEXT PRIMARY KEY`, `turn_id TEXT NOT NULL`, `branch_id TEXT NOT NULL`, `schema_id TEXT NOT NULL`, `start_turn_node_hash TEXT NOT NULL`, `status TEXT NOT NULL`, `current_step_index INTEGER NOT NULL`, `step_sequence_cbor BLOB NOT NULL`, `created_turn_nodes_cbor BLOB NOT NULL`, `created_at_ms INTEGER NOT NULL`, `updated_at_ms INTEGER NOT NULL`
+  - foreign keys: `turn_id -> turns(turn_id)`, `branch_id -> branches(branch_id)`, `schema_id -> schemas(schema_id)`, `start_turn_node_hash -> turn_nodes(hash)`
+  - indexes: primary key on `run_id`, secondary on `turn_id`, `branch_id`, `(branch_id, status)`
+- `staged_results`
+  - columns: `run_id TEXT NOT NULL`, `task_id TEXT NOT NULL`, `object_hash TEXT NOT NULL`, `object_type TEXT NOT NULL`, `status TEXT NOT NULL`, `interrupt_payload_cbor BLOB NULL`, `created_at_ms INTEGER NOT NULL`
+  - primary key: `(run_id, task_id)`
+  - foreign keys: `run_id -> runs(run_id)`, `object_hash -> objects(hash)`
+  - indexes: primary key, secondary on `(run_id, status)`, `object_hash`
 
 ## 4. Interface Contract
-### 4.1 Host-Facing Framework Library API
+### 4.1 Host-Facing TypeScript Framework API
 - **Style:** library API
-- **Authentication / Authorization:** Not built into Kraken. Hosts authenticate and authorize callers before exposing runtime operations.
-- **Compatibility Strategy:** Exported TypeScript package APIs follow semver. Additive fields and additive methods are minor-compatible.
-- **Error model:** Typed `KrakenError` subclasses with stable `code` values. Runtime failures may also emit `error` events before terminal completion.
+- **Authentication / Authorization:** Not built into Kraken. Host applications authenticate and authorize their own callers before exposing runtime operations.
+- **Compatibility Strategy:** Exported TypeScript framework APIs follow semantic versioning. Additive methods and additive optional fields are minor-compatible.
+- **Error model:** Typed `KrakenError` subclasses with stable `code` values plus canonical `error` stream events.
 
 ```ts
+export type HashString = string;
+export type EpochMs = number; // must always be a safe integer
+
 export interface KrakenRuntime {
   createThread(input: {
     threadId?: string;
@@ -258,32 +346,32 @@ export interface KrakenRuntime {
   }): Promise<{
     threadId: string;
     branchId: string;
-    rootTurnNodeHash: string;
-    rootTurnTreeHash: string;
+    rootTurnNodeHash: HashString;
+    rootTurnTreeHash: HashString;
   }>;
 
   getThread(threadId: string): Promise<{
     threadId: string;
     schemaId: string;
-    rootTurnNodeHash: string;
+    rootTurnNodeHash: HashString;
   } | null>;
 
   createBranch(input: {
     branchId?: string;
     threadId: string;
-    fromTurnNodeHash: string;
+    fromTurnNodeHash: HashString;
   }): Promise<{
     branchId: string;
     threadId: string;
-    headTurnNodeHash: string;
+    headTurnNodeHash: HashString;
   }>;
 
   setBranchHead(input: {
     branchId: string;
-    turnNodeHash: string;
+    turnNodeHash: HashString;
   }): Promise<{
     branchId: string;
-    headTurnNodeHash: string;
+    headTurnNodeHash: HashString;
     archiveBranchId?: string;
   }>;
 
@@ -307,18 +395,18 @@ export interface ExecutionHandle {
 }
 ```
 
-### 4.2 Kernel Boundary Contract
-- **Style:** library API
-- **Authentication / Authorization:** Internal-only contract used by framework packages and backend implementations.
-- **Compatibility Strategy:** Internal monorepo contract. Breaking changes require synchronized kernel/framework changes.
-- **Error model:** `KrakenError` with persistence, lineage, validation, and recovery codes.
+### 4.2 Kernel Protocol Surface
+- **Style:** protocol-shaped library contract for the first TypeScript implementation
+- **Authentication / Authorization:** Internal kernel boundary used by framework packages and backend adapters
+- **Compatibility Strategy:** Protocol-first contract. Breaking changes to record shapes, operation signatures, or validation semantics are semver-major.
+- **Error model:** `KrakenError` with persistence, validation, lineage, and recovery codes
 
 ```ts
 export interface KrakenKernel {
   store: {
-    put(blob: Uint8Array, mediaType?: string): Promise<string>;
-    get(hash: string): Promise<Uint8Array | null>;
-    has(hash: string): Promise<boolean>;
+    put(blob: Uint8Array, mediaType?: string): Promise<HashString>;
+    get(hash: HashString): Promise<Uint8Array | null>;
+    has(hash: HashString): Promise<boolean>;
   };
 
   schema: {
@@ -329,25 +417,63 @@ export interface KrakenKernel {
   tree: {
     create(
       schemaId: string,
-      changes: Record<string, string[] | string | null>,
-      baseTurnTreeHash?: string
-    ): Promise<string>;
-    incorporate(baseTurnTreeHash: string, stagedResults: StagedResult[]): Promise<string>;
-    diff(treeHashA: string, treeHashB: string): Promise<string[]>;
-    resolve(treeHash: string, path: string): Promise<string[] | string | null>;
-    manifest(treeHash: string): Promise<Record<string, string[] | string | null>>;
+      changes: Record<string, HashString[] | HashString | null>,
+      baseTurnTreeHash?: HashString
+    ): Promise<HashString>;
+    incorporate(
+      baseTurnTreeHash: HashString,
+      stagedResults: StagedResult[]
+    ): Promise<HashString>;
+    diff(treeHashA: HashString, treeHashB: HashString): Promise<string[]>;
+    resolve(
+      treeHash: HashString,
+      path: string
+    ): Promise<HashString[] | HashString | null>;
+    manifest(
+      treeHash: HashString
+    ): Promise<Record<string, HashString[] | HashString | null>>;
+  };
+
+  node: {
+    get(hash: HashString): Promise<TurnNode | null>;
+    walkBack(fromHash: HashString): AsyncIterable<TurnNode>;
   };
 
   thread: {
-    create(threadId: string, schemaId: string, initialBranchId: string): Promise<ThreadCreateResult>;
+    create(
+      threadId: string,
+      schemaId: string,
+      initialBranchId: string
+    ): Promise<ThreadCreateResult>;
     get(threadId: string): Promise<ThreadRecord | null>;
   };
 
   branch: {
-    create(branchId: string, threadId: string, fromTurnNodeHash: string): Promise<BranchRecord>;
+    create(
+      branchId: string,
+      threadId: string,
+      fromTurnNodeHash: HashString
+    ): Promise<BranchRecord>;
     get(branchId: string): Promise<BranchRecord | null>;
-    setHead(branchId: string, turnNodeHash: string): Promise<SetHeadResult>;
-    list(threadId: string): Promise<Array<{ branchId: string; headTurnNodeHash: string }>>;
+    setHead(
+      branchId: string,
+      turnNodeHash: HashString
+    ): Promise<SetHeadResult>;
+    list(
+      threadId: string
+    ): Promise<Array<{ branchId: string; headTurnNodeHash: HashString }>>;
+  };
+
+  staging: {
+    stage(
+      runId: string,
+      blob: Uint8Array,
+      taskId: string,
+      objectType: string,
+      status: "completed" | "failed" | "interrupted",
+      interruptPayload?: unknown
+    ): Promise<{ objectHash: HashString; stagedResult: StagedResult }>;
+    current(runId: string): Promise<StagedResult[]>;
   };
 
   run: {
@@ -356,32 +482,70 @@ export interface KrakenKernel {
       turnId: string,
       branchId: string,
       schemaId: string,
-      startTurnNodeHash: string,
+      startTurnNodeHash: HashString,
       steps: StepDeclaration[]
     ): Promise<RunRecord>;
     beginStep(runId: string, stepId: string): Promise<StepContext>;
     completeStep(
       runId: string,
       stepId: string,
-      eventHash?: string,
+      eventHash?: HashString,
       observeResults?: ObserveResult[],
-      treeHash?: string
-    ): Promise<{ checkpointed: boolean; turnNodeHash?: string }>;
+      treeHash?: HashString
+    ): Promise<{ checkpointed: boolean; turnNodeHash?: HashString }>;
     complete(
       runId: string,
       status: "completed" | "failed" | "paused",
-      eventHash?: string
-    ): Promise<{ turnNodeHash?: string }>;
+      eventHash?: HashString
+    ): Promise<{ turnNodeHash?: HashString }>;
     recover(runId: string): Promise<RecoveryState>;
+  };
+
+  turn: {
+    create(
+      turnId: string,
+      threadId: string,
+      parentTurnId: string | null | undefined,
+      startTurnNodeHash: HashString
+    ): Promise<TurnRecord>;
+    get(turnId: string): Promise<TurnRecord | null>;
+    updateHead(turnId: string, headTurnNodeHash: HashString): Promise<void>;
   };
 }
 ```
 
-### 4.3 Provider Bridge Contract
+### 4.3 Backend Adapter Contract
 - **Style:** library API
-- **Authentication / Authorization:** Credentials stay in bridge-specific configuration and environment resolution layers, never in persisted runtime state.
-- **Compatibility Strategy:** The Kraken-owned provider contract remains stable while bridges adapt to AI SDK and LangChain changes.
-- **Error model:** Bridge failures normalize into Kraken provider errors with bridge-specific diagnostic metadata.
+- **Authentication / Authorization:** Backends are internal persistence adapters selected by hosts/framework configuration, not end-user entry points
+- **Compatibility Strategy:** Strict shared contract across all official backends
+- **Error model:** backend-specific errors normalized into `KrakenError` persistence codes
+
+```ts
+export interface KrakenBackend {
+  transact<T>(work: (tx: KrakenBackendTx) => Promise<T>): Promise<T>;
+  health(): Promise<{ ok: true } | { ok: false; reason: string }>;
+}
+
+export interface KrakenBackendTx {
+  objects: ObjectRepository;
+  schemas: SchemaRepository;
+  turnTrees: TurnTreeRepository;
+  turnTreePaths: TurnTreePathRepository;
+  orderedPathChunks: OrderedPathChunkRepository;
+  turnNodes: TurnNodeRepository;
+  threads: ThreadRepository;
+  branches: BranchRepository;
+  turns: TurnRepository;
+  runs: RunRepository;
+  stagedResults: StagedResultRepository;
+}
+```
+
+### 4.4 Provider Bridge Contract
+- **Style:** library API
+- **Authentication / Authorization:** Credentials stay in bridge configuration and host environment resolution; they are never persisted as core runtime state
+- **Compatibility Strategy:** Kraken owns the provider contract; the AI SDK bridge adapts to external package changes behind it
+- **Error model:** Provider and bridge failures normalize into Kraken provider errors with bridge-specific diagnostics
 
 ```ts
 export interface KrakenProvider {
@@ -421,11 +585,11 @@ export type ProviderStreamChunk =
   | { type: "error"; error: unknown };
 ```
 
-### 4.4 Canonical Event Stream Contract
+### 4.5 Canonical Event Stream Contract
 - **Style:** library API
-- **Authentication / Authorization:** Controlled by the host embedding layer.
-- **Compatibility Strategy:** Existing event types and required fields are stable within a major version. Minor releases may add event types or optional fields.
-- **Error model:** `error` events plus terminal `turn.end` state where applicable.
+- **Authentication / Authorization:** Controlled by the host embedding layer
+- **Compatibility Strategy:** Existing event types and required fields are stable within a major version; minor releases may add event types or optional fields
+- **Error model:** `error` events plus terminal `turn.end` where applicable
 
 ```ts
 export interface EventSource {
@@ -435,133 +599,219 @@ export interface EventSource {
 }
 
 export type KrakenStreamEvent =
-  | { type: "turn.start"; turnId: string; threadId: string; resumedFrom?: string; timestamp: string; source?: EventSource }
-  | { type: "turn.end"; turnId: string; status: "completed" | "paused" | "failed"; timestamp: string; source?: EventSource }
-  | { type: "iteration.start" | "iteration.end"; iterationCount: number; timestamp: string; source?: EventSource }
-  | { type: "message.start"; messageId: string; role: "assistant"; timestamp: string; source?: EventSource }
-  | { type: "text.delta"; messageId: string; delta: string; timestamp: string; source?: EventSource }
-  | { type: "text.done"; messageId: string; text: string; timestamp: string; source?: EventSource }
-  | { type: "reasoning.delta"; messageId: string; delta: string; timestamp: string; source?: EventSource }
-  | { type: "reasoning.done"; messageId: string; timestamp: string; source?: EventSource }
-  | { type: "structured.delta"; messageId: string; delta: string; timestamp: string; source?: EventSource }
-  | { type: "structured.done"; messageId: string; data: unknown; name?: string; timestamp: string; source?: EventSource }
-  | { type: "tool_call.start"; messageId: string; callId: string; name: string; timestamp: string; source?: EventSource }
-  | { type: "tool_call.args_delta"; callId: string; delta: string; timestamp: string; source?: EventSource }
-  | { type: "tool_call.done"; callId: string; name: string; input: unknown; timestamp: string; source?: EventSource }
-  | { type: "message.done"; messageId: string; finishReason: "stop" | "tool_call" | "length" | "error" | "content_filter"; usage?: { inputTokens: number; outputTokens: number }; timestamp: string; source?: EventSource }
-  | { type: "tool.start"; callId: string; name: string; input: unknown; timestamp: string; source?: EventSource }
-  | { type: "tool.result"; callId: string; name: string; output: unknown; isError?: boolean; timestamp: string; source?: EventSource }
-  | { type: "approval.requested"; request: ApprovalRequest; timestamp: string; source?: EventSource }
-  | { type: "approval.resolved"; response: ApprovalResponse; timestamp: string; source?: EventSource }
-  | { type: "steering.incorporated"; messageId: string; timestamp: string; source?: EventSource }
-  | { type: "state.snapshot"; manifest: ContextManifest; timestamp: string; source?: EventSource }
-  | { type: "state.checkpoint"; turnNodeHash: string; iterationCount: number; timestamp: string; source?: EventSource }
-  | { type: "error"; error: { message: string; code?: string; details?: unknown }; fatal: boolean; timestamp: string; source?: EventSource }
-  | { type: "custom"; name: string; data: unknown; timestamp: string; source?: EventSource };
+  | { type: "turn.start"; turnId: string; threadId: string; resumedFrom?: HashString; timestamp: EpochMs; source?: EventSource }
+  | { type: "turn.end"; turnId: string; status: "completed" | "paused" | "failed"; timestamp: EpochMs; source?: EventSource }
+  | { type: "iteration.start" | "iteration.end"; iterationCount: number; timestamp: EpochMs; source?: EventSource }
+  | { type: "message.start"; messageId: string; role: "assistant"; timestamp: EpochMs; source?: EventSource }
+  | { type: "text.delta"; messageId: string; delta: string; timestamp: EpochMs; source?: EventSource }
+  | { type: "text.done"; messageId: string; text: string; timestamp: EpochMs; source?: EventSource }
+  | { type: "reasoning.delta"; messageId: string; delta: string; timestamp: EpochMs; source?: EventSource }
+  | { type: "reasoning.done"; messageId: string; timestamp: EpochMs; source?: EventSource }
+  | { type: "structured.delta"; messageId: string; delta: string; timestamp: EpochMs; source?: EventSource }
+  | { type: "structured.done"; messageId: string; data: unknown; name?: string; timestamp: EpochMs; source?: EventSource }
+  | { type: "tool_call.start"; messageId: string; callId: string; name: string; timestamp: EpochMs; source?: EventSource }
+  | { type: "tool_call.args_delta"; callId: string; delta: string; timestamp: EpochMs; source?: EventSource }
+  | { type: "tool_call.done"; callId: string; name: string; input: unknown; timestamp: EpochMs; source?: EventSource }
+  | { type: "message.done"; messageId: string; finishReason: "stop" | "tool_call" | "length" | "error" | "content_filter"; usage?: { inputTokens: number; outputTokens: number }; timestamp: EpochMs; source?: EventSource }
+  | { type: "tool.start"; callId: string; name: string; input: unknown; timestamp: EpochMs; source?: EventSource }
+  | { type: "tool.result"; callId: string; name: string; output: unknown; isError?: boolean; timestamp: EpochMs; source?: EventSource }
+  | { type: "approval.requested"; request: ApprovalRequest; timestamp: EpochMs; source?: EventSource }
+  | { type: "approval.resolved"; response: ApprovalResponse; timestamp: EpochMs; source?: EventSource }
+  | { type: "steering.incorporated"; messageId: string; timestamp: EpochMs; source?: EventSource }
+  | { type: "state.snapshot"; manifest: ContextManifest; timestamp: EpochMs; source?: EventSource }
+  | { type: "state.checkpoint"; turnNodeHash: HashString; iterationCount: number; timestamp: EpochMs; source?: EventSource }
+  | { type: "error"; error: { message: string; code?: string; details?: unknown }; fatal: boolean; timestamp: EpochMs; source?: EventSource }
+  | { type: "custom"; name: string; data: unknown; timestamp: EpochMs; source?: EventSource };
 ```
 
 ## 5. Implementation Guidelines
 ### 5.1 Project Structure
+Target implementation layout after code generation begins:
+
 ```text
 .
 ├── constitution/
 │   ├── Architecture.md
 │   ├── PRD.md
 │   └── TechSpec.md
+├── docs/
+├── devenv.nix
+├── devenv.yaml
+├── nx.json
 ├── package.json
 ├── bun.lock
 ├── tsconfig.base.json
 ├── tsconfig.json
 ├── biome.jsonc
-├── docs/
-├── packages/
-│   ├── types/
-│   │   ├── src/
-│   │   ├── test/
-│   │   └── package.json
-│   ├── kernel-contract/
-│   │   ├── src/
-│   │   ├── test/
-│   │   └── package.json
-│   ├── kernel-memory/
-│   │   ├── src/
-│   │   ├── test/
-│   │   └── package.json
+├── boundaries/
+│   ├── kernel/
+│   │   ├── contracts/
+│   │   │   └── protocol/
+│   │   │       ├── package.json
+│   │   │       ├── project.json
+│   │   │       ├── src/
+│   │   │       └── test/
+│   │   ├── implementations/
+│   │   │   └── typescript/
+│   │   │       ├── backend-memory/
+│   │   │       │   ├── package.json
+│   │   │       │   ├── project.json
+│   │   │       │   ├── src/
+│   │   │       │   └── test/
+│   │   │       └── backend-sqlite/
+│   │   │           ├── package.json
+│   │   │           ├── project.json
+│   │   │           ├── migrations/
+│   │   │           ├── src/
+│   │   │           └── test/
+│   │   └── testkit/
+│   │       ├── package.json
+│   │       ├── project.json
+│   │       └── src/
 │   ├── framework/
-│   │   ├── src/
-│   │   ├── test/
-│   │   └── package.json
-│   ├── provider-bridge-ai-sdk/
-│   │   ├── src/
-│   │   ├── test/
-│   │   └── package.json
-│   ├── provider-bridge-langchain/
-│   │   ├── src/
-│   │   ├── test/
-│   │   └── package.json
-│   ├── stream-core/
-│   │   ├── src/
-│   │   └── package.json
-│   ├── stream-sse/
-│   │   ├── src/
-│   │   └── package.json
-│   ├── stream-agui/
-│   │   ├── src/
-│   │   └── package.json
-│   └── testkit/
-│       ├── src/
-│       └── package.json
-├── examples/
-│   └── playground-host/
-│       ├── src/
-│       └── package.json
-└── scripts/
-    ├── verify.ts
-    ├── backend-contract.ts
-    └── release-check.ts
+│   │   ├── contracts/
+│   │   │   ├── runtime-api/
+│   │   │   │   ├── package.json
+│   │   │   │   ├── project.json
+│   │   │   │   └── src/
+│   │   │   ├── event-stream/
+│   │   │   │   ├── package.json
+│   │   │   │   ├── project.json
+│   │   │   │   └── src/
+│   │   │   └── tool-contracts/
+│   │   │       ├── package.json
+│   │   │       ├── project.json
+│   │   │       └── src/
+│   │   ├── implementations/
+│   │   │   └── typescript/
+│   │   │       ├── core/
+│   │   │       │   ├── package.json
+│   │   │       │   ├── project.json
+│   │   │       │   ├── src/
+│   │   │       │   └── test/
+│   │   │       ├── stream-core/
+│   │   │       │   ├── package.json
+│   │   │       │   ├── project.json
+│   │   │       │   └── src/
+│   │   │       ├── stream-sse/
+│   │   │       │   ├── package.json
+│   │   │       │   ├── project.json
+│   │   │       │   └── src/
+│   │   │       └── stream-agui/
+│   │   │           ├── package.json
+│   │   │           ├── project.json
+│   │   │           └── src/
+│   │   └── testkit/
+│   │       ├── package.json
+│   │       ├── project.json
+│   │       └── src/
+│   ├── providers/
+│   │   ├── contracts/
+│   │   │   └── provider-api/
+│   │   │       ├── package.json
+│   │   │       ├── project.json
+│   │   │       └── src/
+│   │   ├── implementations/
+│   │   │   └── typescript/
+│   │   │       └── bridge-ai-sdk/
+│   │   │           ├── package.json
+│   │   │           ├── project.json
+│   │   │           ├── src/
+│   │   │           └── test/
+│   │   └── testkit/
+│   │       ├── package.json
+│   │       ├── project.json
+│   │       └── src/
+│   ├── shared/
+│   │   ├── contracts/
+│   │   │   └── core-types/
+│   │   │       ├── package.json
+│   │   │       ├── project.json
+│   │   │       └── src/
+│   │   └── implementations/
+│   │       └── typescript/
+│   └── hosts/
+│       └── implementations/
+│           └── typescript/
+│               └── playground/
+│                   ├── package.json
+│                   ├── project.json
+│                   └── src/
+├── tools/
+│   ├── nx/
+│   ├── scripts/
+│   │   ├── verify.ts
+│   │   ├── backend-contract.ts
+│   │   ├── cbor-fixtures.ts
+│   │   └── release-check.ts
+│   └── generators/
+└── tests/
+    ├── fixtures/
+    └── scenarios/
 ```
 
+### 5.1.1 Structure Rules
+- The repository is architecture-first and language-neutral at the top level.
+- `boundaries/` is the authoritative implementation tree.
+- Each architectural boundary owns its own contracts and implementations.
+- Language-specific code lives under `implementations/<language>/...`.
+- Nx manages the TypeScript projects in this tree. Nx does not define the repo ontology.
+- `shared/` must remain small and contain only truly cross-boundary primitives. It must not become a semantic dumping ground.
+- Contract-driven components such as backends, provider surfaces, tool contracts, and stream-event vocabulary must have an explicit contract home before any implementation package is added.
+
 ### 5.2 Coding Standards
-- **Formatting / Linting:** Use Biome configured to follow the Ultracite standards profile. Respect repo-local formatting settings rather than forcing a global style. Keep code explicit, type-safe, and maintainable.
-- **Build Tooling:** Use `tsup` for TypeScript package builds. Core packages emit ESM-first builds. Any compatibility outputs are adapter-specific and must not reintroduce CommonJS into core package design.
-- **TypeScript Settings:** 
+- **Formatting / Linting:** Use Biome configured to follow the repository’s Ultracite-aligned standards.
+- **Workspace Tooling:** Use `devenv` for reproducible developer environments and `nx@22.6.3` with aligned `@nx/*` packages for project orchestration, affected-graph analysis, caching, generators, and task coordination across the TypeScript subtree.
+- **Build Tooling:** Use `tsup` for TypeScript package builds. Core packages emit ESM-first builds.
+- **TypeScript Settings:**
   - `"strict": true`
   - `"module": "esnext"`
   - `"moduleResolution": "bundler"`
   - `"target": "es2025"`
   - explicit `"rootDir"` per package
   - explicit `"types"` arrays where runtime globals are required
+- **Kernel Encoding Rules:**
+  - deterministic CBOR only for structured kernel records
+  - lowercase hex SHA-256 digests only for canonical hash strings
+  - no floating-point values in normative kernel records
+  - timestamps are safe-integer epoch milliseconds
 - **Testing Expectations:**
-  - Unit tests for pure logic in `types`, `kernel-contract`, `kernel-memory`, and `framework`
-  - Shared persistence-contract tests that every backend implementation must pass
-  - Golden event-sequence tests including structured output events
-  - Bridge contract tests for the AI SDK and LangChain integrations
-  - Runtime portability tests for core packages at minimum on Bun and Node; Deno compatibility tests added as soon as package surface stabilizes
+  - unit tests for pure logic in `shared/contracts/core-types`, `kernel/contracts/protocol`, `kernel/implementations/typescript/backend-memory`, `kernel/implementations/typescript/backend-sqlite`, and `framework/implementations/typescript/core`
+  - golden-byte tests for deterministic CBOR encodings
+  - hash identity fixtures for opaque bytes and structured records
+  - shared backend contract tests that every official backend must pass
+  - recovery and checkpoint scenario tests covering pause/resume, reactive checkpointing, and rollback archival
+  - AI SDK bridge contract tests
+  - runtime portability tests for core packages on Bun and Node; Deno compatibility tests for core non-native packages as soon as package surfaces stabilize
 - **Observability Hooks:**
-  - Structured logger interface injected at runtime boundaries
-  - Event tee support for tests and host adapters
-  - Stable metric names for turn count, iteration count, provider latency, tool latency, checkpoint count, and recovery count
+  - structured logger interface injected at runtime boundaries
+  - event tee support for tests and host adapters
+  - stable metric names for turn count, iteration count, provider latency, tool latency, checkpoint count, and recovery count
 - **Migration / Deployment Notes:**
-  - The in-memory backend requires no migrations and is not a persisted production backend
-  - Persisted backend packages must ship their own migration runners
-  - No runtime may silently weaken backend guarantees below the Kernel storage contract
+  - `kernel/implementations/typescript/backend-memory` has no persisted migration surface
+  - `kernel/implementations/typescript/backend-sqlite` ships forward-only SQL migrations
+  - the first SQLite backend implementation is Node.js-first because it depends on `better-sqlite3@12.8.0`
+  - future backends own their own physical migration story
+  - no runtime may silently weaken backend guarantees below the kernel contract
 - **Performance / Capacity Notes:**
-  - Context decisions should rely on `ContextManifest`, not repeated history scans
-  - Bridge packages must keep provider-native details out of the core hot path
-  - Backends should support hash-only traversal for diff, lineage, and manifest operations where full object loads are unnecessary
+  - `ContextManifest` exists to avoid repeated full-history scans
+  - ordered-path chunking is an internal optimization and must remain protocol-invisible
+  - provider bridges must keep provider-specific details out of core hot paths
 
 ### 5.3 Documentation Drift Prevention
-- `constitution/PRD.md`, `constitution/Architecture.md`, and `constitution/TechSpec.md` remain the authoritative governing artifacts for product, architecture, and implementation posture and must be updated whenever scope, logical architecture, or implementation posture changes materially.
-- New backend implementations require an update to the backend matrix and persistence-contract documentation.
-- New public package contracts require matching examples or tests in `examples/playground-host` or `packages/testkit`.
+- `docs/KrakenKernelSpecification.md` and `docs/KrakenFrameworkSpecification.md` remain the authoritative behavioral sources that this TechSpec realizes physically.
+- `constitution/PRD.md`, `constitution/Architecture.md`, and `constitution/TechSpec.md` remain the governing artifacts for product, logical architecture, and technical implementation posture.
+- Changes to provider posture, backend posture, record encoding, hash algorithm, or public framework contracts require a TechSpec update in the same change.
+- New backend adapters require updates to backend conformance documentation and compatibility notes.
 
 ### 5.4 Initial Build Sequence
-1. Create workspace scaffolding and root Bun/TypeScript/tsup/Biome configuration.
-2. Implement `packages/types` with canonical runtime types, including structured output.
-3. Implement `packages/kernel-contract` with backend-neutral persistence interfaces and shared contract tests.
-4. Implement `packages/kernel-memory` as the built-in backend for development and semantic contract tests.
-5. Implement `packages/framework` against the kernel contract and provider contract.
-6. Select and implement the first persisted backend that can satisfy the full Kernel storage contract.
-7. Implement `provider-bridge-ai-sdk` and `provider-bridge-langchain`.
-8. Implement stream adapter packages and the playground host.
-9. Revisit the open P0 decisions around native Kernel posture, structural sharing, and canonical serialization before locking the long-term backend strategy.
+1. Scaffold `devenv`, `nx`, the Bun workspace, root TypeScript configuration, Biome configuration, and the boundary-grouped monorepo layout.
+2. Implement `boundaries/shared/contracts/core-types` with the small set of truly cross-boundary primitives.
+3. Implement `boundaries/kernel/contracts/protocol` with exact protocol data types, deterministic CBOR utilities, SHA-256 hashing helpers, validation rules, and shared semantic fixtures.
+4. Implement `boundaries/kernel/implementations/typescript/backend-memory` as the reference semantic backend.
+5. Implement `boundaries/kernel/implementations/typescript/backend-sqlite` with WAL mode, migrations, and full backend contract conformance.
+6. Implement the framework contract packages under `boundaries/framework/contracts/`.
+7. Implement `boundaries/framework/implementations/typescript/core` against the kernel protocol and backend ports.
+8. Implement `boundaries/providers/contracts/provider-api` and then `boundaries/providers/implementations/typescript/bridge-ai-sdk`.
+9. Implement stream adapter packages and the playground host under their architectural boundaries.
+10. Add backend conformance suites for future peer adapters such as PostgreSQL and MySQL/MariaDB before expanding the official backend set.
