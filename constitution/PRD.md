@@ -2,7 +2,6 @@
 
 ## 0. Version History & Changelog
 - v0.1.0 - Initial PRD synthesized from the existing Kraken kernel/framework specifications and rationale documents.
-- ... [Older history truncated, refer to git logs]
 
 ## 1. Executive Summary & Target Archetype
 - **Target Archetype:** Embeddable stateful agent runtime kernel plus application framework/SDK
@@ -44,6 +43,7 @@
 | Staged Result | Durable work product recorded before it is committed into history. | temp output, ephemeral result |
 | Context Manifest | The lightweight structural index used to reason about active context without rescanning full history. | summary, prompt cache |
 | Context Engineering | Intentional reshaping of active context while preserving historical auditability. | deleting history, prompt trimming |
+| Structured Output | Assistant-authored schema-constrained data produced as content, not as a tool call or side effect. | JSON mode, fake tool call |
 | Steering | Host-supplied user input injected between iterations of a running turn. | cancel, edit-in-place |
 | Approval | Human review required before executing one or more sensitive tool actions. | pause forever, manual override only |
 | Extension | A composable policy or behavior unit that can observe, influence, or wrap execution. | plugin blob, middleware soup |
@@ -145,7 +145,7 @@
 ### Epic: Model and Tool Interaction
 - **Priority:** P0
 - **Capability ID:** CAP-P0-012
-- **Capability:** The product must normalize model outputs into a canonical internal representation of conversational content, reasoning content, tool calls, tool results, and file-like payloads.
+- **Capability:** The product must normalize model outputs into a canonical internal representation of conversational content, reasoning content, structured output, tool calls, tool results, and file-like payloads.
 - **Rationale:** Builders need one stable runtime model even when upstream model providers differ.
 
 - **Priority:** P0
@@ -280,7 +280,7 @@
 ### In Scope
 - A runtime kernel that preserves durable execution state, lineage, and recoverable history
 - A framework layer that executes agent turns, manages iteration, and incorporates model and tool work
-- Canonical runtime representations for messages, tool calls, tool results, reasoning content, and file-like payloads
+- Canonical runtime representations for messages, reasoning content, structured output, tool calls, tool results, and file-like payloads
 - Context engineering for active-context pruning, summarization, compaction, or replacement while preserving audit history
 - Host-facing controls for event consumption, cancellation, steering, and approval resolution
 - Human-in-the-loop approval flows for sensitive tool execution

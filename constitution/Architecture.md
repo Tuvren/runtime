@@ -2,7 +2,6 @@
 
 ## 0. Version History & Changelog
 - v0.1.0 - Initial architecture derived from PRD v0.1.0, establishing the logical container model, critical flows, and resilience posture for Kraken Runtime.
-- ... [Older history truncated, refer to git logs]
 
 ## 1. Architectural Strategy & Archetype Alignment
 - **Architectural Pattern:** Layered modular runtime with a narrow kernel boundary, explicit adapter edges, and orchestrated execution loops
@@ -52,7 +51,7 @@
 
 ### Agent Runtime Core
 - **Logical Type:** Domain service layer
-- **Responsibility:** Render prompts, manage canonical content types, evaluate loop decisions, normalize provider responses, define tool batches, and compose extension behavior around model and tool work.
+- **Responsibility:** Render prompts, manage canonical content types including structured output, evaluate loop decisions, normalize provider responses, define tool batches, and compose extension behavior around model and tool work.
 - **Inputs:** Active messages and manifest, agent configuration, extension contributions, provider responses, tool definitions, approval decisions.
 - **Outputs:** Canonical assistant messages, tool call batches, runtime resolutions, runtime status updates, extension state updates.
 - **Depends on:** Provider Gateway, Tool Execution Gateway, Extension Runtime, Context Assembly and Engineering.
@@ -73,7 +72,7 @@
 
 ### Provider Gateway
 - **Logical Type:** External integration boundary
-- **Responsibility:** Translate canonical prompts to provider-facing requests, translate provider outputs and streams back into canonical Kraken representations, and preserve provider continuity artifacts without leaking provider-specific ontology inward.
+- **Responsibility:** Translate canonical prompts to provider-facing requests, translate provider outputs and streams back into canonical Kraken representations including structured output, and preserve provider continuity artifacts without leaking provider-specific ontology inward.
 - **Inputs:** Canonical prompt, rendered tool definitions, model configuration.
 - **Outputs:** Canonical model responses, normalized stream chunks, provider metadata continuity artifacts, provider failure signals.
 - **Depends on:** External Model Providers.
@@ -108,7 +107,7 @@
 
 ### Event Stream Adapter Layer
 - **Logical Type:** Outbound protocol adaptation boundary
-- **Responsibility:** Convert canonical Kraken stream events into host-facing protocol shapes while preserving source attribution and execution ordering.
+- **Responsibility:** Convert canonical Kraken stream events, including structured-output events, into host-facing protocol shapes while preserving source attribution and execution ordering.
 - **Inputs:** Canonical runtime events, custom events, worker-forwarded events.
 - **Outputs:** Protocol-ready event streams for host consumers.
 - **Depends on:** Execution Driver, Extension Runtime, Orchestration Runtime.
@@ -195,7 +194,7 @@ Driver->>Core: execute iteration with active context
 Core->>Ext: collect prompts / aroundModel wrappers
 Core->>Provider: stream canonical prompt
 Provider-->>Core: normalized response stream + final response
-Core-->>Driver: assistant message, tool intents, loop decision, state updates
+Core-->>Driver: assistant message, structured output, tool intents, loop decision, state updates
 Driver->>Kernel: stage assistant message + manifest and checkpoint iteration
 Kernel->>State: atomically commit staged results into new TurnNode / TurnTree
 Kernel-->>Driver: new head committed
