@@ -1,24 +1,32 @@
 {
   "$schema": "./node_modules/nx/schemas/nx-schema.json",
+  "plugins": [
+    {
+      "plugin": "@nx/js/typescript",
+      "options": {
+        "typecheck": {
+          "targetName": "typecheck"
+        },
+        "build": {
+          "targetName": "build",
+          "configName": "tsconfig.lib.json",
+          "buildDepsName": "build-deps",
+          "watchDepsName": "watch-deps"
+        }
+      }
+    }
+  ],
   "namedInputs": {
     "default": ["{projectRoot}/**/*"],
     "production": ["default"]
   },
   "targetDefaults": {
-    "build": {
-      "cache": true,
-      "inputs": ["production", "^production"]
-    },
-    "test": {
-      "cache": true,
-      "inputs": ["default", "^production"]
-    },
-    "lint": {
+    "typecheck": {
       "cache": true,
       "inputs": [
-        "default",
-        "{workspaceRoot}/biome.jsonc",
-        "{workspaceRoot}/package.json"
+        "production",
+        "^production",
+        "{workspaceRoot}/tsconfig.base.json"
       ]
     }
   },

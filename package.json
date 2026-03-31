@@ -9,8 +9,8 @@
     "boundaries/*/testkit"
   ],
   "scripts": {
-    "lint": "ultracite check .",
-    "format": "ultracite fix .",
+    "lint": "bunx --bun @biomejs/biome check .",
+    "format": "bunx --bun @biomejs/biome check --write .",
     "typecheck": "tsc -b --pretty false",
     "graph": "nx graph"
   },
