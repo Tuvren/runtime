@@ -487,7 +487,7 @@ export type KrakenStreamEvent =
 │   │   ├── src/
 │   │   ├── test/
 │   │   └── package.json
-│   ├── constitution/
+│   ├── framework/
 │   │   ├── src/
 │   │   ├── test/
 │   │   └── package.json

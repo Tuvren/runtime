@@ -227,7 +227,10 @@ Driver->>Kernel: stage paused runtime status + manifest, complete paused Run
 Kernel->>State: checkpoint partial batch into new TurnNode
 Driver->>Events: emit approval.requested then paused turn.end
 Host->>Driver: resolveApproval(decisions)
-Driver->>Kernel: fail paused Run and restage runtime status = running
+Driver->>Kernel: fail paused Run to unblock Branch
+Driver->>Events: emit resumed turn.start and approval.resolved
+Driver->>Kernel: create replacement Run from pause TurnNode
+Driver->>Kernel: stage runtime status = running for resumed execution
 Driver->>Tooling: resume only unfinished tool calls with decisions
 Tooling->>Kernel: stage resumed tool results
 Kernel->>State: commit resumed results and new history point
