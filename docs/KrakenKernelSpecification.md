@@ -683,14 +683,20 @@ turn.updateHead(id, headTurnNodeHash) → void
 
 ### 8.1 Storage Contract
 
-The kernel requires **single-writer ACID transactions** across its storage tables:
+The kernel defines its persistence requirements as **observable behavioral guarantees**, not as a dependency on any specific storage product, database category, or deployment topology. Any storage backend or combination of backends is acceptable if and only if the implementation as a whole satisfies every guarantee below.
 
-- **Atomic single-row writes**: `store.put` and status updates are all-or-nothing.
-- **Atomic multi-row writes**: `staging.stage` (Object + StagedResult) and checkpoint transactions (TurnTree + TurnNode + Branch Head + staging clear) commit atomically.
-- **Durable visibility**: once committed, subsequent reads see the committed state, even after restart.
+**Required semantics:**
+
+- **Atomic single-entity writes**: `store.put` and status updates are all-or-nothing. An Object either exists in durable storage or it does not.
+- **Atomic multi-entity writes**: `staging.stage` (Object + StagedResult) and checkpoint transactions (TurnTree + TurnNode + Branch Head + staging clear) commit atomically. Either all entities become visible together, or none do.
+- **Durable visibility**: once committed, subsequent reads see the committed state, even after process restart.
 - **Read-after-write consistency**: within the same writer, reads after a committed write always reflect the write.
 
-SQLite with WAL satisfies all of these.
+**Implementation freedom**: The kernel does not prescribe a storage engine, schema shape, or deployment model. A single embedded database, a distributed store with coordination, a multi-backend architecture splitting objects from metadata — all are valid choices provided the behavioral guarantees hold. Concrete technologies (SQLite, PostgreSQL, S3, etc.) are illustrative examples, not normative anchors.
+
+**Non-transactional backends**: Storage substrates that do not natively provide the required atomicity or durability guarantees are acceptable only when wrapped in an adapter or coordination layer that restores those guarantees at the boundary the kernel observes. The kernel contract is satisfied by the observable behavior of the storage surface it calls, not by the internal properties of any individual component behind that surface.
+
+Backend choice is an implementation concern. Correctness semantics are not.
 
 ### 8.2 Kernel Invariants
 
