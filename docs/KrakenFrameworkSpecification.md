@@ -1,6 +1,6 @@
 # Kraken Framework Specification
 
-**Version**: v0.13
+**Version**: v0.14
 **Status**: Authoritative
 **Basis**: Kernel Specification v0.9 (frozen)
 
@@ -52,10 +52,18 @@ FilePart
 ├─ filename?: string
 └─ providerMetadata?: Record<string, unknown>
 
-ContentPart = TextPart | ReasoningPart | ToolCallPart | ToolResultPart | FilePart
+StructuredPart
+├─ type: "structured"
+├─ data: unknown                    // parsed structured data, never a raw string
+├─ name?: string                    // schema/format identifier from the request
+└─ providerMetadata?: Record<string, unknown>
+
+ContentPart = TextPart | ReasoningPart | ToolCallPart | ToolResultPart | FilePart | StructuredPart
 ```
 
-Design principles: one type per part (no bag-of-optional-fields). Tool call input is always parsed. `callId` is framework-owned (provider-native IDs in `providerMetadata`). `providerMetadata` is structural — carries opaque tokens needed for multi-turn continuity (Anthropic’s `signature`, OpenAI’s `encrypted_content`, Google’s `thoughtSignature`). No provider-specific content types in the canonical model. Streaming is not in the content model — these types represent complete, durable content.
+Design principles: one type per part (no bag-of-optional-fields). Tool call input is always parsed. Structured output data is always parsed. `callId` is framework-owned (provider-native IDs in `providerMetadata`). `providerMetadata` is structural — carries opaque tokens needed for multi-turn continuity (Anthropic’s `signature`, OpenAI’s `encrypted_content`, Google’s `thoughtSignature`). No provider-specific content types in the canonical model. Streaming is not in the content model — these types represent complete, durable content.
+
+Structured output is assistant-authored structured data — a distinct content kind from freeform text and from tool use. It is not a tool call, does not require a tool result, and does not imply executable side effects. Tool calls remain for delegated actions and side effects. Structured output is model-generated data conforming to a requested schema.
 
 ### 1.2 Messages
 
@@ -98,10 +106,20 @@ KrakenModelConfig
 `RenderedToolDefinition` is the provider-facing projection of a runtime tool definition. Runtime executable tool definitions do not cross the provider prompt boundary.
 
 ```
+StructuredOutputRequest
+├─ schema: JSONSchema               // the schema to request
+├─ name?: string                    // optional identifier for the schema
+└─ strict?: boolean                 // enforcement hint for providers that support native schema enforcement
+```
+
+`StructuredOutputRequest` is the provider-neutral contract for requesting schema-constrained model output. `schema` is the JSON Schema the response must satisfy. `name` is an optional identifier for the schema (mapped to provider-native name fields where applicable). `strict` is an enforcement hint — providers that support native structured output enforcement (OpenAI’s strict mode, Google’s `responseSchema`) apply it at generation time; providers that do not support native enforcement must either reject with a clear error or fall back through a documented compatibility path (e.g., schema-in-prompt instruction).
+
+```
 KrakenPrompt
 ├─ messages: KrakenMessage[]
 ├─ tools?: RenderedToolDefinition[]
-└─ config?: KrakenModelConfig
+├─ config?: KrakenModelConfig
+└─ responseFormat?: StructuredOutputRequest
 
 KrakenModelResponse
 ├─ parts: ContentPart[]
@@ -254,7 +272,7 @@ EventSource
 
 **Lifecycle events**: `turn.start`, `turn.end`, `iteration.start`, `iteration.end`
 
-**Model output events** (streaming): `message.start`, `text.delta`, `text.done`, `reasoning.delta`, `reasoning.done`, `tool_call.start`, `tool_call.args_delta`, `tool_call.done`, `message.done`
+**Model output events** (streaming): `message.start`, `text.delta`, `text.done`, `reasoning.delta`, `reasoning.done`, `structured.delta`, `structured.done`, `tool_call.start`, `tool_call.args_delta`, `tool_call.done`, `message.done`
 
 **Tool execution events**: `tool.start`, `tool.result`
 
@@ -264,7 +282,7 @@ EventSource
 
 **Custom events**: `custom` (extension-defined `name` and `data`)
 
-Twenty-two event types in six groups. Complete type definitions:
+Twenty-four event types in six groups. Complete type definitions:
 
 ```
 TurnStartEvent         { type: "turn.start", turnId, threadId, resumedFrom?: string, timestamp }
@@ -277,6 +295,8 @@ TextDeltaEvent         { type: "text.delta", messageId, delta: string, timestamp
 TextDoneEvent          { type: "text.done", messageId, text: string, timestamp }
 ReasoningDeltaEvent    { type: "reasoning.delta", messageId, delta: string, timestamp }
 ReasoningDoneEvent     { type: "reasoning.done", messageId, timestamp }
+StructuredDeltaEvent   { type: "structured.delta", messageId, delta: string, timestamp }
+StructuredDoneEvent    { type: "structured.done", messageId, data: unknown, name?: string, timestamp }
 ToolCallStartEvent     { type: "tool_call.start", messageId, callId, name, timestamp }
 ToolCallArgsDeltaEvent { type: "tool_call.args_delta", callId, delta: string, timestamp }
 ToolCallDoneEvent      { type: "tool_call.done", callId, name, input: unknown, timestamp }
@@ -298,11 +318,11 @@ CustomEvent            { type: "custom", name: string, data: unknown, timestamp 
 
 `TurnStartEvent.resumedFrom`: When present, contains the TurnNode hash of the pause point. Protocol adapters use this to distinguish fresh Turns from resumed Turns. Absent means fresh Turn.
 
-**Ordering guarantees**: `message.start` precedes all deltas for that message. `text.delta` events arrive in order. `tool_call.start` precedes `tool_call.args_delta`. `message.done` follows all content events. Note: `tool_call.*` describes what the model requests (args streaming). `tool.*` describes what the framework executes. These are two different moments.
+**Ordering guarantees**: `message.start` precedes all deltas for that message. `text.delta` events arrive in order. `structured.delta` events arrive in order; `structured.done` follows all `structured.delta` events for that message. `tool_call.start` precedes `tool_call.args_delta`. `message.done` follows all content events. Note: `tool_call.*` describes what the model requests (args streaming). `tool.*` describes what the framework executes. These are two different moments.
 
 **Contract tiers**: Kraken's internal event vocabulary is intentionally richer than any single external protocol. Protocol adapters consume this canonical stream and bridge it into AG-UI, ACP, OpenResponses-style transports, or any other host protocol.
 
-**Required core events**: `turn.start`, `turn.end`, `iteration.start`, `iteration.end`, `message.start`, `text.delta`, `text.done`, `reasoning.delta`, `reasoning.done`, `tool_call.start`, `tool_call.args_delta`, `tool_call.done`, `message.done`, `tool.start`, `tool.result`, `approval.requested`, `approval.resolved`, `steering.incorporated`, and `error`. When their corresponding runtime moments occur, the framework MUST emit them.
+**Required core events**: `turn.start`, `turn.end`, `iteration.start`, `iteration.end`, `message.start`, `text.delta`, `text.done`, `reasoning.delta`, `reasoning.done`, `structured.delta`, `structured.done`, `tool_call.start`, `tool_call.args_delta`, `tool_call.done`, `message.done`, `tool.start`, `tool.result`, `approval.requested`, `approval.resolved`, `steering.incorporated`, and `error`. When their corresponding runtime moments occur, the framework MUST emit them.
 
 **Optional standardized events**: `state.snapshot`, `state.checkpoint`, and `custom`. Their shapes and meanings are standardized, but hosts and protocol adapters MUST tolerate their absence. They are observability and integration affordances, not correctness dependencies.
 
@@ -401,6 +421,8 @@ ProviderStreamChunk =
   | { type: "tool_call_start", providerCallId: string, name: string }
   | { type: "tool_call_args_delta", providerCallId: string, delta: string }
   | { type: "tool_call_done", providerCallId: string, name: string, input: unknown }
+  | { type: "structured_delta", delta: string }
+  | { type: "structured_done", data: unknown, name?: string }
   | { type: "finish", finishReason: string, usage?: { inputTokens: number, outputTokens: number },
       providerMetadata?: Record<string, unknown> }
   | { type: "error", error: unknown }
@@ -421,7 +443,7 @@ StreamAccumulator
 ├─ hasContent(): boolean
 ```
 
-`absorb` processes one chunk: appends text deltas, accumulates tool call arguments, captures usage and metadata. `finalize` produces the complete `KrakenModelResponse` with all parts assembled, arguments parsed, and metadata merged. `hasContent` returns whether any chunks have been absorbed — used by the driver to detect aroundModel short-circuits that need synthetic event generation (§6.5).
+`absorb` processes one chunk: appends text deltas, accumulates tool call arguments, accumulates structured output deltas, captures usage and metadata. `finalize` produces the complete `KrakenModelResponse` with all parts assembled, arguments parsed, structured output parsed into `StructuredPart.data`, and metadata merged. If structured output cannot be parsed (malformed JSON or equivalent), `finalize` produces an error response. `hasContent` returns whether any chunks have been absorbed — used by the driver to detect aroundModel short-circuits that need synthetic event generation (§6.5).
 
 ### 3.4 Adapter Strategy
 
@@ -441,6 +463,46 @@ Both produce identical behavior from the framework’s perspective. Package topo
 ```
 
 Each adapter implements two conversion directions: outbound (`KrakenPrompt → provider payload`) and inbound (`provider response/stream → KrakenModelResponse/ProviderStreamChunk`). Typically 50–150 lines per direction.
+
+### 3.5 Structured Output
+
+Structured output is model-authored structured data requested via `StructuredOutputRequest` on the prompt and returned as a `StructuredPart` on the assistant message. This section defines the full contract: adapter normalization, streaming behavior, validation, and failure.
+
+#### Adapter Normalization
+
+Provider adapters normalize provider-native structured responses into `StructuredPart` before durable staging. The canonical model never exposes provider-specific structured output types.
+
+Outbound: when `KrakenPrompt.responseFormat` is set, the adapter maps `StructuredOutputRequest` to the provider's native structured output mechanism (OpenAI's `response_format`, Google's `generationConfig.responseSchema`, or equivalent). When the provider does not support native structured output, the adapter must either reject with a clear error identifying the unsupported capability, or fall back through a documented compatibility path (e.g., injecting the schema into the system prompt as an instruction). The choice between rejection and fallback is adapter-specific and must be documented per adapter.
+
+Inbound: the adapter maps the provider's structured response into a `StructuredPart` with `data` containing the parsed result and `name` carrying the schema identifier from the request. Provider-specific structured output metadata (e.g., refusal reasons, schema enforcement details) is preserved in `providerMetadata`.
+
+#### Streaming Behavior
+
+Structured output follows the same two-path model as text content:
+
+**Live path**: Provider stream chunks of type `structured_delta` are translated into `structured.delta` framework events and yielded to the output iterable immediately. The consumer sees the raw structured content building incrementally. When the provider emits `structured_done`, the driver yields `structured.done` with the final parsed data.
+
+**Durable path**: The same chunks are accumulated by the `StreamAccumulator`. On `finalize`, the accumulator parses the accumulated content into a `StructuredPart` with the complete parsed `data`. This complete part is what gets staged as part of the durable assistant message.
+
+Both paths converge on the same durable `StructuredPart` representation. The streaming and non-streaming execution paths produce identical durable content.
+
+When `provider.generate()` is used instead of `provider.stream()`, the driver synthesizes `structured.delta` (with the full serialized content) and `structured.done` events from the complete response, consistent with the non-streaming fallback pattern (§6.3).
+
+#### Validation
+
+**Parse responsibility**: The `StreamAccumulator` parses raw structured output into `StructuredPart.data`. If parsing fails (malformed JSON or equivalent), the accumulator produces an error response and the driver treats it as a model call failure.
+
+**Schema validation**: After the `aroundModel` chain returns (whether it called `next` or not), the driver validates the `StructuredPart.data` against the `schema` from the prompt's `StructuredOutputRequest`. Provider-side enforcement via the `strict` flag is the first line of defense — providers that support native schema enforcement apply it at generation time. The framework validates after receipt regardless. This is consistent with the "framework always normalizes, never trusts the wire" principle applied to tool call argument parsing.
+
+**Failure behavior**: Schema mismatch produces `fail(hard)` with error code `structured_output_validation`. This is a defined runtime outcome, not a silent acceptance or best-effort parse. The error is staged and the Run fails through the standard `failIteration` path. The model does not see the invalid output on the next iteration — the Turn terminates.
+
+#### Lifecycle
+
+Structured output is ordinary assistant content. A `StructuredPart` lives on an assistant message's `parts` array alongside `TextPart`, `ReasoningPart`, or other content the model produced in the same response.
+
+Structured output survives checkpointing, recovery, rollback, handoff, and context engineering through the same mechanisms as any other content part. No special handling is required. Context assembly includes structured outputs in history unless explicitly removed by context engineering policy. Handoff context builders can read structured outputs from message history through the standard `ContextEngineeringHelpers`.
+
+No kernel primitive or syscall changes are required. Structured output is stored as part of serialized `KrakenMessage` Objects in the content-addressed store.
 
 ---
 
@@ -942,11 +1004,12 @@ If a `beforeIteration` hook returns a CE plan, the hook’s plan executes first.
 
 ```
 renderer.render(messages: KrakenMessage[], tools: RenderedToolDefinition[],
-                config: KrakenModelConfig, systemPrompts: string[])
+                config: KrakenModelConfig, systemPrompts: string[],
+                responseFormat?: StructuredOutputRequest)
   → KrakenPrompt
 ```
 
-Pure function. Same inputs, same output. `systemPrompts` contains the final ordered system prompt sequence supplied to the model: extension contributions in registration order followed by the active agent’s base system prompt. Default: identity pass-through with system prompts prepended.
+Pure function. Same inputs, same output. `systemPrompts` contains the final ordered system prompt sequence supplied to the model: extension contributions in registration order followed by the active agent’s base system prompt. Default: identity pass-through with system prompts prepended and response format forwarded.
 
 ### 5.3 Loop Policy
 
@@ -960,7 +1023,7 @@ IterationDecision
 └─ reason?: string
 ```
 
-Default: `continue = true, executeTools = true` when `finishReason == "tool_call"`. `continue = false` otherwise.
+Default: `continue = true, executeTools = true` when `finishReason == "tool_call"`. `continue = false` otherwise. Responses containing structured output (`StructuredPart`) are evaluated by the same rules as freeform text responses — structured output does not alter loop policy semantics unless the policy is explicitly specialized.
 
 `IterationDecision` maps to `RuntimeResolution` during resolution composition.
 
@@ -1667,6 +1730,7 @@ AgentConfig
 ├─ extensions?: Extension[]
 ├─ loopPolicy?: LoopPolicy
 ├─ contextPolicy?: ContextPolicy
+├─ responseFormat?: StructuredOutputRequest
 └─ maxIterations?: number
 ```
 
@@ -1995,4 +2059,4 @@ This specification does not define:
 
 ---
 
-_v0.13. This is the single authoritative framework specification. All framework behavior — execution model, extension system, multi-agent orchestration, streaming, host contract, and tool dispatch — is defined here. Companion rationale is explanatory only and non-contract._
+_v0.14. This is the single authoritative framework specification. All framework behavior — execution model, extension system, multi-agent orchestration, streaming, host contract, and tool dispatch — is defined here. Companion rationale is explanatory only and non-contract._
