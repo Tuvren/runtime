@@ -159,6 +159,36 @@ function isDenseKernelArray(
   value: unknown[],
   activeParents: WeakSet<object>
 ): value is KernelArray {
+  if (Object.getOwnPropertySymbols(value).length > 0) {
+    return false;
+  }
+
+  const descriptors = Object.getOwnPropertyDescriptors(value);
+
+  for (const key of Object.getOwnPropertyNames(descriptors)) {
+    if (key === "length") {
+      continue;
+    }
+
+    const descriptor = descriptors[key];
+    const index = Number(key);
+
+    if (
+      !(
+        descriptor?.enumerable &&
+        Object.hasOwn(descriptor, "value") &&
+        Number.isInteger(index) &&
+        index >= 0 &&
+        index < value.length &&
+        String(index) === key
+      ) ||
+      Object.hasOwn(descriptor, "get") ||
+      Object.hasOwn(descriptor, "set")
+    ) {
+      return false;
+    }
+  }
+
   for (let index = 0; index < value.length; index += 1) {
     if (
       !(

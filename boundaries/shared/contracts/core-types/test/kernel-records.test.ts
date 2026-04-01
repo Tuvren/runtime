@@ -122,9 +122,35 @@ describe("KernelRecord", () => {
       if (hadOwnPrototypeElement) {
         Array.prototype[0] = originalPrototypeElement;
       } else {
-        Array.prototype[0] = undefined;
+        Reflect.deleteProperty(Array.prototype, 0);
       }
     }
+  });
+
+  test("rejects arrays with extra own metadata properties or symbols", () => {
+    const hiddenPropertyArray = [1];
+    Object.defineProperty(hiddenPropertyArray, "secret", {
+      enumerable: false,
+      value: 2,
+    });
+
+    const accessorArray = [1];
+    Object.defineProperty(accessorArray, "extra", {
+      enumerable: true,
+      get() {
+        return 2;
+      },
+    });
+
+    const symbolArray = [1];
+    symbolArray[Symbol("meta")] = 2;
+
+    expect(isKernelRecord(hiddenPropertyArray)).toBe(false);
+    expect(isKernelRecord(accessorArray)).toBe(false);
+    expect(isKernelRecord(symbolArray)).toBe(false);
+    expect(() => assertKernelRecord(hiddenPropertyArray, "record")).toThrow(
+      "record must match the restricted Kraken kernel record profile"
+    );
   });
 
   test("rejects objects with non-enumerable own string properties", () => {
