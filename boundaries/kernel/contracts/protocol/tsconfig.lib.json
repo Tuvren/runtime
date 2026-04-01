@@ -2,7 +2,7 @@
   "extends": "../../../../tsconfig.base.json",
   "compilerOptions": {
     "rootDir": "./src",
-    "outDir": "../../../../dist/boundaries/kernel/contracts/protocol"
+    "outDir": "./dist"
   },
   "include": ["src/**/*.ts"],
   "references": [

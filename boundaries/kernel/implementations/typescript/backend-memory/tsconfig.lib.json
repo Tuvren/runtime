@@ -2,7 +2,7 @@
   "extends": "../../../../../tsconfig.base.json",
   "compilerOptions": {
     "rootDir": "./src",
-    "outDir": "../../../../../dist/boundaries/kernel/implementations/typescript/backend-memory"
+    "outDir": "./dist"
   },
   "include": ["src/**/*.ts"],
   "references": [
