@@ -1,0 +1,18 @@
+{
+  "extends": "./tsconfig.base.json",
+  "files": [],
+  "references": [
+    {
+      "path": "./boundaries/shared/contracts/core-types/tsconfig.json"
+    },
+    {
+      "path": "./boundaries/kernel/contracts/protocol/tsconfig.json"
+    },
+    {
+      "path": "./boundaries/kernel/implementations/typescript/backend-memory/tsconfig.json"
+    },
+    {
+      "path": "./boundaries/kernel/testkit/tsconfig.json"
+    }
+  ]
+}
