@@ -145,9 +145,39 @@ export function hashTurnNodeIdentity(
 function toTurnNodeIdentityRecord(
   value: Omit<TurnNode, "hash"> | TurnNode
 ): KernelRecord {
-  const { hash: _ignoredHash, ...identityRecord } = value as TurnNode & {
+  const turnNodeValue = value as TurnNode & {
     hash?: HashString;
   };
+  const identityRecord = {
+    consumedStagedResults: turnNodeValue.consumedStagedResults.map(
+      (stagedResult) => {
+        const projectedResult = {
+          objectHash: stagedResult.objectHash,
+          objectType: stagedResult.objectType,
+          status: stagedResult.status,
+          taskId: stagedResult.taskId,
+          timestamp: stagedResult.timestamp,
+        } as {
+          interruptPayload?: KernelRecord;
+          objectHash: HashString;
+          objectType: string;
+          status: typeof stagedResult.status;
+          taskId: string;
+          timestamp: number;
+        };
+
+        if (stagedResult.interruptPayload !== undefined) {
+          projectedResult.interruptPayload = stagedResult.interruptPayload;
+        }
+
+        return projectedResult;
+      }
+    ),
+    eventHash: turnNodeValue.eventHash,
+    previousTurnNodeHash: turnNodeValue.previousTurnNodeHash,
+    schemaId: turnNodeValue.schemaId,
+    turnTreeHash: turnNodeValue.turnTreeHash,
+  } satisfies KernelRecord;
 
   assertKernelRecord(identityRecord, "turn node identity payload");
 

@@ -438,14 +438,14 @@ export interface ExecutionHandle {
 - **Compatibility Strategy:** Protocol-first contract. Breaking changes to record shapes, operation signatures, or validation semantics are semver-major.
 - **Error model:** `KrakenError` with persistence, validation, lineage, and recovery codes
 - **Concrete payload rule:** The frozen kernel specification names `ObserveResult.annotations` as `Object[]` and `signals` as `Signal[]`, but does not define their first TypeScript wire shape. The authoritative TypeScript realization is:
-  - observe annotations are `KernelRecord[]` carried into `run.completeStep`, where the kernel remains responsible for persisting them per the frozen kernel specification
+  - observe annotations are `KernelObject[]` carried into `run.completeStep`, where the kernel remains responsible for persisting them per the frozen kernel specification
   - observe signals are `KernelRecord[]`, keeping them serializable and boundary-safe within the run lifecycle
 
 ```ts
 export type KernelSignal = KernelRecord;
 
 export interface ObserveResult {
-  annotations: KernelRecord[];
+  annotations: KernelObject[];
   signals: KernelSignal[];
 }
 

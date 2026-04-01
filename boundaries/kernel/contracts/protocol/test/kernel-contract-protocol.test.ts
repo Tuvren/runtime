@@ -26,6 +26,7 @@ import {
 import { deterministicKernelRecordFixture } from "../../../../../tests/fixtures/kernel-record-fixtures.js";
 import {
   assertBranchHeadListEntry,
+  assertBranchRecord,
   assertObserveResult,
   assertPathValue,
   assertPathValueForCollectionKind,
@@ -488,6 +489,33 @@ describe("logical contract fixtures", () => {
     ).rejects.toThrow("hash must match the canonical TurnNode identity hash");
   });
 
+  test("rejects stored-only metadata on logical lifecycle records", () => {
+    expect(() =>
+      assertThreadRecord({
+        ...kernelProtocolLogicalFixtures.threadRecord,
+        createdAtMs: 1_717_171_717_171,
+      })
+    ).toThrow("createdAtMs is not part of the contract shape");
+    expect(() =>
+      assertBranchRecord({
+        ...kernelProtocolLogicalFixtures.branchRecord,
+        archivedFromBranchId: "branch_archive",
+      })
+    ).toThrow("archivedFromBranchId is not part of the contract shape");
+    expect(() =>
+      assertTurnRecord({
+        ...kernelProtocolLogicalFixtures.turnRecord,
+        updatedAtMs: 1_717_171_717_272,
+      })
+    ).toThrow("updatedAtMs is not part of the contract shape");
+    expect(() =>
+      assertRunRecord({
+        ...kernelProtocolLogicalFixtures.runRecord,
+        createdAtMs: 1_717_171_717_171,
+      })
+    ).toThrow("createdAtMs is not part of the contract shape");
+  });
+
   test("rejects impossible run step indexes", () => {
     expect(() =>
       assertRunRecord(
@@ -502,7 +530,7 @@ describe("logical contract fixtures", () => {
         ...kernelProtocolLogicalFixtures.turnNode,
         createdAtMs: 1_717_171_717_272,
       })
-    ).toThrow("createdAtMs is not part of the logical TurnNode contract");
+    ).toThrow("createdAtMs is not part of the contract shape");
   });
 
   test("rejects recovery states whose lastCompletedStepId is not declared", () => {
@@ -536,9 +564,16 @@ describe("logical contract fixtures", () => {
     ).toBe(false);
     expect(() =>
       assertObserveResult(kernelProtocolInvalidFixtures.invalidObserveResult)
-    ).toThrow(
-      "annotations[0] must match the restricted Kraken kernel record profile"
-    );
+    ).toThrow("annotations[0] must be a plain object");
+  });
+
+  test("rejects staged results with undeclared extra fields", () => {
+    expect(() =>
+      assertStagedResult({
+        ...kernelProtocolLogicalFixtures.stagedResult,
+        debug: 1,
+      })
+    ).toThrow("debug is not part of the contract shape");
   });
 
   test("rejects invalid branch head list entries", () => {

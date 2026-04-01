@@ -18,6 +18,7 @@
 import type {
   EpochMs,
   HashString,
+  KernelObject,
   KernelRecord,
 } from "@kraken/shared-core-types";
 
@@ -57,7 +58,7 @@ export interface StepDeclaration {
 }
 
 export interface ObserveResult {
-  annotations: KernelRecord[];
+  annotations: KernelObject[];
   signals: KernelRecord[];
 }
 
@@ -80,35 +81,28 @@ export interface TurnNode {
 }
 
 export interface ThreadRecord {
-  createdAtMs?: EpochMs;
   rootTurnNodeHash: HashString;
   schemaId: string;
   threadId: string;
 }
 
 export interface BranchRecord {
-  archivedFromBranchId?: string;
   branchId: string;
-  createdAtMs?: EpochMs;
   headTurnNodeHash: HashString;
   threadId: string;
-  updatedAtMs?: EpochMs;
 }
 
 export interface TurnRecord {
   branchId: string;
-  createdAtMs?: EpochMs;
   headTurnNodeHash: HashString;
   parentTurnId: string | null;
   startTurnNodeHash: HashString;
   threadId: string;
   turnId: string;
-  updatedAtMs?: EpochMs;
 }
 
 export interface RunRecord {
   branchId: string;
-  createdAtMs?: EpochMs;
   createdTurnNodes: HashString[];
   currentStepIndex: number;
   runId: string;
@@ -117,7 +111,6 @@ export interface RunRecord {
   status: RunStatus;
   stepSequence: StepDeclaration[];
   turnId: string;
-  updatedAtMs?: EpochMs;
 }
 
 export interface StepContext {

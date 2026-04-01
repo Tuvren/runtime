@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-import type { KernelRecord } from "@kraken/shared-core-types";
+import type { KernelObject, KernelRecord } from "@kraken/shared-core-types";
 import {
   assertEpochMs,
   assertHashString,
@@ -197,8 +197,9 @@ export function assertObserveResult(
   label = "value"
 ): asserts value is ObserveResult {
   const objectValue = assertPlainObject(value, label);
+  assertAllowedObjectKeys(objectValue, ["annotations", "signals"], label);
 
-  assertKernelRecordArray(objectValue.annotations, `${label}.annotations`);
+  assertKernelObjectArray(objectValue.annotations, `${label}.annotations`);
   assertKernelRecordArray(objectValue.signals, `${label}.signals`);
 }
 
@@ -266,6 +267,18 @@ export function assertTurnNode(
   label = "value"
 ): asserts value is TurnNode {
   const objectValue = assertPlainObject(value, label);
+  assertAllowedObjectKeys(
+    objectValue,
+    [
+      "consumedStagedResults",
+      "eventHash",
+      "hash",
+      "previousTurnNodeHash",
+      "schemaId",
+      "turnTreeHash",
+    ],
+    label
+  );
 
   assertHashString(objectValue.hash, `${label}.hash`);
   assertNullableHashString(
@@ -279,14 +292,6 @@ export function assertTurnNode(
   );
   assertNonEmptyString(objectValue.schemaId, `${label}.schemaId`);
   assertNullableHashString(objectValue.eventHash, `${label}.eventHash`);
-
-  if (objectValue.createdAtMs !== undefined) {
-    throw validationError(
-      `${label}.createdAtMs is not part of the logical TurnNode contract`,
-      "invalid_turn_node_field",
-      { field: "createdAtMs" }
-    );
-  }
 }
 
 export async function assertTurnNodeIdentity(
@@ -318,14 +323,15 @@ export function assertThreadRecord(
   label = "value"
 ): asserts value is ThreadRecord {
   const objectValue = assertPlainObject(value, label);
+  assertAllowedObjectKeys(
+    objectValue,
+    ["rootTurnNodeHash", "schemaId", "threadId"],
+    label
+  );
 
   assertNonEmptyString(objectValue.threadId, `${label}.threadId`);
   assertNonEmptyString(objectValue.schemaId, `${label}.schemaId`);
   assertHashString(objectValue.rootTurnNodeHash, `${label}.rootTurnNodeHash`);
-
-  if (objectValue.createdAtMs !== undefined) {
-    assertEpochMs(objectValue.createdAtMs, `${label}.createdAtMs`);
-  }
 }
 
 export function isBranchRecord(value: unknown): value is BranchRecord {
@@ -337,25 +343,15 @@ export function assertBranchRecord(
   label = "value"
 ): asserts value is BranchRecord {
   const objectValue = assertPlainObject(value, label);
+  assertAllowedObjectKeys(
+    objectValue,
+    ["branchId", "headTurnNodeHash", "threadId"],
+    label
+  );
 
   assertNonEmptyString(objectValue.branchId, `${label}.branchId`);
   assertNonEmptyString(objectValue.threadId, `${label}.threadId`);
   assertHashString(objectValue.headTurnNodeHash, `${label}.headTurnNodeHash`);
-
-  if (objectValue.archivedFromBranchId !== undefined) {
-    assertNonEmptyString(
-      objectValue.archivedFromBranchId,
-      `${label}.archivedFromBranchId`
-    );
-  }
-
-  if (objectValue.createdAtMs !== undefined) {
-    assertEpochMs(objectValue.createdAtMs, `${label}.createdAtMs`);
-  }
-
-  if (objectValue.updatedAtMs !== undefined) {
-    assertEpochMs(objectValue.updatedAtMs, `${label}.updatedAtMs`);
-  }
 }
 
 export function isBranchHeadListEntry(
@@ -391,6 +387,18 @@ export function assertTurnRecord(
   label = "value"
 ): asserts value is TurnRecord {
   const objectValue = assertPlainObject(value, label);
+  assertAllowedObjectKeys(
+    objectValue,
+    [
+      "branchId",
+      "headTurnNodeHash",
+      "parentTurnId",
+      "startTurnNodeHash",
+      "threadId",
+      "turnId",
+    ],
+    label
+  );
 
   assertNonEmptyString(objectValue.turnId, `${label}.turnId`);
   assertNonEmptyString(objectValue.threadId, `${label}.threadId`);
@@ -398,14 +406,6 @@ export function assertTurnRecord(
   assertNullableString(objectValue.parentTurnId, `${label}.parentTurnId`);
   assertHashString(objectValue.startTurnNodeHash, `${label}.startTurnNodeHash`);
   assertHashString(objectValue.headTurnNodeHash, `${label}.headTurnNodeHash`);
-
-  if (objectValue.createdAtMs !== undefined) {
-    assertEpochMs(objectValue.createdAtMs, `${label}.createdAtMs`);
-  }
-
-  if (objectValue.updatedAtMs !== undefined) {
-    assertEpochMs(objectValue.updatedAtMs, `${label}.updatedAtMs`);
-  }
 }
 
 export function isRunRecord(value: unknown): value is RunRecord {
@@ -417,6 +417,21 @@ export function assertRunRecord(
   label = "value"
 ): asserts value is RunRecord {
   const objectValue = assertPlainObject(value, label);
+  assertAllowedObjectKeys(
+    objectValue,
+    [
+      "branchId",
+      "createdTurnNodes",
+      "currentStepIndex",
+      "runId",
+      "schemaId",
+      "startTurnNodeHash",
+      "status",
+      "stepSequence",
+      "turnId",
+    ],
+    label
+  );
   const currentStepIndex = objectValue.currentStepIndex;
   const stepSequence = objectValue.stepSequence;
 
@@ -442,14 +457,6 @@ export function assertRunRecord(
         stepCount: stepSequence.length,
       }
     );
-  }
-
-  if (objectValue.createdAtMs !== undefined) {
-    assertEpochMs(objectValue.createdAtMs, `${label}.createdAtMs`);
-  }
-
-  if (objectValue.updatedAtMs !== undefined) {
-    assertEpochMs(objectValue.updatedAtMs, `${label}.updatedAtMs`);
   }
 }
 
@@ -1029,7 +1036,17 @@ export function assertStoredBranch(
 ): asserts value is StoredBranch {
   const objectValue = assertPlainObject(value, label);
 
-  assertBranchRecord(objectValue, label);
+  assertNonEmptyString(objectValue.branchId, `${label}.branchId`);
+  assertNonEmptyString(objectValue.threadId, `${label}.threadId`);
+  assertHashString(objectValue.headTurnNodeHash, `${label}.headTurnNodeHash`);
+
+  if (objectValue.archivedFromBranchId !== undefined) {
+    assertNonEmptyString(
+      objectValue.archivedFromBranchId,
+      `${label}.archivedFromBranchId`
+    );
+  }
+
   assertEpochMs(objectValue.createdAtMs, `${label}.createdAtMs`);
   assertEpochMs(objectValue.updatedAtMs, `${label}.updatedAtMs`);
 }
@@ -1044,7 +1061,12 @@ export function assertStoredTurn(
 ): asserts value is StoredTurn {
   const objectValue = assertPlainObject(value, label);
 
-  assertTurnRecord(objectValue, label);
+  assertNonEmptyString(objectValue.turnId, `${label}.turnId`);
+  assertNonEmptyString(objectValue.threadId, `${label}.threadId`);
+  assertNonEmptyString(objectValue.branchId, `${label}.branchId`);
+  assertNullableString(objectValue.parentTurnId, `${label}.parentTurnId`);
+  assertHashString(objectValue.startTurnNodeHash, `${label}.startTurnNodeHash`);
+  assertHashString(objectValue.headTurnNodeHash, `${label}.headTurnNodeHash`);
   assertEpochMs(objectValue.createdAtMs, `${label}.createdAtMs`);
   assertEpochMs(objectValue.updatedAtMs, `${label}.updatedAtMs`);
 }
@@ -1142,6 +1164,18 @@ export function assertStagedResult(
   label = "value"
 ): asserts value is StagedResult {
   const objectValue = assertPlainObject(value, label);
+  assertAllowedObjectKeys(
+    objectValue,
+    [
+      "interruptPayload",
+      "objectHash",
+      "objectType",
+      "status",
+      "taskId",
+      "timestamp",
+    ],
+    label
+  );
 
   assertNonEmptyString(objectValue.taskId, `${label}.taskId`);
   assertHashString(objectValue.objectHash, `${label}.objectHash`);
@@ -1331,6 +1365,17 @@ function assertKernelRecordArray(
   }
 }
 
+function assertKernelObjectArray(
+  value: unknown,
+  label: string
+): asserts value is KernelObject[] {
+  const items = assertArray(value, label);
+
+  for (const [index, item] of items.entries()) {
+    assertKernelObject(item, `${label}[${index}]`);
+  }
+}
+
 function assertHashStringArray(
   value: unknown,
   label: string
@@ -1340,6 +1385,14 @@ function assertHashStringArray(
   for (const [index, item] of items.entries()) {
     assertHashString(item, `${label}[${index}]`);
   }
+}
+
+function assertKernelObject(
+  value: unknown,
+  label: string
+): asserts value is KernelObject {
+  assertPlainObject(value, label);
+  assertKernelRecord(value, label);
 }
 
 function assertDecodedHashStringArray(
@@ -1543,6 +1596,24 @@ function assertPlainObject(
     Object.create(null),
     Object.fromEntries(Object.entries(value))
   ) as Record<string, unknown>;
+}
+
+function assertAllowedObjectKeys(
+  value: Record<string, unknown>,
+  allowedKeys: readonly string[],
+  label: string
+): void {
+  const allowedKeySet = new Set(allowedKeys);
+
+  for (const key of Object.keys(value)) {
+    if (!allowedKeySet.has(key)) {
+      throw validationError(
+        `${label}.${key} is not part of the contract shape`,
+        "invalid_object_key",
+        { allowedKeys, key }
+      );
+    }
+  }
 }
 
 function assertNonEmptyString(

@@ -90,13 +90,10 @@ export const kernelProtocolLogicalFixtures = {
     "9999999999999999999999999999999999999999999999999999999999999999",
   ],
   branchRecord: {
-    archivedFromBranchId: "branch_archive",
     branchId: "branch_main",
-    createdAtMs: 1_717_171_717_171,
     headTurnNodeHash:
       "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
     threadId: "thread_main",
-    updatedAtMs: 1_717_171_717_272,
   },
   observeResult: {
     annotations: [{ kind: "note", severity: 1 }],
@@ -144,7 +141,6 @@ export const kernelProtocolLogicalFixtures = {
   },
   runRecord: {
     branchId: "branch_main",
-    createdAtMs: 1_717_171_717_171,
     createdTurnNodes: [
       "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
     ],
@@ -163,24 +159,19 @@ export const kernelProtocolLogicalFixtures = {
       },
     ],
     turnId: "turn_main",
-    updatedAtMs: 1_717_171_717_272,
   },
   setHeadResult: {
     archiveBranch: {
       branchId: "branch_archive",
-      createdAtMs: 1_717_171_717_171,
       headTurnNodeHash:
         "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
       threadId: "thread_main",
-      updatedAtMs: 1_717_171_717_272,
     },
     branch: {
       branchId: "branch_main",
-      createdAtMs: 1_717_171_717_171,
       headTurnNodeHash:
         "dededededededededededededededededededededededededededededededede",
       threadId: "thread_main",
-      updatedAtMs: 1_717_171_717_272,
     },
   },
   stagedResult: {
@@ -217,7 +208,6 @@ export const kernelProtocolLogicalFixtures = {
     threadId: "thread_main",
   },
   threadRecord: {
-    createdAtMs: 1_717_171_717_171,
     rootTurnNodeHash:
       "1515151515151515151515151515151515151515151515151515151515151515",
     schemaId: "schema_main",
@@ -244,7 +234,6 @@ export const kernelProtocolLogicalFixtures = {
   },
   turnRecord: {
     branchId: "branch_main",
-    createdAtMs: 1_717_171_717_171,
     headTurnNodeHash:
       "2020202020202020202020202020202020202020202020202020202020202020",
     parentTurnId: null,
@@ -252,7 +241,6 @@ export const kernelProtocolLogicalFixtures = {
       "2121212121212121212121212121212121212121212121212121212121212121",
     threadId: "thread_main",
     turnId: "turn_main",
-    updatedAtMs: 1_717_171_717_272,
   },
   turnTreeChangeSet: {
     context_manifest:
@@ -394,7 +382,7 @@ export const kernelProtocolInvalidFixtures = {
     schemaId: "schema_main",
   },
   invalidObserveResult: {
-    annotations: [Number.NaN],
+    annotations: ["note"],
     signals: ["okay"],
   },
   invalidSchemaPathSchema: {
@@ -413,7 +401,6 @@ export const kernelProtocolInvalidFixtures = {
   },
   invalidRunRecordPastStepSequence: {
     branchId: "branch_main",
-    createdAtMs: 1_717_171_717_171,
     createdTurnNodes: [],
     currentStepIndex: 5,
     runId: "run_main",
@@ -429,7 +416,6 @@ export const kernelProtocolInvalidFixtures = {
       },
     ],
     turnId: "turn_main",
-    updatedAtMs: 1_717_171_717_272,
   },
   invalidSchemaWithAccessorPathMetadata: (() => {
     const pathDefinition = { path: "messages", collection: "ordered" };
