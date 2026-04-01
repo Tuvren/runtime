@@ -527,10 +527,16 @@ export function assertStoredSchema(
   label = "value"
 ): asserts value is StoredSchema {
   const objectValue = assertPlainObject(value, label);
+  const schemaCbor = objectValue.schemaCbor;
 
   assertNonEmptyString(objectValue.schemaId, `${label}.schemaId`);
-  assertUint8Array(objectValue.schemaCbor, `${label}.schemaCbor`);
+  assertUint8Array(schemaCbor, `${label}.schemaCbor`);
   assertEpochMs(objectValue.createdAtMs, `${label}.createdAtMs`);
+  assertDecodedKernelRecord(
+    schemaCbor,
+    assertTurnTreeSchema,
+    `${label}.schemaCbor`
+  );
 }
 
 export function isStoredTurnTree(value: unknown): value is StoredTurnTree {
@@ -542,11 +548,17 @@ export function assertStoredTurnTree(
   label = "value"
 ): asserts value is StoredTurnTree {
   const objectValue = assertPlainObject(value, label);
+  const manifestCbor = objectValue.manifestCbor;
 
   assertHashString(objectValue.hash, `${label}.hash`);
   assertNonEmptyString(objectValue.schemaId, `${label}.schemaId`);
-  assertUint8Array(objectValue.manifestCbor, `${label}.manifestCbor`);
+  assertUint8Array(manifestCbor, `${label}.manifestCbor`);
   assertEpochMs(objectValue.createdAtMs, `${label}.createdAtMs`);
+  assertDecodedKernelRecord(
+    manifestCbor,
+    assertTurnTreeManifest,
+    `${label}.manifestCbor`
+  );
 }
 
 export function isStoredTurnTreePath(
@@ -778,6 +790,7 @@ export function assertStoredTurnNode(
   label = "value"
 ): asserts value is StoredTurnNode {
   const objectValue = assertPlainObject(value, label);
+  const consumedStagedResultsCbor = objectValue.consumedStagedResultsCbor;
 
   assertHashString(objectValue.hash, `${label}.hash`);
   assertNullableHashString(
@@ -786,12 +799,17 @@ export function assertStoredTurnNode(
   );
   assertHashString(objectValue.turnTreeHash, `${label}.turnTreeHash`);
   assertUint8Array(
-    objectValue.consumedStagedResultsCbor,
+    consumedStagedResultsCbor,
     `${label}.consumedStagedResultsCbor`
   );
   assertNonEmptyString(objectValue.schemaId, `${label}.schemaId`);
   assertNullableHashString(objectValue.eventHash, `${label}.eventHash`);
   assertEpochMs(objectValue.createdAtMs, `${label}.createdAtMs`);
+  assertDecodedKernelRecord(
+    consumedStagedResultsCbor,
+    assertStagedResultArray,
+    `${label}.consumedStagedResultsCbor`
+  );
 }
 
 export function isStoredThread(value: unknown): value is StoredThread {
@@ -849,6 +867,9 @@ export function assertStoredRun(
   label = "value"
 ): asserts value is StoredRun {
   const objectValue = assertPlainObject(value, label);
+  const currentStepIndex = objectValue.currentStepIndex;
+  const stepSequenceCbor = objectValue.stepSequenceCbor;
+  const createdTurnNodesCbor = objectValue.createdTurnNodesCbor;
 
   assertNonEmptyString(objectValue.runId, `${label}.runId`);
   assertNonEmptyString(objectValue.turnId, `${label}.turnId`);
@@ -856,17 +877,32 @@ export function assertStoredRun(
   assertNonEmptyString(objectValue.schemaId, `${label}.schemaId`);
   assertHashString(objectValue.startTurnNodeHash, `${label}.startTurnNodeHash`);
   assertRunStatus(objectValue.status, `${label}.status`);
-  assertNonNegativeInteger(
-    objectValue.currentStepIndex,
-    `${label}.currentStepIndex`
+  assertNonNegativeInteger(currentStepIndex, `${label}.currentStepIndex`);
+  assertUint8Array(stepSequenceCbor, `${label}.stepSequenceCbor`);
+  assertUint8Array(createdTurnNodesCbor, `${label}.createdTurnNodesCbor`);
+  const stepSequence = assertDecodedKernelRecord(
+    stepSequenceCbor,
+    assertStepDeclarationArray,
+    `${label}.stepSequenceCbor`
   );
-  assertUint8Array(objectValue.stepSequenceCbor, `${label}.stepSequenceCbor`);
-  assertUint8Array(
-    objectValue.createdTurnNodesCbor,
+  assertDecodedKernelRecord(
+    createdTurnNodesCbor,
+    assertHashStringArray,
     `${label}.createdTurnNodesCbor`
   );
   assertEpochMs(objectValue.createdAtMs, `${label}.createdAtMs`);
   assertEpochMs(objectValue.updatedAtMs, `${label}.updatedAtMs`);
+
+  if (currentStepIndex > stepSequence.length) {
+    throw validationError(
+      `${label}.currentStepIndex must not exceed the decoded step count in ${label}.stepSequenceCbor`,
+      "invalid_run_step_index",
+      {
+        currentStepIndex,
+        stepCount: stepSequence.length,
+      }
+    );
+  }
 }
 
 export function isStoredStagedResult(
@@ -880,6 +916,7 @@ export function assertStoredStagedResult(
   label = "value"
 ): asserts value is StoredStagedResult {
   const objectValue = assertPlainObject(value, label);
+  const interruptPayloadCbor = objectValue.interruptPayloadCbor;
 
   assertNonEmptyString(objectValue.runId, `${label}.runId`);
   assertNonEmptyString(objectValue.taskId, `${label}.taskId`);
@@ -887,16 +924,18 @@ export function assertStoredStagedResult(
   assertNonEmptyString(objectValue.objectType, `${label}.objectType`);
   assertStagedResultStatus(objectValue.status, `${label}.status`);
 
-  if (objectValue.interruptPayloadCbor !== undefined) {
-    assertUint8Array(
-      objectValue.interruptPayloadCbor,
+  if (interruptPayloadCbor !== undefined) {
+    assertUint8Array(interruptPayloadCbor, `${label}.interruptPayloadCbor`);
+    assertDecodedKernelRecord(
+      interruptPayloadCbor,
+      assertKernelRecord,
       `${label}.interruptPayloadCbor`
     );
   }
 
   assertInterruptPayloadConsistency(
     objectValue.status,
-    objectValue.interruptPayloadCbor,
+    interruptPayloadCbor,
     `${label}.interruptPayloadCbor`
   );
 
@@ -1099,9 +1138,32 @@ function assertDecodedHashStringArray(
   value: Uint8Array,
   label: string
 ): string[] {
-  const decodedValue = decodeDeterministicKernelRecord(value);
+  return assertDecodedKernelRecord(value, assertHashStringArray, label);
+}
 
-  assertHashStringArray(decodedValue, label);
+function assertDecodedKernelRecord<T>(
+  value: Uint8Array,
+  assertion: (value: unknown, label: string) => asserts value is T,
+  label: string
+): T {
+  let decodedValue: KernelRecord;
+
+  try {
+    decodedValue = decodeDeterministicKernelRecord(value);
+  } catch (error: unknown) {
+    throw validationError(
+      `${label} must contain canonical deterministic CBOR`,
+      "invalid_cbor_payload",
+      {
+        cause:
+          error instanceof Error
+            ? error.message
+            : "unknown CBOR decode failure",
+      }
+    );
+  }
+
+  assertion(decodedValue, label);
 
   return decodedValue;
 }

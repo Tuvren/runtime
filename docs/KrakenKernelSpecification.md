@@ -387,6 +387,7 @@ One user-visible interaction unit. A semantic span over a contiguous segment of 
 Turn
 ├─ id: string
 ├─ threadId: string
+├─ branchId: string
 ├─ parentTurnId: string | null     // immediate previous semantic Turn in same Thread
 ├─ startTurnNodeHash: Hash
 └─ headTurnNodeHash: Hash        // advances as TurnNodes are created
@@ -400,7 +401,7 @@ A Turn may be served by multiple Runs if execution pauses and resumes.
 #### Turn Operations
 
 ```
-turn.create(id, threadId, parentTurnId?, startTurnNodeHash) → Turn
+turn.create(id, threadId, branchId, parentTurnId?, startTurnNodeHash) → Turn
 turn.get(id) → Turn | null
 turn.updateHead(id, headTurnNodeHash) → void
 ```
@@ -672,7 +673,7 @@ run.recover(runId) → RecoveryState
 verdicts.compose(verdicts: Verdict[]) → ComposedVerdict
 
 // ─── Turn Lifecycle (3) ─────────────────────────────────────────
-turn.create(id, threadId, parentTurnId?, startTurnNodeHash) → Turn
+turn.create(id, threadId, branchId, parentTurnId?, startTurnNodeHash) → Turn
 turn.get(id) → Turn | null
 turn.updateHead(id, headTurnNodeHash) → void
 ```
@@ -842,7 +843,7 @@ Backend choice is an implementation concern. Correctness semantics are not.
 
 ### Turn Lifecycle
 
-**`turn.create(id, threadId, parentTurnId?, startTurnNodeHash)`** — `id` unique. `threadId` exists. If `parentTurnId`: must exist and belong to the same Thread. `startTurnNodeHash` must exist and belong to Thread by lineage walk.
+**`turn.create(id, threadId, branchId, parentTurnId?, startTurnNodeHash)`** — `id` unique. `threadId` exists. `branchId` exists and belongs to the same Thread. If `parentTurnId`: must exist and belong to the same Thread. `startTurnNodeHash` must exist and belong to Thread by lineage walk.
 
 **`turn.get(id)`** — Returns Turn or null.
 

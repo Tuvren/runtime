@@ -484,6 +484,19 @@ describe("stored contract fixtures", () => {
     ).toThrow("byteLength must match");
   });
 
+  test("rejects stored runs whose decoded step sequence or created nodes are invalid", () => {
+    expect(() =>
+      assertStoredRun(
+        kernelProtocolInvalidFixtures.invalidStoredRunPastStepSequence
+      )
+    ).toThrow("currentStepIndex must not exceed the decoded step count");
+    expect(() =>
+      assertStoredRun(
+        kernelProtocolInvalidFixtures.invalidStoredRunWithMalformedCreatedTurnNodesCbor
+      )
+    ).toThrow("createdTurnNodesCbor");
+  });
+
   test("rejects impossible stored turn-tree path combinations", () => {
     expect(() =>
       assertStoredTurnTreePath(
@@ -553,5 +566,28 @@ describe("stored contract fixtures", () => {
         status: "interrupted",
       })
     ).toThrow('interruptPayloadCbor is required when status is "interrupted"');
+  });
+
+  test("rejects malformed stored CBOR payloads for core records", () => {
+    expect(() =>
+      assertStoredSchema(
+        kernelProtocolInvalidFixtures.invalidStoredSchemaMalformedCbor
+      )
+    ).toThrow("schemaCbor");
+    expect(() =>
+      assertStoredTurnTree(
+        kernelProtocolInvalidFixtures.invalidStoredTurnTreeMalformedManifestCbor
+      )
+    ).toThrow("manifestCbor");
+    expect(() =>
+      assertStoredTurnNode(
+        kernelProtocolInvalidFixtures.invalidStoredTurnNodeMalformedConsumedStagedResultsCbor
+      )
+    ).toThrow("consumedStagedResultsCbor");
+    expect(() =>
+      assertStoredStagedResult(
+        kernelProtocolInvalidFixtures.invalidStoredStagedResultWithMalformedInterruptPayloadCbor
+      )
+    ).toThrow("interruptPayloadCbor");
   });
 });

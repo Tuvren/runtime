@@ -338,6 +338,7 @@ export interface KrakenKernel {
     create(
       turnId: string,
       threadId: string,
+      branchId: string,
       parentTurnId: string | null | undefined,
       startTurnNodeHash: HashString
     ): Promise<TurnRecord>;
