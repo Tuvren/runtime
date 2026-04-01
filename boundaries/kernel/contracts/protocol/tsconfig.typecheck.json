@@ -1,0 +1,14 @@
+{
+  "extends": "./tsconfig.lib.json",
+  "compilerOptions": {
+    "composite": false,
+    "rootDir": "../../../",
+    "paths": {
+      "@kraken/shared-core-types": [
+        "../../../shared/contracts/core-types/src/index.ts"
+      ],
+      "@kraken/kernel-contract-protocol": ["./src/index.ts"]
+    }
+  },
+  "include": ["src/**/*.ts", "../../../shared/contracts/core-types/src/**/*.ts"]
+}

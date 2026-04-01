@@ -1,9 +1,9 @@
 # Technical Specification
 
 ## 0. Version History & Changelog
+- v0.2.2 - Defined the concrete TypeScript kernel-contract shapes for `StepContext`, `ObserveResult`, and kernel observe signals so the run lifecycle surface no longer depends on implied upstream payload structure.
 - v0.2.1 - Added the shared `KrakenError` foundation contract so stable error codes and category subclasses are specified before later framework and backend work depends on them.
 - v0.2.0 - Locked the authoritative implementation posture: protocol-first kernel, TypeScript first implementation, AI SDK bridge-only provider baseline, strict uniform backend contract, official `memory` and `sqlite` backends, deterministic CBOR plus SHA-256 identity rules, integer-only core record profile, path-granular TurnTree storage with threshold-based chunking for ordered paths, and an architecture-first `devenv + nx` monorepo layout grouped by boundary, contract, and implementation language.
-- v0.1.0 - Initial TechSpec draft establishing the baseline package layout, early provider posture, persistence abstraction, and framework-facing public surface.
 - ... [Older history truncated, refer to git logs]
 
 ## 1. Stack Specification (Bill of Materials)
@@ -435,8 +435,25 @@ export interface ExecutionHandle {
 - **Authentication / Authorization:** Internal kernel boundary used by framework packages and backend adapters
 - **Compatibility Strategy:** Protocol-first contract. Breaking changes to record shapes, operation signatures, or validation semantics are semver-major.
 - **Error model:** `KrakenError` with persistence, validation, lineage, and recovery codes
+- **Concrete payload rule:** The frozen kernel specification names `ObserveResult.annotations` as `Object[]` and `signals` as `Signal[]`, but does not define their first TypeScript wire shape. The authoritative TypeScript realization is:
+  - observe annotations are `HashString[]` that reference Objects already present in the kernel object store
+  - observe signals are `KernelRecord[]`, keeping them serializable and boundary-safe without adding a second hidden object-ingest path to `run.completeStep`
 
 ```ts
+export type KernelSignal = KernelRecord;
+
+export interface ObserveResult {
+  annotations: HashString[];
+  signals: KernelSignal[];
+}
+
+export interface StepContext {
+  currentTurnNodeHash: HashString;
+  schema: TurnTreeSchema;
+  step: StepDeclaration;
+  signals: KernelSignal[];
+}
+
 export interface KrakenKernel {
   store: {
     put(blob: Uint8Array, mediaType?: string): Promise<HashString>;
@@ -506,7 +523,7 @@ export interface KrakenKernel {
       taskId: string,
       objectType: string,
       status: "completed" | "failed" | "interrupted",
-      interruptPayload?: unknown
+      interruptPayload?: KernelRecord
     ): Promise<{ objectHash: HashString; stagedResult: StagedResult }>;
     current(runId: string): Promise<StagedResult[]>;
   };
