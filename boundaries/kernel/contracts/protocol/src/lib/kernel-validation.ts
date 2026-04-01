@@ -280,7 +280,11 @@ export function assertTurnNode(
   assertNullableHashString(objectValue.eventHash, `${label}.eventHash`);
 
   if (objectValue.createdAtMs !== undefined) {
-    assertEpochMs(objectValue.createdAtMs, `${label}.createdAtMs`);
+    throw validationError(
+      `${label}.createdAtMs is not part of the logical TurnNode contract`,
+      "invalid_turn_node_field",
+      { field: "createdAtMs" }
+    );
   }
 }
 
@@ -1107,7 +1111,7 @@ function assertPathDefinitions(
     const definitionLabel = `${label}[${index}]`;
     const objectValue = assertPlainObject(definition, definitionLabel);
 
-    assertNonEmptyString(objectValue.path, `${definitionLabel}.path`);
+    assertSchemaPath(objectValue.path, `${definitionLabel}.path`);
     assertPathCollectionKind(
       objectValue.collection,
       `${definitionLabel}.collection`
@@ -1126,6 +1130,23 @@ function assertPathDefinitions(
     }
 
     seenPaths.add(objectValue.path);
+  }
+}
+
+function assertSchemaPath(
+  value: unknown,
+  label: string
+): asserts value is string {
+  assertNonEmptyString(value, label);
+
+  const segments = value.split(".");
+
+  if (segments.some((segment) => segment.length === 0)) {
+    throw validationError(
+      `${label} must be a dot-separated path with non-empty segments`,
+      "invalid_schema_path",
+      { value }
+    );
   }
 }
 

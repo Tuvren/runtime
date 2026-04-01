@@ -72,7 +72,6 @@ export interface StagedResult {
 
 export interface TurnNode {
   consumedStagedResults: StagedResult[];
-  createdAtMs?: EpochMs;
   eventHash: HashString | null;
   hash: HashString;
   previousTurnNodeHash: HashString | null;

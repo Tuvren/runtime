@@ -87,7 +87,25 @@ export function encodeDeterministicKernelRecord(
 export function decodeDeterministicKernelRecord(
   bytes: Uint8Array
 ): KernelRecord {
-  const decodedValue = deterministicDecoder.decode(bytes);
+  let decodedValue: unknown;
+
+  try {
+    decodedValue = deterministicDecoder.decode(bytes);
+  } catch (error: unknown) {
+    throw new KrakenValidationError(
+      "decoded kernel record bytes must contain valid deterministic CBOR",
+      {
+        code: "invalid_decoded_kernel_record",
+        details: {
+          cause:
+            error instanceof Error
+              ? error.message
+              : "unknown CBOR decode failure",
+        },
+      }
+    );
+  }
+
   const normalizedValue = normalizeDecodedKernelValue(decodedValue, "value");
   const canonicalBytes = encodeDeterministicKernelRecord(normalizedValue);
 

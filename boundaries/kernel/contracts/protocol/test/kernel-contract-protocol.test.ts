@@ -16,6 +16,7 @@
  */
 
 import { describe, expect, test } from "bun:test";
+import { KrakenValidationError } from "@kraken/shared-core-types";
 import {
   kernelProtocolDeterministicFixtures,
   kernelProtocolInvalidFixtures,
@@ -127,6 +128,24 @@ describe("deterministic identity", () => {
     ).toThrow("must already use the canonical deterministic CBOR encoding");
   });
 
+  test("wraps malformed deterministic CBOR bytes in KrakenValidationError", () => {
+    let caughtError: unknown;
+
+    try {
+      decodeDeterministicKernelRecord(
+        kernelProtocolInvalidFixtures.invalidTruncatedKernelRecordBytes
+      );
+    } catch (error: unknown) {
+      caughtError = error;
+    }
+
+    expect(caughtError).toBeInstanceOf(KrakenValidationError);
+    expect(caughtError).toBeInstanceOf(Error);
+    expect((caughtError as Error).message).toContain(
+      "must contain valid deterministic CBOR"
+    );
+  });
+
   test("rejects decoded non-canonical kernel numbers as validation errors", () => {
     expect(() =>
       decodeDeterministicKernelRecord(
@@ -218,6 +237,14 @@ describe("schema validation", () => {
     expect(() =>
       assertTurnTreeSchema(kernelProtocolInvalidFixtures.unknownPathSchema)
     ).toThrow("must reference a defined schema path");
+  });
+
+  test("rejects malformed schema path grammar", () => {
+    expect(() =>
+      assertTurnTreeSchema(
+        kernelProtocolInvalidFixtures.invalidSchemaPathSchema
+      )
+    ).toThrow("must be a dot-separated path with non-empty segments");
   });
 
   test("rejects schema records with symbol keys or accessor-backed fields", () => {
@@ -445,6 +472,15 @@ describe("logical contract fixtures", () => {
         kernelProtocolInvalidFixtures.invalidRunRecordPastStepSequence
       )
     ).toThrow("currentStepIndex must not exceed");
+  });
+
+  test("rejects logical TurnNodes with stored-only timestamps", () => {
+    expect(() =>
+      assertTurnNode({
+        ...kernelProtocolLogicalFixtures.turnNode,
+        createdAtMs: 1_717_171_717_272,
+      })
+    ).toThrow("createdAtMs is not part of the logical TurnNode contract");
   });
 
   test("rejects recovery states whose lastCompletedStepId is not declared", () => {
