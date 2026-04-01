@@ -24,6 +24,7 @@ import {
   isHashString,
   KrakenValidationError,
 } from "@kraken/shared-core-types";
+import { decodeDeterministicKernelRecord } from "./kernel-identity.js";
 import type {
   BranchRecord,
   ObserveResult,
@@ -426,6 +427,8 @@ export function assertRecoveryState(
   label = "value"
 ): asserts value is RecoveryState {
   const objectValue = assertPlainObject(value, label);
+  const stepSequence = objectValue.stepSequence;
+  const lastCompletedStepId = objectValue.lastCompletedStepId;
 
   assertHashString(objectValue.lastTurnNodeHash, `${label}.lastTurnNodeHash`);
   assertStagedResultArray(
@@ -436,11 +439,20 @@ export function assertRecoveryState(
     objectValue.uncommittedStagedResults,
     `${label}.uncommittedStagedResults`
   );
-  assertStepDeclarationArray(objectValue.stepSequence, `${label}.stepSequence`);
-  assertNullableString(
-    objectValue.lastCompletedStepId,
-    `${label}.lastCompletedStepId`
-  );
+  assertStepDeclarationArray(stepSequence, `${label}.stepSequence`);
+  assertNullableString(lastCompletedStepId, `${label}.lastCompletedStepId`);
+
+  if (lastCompletedStepId === null) {
+    return;
+  }
+
+  if (!stepSequence.some((step) => step.id === lastCompletedStepId)) {
+    throw validationError(
+      `${label}.lastCompletedStepId must reference a declared stepSequence id`,
+      "invalid_recovery_state_step_id",
+      { lastCompletedStepId, stepIds: stepSequence.map((step) => step.id) }
+    );
+  }
 }
 
 export function isThreadCreateResult(
@@ -688,6 +700,23 @@ function assertStoredFlatTurnTreePathShape(
       { orderedEncoding: value.orderedEncoding }
     );
   }
+
+  const orderedCount = value.orderedCount;
+
+  if (orderedCount === undefined) {
+    throw validationError(
+      `${label}.orderedCount is required when orderedEncoding is "flat"`,
+      "invalid_stored_turn_tree_path_shape",
+      { orderedEncoding: value.orderedEncoding }
+    );
+  }
+
+  assertDecodedHashStringArrayCardinality(
+    value.orderedInlineCbor,
+    orderedCount,
+    `${label}.orderedInlineCbor`,
+    `${label}.orderedCount`
+  );
 }
 
 function assertStoredChunkedTurnTreePathShape(
@@ -709,6 +738,11 @@ function assertStoredChunkedTurnTreePathShape(
       { orderedEncoding: value.orderedEncoding }
     );
   }
+
+  assertDecodedHashStringArray(
+    value.orderedChunkListCbor,
+    `${label}.orderedChunkListCbor`
+  );
 }
 
 export function isStoredOrderedPathChunk(
@@ -727,6 +761,12 @@ export function assertStoredOrderedPathChunk(
   assertNonNegativeInteger(objectValue.itemCount, `${label}.itemCount`);
   assertUint8Array(objectValue.itemsCbor, `${label}.itemsCbor`);
   assertEpochMs(objectValue.createdAtMs, `${label}.createdAtMs`);
+  assertDecodedHashStringArrayCardinality(
+    objectValue.itemsCbor,
+    objectValue.itemCount,
+    `${label}.itemsCbor`,
+    `${label}.itemCount`
+  );
 }
 
 export function isStoredTurnNode(value: unknown): value is StoredTurnNode {
@@ -1052,6 +1092,34 @@ function assertHashStringArray(
 
   for (const [index, item] of items.entries()) {
     assertHashString(item, `${label}[${index}]`);
+  }
+}
+
+function assertDecodedHashStringArray(
+  value: Uint8Array,
+  label: string
+): string[] {
+  const decodedValue = decodeDeterministicKernelRecord(value);
+
+  assertHashStringArray(decodedValue, label);
+
+  return decodedValue;
+}
+
+function assertDecodedHashStringArrayCardinality(
+  value: Uint8Array,
+  expectedCount: number,
+  payloadLabel: string,
+  countLabel: string
+): void {
+  const decodedItems = assertDecodedHashStringArray(value, payloadLabel);
+
+  if (decodedItems.length !== expectedCount) {
+    throw validationError(
+      `${countLabel} must match the decoded item count in ${payloadLabel}`,
+      "invalid_cbor_item_count",
+      { actualCount: decodedItems.length, expectedCount }
+    );
   }
 }
 

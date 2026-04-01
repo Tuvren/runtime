@@ -15,6 +15,18 @@
  * limitations under the License.
  */
 
+import { encodeDeterministicKernelRecord } from "../../boundaries/kernel/contracts/protocol/src/index.ts";
+
+const orderedPathHashes = [
+  "5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f",
+  "6a6a6a6a6a6a6a6a6a6a6a6a6a6a6a6a6a6a6a6a6a6a6a6a6a6a6a6a6a6a6a6a",
+];
+
+const orderedChunkHashes = [
+  "7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b",
+  "8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c",
+];
+
 export const kernelProtocolDeterministicFixtures = {
   rawOpaqueBytes: new Uint8Array([0, 1, 2, 3, 4, 5, 250, 255]),
   rawOpaqueBytesSha256Hex:
@@ -274,7 +286,7 @@ export const kernelProtocolStoredFixtures = {
       "2626262626262626262626262626262626262626262626262626262626262626",
     createdAtMs: 1_717_171_717_171,
     itemCount: 2,
-    itemsCbor: new Uint8Array([130, 1, 2]),
+    itemsCbor: encodeDeterministicKernelRecord(orderedChunkHashes),
   },
   storedRun: {
     branchId: "branch_main",
@@ -347,7 +359,7 @@ export const kernelProtocolStoredFixtures = {
     collectionKind: "ordered",
     orderedCount: 2,
     orderedEncoding: "flat",
-    orderedInlineCbor: new Uint8Array([130, 1, 2]),
+    orderedInlineCbor: encodeDeterministicKernelRecord(orderedPathHashes),
     path: "messages",
     turnTreeHash:
       "3636363636363636363636363636363636363636363636363636363636363636",
@@ -478,6 +490,27 @@ export const kernelProtocolInvalidFixtures = {
     status: "completed",
     taskId: "tool_call_done",
   },
+  invalidRecoveryStateWithUnknownCompletedStepId: {
+    consumedStagedResults: [],
+    lastCompletedStepId: "not_in_sequence",
+    lastTurnNodeHash:
+      "3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a",
+    stepSequence: [
+      {
+        deterministic: false,
+        id: "model_call",
+        sideEffects: false,
+      },
+    ],
+    uncommittedStagedResults: [],
+  },
+  invalidStoredOrderedPathChunkCountMismatch: {
+    chunkHash:
+      "3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b",
+    createdAtMs: 1_717_171_717_171,
+    itemCount: 999,
+    itemsCbor: encodeDeterministicKernelRecord([orderedChunkHashes[0]]),
+  },
   invalidStoredTurnTreePathMissingOrderedPayload: {
     collectionKind: "ordered",
     orderedCount: 2,
@@ -515,6 +548,15 @@ export const kernelProtocolInvalidFixtures = {
     path: "messages",
     turnTreeHash:
       "4444444444444444444444444444444444444444444444444444444444444444",
+  },
+  invalidStoredTurnTreePathOrderedCountMismatch: {
+    collectionKind: "ordered",
+    orderedCount: 999,
+    orderedEncoding: "flat",
+    orderedInlineCbor: encodeDeterministicKernelRecord([orderedPathHashes[0]]),
+    path: "messages",
+    turnTreeHash:
+      "4a4a4a4a4a4a4a4a4a4a4a4a4a4a4a4a4a4a4a4a4a4a4a4a4a4a4a4a4a4a4a4a",
   },
   unknownPathSchema: {
     incorporationRules: [{ objectType: "message", targetPath: "missing" }],

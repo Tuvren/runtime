@@ -408,6 +408,14 @@ describe("logical contract fixtures", () => {
     ).toThrow("currentStepIndex must not exceed");
   });
 
+  test("rejects recovery states whose lastCompletedStepId is not declared", () => {
+    expect(() =>
+      assertRecoveryState(
+        kernelProtocolInvalidFixtures.invalidRecoveryStateWithUnknownCompletedStepId
+      )
+    ).toThrow("lastCompletedStepId must reference a declared stepSequence id");
+  });
+
   test("exposes status guards for runtime callers", () => {
     expect(isRunStatus("running")).toBe(true);
     expect(isRunStatus("broken")).toBe(false);
@@ -501,6 +509,19 @@ describe("stored contract fixtures", () => {
     ).toThrow(
       'orderedChunkListCbor must be omitted when orderedEncoding is "flat"'
     );
+  });
+
+  test("rejects stored ordered payloads whose decoded cardinality disagrees", () => {
+    expect(() =>
+      assertStoredTurnTreePath(
+        kernelProtocolInvalidFixtures.invalidStoredTurnTreePathOrderedCountMismatch
+      )
+    ).toThrow("orderedCount must match the decoded item count");
+    expect(() =>
+      assertStoredOrderedPathChunk(
+        kernelProtocolInvalidFixtures.invalidStoredOrderedPathChunkCountMismatch
+      )
+    ).toThrow("itemCount must match the decoded item count");
   });
 
   test("rejects contradictory interrupt payloads", () => {
