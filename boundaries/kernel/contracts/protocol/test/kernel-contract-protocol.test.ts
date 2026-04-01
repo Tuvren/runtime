@@ -85,6 +85,36 @@ describe("deterministic identity", () => {
     expect(decodedValue).toEqual(deterministicKernelRecordFixture.logicalValue);
   });
 
+  test("round-trips reserved object-property names like __proto__", () => {
+    const logicalValue = Object.assign(Object.create(null), {
+      ["__proto__"]: Object.assign(Object.create(null), { ok: 1 }),
+    });
+
+    const decodedValue = decodeDeterministicKernelRecord(
+      encodeDeterministicKernelRecord(logicalValue)
+    );
+
+    if (
+      decodedValue === null ||
+      typeof decodedValue !== "object" ||
+      Array.isArray(decodedValue) ||
+      decodedValue instanceof Uint8Array
+    ) {
+      throw new Error("decoded value must remain an object record");
+    }
+
+    const protoDescriptor = Object.getOwnPropertyDescriptor(
+      decodedValue,
+      "__proto__"
+    );
+
+    expect(Object.getPrototypeOf(decodedValue)).toBeNull();
+    expect(Object.hasOwn(decodedValue, "__proto__")).toBe(true);
+    expect(protoDescriptor?.value).toEqual(
+      Object.assign(Object.create(null), { ok: 1 })
+    );
+  });
+
   test("rejects non-canonical deterministic CBOR encodings on decode", () => {
     expect(() =>
       decodeDeterministicKernelRecord(
@@ -495,6 +525,14 @@ describe("stored contract fixtures", () => {
         kernelProtocolInvalidFixtures.invalidStoredRunWithMalformedCreatedTurnNodesCbor
       )
     ).toThrow("createdTurnNodesCbor");
+  });
+
+  test("rejects stored schemas whose top-level id disagrees with schemaCbor", () => {
+    expect(() =>
+      assertStoredSchema(
+        kernelProtocolInvalidFixtures.invalidStoredSchemaMismatchedSchemaId
+      )
+    ).toThrow("schemaId must match the decoded schemaId");
   });
 
   test("rejects impossible stored turn-tree path combinations", () => {

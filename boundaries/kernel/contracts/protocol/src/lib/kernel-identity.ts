@@ -194,7 +194,7 @@ function normalizeDecodedKernelValue(
   }
 
   if (value instanceof Map) {
-    const objectValue: Record<string, KernelRecord> = {};
+    const objectValue = Object.create(null) as Record<string, KernelRecord>;
 
     for (const [entryKey, entryValue] of value) {
       if (typeof entryKey !== "string") {
@@ -227,7 +227,7 @@ function normalizeDecodedKernelValue(
   }
 
   if (isPlainObject(value)) {
-    const objectValue: Record<string, KernelRecord> = {};
+    const objectValue = Object.create(null) as Record<string, KernelRecord>;
 
     for (const [entryKey, entryValue] of Object.entries(value)) {
       objectValue[entryKey] = normalizeDecodedKernelValue(

@@ -528,15 +528,27 @@ export function assertStoredSchema(
 ): asserts value is StoredSchema {
   const objectValue = assertPlainObject(value, label);
   const schemaCbor = objectValue.schemaCbor;
+  const schemaId = objectValue.schemaId;
 
-  assertNonEmptyString(objectValue.schemaId, `${label}.schemaId`);
+  assertNonEmptyString(schemaId, `${label}.schemaId`);
   assertUint8Array(schemaCbor, `${label}.schemaCbor`);
   assertEpochMs(objectValue.createdAtMs, `${label}.createdAtMs`);
-  assertDecodedKernelRecord(
+  const decodedSchema = assertDecodedKernelRecord(
     schemaCbor,
     assertTurnTreeSchema,
     `${label}.schemaCbor`
   );
+
+  if (decodedSchema.schemaId !== schemaId) {
+    throw validationError(
+      `${label}.schemaId must match the decoded schemaId in ${label}.schemaCbor`,
+      "invalid_stored_schema_id",
+      {
+        decodedSchemaId: decodedSchema.schemaId,
+        schemaId,
+      }
+    );
+  }
 }
 
 export function isStoredTurnTree(value: unknown): value is StoredTurnTree {

@@ -534,6 +534,15 @@ export const kernelProtocolInvalidFixtures = {
     turnId: "turn_main",
     updatedAtMs: 1_717_171_717_272,
   },
+  invalidStoredSchemaMismatchedSchemaId: {
+    createdAtMs: 1_717_171_717_171,
+    schemaCbor: encodeDeterministicKernelRecord({
+      incorporationRules: [],
+      paths: [{ collection: "ordered", path: "messages" }],
+      schemaId: "inner_schema",
+    }),
+    schemaId: "outer_schema",
+  },
   invalidStoredSchemaMalformedCbor: {
     createdAtMs: 1_717_171_717_171,
     schemaCbor: new Uint8Array([255]),
