@@ -28,6 +28,7 @@ import {
   decodeDeterministicKernelRecord,
   hashKernelRecord,
   hashOpaqueObjectBytes,
+  hashTurnNodeIdentity,
 } from "./kernel-identity.js";
 import type {
   BranchHeadListEntry,
@@ -284,6 +285,26 @@ export function assertTurnNode(
       `${label}.createdAtMs is not part of the logical TurnNode contract`,
       "invalid_turn_node_field",
       { field: "createdAtMs" }
+    );
+  }
+}
+
+export async function assertTurnNodeIdentity(
+  value: unknown,
+  label = "value"
+): Promise<void> {
+  assertTurnNode(value, label);
+
+  const expectedHash = await hashTurnNodeIdentity(value);
+
+  if (value.hash !== expectedHash) {
+    throw validationError(
+      `${label}.hash must match the canonical TurnNode identity hash`,
+      "invalid_turn_node_hash",
+      {
+        expectedHash,
+        hash: value.hash,
+      }
     );
   }
 }
@@ -896,6 +917,30 @@ export function assertStoredOrderedPathChunk(
   );
 }
 
+export async function assertStoredOrderedPathChunkIdentity(
+  value: unknown,
+  label = "value"
+): Promise<void> {
+  assertStoredOrderedPathChunk(value, label);
+
+  const items = assertDecodedHashStringArray(
+    value.itemsCbor,
+    `${label}.itemsCbor`
+  );
+  const expectedHash = await hashKernelRecord(items);
+
+  if (value.chunkHash !== expectedHash) {
+    throw validationError(
+      `${label}.chunkHash must match the deterministic hash of ${label}.itemsCbor`,
+      "invalid_stored_ordered_path_chunk_hash",
+      {
+        expectedHash,
+        hash: value.chunkHash,
+      }
+    );
+  }
+}
+
 export function isStoredTurnNode(value: unknown): value is StoredTurnNode {
   return tryAssert(value, assertStoredTurnNode);
 }
@@ -925,6 +970,37 @@ export function assertStoredTurnNode(
     assertStagedResultArray,
     `${label}.consumedStagedResultsCbor`
   );
+}
+
+export async function assertStoredTurnNodeIdentity(
+  value: unknown,
+  label = "value"
+): Promise<void> {
+  assertStoredTurnNode(value, label);
+
+  const consumedStagedResults = assertDecodedKernelRecord(
+    value.consumedStagedResultsCbor,
+    assertStagedResultArray,
+    `${label}.consumedStagedResultsCbor`
+  );
+  const expectedHash = await hashTurnNodeIdentity({
+    consumedStagedResults,
+    eventHash: value.eventHash,
+    previousTurnNodeHash: value.previousTurnNodeHash,
+    schemaId: value.schemaId,
+    turnTreeHash: value.turnTreeHash,
+  });
+
+  if (value.hash !== expectedHash) {
+    throw validationError(
+      `${label}.hash must match the canonical TurnNode identity hash`,
+      "invalid_stored_turn_node_hash",
+      {
+        expectedHash,
+        hash: value.hash,
+      }
+    );
+  }
 }
 
 export function isStoredThread(value: unknown): value is StoredThread {

@@ -187,7 +187,7 @@ TurnNode
                                  // record of what triggered this checkpoint
 ```
 
-- **Identity**: Hash, computed from its fields.
+- **Identity**: Hash, computed from the canonical serialization of all TurnNode fields except `hash` itself.
 - **Mutation authority**: Created only by the kernel during checkpoint transactions or reactive checkpointing. Never modified.
 - **Crash consistency**: TurnNode creation is part of an atomic checkpoint transaction (§5.5). All-or-nothing.
 

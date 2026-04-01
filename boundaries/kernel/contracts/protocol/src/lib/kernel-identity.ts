@@ -22,6 +22,7 @@ import {
   KrakenValidationError,
 } from "@kraken/shared-core-types";
 import { Decoder, Encoder } from "cbor-x";
+import type { TurnNode } from "./kernel-types.js";
 
 const deterministicEncoderOptions = {
   tagUint8Array: false,
@@ -133,6 +134,24 @@ export function hashKernelRecord(value: KernelRecord): Promise<HashString> {
 
 export function hashOpaqueObjectBytes(bytes: Uint8Array): Promise<HashString> {
   return hashBytesToHex(bytes);
+}
+
+export function hashTurnNodeIdentity(
+  value: Omit<TurnNode, "hash"> | TurnNode
+): Promise<HashString> {
+  return hashKernelRecord(toTurnNodeIdentityRecord(value));
+}
+
+function toTurnNodeIdentityRecord(
+  value: Omit<TurnNode, "hash"> | TurnNode
+): KernelRecord {
+  const { hash: _ignoredHash, ...identityRecord } = value as TurnNode & {
+    hash?: HashString;
+  };
+
+  assertKernelRecord(identityRecord, "turn node identity payload");
+
+  return identityRecord;
 }
 
 function prepareCanonicalKernelValue(value: unknown): unknown {

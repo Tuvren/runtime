@@ -41,18 +41,21 @@ import {
   assertStoredObject,
   assertStoredObjectIdentity,
   assertStoredOrderedPathChunk,
+  assertStoredOrderedPathChunkIdentity,
   assertStoredRun,
   assertStoredSchema,
   assertStoredStagedResult,
   assertStoredThread,
   assertStoredTurn,
   assertStoredTurnNode,
+  assertStoredTurnNodeIdentity,
   assertStoredTurnTree,
   assertStoredTurnTreeIdentity,
   assertStoredTurnTreePath,
   assertThreadCreateResult,
   assertThreadRecord,
   assertTurnNode,
+  assertTurnNodeIdentity,
   assertTurnRecord,
   assertTurnTreeChangeSet,
   assertTurnTreeSchema,
@@ -60,6 +63,7 @@ import {
   encodeDeterministicKernelRecord,
   hashKernelRecord,
   hashOpaqueObjectBytes,
+  hashTurnNodeIdentity,
   isBranchHeadListEntry,
   isObserveResult,
   isRunStatus,
@@ -183,21 +187,21 @@ describe("deterministic identity", () => {
     );
   });
 
-  test("locks the canonical TurnNode fixture bytes and record digest", async () => {
+  test("locks the canonical TurnNode identity-preimage bytes and digest", async () => {
     const encodedHex = Buffer.from(
       encodeDeterministicKernelRecord(
-        kernelProtocolDeterministicFixtures.turnNodeRecord
+        kernelProtocolDeterministicFixtures.turnNodeIdentityRecord
       )
     ).toString("hex");
-    const digestHex = await hashKernelRecord(
-      kernelProtocolDeterministicFixtures.turnNodeRecord
+    const digestHex = await hashTurnNodeIdentity(
+      kernelProtocolDeterministicFixtures.turnNodeIdentityRecord
     );
 
     expect(encodedHex).toBe(
-      kernelProtocolDeterministicFixtures.turnNodeRecordCborHex
+      kernelProtocolDeterministicFixtures.turnNodeIdentityRecordCborHex
     );
     expect(digestHex).toBe(
-      kernelProtocolDeterministicFixtures.turnNodeRecordSha256Hex
+      kernelProtocolDeterministicFixtures.turnNodeIdentityRecordSha256Hex
     );
   });
 
@@ -472,6 +476,18 @@ describe("logical contract fixtures", () => {
     ).not.toThrow();
   });
 
+  test("enforces canonical TurnNode identity hashes", async () => {
+    await expect(
+      assertTurnNodeIdentity(kernelProtocolLogicalFixtures.turnNode)
+    ).resolves.toBeUndefined();
+    await expect(
+      assertTurnNodeIdentity({
+        ...kernelProtocolLogicalFixtures.turnNode,
+        hash: "5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b",
+      })
+    ).rejects.toThrow("hash must match the canonical TurnNode identity hash");
+  });
+
   test("rejects impossible run step indexes", () => {
     expect(() =>
       assertRunRecord(
@@ -581,9 +597,17 @@ describe("stored contract fixtures", () => {
     ).toThrow("byteLength must match");
   });
 
-  test("enforces content-addressed identity for stored objects and turn trees", async () => {
+  test("enforces content-addressed identity for stored objects, chunk refs, turn nodes, and turn trees", async () => {
     await expect(
       assertStoredObjectIdentity(kernelProtocolStoredFixtures.storedObject)
+    ).resolves.toBeUndefined();
+    await expect(
+      assertStoredOrderedPathChunkIdentity(
+        kernelProtocolStoredFixtures.storedOrderedPathChunk
+      )
+    ).resolves.toBeUndefined();
+    await expect(
+      assertStoredTurnNodeIdentity(kernelProtocolStoredFixtures.storedTurnNode)
     ).resolves.toBeUndefined();
     await expect(
       assertStoredTurnTreeIdentity(kernelProtocolStoredFixtures.storedTurnTree)
@@ -593,6 +617,16 @@ describe("stored contract fixtures", () => {
         kernelProtocolInvalidFixtures.invalidStoredObjectMismatchedHash
       )
     ).rejects.toThrow("hash must match the SHA-256 digest");
+    await expect(
+      assertStoredOrderedPathChunkIdentity(
+        kernelProtocolInvalidFixtures.invalidStoredOrderedPathChunkMismatchedHash
+      )
+    ).rejects.toThrow("chunkHash must match the deterministic hash");
+    await expect(
+      assertStoredTurnNodeIdentity(
+        kernelProtocolInvalidFixtures.invalidStoredTurnNodeMismatchedHash
+      )
+    ).rejects.toThrow("hash must match the canonical TurnNode identity hash");
     await expect(
       assertStoredTurnTreeIdentity(
         kernelProtocolInvalidFixtures.invalidStoredTurnTreeMismatchedHash

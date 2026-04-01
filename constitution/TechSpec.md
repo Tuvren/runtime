@@ -174,6 +174,7 @@
   - `itemCount: number`
   - `itemsCbor: Uint8Array`
   - `createdAtMs: EpochMs`
+  - identity note: `chunkHash` is derived from the deterministic-CBOR logical chunk item list represented by `itemsCbor`; `itemCount` and `createdAtMs` are not identity inputs
 - `StoredTurnNode`
   - `hash: HashString`
   - `previousTurnNodeHash: HashString | null`
@@ -182,6 +183,7 @@
   - `schemaId: string`
   - `eventHash: HashString | null`
   - `createdAtMs: EpochMs`
+  - identity note: `hash` is derived from the logical TurnNode fields excluding `hash` itself; stored metadata such as `createdAtMs` is not part of the logical TurnNode identity
 - `StoredThread`
   - `threadId: string`
   - `schemaId: string`
