@@ -37,6 +37,7 @@ import {
   assertStepDeclaration,
   assertStoredBranch,
   assertStoredObject,
+  assertStoredObjectIdentity,
   assertStoredOrderedPathChunk,
   assertStoredRun,
   assertStoredSchema,
@@ -45,6 +46,7 @@ import {
   assertStoredTurn,
   assertStoredTurnNode,
   assertStoredTurnTree,
+  assertStoredTurnTreeIdentity,
   assertStoredTurnTreePath,
   assertThreadCreateResult,
   assertThreadRecord,
@@ -512,6 +514,25 @@ describe("stored contract fixtures", () => {
         kernelProtocolInvalidFixtures.invalidStoredObjectByteLength
       )
     ).toThrow("byteLength must match");
+  });
+
+  test("enforces content-addressed identity for stored objects and turn trees", async () => {
+    await expect(
+      assertStoredObjectIdentity(kernelProtocolStoredFixtures.storedObject)
+    ).resolves.toBeUndefined();
+    await expect(
+      assertStoredTurnTreeIdentity(kernelProtocolStoredFixtures.storedTurnTree)
+    ).resolves.toBeUndefined();
+    await expect(
+      assertStoredObjectIdentity(
+        kernelProtocolInvalidFixtures.invalidStoredObjectMismatchedHash
+      )
+    ).rejects.toThrow("hash must match the SHA-256 digest");
+    await expect(
+      assertStoredTurnTreeIdentity(
+        kernelProtocolInvalidFixtures.invalidStoredTurnTreeMismatchedHash
+      )
+    ).rejects.toThrow("hash must match the deterministic hash");
   });
 
   test("rejects stored runs whose decoded step sequence or created nodes are invalid", () => {

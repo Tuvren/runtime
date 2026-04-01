@@ -24,7 +24,11 @@ import {
   isHashString,
   KrakenValidationError,
 } from "@kraken/shared-core-types";
-import { decodeDeterministicKernelRecord } from "./kernel-identity.js";
+import {
+  decodeDeterministicKernelRecord,
+  hashKernelRecord,
+  hashOpaqueObjectBytes,
+} from "./kernel-identity.js";
 import type {
   BranchRecord,
   ObserveResult,
@@ -518,6 +522,26 @@ export function assertStoredObject(
   }
 }
 
+export async function assertStoredObjectIdentity(
+  value: unknown,
+  label = "value"
+): Promise<void> {
+  assertStoredObject(value, label);
+
+  const expectedHash = await hashOpaqueObjectBytes(value.bytes);
+
+  if (value.hash !== expectedHash) {
+    throw validationError(
+      `${label}.hash must match the SHA-256 digest of ${label}.bytes`,
+      "invalid_stored_object_hash",
+      {
+        expectedHash,
+        hash: value.hash,
+      }
+    );
+  }
+}
+
 export function isStoredSchema(value: unknown): value is StoredSchema {
   return tryAssert(value, assertStoredSchema);
 }
@@ -571,6 +595,31 @@ export function assertStoredTurnTree(
     assertTurnTreeManifest,
     `${label}.manifestCbor`
   );
+}
+
+export async function assertStoredTurnTreeIdentity(
+  value: unknown,
+  label = "value"
+): Promise<void> {
+  assertStoredTurnTree(value, label);
+
+  const manifest = assertDecodedKernelRecord(
+    value.manifestCbor,
+    assertTurnTreeManifest,
+    `${label}.manifestCbor`
+  );
+  const expectedHash = await hashKernelRecord(manifest);
+
+  if (value.hash !== expectedHash) {
+    throw validationError(
+      `${label}.hash must match the deterministic hash of ${label}.manifestCbor`,
+      "invalid_stored_turn_tree_hash",
+      {
+        expectedHash,
+        hash: value.hash,
+      }
+    );
+  }
 }
 
 export function isStoredTurnTreePath(

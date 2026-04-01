@@ -278,7 +278,7 @@ export const kernelProtocolStoredFixtures = {
     byteLength: 4,
     bytes: new Uint8Array([1, 2, 3, 4]),
     createdAtMs: 1_717_171_717_171,
-    hash: "2525252525252525252525252525252525252525252525252525252525252525",
+    hash: "9f64a747e1b97f131fabb6b447296c9b6f0201e79fb3c5356e6c77e89b6a806a",
     mediaType: "application/json",
   },
   storedOrderedPathChunk: {
@@ -359,7 +359,7 @@ export const kernelProtocolStoredFixtures = {
   },
   storedTurnTree: {
     createdAtMs: 1_717_171_717_171,
-    hash: "3535353535353535353535353535353535353535353535353535353535353535",
+    hash: "8d3bd386c9db2a0579098a945db580ba7bfb44f84c9c91cf0691840b30c17be8",
     manifestCbor: encodeDeterministicKernelRecord(
       kernelProtocolLogicalFixtures.turnTreeChangeSet
     ),
@@ -488,6 +488,13 @@ export const kernelProtocolInvalidFixtures = {
     hash: "3838383838383838383838383838383838383838383838383838383838383838",
     mediaType: "application/json",
   },
+  invalidStoredObjectMismatchedHash: {
+    byteLength: 4,
+    bytes: new Uint8Array([1, 2, 3, 4]),
+    createdAtMs: 1_717_171_717_171,
+    hash: "5353535353535353535353535353535353535353535353535353535353535353",
+    mediaType: "application/json",
+  },
   invalidStoredStagedResultWithCompletedInterruptPayload: {
     createdAtMs: 1_717_171_717_171,
     interruptPayloadCbor: encodeDeterministicKernelRecord({
@@ -594,6 +601,14 @@ export const kernelProtocolInvalidFixtures = {
     createdAtMs: 1_717_171_717_171,
     hash: "5252525252525252525252525252525252525252525252525252525252525252",
     manifestCbor: new Uint8Array([255]),
+    schemaId: "schema_main",
+  },
+  invalidStoredTurnTreeMismatchedHash: {
+    createdAtMs: 1_717_171_717_171,
+    hash: "5454545454545454545454545454545454545454545454545454545454545454",
+    manifestCbor: encodeDeterministicKernelRecord(
+      kernelProtocolLogicalFixtures.turnTreeChangeSet
+    ),
     schemaId: "schema_main",
   },
   invalidStoredTurnTreePathMissingOrderedPayload: {
