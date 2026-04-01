@@ -185,6 +185,19 @@ describe("schema validation", () => {
     ).toThrow("must reference a defined schema path");
   });
 
+  test("rejects schema records with symbol keys or accessor-backed fields", () => {
+    expect(() =>
+      assertTurnTreeSchema(
+        kernelProtocolInvalidFixtures.invalidSchemaWithSymbolKey
+      )
+    ).toThrow("must be a plain object");
+    expect(() =>
+      assertTurnTreeSchema(
+        kernelProtocolInvalidFixtures.invalidSchemaWithAccessorPathMetadata
+      )
+    ).toThrow("must be a plain object");
+  });
+
   test("enforces collection-kind-specific path values", () => {
     expect(() =>
       assertPathValueForCollectionKind(

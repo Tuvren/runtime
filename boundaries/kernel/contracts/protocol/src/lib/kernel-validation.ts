@@ -1087,6 +1087,30 @@ function assertPlainObject(
     });
   }
 
+  if (Object.getOwnPropertySymbols(value).length > 0) {
+    throw validationError(`${label} must be a plain object`, "invalid_object", {
+      value,
+    });
+  }
+
+  const descriptors = Object.getOwnPropertyDescriptors(value);
+
+  for (const key of Object.getOwnPropertyNames(descriptors)) {
+    const descriptor = descriptors[key];
+
+    if (
+      !(descriptor?.enumerable && Object.hasOwn(descriptor, "value")) ||
+      Object.hasOwn(descriptor, "get") ||
+      Object.hasOwn(descriptor, "set")
+    ) {
+      throw validationError(
+        `${label} must be a plain object`,
+        "invalid_object",
+        { value }
+      );
+    }
+  }
+
   return value as Record<string, unknown>;
 }
 

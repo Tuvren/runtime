@@ -383,6 +383,30 @@ export const kernelProtocolInvalidFixtures = {
     infinity: Uint8Array.from(Buffer.from("f97c00", "hex")),
     nan: Uint8Array.from(Buffer.from("f97e00", "hex")),
   },
+  invalidSchemaWithAccessorPathMetadata: (() => {
+    const pathDefinition = { path: "messages", collection: "ordered" };
+    Object.defineProperty(pathDefinition, "metadata", {
+      enumerable: true,
+      get() {
+        return { phase: "x" };
+      },
+    });
+
+    return {
+      schemaId: "schema_main",
+      paths: [pathDefinition],
+      incorporationRules: [],
+    };
+  })(),
+  invalidSchemaWithSymbolKey: (() => {
+    const schema = {
+      schemaId: "schema_main",
+      paths: [{ path: "messages", collection: "ordered" }],
+      incorporationRules: [],
+    };
+    schema[Symbol("meta")] = 1;
+    return schema;
+  })(),
   invalidSparseOrderedPathValue: new Array(1),
   invalidStagedResultWithCompletedInterruptPayload: {
     interruptPayload: { reason: "should_not_exist" },
