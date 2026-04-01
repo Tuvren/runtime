@@ -136,10 +136,11 @@ export function hashOpaqueObjectBytes(bytes: Uint8Array): Promise<HashString> {
   return hashBytesToHex(bytes);
 }
 
-export function hashTurnNodeIdentity(
+export async function hashTurnNodeIdentity(
   value: Omit<TurnNode, "hash"> | TurnNode
 ): Promise<HashString> {
-  return hashKernelRecord(toTurnNodeIdentityRecord(value));
+  assertTurnNodeIdentityInput(value);
+  return await hashKernelRecord(toTurnNodeIdentityRecord(value));
 }
 
 function toTurnNodeIdentityRecord(
@@ -182,6 +183,37 @@ function toTurnNodeIdentityRecord(
   assertKernelRecord(identityRecord, "turn node identity payload");
 
   return identityRecord;
+}
+
+function assertTurnNodeIdentityInput(
+  value: Omit<TurnNode, "hash"> | TurnNode
+): void {
+  if (
+    value === null ||
+    typeof value !== "object" ||
+    Array.isArray(value) ||
+    !isPlainObject(value)
+  ) {
+    throw new KrakenValidationError(
+      "turn node identity input must be a plain object",
+      {
+        code: "invalid_turn_node_hash",
+        details: { value },
+      }
+    );
+  }
+
+  const consumedStagedResults = value.consumedStagedResults;
+
+  if (!Array.isArray(consumedStagedResults)) {
+    throw new KrakenValidationError(
+      "turn node identity input must include consumedStagedResults as an array",
+      {
+        code: "invalid_turn_node_hash",
+        details: { value },
+      }
+    );
+  }
 }
 
 function prepareCanonicalKernelValue(value: unknown): unknown {

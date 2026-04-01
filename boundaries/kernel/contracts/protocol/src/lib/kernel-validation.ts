@@ -145,6 +145,11 @@ export function assertTurnTreeSchema(
   label = "value"
 ): asserts value is TurnTreeSchema {
   const objectValue = assertPlainObject(value, label);
+  assertAllowedObjectKeys(
+    objectValue,
+    ["incorporationRules", "paths", "schemaId"],
+    label
+  );
 
   assertNonEmptyString(objectValue.schemaId, `${label}.schemaId`);
   assertPathDefinitions(objectValue.paths, `${label}.paths`);
@@ -178,6 +183,11 @@ export function assertStepDeclaration(
   label = "value"
 ): asserts value is StepDeclaration {
   const objectValue = assertPlainObject(value, label);
+  assertAllowedObjectKeys(
+    objectValue,
+    ["deterministic", "id", "metadata", "sideEffects"],
+    label
+  );
 
   assertNonEmptyString(objectValue.id, `${label}.id`);
   assertBoolean(objectValue.deterministic, `${label}.deterministic`);
@@ -469,6 +479,11 @@ export function assertStepContext(
   label = "value"
 ): asserts value is StepContext {
   const objectValue = assertPlainObject(value, label);
+  assertAllowedObjectKeys(
+    objectValue,
+    ["currentTurnNodeHash", "schema", "signals", "step"],
+    label
+  );
 
   assertHashString(
     objectValue.currentTurnNodeHash,
@@ -488,6 +503,17 @@ export function assertRecoveryState(
   label = "value"
 ): asserts value is RecoveryState {
   const objectValue = assertPlainObject(value, label);
+  assertAllowedObjectKeys(
+    objectValue,
+    [
+      "consumedStagedResults",
+      "lastCompletedStepId",
+      "lastTurnNodeHash",
+      "stepSequence",
+      "uncommittedStagedResults",
+    ],
+    label
+  );
   const stepSequence = objectValue.stepSequence;
   const lastCompletedStepId = objectValue.lastCompletedStepId;
 
@@ -527,6 +553,11 @@ export function assertThreadCreateResult(
   label = "value"
 ): asserts value is ThreadCreateResult {
   const objectValue = assertPlainObject(value, label);
+  assertAllowedObjectKeys(
+    objectValue,
+    ["branchId", "rootTurnNodeHash", "rootTurnTreeHash", "threadId"],
+    label
+  );
 
   assertNonEmptyString(objectValue.threadId, `${label}.threadId`);
   assertNonEmptyString(objectValue.branchId, `${label}.branchId`);
@@ -543,6 +574,7 @@ export function assertSetHeadResult(
   label = "value"
 ): asserts value is SetHeadResult {
   const objectValue = assertPlainObject(value, label);
+  assertAllowedObjectKeys(objectValue, ["archiveBranch", "branch"], label);
 
   assertBranchRecord(objectValue.branch, `${label}.branch`);
 
@@ -560,6 +592,11 @@ export function assertStoredObject(
   label = "value"
 ): asserts value is StoredObject {
   const objectValue = assertPlainObject(value, label);
+  assertAllowedObjectKeys(
+    objectValue,
+    ["byteLength", "bytes", "createdAtMs", "hash", "mediaType"],
+    label
+  );
 
   assertHashString(objectValue.hash, `${label}.hash`);
   assertNonEmptyString(objectValue.mediaType, `${label}.mediaType`);
@@ -608,6 +645,11 @@ export function assertStoredSchema(
   label = "value"
 ): asserts value is StoredSchema {
   const objectValue = assertPlainObject(value, label);
+  assertAllowedObjectKeys(
+    objectValue,
+    ["createdAtMs", "schemaCbor", "schemaId"],
+    label
+  );
   const schemaCbor = objectValue.schemaCbor;
   const schemaId = objectValue.schemaId;
 
@@ -641,6 +683,11 @@ export function assertStoredTurnTree(
   label = "value"
 ): asserts value is StoredTurnTree {
   const objectValue = assertPlainObject(value, label);
+  assertAllowedObjectKeys(
+    objectValue,
+    ["createdAtMs", "hash", "manifestCbor", "schemaId"],
+    label
+  );
   const manifestCbor = objectValue.manifestCbor;
 
   assertHashString(objectValue.hash, `${label}.hash`);
@@ -690,6 +737,20 @@ export function assertStoredTurnTreePath(
   label = "value"
 ): asserts value is StoredTurnTreePath {
   const objectValue = assertPlainObject(value, label);
+  assertAllowedObjectKeys(
+    objectValue,
+    [
+      "collectionKind",
+      "orderedChunkListCbor",
+      "orderedCount",
+      "orderedEncoding",
+      "orderedInlineCbor",
+      "path",
+      "singleHash",
+      "turnTreeHash",
+    ],
+    label
+  );
   const turnTreeHash = objectValue.turnTreeHash;
   const path = objectValue.path;
   const collectionKind = objectValue.collectionKind;
@@ -911,6 +972,11 @@ export function assertStoredOrderedPathChunk(
   label = "value"
 ): asserts value is StoredOrderedPathChunk {
   const objectValue = assertPlainObject(value, label);
+  assertAllowedObjectKeys(
+    objectValue,
+    ["chunkHash", "createdAtMs", "itemCount", "itemsCbor"],
+    label
+  );
 
   assertHashString(objectValue.chunkHash, `${label}.chunkHash`);
   assertNonNegativeInteger(objectValue.itemCount, `${label}.itemCount`);
@@ -957,6 +1023,19 @@ export function assertStoredTurnNode(
   label = "value"
 ): asserts value is StoredTurnNode {
   const objectValue = assertPlainObject(value, label);
+  assertAllowedObjectKeys(
+    objectValue,
+    [
+      "consumedStagedResultsCbor",
+      "createdAtMs",
+      "eventHash",
+      "hash",
+      "previousTurnNodeHash",
+      "schemaId",
+      "turnTreeHash",
+    ],
+    label
+  );
   const consumedStagedResultsCbor = objectValue.consumedStagedResultsCbor;
 
   assertHashString(objectValue.hash, `${label}.hash`);
@@ -1019,6 +1098,11 @@ export function assertStoredThread(
   label = "value"
 ): asserts value is StoredThread {
   const objectValue = assertPlainObject(value, label);
+  assertAllowedObjectKeys(
+    objectValue,
+    ["createdAtMs", "rootTurnNodeHash", "schemaId", "threadId"],
+    label
+  );
 
   assertNonEmptyString(objectValue.threadId, `${label}.threadId`);
   assertNonEmptyString(objectValue.schemaId, `${label}.schemaId`);
@@ -1035,6 +1119,18 @@ export function assertStoredBranch(
   label = "value"
 ): asserts value is StoredBranch {
   const objectValue = assertPlainObject(value, label);
+  assertAllowedObjectKeys(
+    objectValue,
+    [
+      "archivedFromBranchId",
+      "branchId",
+      "createdAtMs",
+      "headTurnNodeHash",
+      "threadId",
+      "updatedAtMs",
+    ],
+    label
+  );
 
   assertNonEmptyString(objectValue.branchId, `${label}.branchId`);
   assertNonEmptyString(objectValue.threadId, `${label}.threadId`);
@@ -1060,6 +1156,20 @@ export function assertStoredTurn(
   label = "value"
 ): asserts value is StoredTurn {
   const objectValue = assertPlainObject(value, label);
+  assertAllowedObjectKeys(
+    objectValue,
+    [
+      "branchId",
+      "createdAtMs",
+      "headTurnNodeHash",
+      "parentTurnId",
+      "startTurnNodeHash",
+      "threadId",
+      "turnId",
+      "updatedAtMs",
+    ],
+    label
+  );
 
   assertNonEmptyString(objectValue.turnId, `${label}.turnId`);
   assertNonEmptyString(objectValue.threadId, `${label}.threadId`);
@@ -1080,6 +1190,23 @@ export function assertStoredRun(
   label = "value"
 ): asserts value is StoredRun {
   const objectValue = assertPlainObject(value, label);
+  assertAllowedObjectKeys(
+    objectValue,
+    [
+      "branchId",
+      "createdAtMs",
+      "createdTurnNodesCbor",
+      "currentStepIndex",
+      "runId",
+      "schemaId",
+      "startTurnNodeHash",
+      "status",
+      "stepSequenceCbor",
+      "turnId",
+      "updatedAtMs",
+    ],
+    label
+  );
   const currentStepIndex = objectValue.currentStepIndex;
   const stepSequenceCbor = objectValue.stepSequenceCbor;
   const createdTurnNodesCbor = objectValue.createdTurnNodesCbor;
@@ -1129,6 +1256,19 @@ export function assertStoredStagedResult(
   label = "value"
 ): asserts value is StoredStagedResult {
   const objectValue = assertPlainObject(value, label);
+  assertAllowedObjectKeys(
+    objectValue,
+    [
+      "createdAtMs",
+      "interruptPayloadCbor",
+      "objectHash",
+      "objectType",
+      "runId",
+      "status",
+      "taskId",
+    ],
+    label
+  );
   const interruptPayloadCbor = objectValue.interruptPayloadCbor;
 
   assertNonEmptyString(objectValue.runId, `${label}.runId`);
@@ -1245,6 +1385,11 @@ function assertPathDefinitions(
   for (const [index, definition] of definitions.entries()) {
     const definitionLabel = `${label}[${index}]`;
     const objectValue = assertPlainObject(definition, definitionLabel);
+    assertAllowedObjectKeys(
+      objectValue,
+      ["collection", "metadata", "path"],
+      definitionLabel
+    );
 
     assertSchemaPath(objectValue.path, `${definitionLabel}.path`);
     assertPathCollectionKind(
@@ -1297,6 +1442,11 @@ function assertIncorporationRules(
   for (const [index, rule] of rules.entries()) {
     const ruleLabel = `${label}[${index}]`;
     const objectValue = assertPlainObject(rule, ruleLabel);
+    assertAllowedObjectKeys(
+      objectValue,
+      ["objectType", "targetPath"],
+      ruleLabel
+    );
 
     assertNonEmptyString(objectValue.objectType, `${ruleLabel}.objectType`);
     assertNonEmptyString(objectValue.targetPath, `${ruleLabel}.targetPath`);

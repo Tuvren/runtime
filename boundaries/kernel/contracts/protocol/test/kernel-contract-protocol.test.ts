@@ -151,6 +151,15 @@ describe("deterministic identity", () => {
     );
   });
 
+  test("rejects malformed TurnNode identity inputs with KrakenValidationError", async () => {
+    await expect(
+      hashTurnNodeIdentity(undefined as never)
+    ).rejects.toBeInstanceOf(KrakenValidationError);
+    await expect(hashTurnNodeIdentity(undefined as never)).rejects.toThrow(
+      "turn node identity input must be a plain object"
+    );
+  });
+
   test("rejects decoded non-canonical kernel numbers as validation errors", () => {
     expect(() =>
       decodeDeterministicKernelRecord(
@@ -582,6 +591,27 @@ describe("logical contract fixtures", () => {
         kernelProtocolInvalidFixtures.invalidBranchHeadListEntry
       )
     ).toThrow("[0] must be a non-empty string");
+  });
+
+  test("rejects undeclared extra fields on exact-shape validators", () => {
+    expect(() =>
+      assertStepContext({
+        ...kernelProtocolLogicalFixtures.stepContext,
+        extra: 1,
+      })
+    ).toThrow("extra is not part of the contract shape");
+    expect(() =>
+      assertStoredRun({
+        ...kernelProtocolStoredFixtures.storedRun,
+        extra: 1,
+      })
+    ).toThrow("extra is not part of the contract shape");
+    expect(() =>
+      assertStoredTurnNode({
+        ...kernelProtocolStoredFixtures.storedTurnNode,
+        extra: 1,
+      })
+    ).toThrow("extra is not part of the contract shape");
   });
 });
 
