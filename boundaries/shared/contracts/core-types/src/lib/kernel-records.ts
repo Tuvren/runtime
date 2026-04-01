@@ -93,7 +93,7 @@ function isKernelRecordValueInternal(
       return isCanonicalKernelInteger(value);
     case "object":
       if (value instanceof Uint8Array) {
-        return true;
+        return isCanonicalKernelBytes(value);
       }
 
       if (activeParents.has(value)) {
@@ -209,4 +209,34 @@ function isCanonicalKernelInteger(value: unknown): value is number {
     Number.isSafeInteger(value) &&
     !Object.is(value, -0)
   );
+}
+
+function isCanonicalKernelBytes(value: Uint8Array): boolean {
+  if (Object.getOwnPropertySymbols(value).length > 0) {
+    return false;
+  }
+
+  const descriptors = Object.getOwnPropertyDescriptors(value);
+
+  for (const key of Object.getOwnPropertyNames(descriptors)) {
+    const descriptor = descriptors[key];
+    const index = Number(key);
+
+    if (
+      !(
+        descriptor?.enumerable &&
+        Object.hasOwn(descriptor, "value") &&
+        Number.isInteger(index) &&
+        index >= 0 &&
+        index < value.length &&
+        String(index) === key
+      ) ||
+      Object.hasOwn(descriptor, "get") ||
+      Object.hasOwn(descriptor, "set")
+    ) {
+      return false;
+    }
+  }
+
+  return true;
 }

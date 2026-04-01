@@ -226,6 +226,14 @@ describe("KernelRecord", () => {
     expect(encodedHex).toBe("a261620262616101");
   });
 
+  test("preserves RFC 8949 key order for mixed integer-like and string keys", () => {
+    const encodedHex = Buffer.from(
+      encodeDeterministicKernelRecord({ "100": 2, z: 1 })
+    ).toString("hex");
+
+    expect(encodedHex).toBe("a2617a016331303002");
+  });
+
   test("locks the canonical fixture bytes and hash", async () => {
     const encodedBytes = encodeDeterministicKernelRecord(
       deterministicKernelRecordFixture.logicalValue
@@ -253,6 +261,29 @@ describe("KernelRecord", () => {
 
     expect(encodedHex).toContain("65734401020304");
     expect(encodedHex).not.toContain("d84044");
+  });
+
+  test("rejects Uint8Array values with non-canonical metadata", () => {
+    const hiddenPropertyBytes = new Uint8Array([1, 2]);
+    Object.defineProperty(hiddenPropertyBytes, "secret", {
+      enumerable: false,
+      value: 3,
+    });
+
+    const accessorBytes = new Uint8Array([1, 2]);
+    Object.defineProperty(accessorBytes, "extra", {
+      enumerable: true,
+      get() {
+        return 3;
+      },
+    });
+
+    const symbolBytes = new Uint8Array([1, 2]);
+    symbolBytes[Symbol("meta")] = 3;
+
+    expect(isKernelRecord(hiddenPropertyBytes)).toBe(false);
+    expect(isKernelRecord(accessorBytes)).toBe(false);
+    expect(isKernelRecord(symbolBytes)).toBe(false);
   });
 });
 

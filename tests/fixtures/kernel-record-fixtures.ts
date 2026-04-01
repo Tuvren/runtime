@@ -21,10 +21,11 @@ import { Encoder } from "cbor-x";
 
 const deterministicEncoder = new Encoder({
   tagUint8Array: false,
+  useTag259ForMaps: false,
   useRecords: false,
   variableMapSize: true,
 });
-const deterministicKeyEncoder = new Encoder({
+const deterministicScalarEncoder = new Encoder({
   tagUint8Array: false,
   useRecords: false,
   variableMapSize: true,
@@ -82,7 +83,7 @@ export const invalidKernelRecordFixtures: readonly unknown[] = [
   () => "nope",
 ];
 
-export function canonicalizeKernelRecord(value: KernelRecord): KernelRecord {
+export function canonicalizeKernelRecord(value: KernelRecord): unknown {
   assertKernelRecord(value);
 
   if (
@@ -103,7 +104,7 @@ export function canonicalizeKernelRecord(value: KernelRecord): KernelRecord {
     compareKeys(leftKey, rightKey)
   );
 
-  return Object.fromEntries(
+  return new Map(
     sortedEntries.map(([key, nestedValue]) => [
       key,
       canonicalizeKernelRecord(nestedValue),
@@ -116,7 +117,7 @@ export function encodeDeterministicKernelRecord(
 ): Uint8Array {
   const canonicalValue = canonicalizeKernelRecord(value);
   return new Uint8Array(
-    deterministicEncoder.encode(prepareKernelRecordForEncoding(canonicalValue))
+    deterministicEncoder.encode(prepareCanonicalKernelValue(canonicalValue))
   );
 }
 
@@ -127,7 +128,7 @@ export async function sha256Hex(bytes: Uint8Array): Promise<string> {
   ).join("");
 }
 
-function prepareKernelRecordForEncoding(value: KernelRecord): unknown {
+function prepareCanonicalKernelValue(value: unknown): unknown {
   if (
     value === null ||
     typeof value === "boolean" ||
@@ -146,21 +147,25 @@ function prepareKernelRecordForEncoding(value: KernelRecord): unknown {
   }
 
   if (Array.isArray(value)) {
-    return value.map((item) => prepareKernelRecordForEncoding(item));
+    return value.map((item) => prepareCanonicalKernelValue(item));
   }
 
-  return Object.fromEntries(
-    Object.entries(value).map(([key, nestedValue]) => [
-      key,
-      prepareKernelRecordForEncoding(nestedValue),
-    ])
-  );
+  if (value instanceof Map) {
+    return new Map(
+      Array.from(value, ([key, nestedValue]) => [
+        key,
+        prepareCanonicalKernelValue(nestedValue),
+      ])
+    );
+  }
+
+  return value;
 }
 
 function compareKeys(leftKey: string, rightKey: string): number {
   return compareByteArrays(
-    encodeDeterministicKey(leftKey),
-    encodeDeterministicKey(rightKey)
+    encodeDeterministicScalar(leftKey),
+    encodeDeterministicScalar(rightKey)
   );
 }
 
@@ -183,6 +188,6 @@ function compareByteArrays(
   return leftBytes.length < rightBytes.length ? -1 : 1;
 }
 
-function encodeDeterministicKey(value: string): Uint8Array {
-  return new Uint8Array(deterministicKeyEncoder.encode(value));
+function encodeDeterministicScalar(value: string): Uint8Array {
+  return new Uint8Array(deterministicScalarEncoder.encode(value));
 }
