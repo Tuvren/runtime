@@ -269,6 +269,10 @@ function assertTurnNodeIdentityInput(
         `turn node identity input.consumedStagedResults[${index}]`
       )
   );
+  assertUniqueStagedResultTaskIds(
+    normalizedConsumedStagedResults,
+    "turn node identity input.consumedStagedResults"
+  );
 
   return Object.assign(Object.create(null), objectValue, {
     consumedStagedResults: normalizedConsumedStagedResults,
@@ -397,6 +401,24 @@ function assertDenseDataArray(
         value,
       });
     }
+  }
+}
+
+function assertUniqueStagedResultTaskIds(
+  stagedResults: StagedResult[],
+  label: string
+): void {
+  const seenTaskIds = new Set<string>();
+
+  for (const stagedResult of stagedResults) {
+    if (seenTaskIds.has(stagedResult.taskId)) {
+      throw turnNodeIdentityError(
+        `${label} must not contain duplicate staged result taskIds`,
+        { taskId: stagedResult.taskId }
+      );
+    }
+
+    seenTaskIds.add(stagedResult.taskId);
   }
 }
 

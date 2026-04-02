@@ -2115,6 +2115,17 @@ function assertSetHeadArchiveCoherence(
       { archiveBranchId: archiveBranch.branchId, branchId: branch.branchId }
     );
   }
+
+  if (branch.headTurnNodeHash === archiveBranch.headTurnNodeHash) {
+    throw validationError(
+      `${archiveBranchLabel}.headTurnNodeHash must differ from ${branchLabel}.headTurnNodeHash`,
+      "invalid_set_head_result",
+      {
+        archiveHeadTurnNodeHash: archiveBranch.headTurnNodeHash,
+        branchHeadTurnNodeHash: branch.headTurnNodeHash,
+      }
+    );
+  }
 }
 
 function assertMonotonicTimestamps(

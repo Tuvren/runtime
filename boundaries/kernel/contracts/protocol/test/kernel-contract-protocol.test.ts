@@ -285,6 +285,33 @@ describe("deterministic identity", () => {
     ).rejects.toThrow(
       'interruptPayload must be omitted unless status is "interrupted"'
     );
+    await expect(
+      hashTurnNodeIdentity({
+        consumedStagedResults: [
+          {
+            objectHash:
+              "1111111111111111111111111111111111111111111111111111111111111111",
+            objectType: "tool_result",
+            status: "completed",
+            taskId: "tool_call_1",
+            timestamp: 1_717_171_717_171,
+          },
+          {
+            objectHash:
+              "1212121212121212121212121212121212121212121212121212121212121212",
+            objectType: "tool_result",
+            status: "failed",
+            taskId: "tool_call_1",
+            timestamp: 1_717_171_717_272,
+          },
+        ],
+        eventHash: null,
+        previousTurnNodeHash: null,
+        schemaId: "schema_main",
+        turnTreeHash:
+          "2222222222222222222222222222222222222222222222222222222222222222",
+      } as never)
+    ).rejects.toThrow("must not contain duplicate staged result taskIds");
   });
 
   test("rejects TurnNode identity inputs with non-data consumedStagedResults arrays", async () => {
@@ -974,6 +1001,18 @@ describe("logical contract fixtures", () => {
       })
     ).toThrow(
       "value.archiveBranch.branchId must differ from value.branch.branchId"
+    );
+    expect(() =>
+      assertSetHeadResult({
+        archiveBranch: {
+          ...kernelProtocolLogicalFixtures.setHeadResult.archiveBranch,
+          headTurnNodeHash:
+            kernelProtocolLogicalFixtures.setHeadResult.branch.headTurnNodeHash,
+        },
+        branch: kernelProtocolLogicalFixtures.setHeadResult.branch,
+      })
+    ).toThrow(
+      "value.archiveBranch.headTurnNodeHash must differ from value.branch.headTurnNodeHash"
     );
   });
 
