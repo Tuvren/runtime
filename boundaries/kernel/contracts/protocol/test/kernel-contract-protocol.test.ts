@@ -29,6 +29,7 @@ import type { ComposedVerdict, KernelSignal, Verdict } from "../src/index.ts";
 import {
   assertBranchHeadListEntry,
   assertBranchRecord,
+  assertComposedVerdict,
   assertObserveResult,
   assertPathValue,
   assertPathValueForCollectionKind,
@@ -63,6 +64,8 @@ import {
   assertTurnTreeChangeSet,
   assertTurnTreeManifest,
   assertTurnTreeSchema,
+  assertVerdict,
+  assertVerdictDisposition,
   decodeDeterministicKernelRecord,
   encodeDeterministicKernelRecord,
   hashKernelRecord,
@@ -73,6 +76,8 @@ import {
   isObserveResult,
   isRunStatus,
   isStagedResultStatus,
+  isVerdict,
+  isVerdictDisposition,
 } from "../src/index.ts";
 
 describe("deterministic identity", () => {
@@ -713,6 +718,40 @@ describe("logical contract fixtures", () => {
     expect(composedVerdict.kind).toBe("abort");
   });
 
+  test("validates verdict algebra shapes at runtime", () => {
+    expect(isVerdictDisposition("HardFail")).toBe(true);
+    expect(isVerdictDisposition("explode")).toBe(false);
+    expect(() => assertVerdictDisposition("SoftFail")).not.toThrow();
+    expect(() =>
+      assertVerdict({
+        disposition: "HardFail",
+        kind: "abort",
+        reason: "blocked",
+      })
+    ).not.toThrow();
+    expect(() =>
+      assertComposedVerdict({
+        kind: "pause",
+        reason: "waiting",
+        resumptionSchema: { kind: "approval" },
+      })
+    ).not.toThrow();
+    expect(isVerdict({ kind: "proceed" })).toBe(true);
+    expect(() =>
+      assertVerdict({
+        kind: "abort",
+        reason: "blocked",
+      })
+    ).toThrow("disposition");
+    expect(() =>
+      assertVerdict({
+        adjustment: { retries: 1 },
+        kind: "retry",
+        extra: true,
+      })
+    ).toThrow("extra is not part of the contract shape");
+  });
+
   test("wraps primitive field failures in KrakenValidationError", () => {
     let turnNodeError: unknown;
     let storedObjectError: unknown;
@@ -1010,11 +1049,19 @@ describe("stored contract fixtures", () => {
 
   test("rejects manifests and stored TurnTree rows that do not match the active schema", async () => {
     const schema = kernelProtocolDeterministicFixtures.turnTreeSchemaRecord;
+    const partialManifest = {
+      messages: [],
+    };
     const invalidManifest = {
+      "context.manifest":
+        "2222222222222222222222222222222222222222222222222222222222222222",
       ghost: [],
-      messages: null,
+      messages: [],
     };
 
+    expect(() => assertTurnTreeManifest(partialManifest, schema)).toThrow(
+      "context.manifest must be present in a full TurnTree manifest"
+    );
     expect(() => assertTurnTreeManifest(invalidManifest, schema)).toThrow(
       "must reference a schema-defined path"
     );
@@ -1056,6 +1103,41 @@ describe("stored contract fixtures", () => {
         schema
       )
     ).toThrow("collectionKind must match the schema collection");
+  });
+
+  test("rejects partial manifests when validating against a full schema", async () => {
+    const schema = kernelProtocolDeterministicFixtures.turnTreeSchemaRecord;
+    const partialManifest = {
+      messages: [],
+    };
+
+    expect(() => assertTurnTreeManifest(partialManifest, schema)).toThrow(
+      "context.manifest must be present in a full TurnTree manifest"
+    );
+    expect(() =>
+      assertStoredTurnTree(
+        {
+          ...kernelProtocolStoredFixtures.storedTurnTree,
+          manifestCbor: encodeDeterministicKernelRecord(
+            partialManifest as never
+          ),
+        },
+        schema
+      )
+    ).toThrow("context.manifest must be present in a full TurnTree manifest");
+    await expect(
+      assertStoredTurnTreeIdentity(
+        {
+          ...kernelProtocolStoredFixtures.storedTurnTree,
+          manifestCbor: encodeDeterministicKernelRecord(
+            partialManifest as never
+          ),
+        },
+        schema
+      )
+    ).rejects.toThrow(
+      "context.manifest must be present in a full TurnTree manifest"
+    );
   });
 
   test("rejects stored runs whose decoded step sequence or created nodes are invalid", () => {

@@ -34,6 +34,7 @@ import {
 import type {
   BranchHeadListEntry,
   BranchRecord,
+  ComposedVerdict,
   ObserveResult,
   PathCollectionKind,
   PathDefinition,
@@ -65,6 +66,8 @@ import type {
   TurnTreeChangeSet,
   TurnTreeManifest,
   TurnTreeSchema,
+  Verdict,
+  VerdictDisposition,
 } from "./kernel-types.js";
 
 const PATH_COLLECTION_KINDS = ["ordered", "single"] as const;
@@ -72,6 +75,7 @@ const STAGED_RESULT_STATUSES = ["completed", "failed", "interrupted"] as const;
 const RUN_STATUSES = ["running", "paused", "completed", "failed"] as const;
 const RUN_COMPLETION_STATUSES = ["paused", "completed", "failed"] as const;
 const ORDERED_ENCODINGS = ["flat", "chunked"] as const;
+const VERDICT_DISPOSITIONS = ["HardFail", "SoftFail", "EndTurn"] as const;
 
 export function isPathCollectionKind(
   value: unknown
@@ -232,6 +236,79 @@ export function assertObserveResult(
 
   assertKernelObjectArray(objectValue.annotations, `${label}.annotations`);
   assertKernelRecordArray(objectValue.signals, `${label}.signals`);
+}
+
+export function isVerdictDisposition(
+  value: unknown
+): value is VerdictDisposition {
+  return isStringLiteral(value, VERDICT_DISPOSITIONS);
+}
+
+export function assertVerdictDisposition(
+  value: unknown,
+  label = "value"
+): asserts value is VerdictDisposition {
+  if (!isVerdictDisposition(value)) {
+    throw validationError(
+      `${label} must be one of ${VERDICT_DISPOSITIONS.join(", ")}`,
+      "invalid_verdict_disposition",
+      { value }
+    );
+  }
+}
+
+export function isVerdict(value: unknown): value is Verdict {
+  return tryAssert(value, assertVerdict);
+}
+
+export function assertVerdict(
+  value: unknown,
+  label = "value"
+): asserts value is Verdict {
+  const objectValue = assertPlainObject(value, label);
+  const kind = objectValue.kind;
+
+  if (kind === "proceed") {
+    assertProceedVerdict(objectValue, label);
+    return;
+  }
+
+  if (kind === "abort") {
+    assertAbortVerdict(objectValue, label);
+    return;
+  }
+
+  if (kind === "modify") {
+    assertModifyVerdict(objectValue, label);
+    return;
+  }
+
+  if (kind === "pause") {
+    assertPauseVerdict(objectValue, label);
+    return;
+  }
+
+  if (kind === "retry") {
+    assertRetryVerdict(objectValue, label);
+    return;
+  }
+
+  throw validationError(
+    `${label}.kind must be one of proceed, abort, modify, pause, retry`,
+    "invalid_verdict_kind",
+    { value: kind }
+  );
+}
+
+export function isComposedVerdict(value: unknown): value is ComposedVerdict {
+  return tryAssert(value, assertComposedVerdict);
+}
+
+export function assertComposedVerdict(
+  value: unknown,
+  label = "value"
+): asserts value is ComposedVerdict {
+  assertVerdict(value, label);
 }
 
 export function isStagedResultStatus(
@@ -1524,6 +1601,16 @@ function assertTurnTreePathMapMatchesSchema(
     schema.paths.map((definition) => [definition.path, definition.collection])
   );
 
+  for (const pathDefinition of schema.paths) {
+    if (!Object.hasOwn(value, pathDefinition.path)) {
+      throw validationError(
+        `${label}.${pathDefinition.path} must be present in a full TurnTree manifest`,
+        "missing_turn_tree_path",
+        { path: pathDefinition.path, schemaId: schema.schemaId }
+      );
+    }
+  }
+
   for (const [path, pathValue] of Object.entries(value)) {
     const collectionKind = pathDefinitions.get(path);
 
@@ -1541,6 +1628,91 @@ function assertTurnTreePathMapMatchesSchema(
       `${label}.${path}`
     );
   }
+}
+
+function assertProceedVerdict(
+  value: Record<string, unknown>,
+  label: string
+): void {
+  assertAllowedObjectKeys(value, ["kind"], label);
+
+  if (value.kind !== "proceed") {
+    throw validationError(
+      `${label}.kind must be "proceed"`,
+      "invalid_verdict_kind",
+      { value: value.kind }
+    );
+  }
+}
+
+function assertAbortVerdict(
+  value: Record<string, unknown>,
+  label: string
+): void {
+  assertAllowedObjectKeys(value, ["disposition", "kind", "reason"], label);
+
+  if (value.kind !== "abort") {
+    throw validationError(
+      `${label}.kind must be "abort"`,
+      "invalid_verdict_kind",
+      { value: value.kind }
+    );
+  }
+
+  assertVerdictDisposition(value.disposition, `${label}.disposition`);
+  assertNonEmptyString(value.reason, `${label}.reason`);
+}
+
+function assertModifyVerdict(
+  value: Record<string, unknown>,
+  label: string
+): void {
+  assertAllowedObjectKeys(value, ["kind", "transform"], label);
+
+  if (value.kind !== "modify") {
+    throw validationError(
+      `${label}.kind must be "modify"`,
+      "invalid_verdict_kind",
+      { value: value.kind }
+    );
+  }
+
+  assertKernelRecord(value.transform, `${label}.transform`);
+}
+
+function assertPauseVerdict(
+  value: Record<string, unknown>,
+  label: string
+): void {
+  assertAllowedObjectKeys(value, ["kind", "reason", "resumptionSchema"], label);
+
+  if (value.kind !== "pause") {
+    throw validationError(
+      `${label}.kind must be "pause"`,
+      "invalid_verdict_kind",
+      { value: value.kind }
+    );
+  }
+
+  assertNonEmptyString(value.reason, `${label}.reason`);
+  assertKernelRecord(value.resumptionSchema, `${label}.resumptionSchema`);
+}
+
+function assertRetryVerdict(
+  value: Record<string, unknown>,
+  label: string
+): void {
+  assertAllowedObjectKeys(value, ["adjustment", "kind"], label);
+
+  if (value.kind !== "retry") {
+    throw validationError(
+      `${label}.kind must be "retry"`,
+      "invalid_verdict_kind",
+      { value: value.kind }
+    );
+  }
+
+  assertKernelRecord(value.adjustment, `${label}.adjustment`);
 }
 
 function assertStoredTurnTreePathMatchesSchema(

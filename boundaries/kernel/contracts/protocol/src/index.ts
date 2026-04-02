@@ -74,6 +74,7 @@ export type {
 export {
   assertBranchHeadListEntry,
   assertBranchRecord,
+  assertComposedVerdict,
   assertObserveResult,
   assertPathCollectionKind,
   assertPathValue,
@@ -110,8 +111,11 @@ export {
   assertTurnTreeChangeSet,
   assertTurnTreeManifest,
   assertTurnTreeSchema,
+  assertVerdict,
+  assertVerdictDisposition,
   isBranchHeadListEntry,
   isBranchRecord,
+  isComposedVerdict,
   isObserveResult,
   isPathCollectionKind,
   isPathValue,
@@ -140,4 +144,6 @@ export {
   isTurnNode,
   isTurnRecord,
   isTurnTreeSchema,
+  isVerdict,
+  isVerdictDisposition,
 } from "./lib/kernel-validation.js";
