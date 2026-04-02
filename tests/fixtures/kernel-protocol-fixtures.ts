@@ -405,7 +405,18 @@ export const kernelProtocolStoredFixtures = {
     singleHash:
       "2222222222222222222222222222222222222222222222222222222222222222",
     turnTreeHash:
-      "3636363636363636363636363636363636363636363636363636363636363636",
+      "98d7b1f35f6ebf506508b1bfbd6be173147a80bc85917a17756c66d97faf8b87",
+  },
+  storedTurnTreePathOrdered: {
+    collectionKind: "ordered",
+    orderedCount: 2,
+    orderedEncoding: "flat",
+    orderedInlineCbor: bytesFromHex(
+      kernelProtocolDeterministicFixtures.storedTurnTreePathOrderedInlineCborHex
+    ),
+    path: "messages",
+    turnTreeHash:
+      "98d7b1f35f6ebf506508b1bfbd6be173147a80bc85917a17756c66d97faf8b87",
   },
 };
 
@@ -683,6 +694,7 @@ export const kernelProtocolInvalidFixtures = {
     orderedEncoding: "flat",
     orderedInlineCbor: new Uint8Array([129, 1]),
     path: "context.manifest",
+    singleHash: null,
     turnTreeHash:
       "4141414141414141414141414141414141414141414141414141414141414141",
   },

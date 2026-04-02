@@ -358,24 +358,41 @@ describe("deterministic identity", () => {
 
   test("rejects malformed TurnTree manifest inputs before hashing identity", () => {
     expect(() =>
-      hashTurnTreeIdentity("schema_main", { messages: 1 } as never)
-    ).toThrow(
-      "manifest.messages must be a lowercase 64-character SHA-256 hex digest"
-    );
+      hashTurnTreeIdentity(
+        "schema_main",
+        {
+          "context.manifest":
+            "2222222222222222222222222222222222222222222222222222222222222222",
+          messages: 1,
+        } as never,
+        kernelProtocolDeterministicFixtures.turnTreeSchemaRecord
+      )
+    ).toThrow("manifest.messages must be a HashString[] for an ordered path");
     expect(() =>
-      hashTurnTreeIdentity("schema_main", {
-        messages: ["not_hash"],
-      } as never)
+      hashTurnTreeIdentity(
+        "schema_main",
+        {
+          "context.manifest":
+            "2222222222222222222222222222222222222222222222222222222222222222",
+          messages: ["not_hash"],
+        } as never,
+        kernelProtocolDeterministicFixtures.turnTreeSchemaRecord
+      )
     ).toThrow(
       "manifest.messages[0] must be a lowercase 64-character SHA-256 hex digest"
     );
     expect(() =>
-      hashTurnTreeIdentity("schema_main", {
-        "bad..path": null,
-      } as never)
-    ).toThrow(
-      "manifest path must be a dot-separated path with non-empty segments"
-    );
+      hashTurnTreeIdentity(
+        "schema_main",
+        {
+          "context.manifest":
+            "2222222222222222222222222222222222222222222222222222222222222222",
+          "bad..path": null,
+          messages: [],
+        } as never,
+        kernelProtocolDeterministicFixtures.turnTreeSchemaRecord
+      )
+    ).toThrow("manifest.bad..path must reference a schema-defined path");
   });
 
   test("hashes opaque object bytes without structured-record canonicalization", async () => {
@@ -432,6 +449,13 @@ describe("deterministic identity", () => {
         kernelProtocolStoredFixtures.storedTurnTree.manifestCbor
       ).toString("hex")
     ).toBe(kernelProtocolDeterministicFixtures.storedTurnTreeManifestCborHex);
+    expect(
+      Buffer.from(
+        kernelProtocolStoredFixtures.storedTurnTreePathOrdered.orderedInlineCbor
+      ).toString("hex")
+    ).toBe(
+      kernelProtocolDeterministicFixtures.storedTurnTreePathOrderedInlineCborHex
+    );
   });
 });
 
@@ -963,6 +987,12 @@ describe("stored contract fixtures", () => {
       )
     ).not.toThrow();
     expect(() =>
+      assertStoredTurnTreePath(
+        kernelProtocolStoredFixtures.storedTurnTreePathOrdered,
+        schema
+      )
+    ).not.toThrow();
+    expect(() =>
       assertStoredOrderedPathChunk(
         kernelProtocolStoredFixtures.storedOrderedPathChunk
       )
@@ -1138,6 +1168,9 @@ describe("stored contract fixtures", () => {
     ).rejects.toThrow(
       "context.manifest must be present in a full TurnTree manifest"
     );
+    expect(() =>
+      hashTurnTreeIdentity("schema_main", partialManifest as never, schema)
+    ).toThrow("context.manifest must be present in a full TurnTree manifest");
   });
 
   test("rejects stored runs whose decoded step sequence or created nodes are invalid", () => {
@@ -1286,6 +1319,14 @@ describe("stored contract fixtures", () => {
         singleHash: undefined,
       })
     ).toThrow("singleHash must be omitted instead of undefined");
+    expect(() =>
+      assertStoredTurnTreePath({
+        collectionKind: "single",
+        path: "context.manifest",
+        turnTreeHash:
+          "98d7b1f35f6ebf506508b1bfbd6be173147a80bc85917a17756c66d97faf8b87",
+      })
+    ).toThrow('singleHash is required when collectionKind is "single"');
   });
 
   test("rejects malformed stored CBOR payloads for core records", () => {

@@ -16,6 +16,6 @@
     "src/**/*.ts",
     "test/**/*.ts",
     "../../../shared/contracts/core-types/src/**/*.ts",
-    "../../../tests/fixtures/**/*.ts"
+    "../../../../tests/fixtures/**/*.ts"
   ]
 }

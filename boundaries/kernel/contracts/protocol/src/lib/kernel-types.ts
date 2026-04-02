@@ -210,7 +210,7 @@ export interface StoredTurnTreePath {
   orderedEncoding?: "flat" | "chunked";
   orderedInlineCbor?: Uint8Array;
   path: string;
-  singleHash?: HashString | null;
+  singleHash: HashString | null;
   turnTreeHash: HashString;
 }
 

@@ -27,6 +27,7 @@ import type {
   StagedResult,
   TurnNode,
   TurnTreeManifest,
+  TurnTreeSchema,
 } from "./kernel-types.js";
 
 const deterministicEncoderOptions = {
@@ -144,10 +145,17 @@ export function hashOpaqueObjectBytes(bytes: Uint8Array): Promise<HashString> {
 
 export function hashTurnTreeIdentity(
   schemaId: string,
-  manifest: TurnTreeManifest
+  manifest: TurnTreeManifest,
+  schema: TurnTreeSchema
 ): Promise<HashString> {
   assertNonEmptyString(schemaId, "schemaId");
-  assertTurnTreeManifestIdentityInput(manifest, "manifest");
+  assertTurnTreeManifestIdentityInput(manifest, schema, "manifest");
+  if (schema.schemaId !== schemaId) {
+    throw turnTreeIdentityError("schemaId must match schema.schemaId", {
+      expectedSchemaId: schema.schemaId,
+      schemaId,
+    });
+  }
   return hashKernelRecord({ manifest, schemaId });
 }
 
@@ -430,32 +438,178 @@ function assertAllowedKeys(
 
 function assertTurnTreeManifestIdentityInput(
   value: TurnTreeManifest,
+  schema: TurnTreeSchema,
   label: string
 ): void {
-  const objectValue = assertPlainObjectRecord(value, label);
+  const objectValue = assertTurnTreePlainObjectRecord(value, label);
 
   assertKernelRecord(objectValue, label);
+  assertTurnTreeSchemaIdentityInput(schema, "schema");
+
+  const pathDefinitions = new Map(
+    schema.paths.map((definition) => [definition.path, definition.collection])
+  );
+
+  for (const definition of schema.paths) {
+    if (!Object.hasOwn(objectValue, definition.path)) {
+      throw turnTreeIdentityError(
+        `${label}.${definition.path} must be present in a full TurnTree manifest`,
+        { path: definition.path, schemaId: schema.schemaId }
+      );
+    }
+  }
 
   for (const [path, pathValue] of Object.entries(objectValue)) {
-    assertSchemaPath(path, `${label} path`);
-    assertTurnTreePathValue(pathValue, `${label}.${path}`);
+    const collectionKind = pathDefinitions.get(path);
+
+    if (collectionKind === undefined) {
+      throw turnTreeIdentityError(
+        `${label}.${path} must reference a schema-defined path`,
+        { path, schemaId: schema.schemaId }
+      );
+    }
+
+    assertTurnTreeSchemaPath(path, `${label} path`);
+    assertTurnTreePathValue(pathValue, collectionKind, `${label}.${path}`);
   }
 }
 
-function assertTurnTreePathValue(value: unknown, label: string): void {
-  if (value === null) {
-    return;
-  }
-
-  if (Array.isArray(value)) {
-    for (const [index, item] of value.entries()) {
-      assertHashStringOrThrow(item, `${label}[${index}]`);
+function assertTurnTreePathValue(
+  value: unknown,
+  collectionKind: "ordered" | "single",
+  label: string
+): void {
+  if (collectionKind === "single") {
+    if (value === null) {
+      return;
     }
 
+    assertTurnTreeHashStringOrThrow(value, label);
     return;
   }
 
-  assertHashStringOrThrow(value, label);
+  if (!Array.isArray(value)) {
+    throw turnTreeIdentityError(
+      `${label} must be a HashString[] for an ordered path`,
+      { collectionKind, value }
+    );
+  }
+
+  for (const [index, item] of value.entries()) {
+    assertTurnTreeHashStringOrThrow(item, `${label}[${index}]`);
+  }
+}
+
+function assertTurnTreeSchemaIdentityInput(
+  value: TurnTreeSchema,
+  label: string
+): void {
+  const objectValue = assertTurnTreePlainObjectRecord(value, label);
+  assertAllowedKeys(
+    objectValue,
+    ["incorporationRules", "paths", "schemaId"],
+    label
+  );
+  assertTurnTreeNonEmptyString(objectValue.schemaId, `${label}.schemaId`);
+  if (!Array.isArray(objectValue.paths)) {
+    throw turnTreeIdentityError(`${label}.paths must be an array`, {
+      value: objectValue.paths,
+    });
+  }
+
+  for (const [index, definition] of objectValue.paths.entries()) {
+    const definitionValue = assertTurnTreePlainObjectRecord(
+      definition,
+      `${label}.paths[${index}]`
+    );
+    assertAllowedKeys(
+      definitionValue,
+      ["collection", "metadata", "path"],
+      `${label}.paths[${index}]`
+    );
+    assertTurnTreeSchemaPath(
+      definitionValue.path,
+      `${label}.paths[${index}].path`
+    );
+    if (
+      !(
+        definitionValue.collection === "ordered" ||
+        definitionValue.collection === "single"
+      )
+    ) {
+      throw turnTreeIdentityError(
+        `${label}.paths[${index}].collection must be "ordered" or "single"`,
+        { value: definitionValue.collection }
+      );
+    }
+  }
+}
+
+function assertTurnTreePlainObjectRecord(
+  value: unknown,
+  label: string
+): Record<string, unknown> {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) {
+    throw turnTreeIdentityError(`${label} must be a plain object`, { value });
+  }
+
+  if (!isPlainObject(value) || Object.getOwnPropertySymbols(value).length > 0) {
+    throw turnTreeIdentityError(`${label} must be a plain object`, { value });
+  }
+
+  const descriptors = Object.getOwnPropertyDescriptors(value);
+
+  for (const key of Object.getOwnPropertyNames(descriptors)) {
+    const descriptor = descriptors[key];
+
+    if (
+      !(descriptor?.enumerable && Object.hasOwn(descriptor, "value")) ||
+      Object.hasOwn(descriptor, "get") ||
+      Object.hasOwn(descriptor, "set")
+    ) {
+      throw turnTreeIdentityError(`${label} must be a plain object`, { value });
+    }
+  }
+
+  return Object.assign(
+    Object.create(null),
+    Object.fromEntries(Object.entries(value))
+  ) as Record<string, unknown>;
+}
+
+function assertTurnTreeNonEmptyString(
+  value: unknown,
+  label: string
+): asserts value is string {
+  if (typeof value !== "string" || value.length === 0) {
+    throw turnTreeIdentityError(`${label} must be a non-empty string`, {
+      value,
+    });
+  }
+}
+
+function assertTurnTreeSchemaPath(value: unknown, label: string): void {
+  assertTurnTreeNonEmptyString(value, label);
+  const pathValue = value;
+  const segments = pathValue.split(".");
+
+  if (segments.some((segment) => segment.length === 0)) {
+    throw turnTreeIdentityError(
+      `${label} must be a dot-separated path with non-empty segments`,
+      { value: pathValue }
+    );
+  }
+}
+
+function assertTurnTreeHashStringOrThrow(value: unknown, label: string): void {
+  try {
+    assertHashString(value, label);
+  } catch (error: unknown) {
+    throw turnTreeIdentityError(
+      error instanceof Error ? error.message : `${label} must be a hash string`,
+      { value }
+    );
+  }
 }
 
 function assertPlainObjectRecord(
@@ -499,20 +653,6 @@ function assertOptionalFieldIsOmittedWhenUndefined(
     throw turnNodeIdentityError(
       `${label}.${key} must be omitted instead of undefined`,
       { key }
-    );
-  }
-}
-
-function assertSchemaPath(value: unknown, label: string): void {
-  assertNonEmptyString(value, label);
-  const pathValue = value as string;
-
-  const segments = pathValue.split(".");
-
-  if (segments.some((segment) => segment.length === 0)) {
-    throw turnNodeIdentityError(
-      `${label} must be a dot-separated path with non-empty segments`,
-      { value: pathValue }
     );
   }
 }
@@ -564,6 +704,16 @@ function turnNodeIdentityError(
 ): KrakenValidationError {
   return new KrakenValidationError(message, {
     code: "invalid_turn_node_hash",
+    details,
+  });
+}
+
+function turnTreeIdentityError(
+  message: string,
+  details: unknown
+): KrakenValidationError {
+  return new KrakenValidationError(message, {
+    code: "invalid_turn_tree_hash",
     details,
   });
 }

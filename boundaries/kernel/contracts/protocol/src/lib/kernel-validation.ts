@@ -77,6 +77,17 @@ const RUN_COMPLETION_STATUSES = ["paused", "completed", "failed"] as const;
 const ORDERED_ENCODINGS = ["flat", "chunked"] as const;
 const VERDICT_DISPOSITIONS = ["HardFail", "SoftFail", "EndTurn"] as const;
 
+interface StoredTurnTreePathCandidate {
+  collectionKind: PathCollectionKind;
+  orderedChunkListCbor?: Uint8Array;
+  orderedCount?: number;
+  orderedEncoding?: "flat" | "chunked";
+  orderedInlineCbor?: Uint8Array;
+  path: string;
+  singleHash?: string | null;
+  turnTreeHash: string;
+}
+
 export function isPathCollectionKind(
   value: unknown
 ): value is PathCollectionKind {
@@ -849,7 +860,11 @@ export async function assertStoredTurnTreeIdentity(
       assertTurnTreeManifest(decodedValue, schema, manifestLabel),
     `${resolvedLabel}.manifestCbor`
   );
-  const expectedHash = await hashTurnTreeIdentity(value.schemaId, manifest);
+  const expectedHash = await hashTurnTreeIdentity(
+    value.schemaId,
+    manifest,
+    schema
+  );
 
   if (value.hash !== expectedHash) {
     throw validationError(
@@ -1004,7 +1019,7 @@ export function assertStoredTurnTreePath(
 }
 
 function assertStoredTurnTreePathShape(
-  value: StoredTurnTreePath,
+  value: StoredTurnTreePathCandidate,
   label: string
 ): void {
   if (value.collectionKind === "single") {
@@ -1016,9 +1031,17 @@ function assertStoredTurnTreePathShape(
 }
 
 function assertStoredSingleTurnTreePathShape(
-  value: StoredTurnTreePath,
+  value: StoredTurnTreePathCandidate,
   label: string
 ): void {
+  if (value.singleHash === undefined) {
+    throw validationError(
+      `${label}.singleHash is required when collectionKind is "single"`,
+      "invalid_stored_turn_tree_path_shape",
+      { collectionKind: value.collectionKind }
+    );
+  }
+
   if (
     value.orderedEncoding !== undefined ||
     value.orderedCount !== undefined ||
@@ -1034,7 +1057,7 @@ function assertStoredSingleTurnTreePathShape(
 }
 
 function assertStoredOrderedTurnTreePathShape(
-  value: StoredTurnTreePath,
+  value: StoredTurnTreePathCandidate,
   label: string
 ): void {
   if (value.singleHash !== undefined) {
@@ -1070,7 +1093,7 @@ function assertStoredOrderedTurnTreePathShape(
 }
 
 function assertStoredFlatTurnTreePathShape(
-  value: StoredTurnTreePath,
+  value: StoredTurnTreePathCandidate,
   label: string
 ): void {
   if (value.orderedInlineCbor === undefined) {
@@ -1108,7 +1131,7 @@ function assertStoredFlatTurnTreePathShape(
 }
 
 function assertStoredChunkedTurnTreePathShape(
-  value: StoredTurnTreePath,
+  value: StoredTurnTreePathCandidate,
   label: string
 ): void {
   if (value.orderedChunkListCbor === undefined) {
@@ -1697,7 +1720,7 @@ function assertRetryVerdict(
 }
 
 function assertStoredTurnTreePathMatchesSchema(
-  value: StoredTurnTreePath,
+  value: StoredTurnTreePathCandidate,
   schema: TurnTreeSchema,
   label: string
 ): void {
