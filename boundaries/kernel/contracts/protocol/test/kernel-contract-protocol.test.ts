@@ -65,6 +65,7 @@ import {
   hashKernelRecord,
   hashOpaqueObjectBytes,
   hashTurnNodeIdentity,
+  hashTurnTreeIdentity,
   isBranchHeadListEntry,
   isObserveResult,
   isRunStatus,
@@ -273,6 +274,28 @@ describe("deterministic identity", () => {
     );
     expect(digestHex).toBe(
       kernelProtocolDeterministicFixtures.turnNodeIdentityRecordSha256Hex
+    );
+  });
+
+  test("rejects malformed TurnTree manifest inputs before hashing identity", () => {
+    expect(() =>
+      hashTurnTreeIdentity("schema_main", { messages: 1 } as never)
+    ).toThrow(
+      "manifest.messages must be a lowercase 64-character SHA-256 hex digest"
+    );
+    expect(() =>
+      hashTurnTreeIdentity("schema_main", {
+        messages: ["not_hash"],
+      } as never)
+    ).toThrow(
+      "manifest.messages[0] must be a lowercase 64-character SHA-256 hex digest"
+    );
+    expect(() =>
+      hashTurnTreeIdentity("schema_main", {
+        "bad..path": null,
+      } as never)
+    ).toThrow(
+      "manifest path must be a dot-separated path with non-empty segments"
     );
   });
 

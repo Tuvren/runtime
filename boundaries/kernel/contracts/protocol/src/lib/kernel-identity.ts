@@ -147,7 +147,7 @@ export function hashTurnTreeIdentity(
   manifest: TurnTreeManifest
 ): Promise<HashString> {
   assertNonEmptyString(schemaId, "schemaId");
-  assertKernelRecord(manifest, "manifest");
+  assertTurnTreeManifestIdentityInput(manifest, "manifest");
   return hashKernelRecord({ manifest, schemaId });
 }
 
@@ -353,6 +353,36 @@ function assertAllowedKeys(
   }
 }
 
+function assertTurnTreeManifestIdentityInput(
+  value: TurnTreeManifest,
+  label: string
+): void {
+  const objectValue = assertPlainObjectRecord(value, label);
+
+  assertKernelRecord(objectValue, label);
+
+  for (const [path, pathValue] of Object.entries(objectValue)) {
+    assertSchemaPath(path, `${label} path`);
+    assertTurnTreePathValue(pathValue, `${label}.${path}`);
+  }
+}
+
+function assertTurnTreePathValue(value: unknown, label: string): void {
+  if (value === null) {
+    return;
+  }
+
+  if (Array.isArray(value)) {
+    for (const [index, item] of value.entries()) {
+      assertHashStringOrThrow(item, `${label}[${index}]`);
+    }
+
+    return;
+  }
+
+  assertHashStringOrThrow(value, label);
+}
+
 function assertPlainObjectRecord(
   value: unknown,
   label: string
@@ -394,6 +424,20 @@ function assertOptionalFieldIsOmittedWhenUndefined(
     throw turnNodeIdentityError(
       `${label}.${key} must be omitted instead of undefined`,
       { key }
+    );
+  }
+}
+
+function assertSchemaPath(value: unknown, label: string): void {
+  assertNonEmptyString(value, label);
+  const pathValue = value as string;
+
+  const segments = pathValue.split(".");
+
+  if (segments.some((segment) => segment.length === 0)) {
+    throw turnNodeIdentityError(
+      `${label} must be a dot-separated path with non-empty segments`,
+      { value: pathValue }
     );
   }
 }
