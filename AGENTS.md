@@ -26,7 +26,9 @@
 - Use Nx for per-project actions; do not duplicate project execution commands into inner package `package.json` scripts unless there is a specific reason.
 - Keep inner package manifests lightweight and project-focused.
 - Do not point package runtime `exports` at source `.ts` files; package boundaries should target built artifacts, while local development wiring can rely on TypeScript path mapping and Nx.
+- If a package manifest exports `dist/*`, define an explicit Nx `build` target that produces those artifacts.
 - Treat `typecheck` as a no-emit validation step; artifact generation belongs to explicit build flows.
+- When a package uses a supplemental no-emit/test typecheck config, keep the package `typecheck` target validating the publishable lib config as well so checked and emitted surfaces cannot drift.
 - When adding Nx targets or inference, keep them aligned with the TechSpec so the scaffold does not silently standardize on the wrong build tool.
 
 ## Tailored code standards

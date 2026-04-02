@@ -59,9 +59,39 @@ export abstract class KrakenError extends Error {
   }
 }
 
-export class KrakenValidationError extends KrakenError {}
-export class KrakenPersistenceError extends KrakenError {}
-export class KrakenLineageError extends KrakenError {}
-export class KrakenRecoveryError extends KrakenError {}
-export class KrakenRuntimeError extends KrakenError {}
-export class KrakenProviderError extends KrakenError {}
+export class KrakenValidationError extends KrakenError {
+  // biome-ignore lint/complexity/noUselessConstructor: The shared base constructor is protected, so public subclasses must re-expose construction intentionally.
+  constructor(message: string, options: KrakenErrorOptions) {
+    super(message, options);
+  }
+}
+export class KrakenPersistenceError extends KrakenError {
+  // biome-ignore lint/complexity/noUselessConstructor: The shared base constructor is protected, so public subclasses must re-expose construction intentionally.
+  constructor(message: string, options: KrakenErrorOptions) {
+    super(message, options);
+  }
+}
+export class KrakenLineageError extends KrakenError {
+  // biome-ignore lint/complexity/noUselessConstructor: The shared base constructor is protected, so public subclasses must re-expose construction intentionally.
+  constructor(message: string, options: KrakenErrorOptions) {
+    super(message, options);
+  }
+}
+export class KrakenRecoveryError extends KrakenError {
+  // biome-ignore lint/complexity/noUselessConstructor: The shared base constructor is protected, so public subclasses must re-expose construction intentionally.
+  constructor(message: string, options: KrakenErrorOptions) {
+    super(message, options);
+  }
+}
+export class KrakenRuntimeError extends KrakenError {
+  // biome-ignore lint/complexity/noUselessConstructor: The shared base constructor is protected, so public subclasses must re-expose construction intentionally.
+  constructor(message: string, options: KrakenErrorOptions) {
+    super(message, options);
+  }
+}
+export class KrakenProviderError extends KrakenError {
+  // biome-ignore lint/complexity/noUselessConstructor: The shared base constructor is protected, so public subclasses must re-expose construction intentionally.
+  constructor(message: string, options: KrakenErrorOptions) {
+    super(message, options);
+  }
+}

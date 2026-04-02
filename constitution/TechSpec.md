@@ -1,9 +1,9 @@
 # Technical Specification
 
 ## 0. Version History & Changelog
+- v0.2.2 - Defined the concrete TypeScript kernel-contract shapes for `StepContext`, `ObserveResult`, and kernel observe signals so the run lifecycle surface no longer depends on implied upstream payload structure.
 - v0.2.1 - Added the shared `KrakenError` foundation contract so stable error codes and category subclasses are specified before later framework and backend work depends on them.
 - v0.2.0 - Locked the authoritative implementation posture: protocol-first kernel, TypeScript first implementation, AI SDK bridge-only provider baseline, strict uniform backend contract, official `memory` and `sqlite` backends, deterministic CBOR plus SHA-256 identity rules, integer-only core record profile, path-granular TurnTree storage with threshold-based chunking for ordered paths, and an architecture-first `devenv + nx` monorepo layout grouped by boundary, contract, and implementation language.
-- v0.1.0 - Initial TechSpec draft establishing the baseline package layout, early provider posture, persistence abstraction, and framework-facing public surface.
 - ... [Older history truncated, refer to git logs]
 
 ## 1. Stack Specification (Bill of Materials)
@@ -160,6 +160,7 @@
   - `schemaId: string`
   - `manifestCbor: Uint8Array`
   - `createdAtMs: EpochMs`
+  - identity note: `hash` is derived from the logical tree identity tuple `{ schemaId, manifest }`, so identical manifests under different schemas never alias
 - `StoredTurnTreePath`
   - `turnTreeHash: HashString`
   - `path: string`
@@ -174,6 +175,7 @@
   - `itemCount: number`
   - `itemsCbor: Uint8Array`
   - `createdAtMs: EpochMs`
+  - identity note: `chunkHash` is derived from the deterministic-CBOR logical chunk item list represented by `itemsCbor`; `itemCount` and `createdAtMs` are not identity inputs
 - `StoredTurnNode`
   - `hash: HashString`
   - `previousTurnNodeHash: HashString | null`
@@ -182,6 +184,7 @@
   - `schemaId: string`
   - `eventHash: HashString | null`
   - `createdAtMs: EpochMs`
+  - identity note: `hash` is derived from the logical TurnNode fields excluding `hash` itself; stored metadata such as `createdAtMs` is not part of the logical TurnNode identity
 - `StoredThread`
   - `threadId: string`
   - `schemaId: string`
@@ -435,8 +438,35 @@ export interface ExecutionHandle {
 - **Authentication / Authorization:** Internal kernel boundary used by framework packages and backend adapters
 - **Compatibility Strategy:** Protocol-first contract. Breaking changes to record shapes, operation signatures, or validation semantics are semver-major.
 - **Error model:** `KrakenError` with persistence, validation, lineage, and recovery codes
+- **Concrete payload rule:** The frozen kernel specification names `ObserveResult.annotations` as `Object[]` and `signals` as `Signal[]`, but does not define their first TypeScript wire shape. The authoritative TypeScript realization is:
+  - observe annotations are `KernelObject[]` carried into `run.completeStep`, where the kernel remains responsible for persisting them per the frozen kernel specification
+  - observe signals are `KernelRecord[]`, keeping them serializable and boundary-safe within the run lifecycle
 
 ```ts
+export type KernelSignal = KernelRecord;
+export type VerdictDisposition = "HardFail" | "SoftFail" | "EndTurn";
+
+export interface ObserveResult {
+  annotations: KernelObject[];
+  signals: KernelSignal[];
+}
+
+export type Verdict =
+  | { kind: "proceed" }
+  | { kind: "abort"; disposition: VerdictDisposition; reason: string }
+  | { kind: "modify"; transform: KernelRecord }
+  | { kind: "pause"; reason: string; resumptionSchema: KernelRecord }
+  | { kind: "retry"; adjustment: KernelRecord };
+
+export type ComposedVerdict = Verdict;
+
+export interface StepContext {
+  currentTurnNodeHash: HashString;
+  schema: TurnTreeSchema;
+  step: StepDeclaration;
+  signals: KernelSignal[];
+}
+
 export interface KrakenKernel {
   store: {
     put(blob: Uint8Array, mediaType?: string): Promise<HashString>;
@@ -494,9 +524,7 @@ export interface KrakenKernel {
       branchId: string,
       turnNodeHash: HashString
     ): Promise<SetHeadResult>;
-    list(
-      threadId: string
-    ): Promise<Array<{ branchId: string; headTurnNodeHash: HashString }>>;
+    list(threadId: string): Promise<Array<[string, HashString]>>;
   };
 
   staging: {
@@ -506,7 +534,7 @@ export interface KrakenKernel {
       taskId: string,
       objectType: string,
       status: "completed" | "failed" | "interrupted",
-      interruptPayload?: unknown
+      interruptPayload?: KernelRecord
     ): Promise<{ objectHash: HashString; stagedResult: StagedResult }>;
     current(runId: string): Promise<StagedResult[]>;
   };
@@ -536,10 +564,15 @@ export interface KrakenKernel {
     recover(runId: string): Promise<RecoveryState>;
   };
 
+  verdicts: {
+    compose(verdicts: Verdict[]): Promise<ComposedVerdict>;
+  };
+
   turn: {
     create(
       turnId: string,
       threadId: string,
+      branchId: string,
       parentTurnId: string | null | undefined,
       startTurnNodeHash: HashString
     ): Promise<TurnRecord>;
@@ -802,7 +835,7 @@ Target implementation layout after code generation begins:
   - `"strict": true`
   - `"module": "esnext"`
   - `"moduleResolution": "bundler"`
-  - `"target": "es2025"`
+  - `"target": "esnext"`
   - explicit `"rootDir"` per package
   - explicit `"types"` arrays where runtime globals are required
 - **Kernel Encoding Rules:**

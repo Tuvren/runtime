@@ -716,7 +716,7 @@ function executeCEAction(plan, turnId, branchId, schemaId, pendingExtensionState
   }, currentTreeHash)
 
   eventHash = storeEvent({ type: "context_engineering_applied", action: plan.action })
-  kernel.run.completeStep(ceRunId, "context_engineering", eventHash, null, newTreeHash)
+  kernel.run.completeStep(ceRunId, "context_engineering", eventHash, undefined, newTreeHash)
   kernel.run.complete(ceRunId, completed)
   kernel.turn.updateHead(turnId, latestHead())
 ```
@@ -851,7 +851,7 @@ function executeTurn(signal, threadId, branchId, schemaId, tools, config, steeri
   function* driver():
     branch = kernel.branch.get(branchId)
     resolvedParentTurnId = parentTurnId ?? resolveParentTurnId(threadId, branchId)
-    kernel.turn.create(turnId, threadId, resolvedParentTurnId, branch.headTurnNodeHash)
+    kernel.turn.create(turnId, threadId, branchId, resolvedParentTurnId, branch.headTurnNodeHash)
     activeConfig = config
     activeTools = tools ?? activeConfig.tools ?? []
     toolRegistry = buildToolRegistry(activeTools, activeConfig.extensions)
@@ -1865,7 +1865,7 @@ function applyHandoff(plan: HandoffContextPlan, turnId, branchId, schemaId, pend
   }, currentTreeHash)
 
   eventHash = storeEvent({ type: "handoff_applied", targetAgent: plan.targetAgent })
-  kernel.run.completeStep(ceRunId, "handoff_context", eventHash, null, newTreeHash)
+  kernel.run.completeStep(ceRunId, "handoff_context", eventHash, undefined, newTreeHash)
   kernel.run.complete(ceRunId, completed)
   kernel.turn.updateHead(turnId, latestHead())
 
