@@ -24,6 +24,9 @@ import type {
   SetHeadResult,
   StagedResult,
   StepContext,
+  StoredFlatOrderedTurnTreePath,
+  StoredSingleTurnTreePath,
+  StoredStagedResult,
   ThreadCreateResult,
   ThreadRecord,
   TurnNode,
@@ -358,7 +361,7 @@ export const kernelProtocolStoredFixtures = {
     runId: "run_main",
     status: "interrupted",
     taskId: "tool_call_pending",
-  },
+  } satisfies StoredStagedResult,
   storedThread: {
     createdAtMs: 1_717_171_717_171,
     rootTurnNodeHash:
@@ -406,7 +409,7 @@ export const kernelProtocolStoredFixtures = {
       "2222222222222222222222222222222222222222222222222222222222222222",
     turnTreeHash:
       "98d7b1f35f6ebf506508b1bfbd6be173147a80bc85917a17756c66d97faf8b87",
-  },
+  } satisfies StoredSingleTurnTreePath,
   storedTurnTreePathOrdered: {
     collectionKind: "ordered",
     orderedCount: 2,
@@ -417,7 +420,7 @@ export const kernelProtocolStoredFixtures = {
     path: "messages",
     turnTreeHash:
       "98d7b1f35f6ebf506508b1bfbd6be173147a80bc85917a17756c66d97faf8b87",
-  },
+  } satisfies StoredFlatOrderedTurnTreePath,
 };
 
 export const kernelProtocolInvalidFixtures = {

@@ -99,14 +99,24 @@ export type Verdict =
 
 export type ComposedVerdict = Verdict;
 
-export interface StagedResult {
-  interruptPayload?: KernelRecord;
+interface BaseStagedResult {
   objectHash: HashString;
   objectType: string;
-  status: StagedResultStatus;
   taskId: string;
   timestamp: EpochMs;
 }
+
+export interface InterruptedStagedResult extends BaseStagedResult {
+  interruptPayload: KernelRecord;
+  status: "interrupted";
+}
+
+export interface SettledStagedResult extends BaseStagedResult {
+  interruptPayload?: never;
+  status: "completed" | "failed";
+}
+
+export type StagedResult = InterruptedStagedResult | SettledStagedResult;
 
 export interface TurnNode {
   consumedStagedResults: StagedResult[];
@@ -203,16 +213,43 @@ export interface StoredTurnTree {
   schemaId: string;
 }
 
-export interface StoredTurnTreePath {
-  collectionKind: PathCollectionKind;
-  orderedChunkListCbor?: Uint8Array;
-  orderedCount?: number;
-  orderedEncoding?: "flat" | "chunked";
-  orderedInlineCbor?: Uint8Array;
+interface BaseStoredTurnTreePath {
   path: string;
-  singleHash: HashString | null;
   turnTreeHash: HashString;
 }
+
+export interface StoredSingleTurnTreePath extends BaseStoredTurnTreePath {
+  collectionKind: "single";
+  orderedChunkListCbor?: never;
+  orderedCount?: never;
+  orderedEncoding?: never;
+  orderedInlineCbor?: never;
+  singleHash: HashString | null;
+}
+
+export interface StoredFlatOrderedTurnTreePath extends BaseStoredTurnTreePath {
+  collectionKind: "ordered";
+  orderedChunkListCbor?: never;
+  orderedCount: number;
+  orderedEncoding: "flat";
+  orderedInlineCbor: Uint8Array;
+  singleHash?: never;
+}
+
+export interface StoredChunkedOrderedTurnTreePath
+  extends BaseStoredTurnTreePath {
+  collectionKind: "ordered";
+  orderedChunkListCbor: Uint8Array;
+  orderedCount: number;
+  orderedEncoding: "chunked";
+  orderedInlineCbor?: never;
+  singleHash?: never;
+}
+
+export type StoredTurnTreePath =
+  | StoredChunkedOrderedTurnTreePath
+  | StoredFlatOrderedTurnTreePath
+  | StoredSingleTurnTreePath;
 
 export interface StoredOrderedPathChunk {
   chunkHash: HashString;
@@ -272,15 +309,27 @@ export interface StoredRun {
   updatedAtMs: EpochMs;
 }
 
-export interface StoredStagedResult {
+interface BaseStoredStagedResult {
   createdAtMs: EpochMs;
-  interruptPayloadCbor?: Uint8Array;
   objectHash: HashString;
   objectType: string;
   runId: string;
-  status: StagedResultStatus;
   taskId: string;
 }
+
+export interface InterruptedStoredStagedResult extends BaseStoredStagedResult {
+  interruptPayloadCbor: Uint8Array;
+  status: "interrupted";
+}
+
+export interface SettledStoredStagedResult extends BaseStoredStagedResult {
+  interruptPayloadCbor?: never;
+  status: "completed" | "failed";
+}
+
+export type StoredStagedResult =
+  | InterruptedStoredStagedResult
+  | SettledStoredStagedResult;
 
 export interface KrakenKernel {
   branch: {

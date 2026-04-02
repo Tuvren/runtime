@@ -16,7 +16,6 @@
  */
 
 import { describe, expect, test } from "bun:test";
-import type { KernelRecord } from "@kraken/shared-core-types";
 import { KrakenValidationError } from "@kraken/shared-core-types";
 import {
   kernelProtocolDeterministicFixtures,
@@ -323,8 +322,14 @@ describe("deterministic identity", () => {
   });
 
   test("locks the canonical TurnTreeSchema bytes and hash", async () => {
-    const schemaRecord =
-      kernelProtocolDeterministicFixtures.turnTreeSchemaRecord as unknown as KernelRecord;
+    const schemaRecord = decodeDeterministicKernelRecord(
+      Uint8Array.from(
+        Buffer.from(
+          kernelProtocolDeterministicFixtures.turnTreeSchemaRecordCborHex,
+          "hex"
+        )
+      )
+    );
     const encodedHex = Buffer.from(
       encodeDeterministicKernelRecord(schemaRecord)
     ).toString("hex");
@@ -339,8 +344,14 @@ describe("deterministic identity", () => {
   });
 
   test("locks the canonical TurnNode identity-preimage bytes and digest", async () => {
-    const turnNodeIdentityRecord =
-      kernelProtocolDeterministicFixtures.turnNodeIdentityRecord as unknown as KernelRecord;
+    const turnNodeIdentityRecord = decodeDeterministicKernelRecord(
+      Uint8Array.from(
+        Buffer.from(
+          kernelProtocolDeterministicFixtures.turnNodeIdentityRecordCborHex,
+          "hex"
+        )
+      )
+    );
     const encodedHex = Buffer.from(
       encodeDeterministicKernelRecord(turnNodeIdentityRecord)
     ).toString("hex");
@@ -493,10 +504,13 @@ describe("schema validation", () => {
       )
     ).toThrow("must be a dot-separated path with non-empty segments");
     expect(() =>
-      assertTurnTreeChangeSet({
-        "messages..results":
-          "5858585858585858585858585858585858585858585858585858585858585858",
-      })
+      assertTurnTreeChangeSet(
+        {
+          "messages..results":
+            "5858585858585858585858585858585858585858585858585858585858585858",
+        },
+        kernelProtocolDeterministicFixtures.turnTreeSchemaRecord
+      )
     ).toThrow("must be a dot-separated path with non-empty segments");
   });
 
@@ -713,7 +727,10 @@ describe("logical contract fixtures", () => {
       assertSetHeadResult(kernelProtocolLogicalFixtures.setHeadResult)
     ).not.toThrow();
     expect(() =>
-      assertTurnTreeChangeSet(kernelProtocolLogicalFixtures.turnTreeChangeSet)
+      assertTurnTreeChangeSet(
+        kernelProtocolLogicalFixtures.turnTreeChangeSet,
+        kernelProtocolDeterministicFixtures.turnTreeSchemaRecord
+      )
     ).not.toThrow();
     expect(() =>
       assertObserveResult(kernelProtocolLogicalFixtures.observeResult)
@@ -964,6 +981,60 @@ describe("logical contract fixtures", () => {
         extra: 1,
       })
     ).toThrow("extra is not part of the contract shape");
+  });
+
+  test("rejects schema-invalid change sets and duplicate staged-result taskIds", () => {
+    expect(() =>
+      assertTurnTreeChangeSet(
+        { ghost: null },
+        kernelProtocolDeterministicFixtures.turnTreeSchemaRecord
+      )
+    ).toThrow("ghost must reference a schema-defined path");
+    expect(() =>
+      assertTurnTreeChangeSet(
+        {
+          "context.manifest": [
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          ],
+        },
+        kernelProtocolDeterministicFixtures.turnTreeSchemaRecord
+      )
+    ).toThrow(
+      "context.manifest must be a HashString or null for a single path"
+    );
+    expect(() =>
+      assertTurnNode({
+        ...kernelProtocolLogicalFixtures.turnNode,
+        consumedStagedResults: [
+          kernelProtocolLogicalFixtures.turnNode.consumedStagedResults[0],
+          {
+            ...kernelProtocolLogicalFixtures.turnNode.consumedStagedResults[0],
+            objectHash:
+              "f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0",
+          },
+        ],
+      })
+    ).toThrow("must not contain duplicate staged result taskIds");
+    expect(() =>
+      assertStoredTurnNode({
+        ...kernelProtocolStoredFixtures.storedTurnNode,
+        consumedStagedResultsCbor: encodeDeterministicKernelRecord([
+          kernelProtocolLogicalFixtures.turnNode.consumedStagedResults[0],
+          {
+            ...kernelProtocolLogicalFixtures.turnNode.consumedStagedResults[0],
+            objectHash:
+              "f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0",
+          },
+        ]),
+      })
+    ).toThrow("must not contain duplicate staged result taskIds");
+    expect(() =>
+      assertRecoveryState({
+        ...kernelProtocolLogicalFixtures.recoveryState,
+        consumedStagedResults: [kernelProtocolLogicalFixtures.stagedResult],
+        uncommittedStagedResults: [kernelProtocolLogicalFixtures.stagedResult],
+      })
+    ).toThrow("must not repeat taskIds already present");
   });
 });
 

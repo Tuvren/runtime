@@ -299,46 +299,54 @@ function assertStagedResultIdentityInput(
     "interruptPayload",
     label
   );
-  assertHashStringOrThrow(objectValue.objectHash, `${label}.objectHash`);
-  assertNonEmptyString(objectValue.objectType, `${label}.objectType`);
-  assertStagedResultStatusOrThrow(objectValue.status, `${label}.status`);
-  assertNonEmptyString(objectValue.taskId, `${label}.taskId`);
-  assertEpochMs(objectValue.timestamp, `${label}.timestamp`);
+  const objectHash = objectValue.objectHash;
+  const objectType = objectValue.objectType;
+  const status = objectValue.status;
+  const taskId = objectValue.taskId;
+  const timestamp = objectValue.timestamp;
+  const interruptPayload = objectValue.interruptPayload;
 
-  if (objectValue.interruptPayload !== undefined) {
-    assertKernelRecord(
-      objectValue.interruptPayload,
-      `${label}.interruptPayload`
-    );
+  assertHashStringOrThrow(objectHash, `${label}.objectHash`);
+  assertNonEmptyString(objectType, `${label}.objectType`);
+  assertStagedResultStatusOrThrow(status, `${label}.status`);
+  assertNonEmptyString(taskId, `${label}.taskId`);
+  assertEpochMs(timestamp, `${label}.timestamp`);
+
+  if (interruptPayload !== undefined) {
+    assertKernelRecord(interruptPayload, `${label}.interruptPayload`);
   }
 
   assertInterruptPayloadConsistency(
-    objectValue.status as StagedResult["status"],
-    objectValue.interruptPayload,
+    status,
+    interruptPayload,
     `${label}.interruptPayload`
   );
 
-  const normalizedValue = {
-    objectHash: objectValue.objectHash as HashString,
-    objectType: objectValue.objectType as string,
-    status: objectValue.status as StagedResult["status"],
-    taskId: objectValue.taskId as string,
-    timestamp: objectValue.timestamp as StagedResult["timestamp"],
-  } as {
-    interruptPayload?: KernelRecord;
-    objectHash: HashString;
-    objectType: string;
-    status: StagedResult["status"];
-    taskId: string;
-    timestamp: StagedResult["timestamp"];
-  };
+  if (status === "interrupted") {
+    if (interruptPayload === undefined) {
+      throw turnNodeIdentityError(
+        `${label}.interruptPayload is required when status is "interrupted"`,
+        { status }
+      );
+    }
 
-  if (objectValue.interruptPayload !== undefined) {
-    normalizedValue.interruptPayload =
-      objectValue.interruptPayload as KernelRecord;
+    return {
+      interruptPayload,
+      objectHash,
+      objectType,
+      status,
+      taskId,
+      timestamp,
+    };
   }
 
-  return normalizedValue;
+  return {
+    objectHash,
+    objectType,
+    status,
+    taskId,
+    timestamp,
+  };
 }
 
 function assertDenseDataArray(
@@ -657,7 +665,10 @@ function assertOptionalFieldIsOmittedWhenUndefined(
   }
 }
 
-function assertHashStringOrThrow(value: unknown, label: string): void {
+function assertHashStringOrThrow(
+  value: unknown,
+  label: string
+): asserts value is HashString {
   try {
     assertHashString(value, label);
   } catch (error: unknown) {
@@ -668,7 +679,10 @@ function assertHashStringOrThrow(value: unknown, label: string): void {
   }
 }
 
-function assertNullableHashStringOrThrow(value: unknown, label: string): void {
+function assertNullableHashStringOrThrow(
+  value: unknown,
+  label: string
+): asserts value is HashString | null {
   if (value === null) {
     return;
   }
@@ -676,7 +690,10 @@ function assertNullableHashStringOrThrow(value: unknown, label: string): void {
   assertHashStringOrThrow(value, label);
 }
 
-function assertNonEmptyString(value: unknown, label: string): void {
+function assertNonEmptyString(
+  value: unknown,
+  label: string
+): asserts value is string {
   if (typeof value !== "string" || value.length === 0) {
     throw turnNodeIdentityError(`${label} must be a non-empty string`, {
       value,
@@ -684,7 +701,10 @@ function assertNonEmptyString(value: unknown, label: string): void {
   }
 }
 
-function assertStagedResultStatusOrThrow(value: unknown, label: string): void {
+function assertStagedResultStatusOrThrow(
+  value: unknown,
+  label: string
+): asserts value is StagedResult["status"] {
   if (
     !(
       typeof value === "string" &&

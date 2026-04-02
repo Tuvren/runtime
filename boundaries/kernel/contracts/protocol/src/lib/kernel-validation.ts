@@ -198,15 +198,18 @@ export function assertTurnTreeManifest(
   const manifest = assertTurnTreePathMap(value, resolvedLabel);
 
   if (schema !== undefined) {
-    assertTurnTreePathMapMatchesSchema(manifest, schema, resolvedLabel);
+    assertTurnTreePathMapMatchesSchema(manifest, schema, resolvedLabel, true);
   }
 }
 
 export function assertTurnTreeChangeSet(
   value: unknown,
+  schema: TurnTreeSchema,
   label = "value"
 ): asserts value is TurnTreeChangeSet {
-  assertTurnTreePathMap(value, label);
+  assertTurnTreeSchema(schema, "schema");
+  const changeSet = assertTurnTreePathMap(value, label);
+  assertTurnTreePathMapMatchesSchema(changeSet, schema, label, false);
 }
 
 export function isStepDeclaration(value: unknown): value is StepDeclaration {
@@ -637,6 +640,12 @@ export function assertRecoveryState(
   );
   assertStepDeclarationArray(stepSequence, `${label}.stepSequence`);
   assertNullableString(lastCompletedStepId, `${label}.lastCompletedStepId`);
+  assertDisjointStagedResultTaskIds(
+    objectValue.consumedStagedResults,
+    `${label}.consumedStagedResults`,
+    objectValue.uncommittedStagedResults,
+    `${label}.uncommittedStagedResults`
+  );
 
   if (lastCompletedStepId === null) {
     return;
@@ -1599,19 +1608,22 @@ function assertTurnTreePathMap(
 function assertTurnTreePathMapMatchesSchema(
   value: Record<string, PathValue>,
   schema: TurnTreeSchema,
-  label: string
+  label: string,
+  requireFullManifest: boolean
 ): void {
   const pathDefinitions = new Map(
     schema.paths.map((definition) => [definition.path, definition.collection])
   );
 
-  for (const pathDefinition of schema.paths) {
-    if (!Object.hasOwn(value, pathDefinition.path)) {
-      throw validationError(
-        `${label}.${pathDefinition.path} must be present in a full TurnTree manifest`,
-        "missing_turn_tree_path",
-        { path: pathDefinition.path, schemaId: schema.schemaId }
-      );
+  if (requireFullManifest) {
+    for (const pathDefinition of schema.paths) {
+      if (!Object.hasOwn(value, pathDefinition.path)) {
+        throw validationError(
+          `${label}.${pathDefinition.path} must be present in a full TurnTree manifest`,
+          "missing_turn_tree_path",
+          { path: pathDefinition.path, schemaId: schema.schemaId }
+        );
+      }
     }
   }
 
@@ -1903,9 +1915,39 @@ function assertStagedResultArray(
   label: string
 ): asserts value is StagedResult[] {
   const results = assertArray(value, label);
+  const seenTaskIds = new Set<string>();
 
   for (const [index, result] of results.entries()) {
     assertStagedResult(result, `${label}[${index}]`);
+
+    if (seenTaskIds.has(result.taskId)) {
+      throw validationError(
+        `${label} must not contain duplicate staged result taskIds`,
+        "duplicate_staged_result_task_id",
+        { taskId: result.taskId }
+      );
+    }
+
+    seenTaskIds.add(result.taskId);
+  }
+}
+
+function assertDisjointStagedResultTaskIds(
+  leftResults: StagedResult[],
+  leftLabel: string,
+  rightResults: StagedResult[],
+  rightLabel: string
+): void {
+  const consumedTaskIds = new Set(leftResults.map(({ taskId }) => taskId));
+
+  for (const result of rightResults) {
+    if (consumedTaskIds.has(result.taskId)) {
+      throw validationError(
+        `${rightLabel} must not repeat taskIds already present in ${leftLabel}`,
+        "overlapping_staged_result_task_id",
+        { leftLabel, rightLabel, taskId: result.taskId }
+      );
+    }
   }
 }
 
@@ -2147,10 +2189,13 @@ function assertPlainObject(
     }
   }
 
-  return Object.assign(
-    Object.create(null),
-    Object.fromEntries(Object.entries(value))
-  ) as Record<string, unknown>;
+  const normalizedObject: Record<string, unknown> = Object.create(null);
+
+  for (const [entryKey, entryValue] of Object.entries(value)) {
+    normalizedObject[entryKey] = entryValue;
+  }
+
+  return normalizedObject;
 }
 
 function assertAllowedObjectKeys(
