@@ -156,18 +156,71 @@ function createRepositories(
       },
       set(record) {
         assertStoredBranch(record, "record");
-        ensureThreadExists(state, record.threadId, "record.threadId");
+        const thread = ensureThreadExists(
+          state,
+          record.threadId,
+          "record.threadId"
+        );
         ensureTurnNodeExists(
           state,
           record.headTurnNodeHash,
           "record.headTurnNodeHash"
         );
+        assertTurnNodeBelongsToThread(
+          state,
+          record.headTurnNodeHash,
+          thread,
+          "record.headTurnNodeHash"
+        );
+
+        const existingBranch = state.branches.get(record.branchId);
 
         if (record.archivedFromBranchId !== undefined) {
-          ensureBranchExists(
+          const sourceBranch = ensureBranchExists(
             state,
             record.archivedFromBranchId,
             "record.archivedFromBranchId"
+          );
+
+          if (sourceBranch.threadId !== record.threadId) {
+            throw persistenceError(
+              "stored branches must archive only from branches in the same thread",
+              "memory_backend_branch_archive_thread_mismatch",
+              {
+                archivedFromBranchId: sourceBranch.branchId,
+                branchId: record.branchId,
+                branchThreadId: record.threadId,
+                sourceThreadId: sourceBranch.threadId,
+              }
+            );
+          }
+        }
+
+        if (existingBranch !== undefined) {
+          assertImmutableField(
+            existingBranch.threadId,
+            record.threadId,
+            "record.threadId",
+            "memory_backend_branch_thread_immutable"
+          );
+          assertImmutableField(
+            existingBranch.createdAtMs,
+            record.createdAtMs,
+            "record.createdAtMs",
+            "memory_backend_branch_created_at_immutable"
+          );
+          assertImmutableOptionalField(
+            existingBranch.archivedFromBranchId,
+            record.archivedFromBranchId,
+            "record.archivedFromBranchId",
+            "memory_backend_branch_archive_source_immutable"
+          );
+
+          assertBranchHeadMoveIsForward(
+            state,
+            existingBranch.headTurnNodeHash,
+            record.headTurnNodeHash,
+            "record.headTurnNodeHash"
           );
         }
 
@@ -247,9 +300,20 @@ function createRepositories(
         );
         const turn = ensureTurnExists(state, record.turnId, "record.turnId");
         ensureSchemaRecordExists(state, record.schemaId, "record.schemaId");
-        ensureTurnNodeExists(
+        const startTurnNode = ensureTurnNodeExists(
           state,
           record.startTurnNodeHash,
+          "record.startTurnNodeHash"
+        );
+        const thread = ensureThreadExists(
+          state,
+          turn.threadId,
+          "turn.threadId"
+        );
+        assertTurnNodeBelongsToThread(
+          state,
+          record.startTurnNodeHash,
+          thread,
           "record.startTurnNodeHash"
         );
 
@@ -259,6 +323,44 @@ function createRepositories(
             "memory_backend_run_branch_mismatch",
             { branchId: branch.branchId, turnId: turn.turnId }
           );
+        }
+
+        if (startTurnNode.schemaId !== record.schemaId) {
+          throw persistenceError(
+            "stored runs must use the schema of their start turn node",
+            "memory_backend_run_schema_mismatch",
+            {
+              runId: record.runId,
+              runSchemaId: record.schemaId,
+              startTurnNodeHash: startTurnNode.hash,
+              turnNodeSchemaId: startTurnNode.schemaId,
+            }
+          );
+        }
+
+        const existingRun = state.runs.get(record.runId);
+        if (existingRun === undefined) {
+          if (branch.headTurnNodeHash !== record.startTurnNodeHash) {
+            throw persistenceError(
+              "stored runs must start from the current branch head when first created",
+              "memory_backend_run_start_turn_node_mismatch",
+              {
+                branchHeadTurnNodeHash: branch.headTurnNodeHash,
+                runId: record.runId,
+                startTurnNodeHash: record.startTurnNodeHash,
+              }
+            );
+          }
+
+          if (record.status === "running" || record.status === "paused") {
+            assertBranchHasNoOtherActiveRuns(
+              state,
+              record.branchId,
+              record.runId
+            );
+          }
+        } else {
+          assertRunUpdateIsLegal(existingRun, record);
         }
 
         state.runs.set(record.runId, cloneStoredRun(record));
@@ -314,8 +416,19 @@ function createRepositories(
       },
       set(record) {
         assertStoredStagedResult(record, "record");
-        ensureRunExists(state, record.runId, "record.runId");
+        const run = ensureRunExists(state, record.runId, "record.runId");
         ensureObjectExists(state, record.objectHash, "record.objectHash");
+
+        if (run.status !== "running") {
+          throw persistenceError(
+            "stored staged results may only be attached to running runs",
+            "memory_backend_staged_result_run_not_running",
+            {
+              runId: run.runId,
+              status: run.status,
+            }
+          );
+        }
 
         const runResults =
           state.stagedResults.get(record.runId) ??
@@ -335,11 +448,22 @@ function createRepositories(
       put(record) {
         assertStoredThread(record, "record");
         ensureSchemaRecordExists(state, record.schemaId, "record.schemaId");
-        ensureTurnNodeExists(
+        const rootTurnNode = ensureTurnNodeExists(
           state,
           record.rootTurnNodeHash,
           "record.rootTurnNodeHash"
         );
+        if (rootTurnNode.previousTurnNodeHash !== null) {
+          throw persistenceError(
+            "stored thread roots must be genesis turn nodes",
+            "memory_backend_thread_root_not_genesis",
+            {
+              previousTurnNodeHash: rootTurnNode.previousTurnNodeHash,
+              rootTurnNodeHash: rootTurnNode.hash,
+              threadId: record.threadId,
+            }
+          );
+        }
         putImmutableRecord(
           state.threads,
           record.threadId,
@@ -535,6 +659,46 @@ function createRepositories(
           }
         }
 
+        const existingTurn = state.turns.get(record.turnId);
+        if (existingTurn !== undefined) {
+          assertImmutableField(
+            existingTurn.branchId,
+            record.branchId,
+            "record.branchId",
+            "memory_backend_turn_branch_immutable"
+          );
+          assertImmutableField(
+            existingTurn.threadId,
+            record.threadId,
+            "record.threadId",
+            "memory_backend_turn_thread_immutable"
+          );
+          assertImmutableField(
+            existingTurn.startTurnNodeHash,
+            record.startTurnNodeHash,
+            "record.startTurnNodeHash",
+            "memory_backend_turn_start_immutable"
+          );
+          assertImmutableOptionalField(
+            existingTurn.parentTurnId,
+            record.parentTurnId,
+            "record.parentTurnId",
+            "memory_backend_turn_parent_immutable"
+          );
+          assertImmutableField(
+            existingTurn.createdAtMs,
+            record.createdAtMs,
+            "record.createdAtMs",
+            "memory_backend_turn_created_at_immutable"
+          );
+          assertTurnNodeDescendsFrom(
+            state,
+            record.headTurnNodeHash,
+            existingTurn.headTurnNodeHash,
+            "record.headTurnNodeHash"
+          );
+        }
+
         state.turns.set(record.turnId, cloneStoredTurn(record));
         return Promise.resolve();
       },
@@ -584,6 +748,18 @@ function validateThreadInvariants(state: BackendState): void {
           threadId: thread.threadId,
           threadSchemaId: thread.schemaId,
           turnNodeSchemaId: rootTurnNode.schemaId,
+        }
+      );
+    }
+
+    if (rootTurnNode.previousTurnNodeHash !== null) {
+      throw persistenceError(
+        "stored thread roots must be genesis turn nodes",
+        "memory_backend_thread_root_not_genesis",
+        {
+          previousTurnNodeHash: rootTurnNode.previousTurnNodeHash,
+          rootTurnNodeHash: rootTurnNode.hash,
+          threadId: thread.threadId,
         }
       );
     }
@@ -746,18 +922,6 @@ function validateRunInvariants(state: BackendState): void {
       thread,
       "run.startTurnNodeHash"
     );
-
-    if (branch.headTurnNodeHash !== run.startTurnNodeHash) {
-      throw persistenceError(
-        "stored runs must start from the current branch head",
-        "memory_backend_run_start_turn_node_mismatch",
-        {
-          branchHeadTurnNodeHash: branch.headTurnNodeHash,
-          runId: run.runId,
-          startTurnNodeHash: run.startTurnNodeHash,
-        }
-      );
-    }
 
     if (startTurnNode.schemaId !== run.schemaId) {
       throw persistenceError(
@@ -1057,6 +1221,20 @@ function assertTurnNodeDescendsFrom(
   );
 }
 
+function assertBranchHeadMoveIsForward(
+  state: BackendState,
+  previousHeadTurnNodeHash: string,
+  nextHeadTurnNodeHash: string,
+  label: string
+): void {
+  assertTurnNodeDescendsFrom(
+    state,
+    nextHeadTurnNodeHash,
+    previousHeadTurnNodeHash,
+    label
+  );
+}
+
 function assertTurnTreeManifestMatchesStoredPaths(
   state: BackendState,
   turnTree: StoredTurnTree
@@ -1196,6 +1374,142 @@ function encodeHashStringArray(hashes: string[]): Uint8Array {
   return encodeDeterministicKernelRecord(
     hashes.map((hash) => validateHashString(hash))
   );
+}
+
+function assertBranchHasNoOtherActiveRuns(
+  state: BackendState,
+  branchId: string,
+  runId: string
+): void {
+  for (const run of state.runs.values()) {
+    if (
+      run.branchId === branchId &&
+      run.runId !== runId &&
+      (run.status === "running" || run.status === "paused")
+    ) {
+      throw persistenceError(
+        "stored branches must not have more than one active run",
+        "memory_backend_multiple_active_runs",
+        {
+          branchId,
+          conflictingRunId: run.runId,
+          runId,
+        }
+      );
+    }
+  }
+}
+
+function assertRunUpdateIsLegal(
+  existingRun: StoredRun,
+  nextRun: StoredRun
+): void {
+  assertImmutableField(
+    existingRun.branchId,
+    nextRun.branchId,
+    "record.branchId",
+    "memory_backend_run_branch_immutable"
+  );
+  assertImmutableField(
+    existingRun.turnId,
+    nextRun.turnId,
+    "record.turnId",
+    "memory_backend_run_turn_immutable"
+  );
+  assertImmutableField(
+    existingRun.schemaId,
+    nextRun.schemaId,
+    "record.schemaId",
+    "memory_backend_run_schema_immutable"
+  );
+  assertImmutableField(
+    existingRun.startTurnNodeHash,
+    nextRun.startTurnNodeHash,
+    "record.startTurnNodeHash",
+    "memory_backend_run_start_immutable"
+  );
+  assertImmutableField(
+    existingRun.createdAtMs,
+    nextRun.createdAtMs,
+    "record.createdAtMs",
+    "memory_backend_run_created_at_immutable"
+  );
+  assertImmutableBytes(
+    existingRun.stepSequenceCbor,
+    nextRun.stepSequenceCbor,
+    "record.stepSequenceCbor",
+    "memory_backend_run_step_sequence_immutable"
+  );
+
+  assertRunStatusTransition(existingRun.status, nextRun.status);
+}
+
+function assertRunStatusTransition(
+  previousStatus: StoredRun["status"],
+  nextStatus: StoredRun["status"]
+): void {
+  if (previousStatus === nextStatus) {
+    return;
+  }
+
+  const isLegalTransition =
+    (previousStatus === "running" &&
+      (nextStatus === "completed" ||
+        nextStatus === "failed" ||
+        nextStatus === "paused")) ||
+    (previousStatus === "paused" && nextStatus === "failed");
+
+  if (!isLegalTransition) {
+    throw persistenceError(
+      "stored runs must not use illegal status transitions",
+      "memory_backend_run_status_transition_illegal",
+      {
+        nextStatus,
+        previousStatus,
+      }
+    );
+  }
+}
+
+function assertImmutableField<T>(
+  previousValue: T,
+  nextValue: T,
+  label: string,
+  code: string
+): void {
+  if (previousValue !== nextValue) {
+    throw persistenceError(`${label} must remain immutable`, code, {
+      nextValue,
+      previousValue,
+    });
+  }
+}
+
+function assertImmutableOptionalField<T>(
+  previousValue: T | undefined,
+  nextValue: T | undefined,
+  label: string,
+  code: string
+): void {
+  if (previousValue !== nextValue) {
+    throw persistenceError(`${label} must remain immutable`, code, {
+      nextValue,
+      previousValue,
+    });
+  }
+}
+
+function assertImmutableBytes(
+  previousValue: Uint8Array,
+  nextValue: Uint8Array,
+  label: string,
+  code: string
+): void {
+  if (!areBytesEqual(previousValue, nextValue)) {
+    throw persistenceError(`${label} must remain immutable`, code, {
+      label,
+    });
+  }
 }
 
 function validateHashString(hash: string): string {
