@@ -115,7 +115,7 @@ class MemoryBackend implements KrakenBackend {
         work(repositories)
       );
 
-      validateCommittedState(draftState);
+      validateCommittedState(draftState, this.state);
       this.state = draftState;
       return result;
     } finally {
@@ -216,7 +216,7 @@ function createRepositories(
             "memory_backend_branch_archive_source_immutable"
           );
 
-          assertBranchHeadMoveIsForward(
+          assertBranchHeadMoveIsLinear(
             state,
             existingBranch.headTurnNodeHash,
             record.headTurnNodeHash,
@@ -337,6 +337,13 @@ function createRepositories(
             }
           );
         }
+
+        assertRunStartTurnNodeWithinTurnSpan(
+          state,
+          turn,
+          record.startTurnNodeHash,
+          "record.startTurnNodeHash"
+        );
 
         const existingRun = state.runs.get(record.runId);
         if (existingRun === undefined) {
@@ -490,6 +497,16 @@ function createRepositories(
 
         if (record.eventHash !== null) {
           ensureObjectExists(state, record.eventHash, "record.eventHash");
+        }
+
+        for (const objectHash of decodeTurnNodeConsumedStagedResultObjectHashes(
+          record
+        )) {
+          ensureObjectExists(
+            state,
+            objectHash,
+            "record.consumedStagedResultsCbor"
+          );
         }
 
         if (record.previousTurnNodeHash !== null) {
@@ -722,9 +739,12 @@ function createEmptyState(): BackendState {
   };
 }
 
-function validateCommittedState(state: BackendState): void {
+function validateCommittedState(
+  state: BackendState,
+  baseState: BackendState
+): void {
   validateThreadInvariants(state);
-  validateBranchInvariants(state);
+  validateBranchInvariants(state, baseState);
   validateTurnNodeInvariants(state);
   validateTurnInvariants(state);
   validateRunInvariants(state);
@@ -766,7 +786,10 @@ function validateThreadInvariants(state: BackendState): void {
   }
 }
 
-function validateBranchInvariants(state: BackendState): void {
+function validateBranchInvariants(
+  state: BackendState,
+  baseState: BackendState
+): void {
   for (const branch of state.branches.values()) {
     const thread = ensureThreadExists(
       state,
@@ -804,6 +827,31 @@ function validateBranchInvariants(state: BackendState): void {
       );
     }
   }
+
+  for (const branch of state.branches.values()) {
+    const previousBranch = baseState.branches.get(branch.branchId);
+
+    if (previousBranch === undefined) {
+      continue;
+    }
+
+    const headMoveDirection = classifyTurnNodeRelationship(
+      state,
+      previousBranch.headTurnNodeHash,
+      branch.headTurnNodeHash
+    );
+
+    if (headMoveDirection !== "backward") {
+      continue;
+    }
+
+    assertBackwardBranchMoveIsArchived(
+      state,
+      baseState,
+      previousBranch,
+      branch
+    );
+  }
 }
 
 function validateTurnNodeInvariants(state: BackendState): void {
@@ -824,6 +872,16 @@ function validateTurnNodeInvariants(state: BackendState): void {
           turnTreeHash: turnTree.hash,
           turnTreeSchemaId: turnTree.schemaId,
         }
+      );
+    }
+
+    for (const objectHash of decodeTurnNodeConsumedStagedResultObjectHashes(
+      turnNode
+    )) {
+      ensureObjectExists(
+        state,
+        objectHash,
+        "turnNode.consumedStagedResultsCbor"
       );
     }
   }
@@ -936,9 +994,34 @@ function validateRunInvariants(state: BackendState): void {
       );
     }
 
+    assertRunStartTurnNodeWithinTurnSpan(
+      state,
+      turn,
+      run.startTurnNodeHash,
+      "run.startTurnNodeHash"
+    );
+
+    for (const turnNodeHash of decodeRunCreatedTurnNodeHashes(run)) {
+      ensureTurnNodeExists(state, turnNodeHash, "run.createdTurnNodesCbor");
+    }
+
     if (run.status === "running" || run.status === "paused") {
       const currentActiveCount = activeRunCounts.get(run.branchId) ?? 0;
       activeRunCounts.set(run.branchId, currentActiveCount + 1);
+    }
+
+    const stagedResultsForRun = state.stagedResults.get(run.runId);
+
+    if (run.status !== "running" && stagedResultsForRun !== undefined) {
+      throw persistenceError(
+        "stored terminal or paused runs must not retain staged results",
+        "memory_backend_run_has_terminal_staged_results",
+        {
+          runId: run.runId,
+          stagedResultCount: stagedResultsForRun.size,
+          status: run.status,
+        }
+      );
     }
   }
 
@@ -950,6 +1033,22 @@ function validateRunInvariants(state: BackendState): void {
         {
           activeRunCount,
           branchId,
+        }
+      );
+    }
+  }
+
+  for (const [runId, stagedResults] of state.stagedResults.entries()) {
+    const run = ensureRunExists(state, runId, "stagedResults.runId");
+
+    if (run.status !== "running") {
+      throw persistenceError(
+        "stored staged results may only exist for running runs",
+        "memory_backend_staged_result_run_not_running",
+        {
+          runId,
+          stagedResultCount: stagedResults.size,
+          status: run.status,
         }
       );
     }
@@ -1221,18 +1320,28 @@ function assertTurnNodeDescendsFrom(
   );
 }
 
-function assertBranchHeadMoveIsForward(
+function assertBranchHeadMoveIsLinear(
   state: BackendState,
   previousHeadTurnNodeHash: string,
   nextHeadTurnNodeHash: string,
   label: string
 ): void {
-  assertTurnNodeDescendsFrom(
+  const relationship = classifyTurnNodeRelationship(
     state,
-    nextHeadTurnNodeHash,
     previousHeadTurnNodeHash,
-    label
+    nextHeadTurnNodeHash
   );
+
+  if (relationship === "lateral") {
+    throw persistenceError(
+      `${label} must remain on the same thread lineage as the current branch head`,
+      "memory_backend_branch_head_lateral_move",
+      {
+        nextHeadTurnNodeHash,
+        previousHeadTurnNodeHash,
+      }
+    );
+  }
 }
 
 function assertTurnTreeManifestMatchesStoredPaths(
@@ -1441,7 +1550,288 @@ function assertRunUpdateIsLegal(
     "memory_backend_run_step_sequence_immutable"
   );
 
+  assertMonotonicRunStepIndex(existingRun, nextRun);
+  assertAppendOnlyRunCreatedTurnNodes(existingRun, nextRun);
+
   assertRunStatusTransition(existingRun.status, nextRun.status);
+}
+
+function assertMonotonicRunStepIndex(
+  existingRun: StoredRun,
+  nextRun: StoredRun
+): void {
+  if (nextRun.currentStepIndex < existingRun.currentStepIndex) {
+    throw persistenceError(
+      "stored runs must not move currentStepIndex backwards",
+      "memory_backend_run_step_index_regressed",
+      {
+        nextCurrentStepIndex: nextRun.currentStepIndex,
+        previousCurrentStepIndex: existingRun.currentStepIndex,
+        runId: existingRun.runId,
+      }
+    );
+  }
+}
+
+function assertAppendOnlyRunCreatedTurnNodes(
+  existingRun: StoredRun,
+  nextRun: StoredRun
+): void {
+  const existingTurnNodeHashes = decodeRunCreatedTurnNodeHashes(existingRun);
+  const nextTurnNodeHashes = decodeRunCreatedTurnNodeHashes(nextRun);
+
+  if (nextTurnNodeHashes.length < existingTurnNodeHashes.length) {
+    throw persistenceError(
+      "stored runs must keep createdTurnNodesCbor append-only",
+      "memory_backend_run_created_turn_nodes_not_append_only",
+      {
+        nextCount: nextTurnNodeHashes.length,
+        previousCount: existingTurnNodeHashes.length,
+        runId: existingRun.runId,
+      }
+    );
+  }
+
+  for (const [index, turnNodeHash] of existingTurnNodeHashes.entries()) {
+    if (nextTurnNodeHashes[index] !== turnNodeHash) {
+      throw persistenceError(
+        "stored runs must keep createdTurnNodesCbor append-only",
+        "memory_backend_run_created_turn_nodes_not_append_only",
+        {
+          index,
+          nextTurnNodeHash: nextTurnNodeHashes[index],
+          previousTurnNodeHash: turnNodeHash,
+          runId: existingRun.runId,
+        }
+      );
+    }
+  }
+}
+
+function assertRunStartTurnNodeWithinTurnSpan(
+  state: BackendState,
+  turn: StoredTurn,
+  startTurnNodeHash: string,
+  label: string
+): void {
+  const relationshipToTurnStart = classifyTurnNodeRelationship(
+    state,
+    turn.startTurnNodeHash,
+    startTurnNodeHash
+  );
+
+  if (
+    relationshipToTurnStart !== "same" &&
+    relationshipToTurnStart !== "forward"
+  ) {
+    throw persistenceError(
+      `${label} must lie within the referenced turn span`,
+      "memory_backend_run_turn_span_mismatch",
+      {
+        startTurnNodeHash,
+        turnId: turn.turnId,
+        turnStartTurnNodeHash: turn.startTurnNodeHash,
+      }
+    );
+  }
+
+  const relationshipToTurnHead = classifyTurnNodeRelationship(
+    state,
+    startTurnNodeHash,
+    turn.headTurnNodeHash
+  );
+
+  if (
+    relationshipToTurnHead !== "same" &&
+    relationshipToTurnHead !== "forward"
+  ) {
+    throw persistenceError(
+      `${label} must not move past the referenced turn head`,
+      "memory_backend_run_turn_span_mismatch",
+      {
+        startTurnNodeHash,
+        turnHeadTurnNodeHash: turn.headTurnNodeHash,
+        turnId: turn.turnId,
+      }
+    );
+  }
+}
+
+function assertBackwardBranchMoveIsArchived(
+  state: BackendState,
+  baseState: BackendState,
+  previousBranch: StoredBranch,
+  nextBranch: StoredBranch
+): void {
+  let archiveBranchFound = false;
+
+  for (const branch of state.branches.values()) {
+    if (branch.branchId === nextBranch.branchId) {
+      continue;
+    }
+
+    if (
+      branch.archivedFromBranchId === nextBranch.branchId &&
+      branch.headTurnNodeHash === previousBranch.headTurnNodeHash
+    ) {
+      archiveBranchFound = true;
+      break;
+    }
+  }
+
+  if (!archiveBranchFound) {
+    throw persistenceError(
+      "stored backward branch moves must preserve the abandoned head as an archive branch",
+      "memory_backend_backward_branch_move_missing_archive",
+      {
+        branchId: nextBranch.branchId,
+        nextHeadTurnNodeHash: nextBranch.headTurnNodeHash,
+        previousHeadTurnNodeHash: previousBranch.headTurnNodeHash,
+      }
+    );
+  }
+
+  for (const run of baseState.runs.values()) {
+    if (
+      run.branchId !== nextBranch.branchId ||
+      (run.status !== "running" && run.status !== "paused")
+    ) {
+      continue;
+    }
+
+    const finalRun = ensureRunExists(state, run.runId, "run.runId");
+
+    if (finalRun.status !== "failed") {
+      throw persistenceError(
+        "stored backward branch moves must fail active runs from the abandoned segment",
+        "memory_backend_backward_branch_move_active_run_not_failed",
+        {
+          branchId: nextBranch.branchId,
+          runId: run.runId,
+          status: finalRun.status,
+        }
+      );
+    }
+  }
+}
+
+type TurnNodeRelationship = "backward" | "forward" | "lateral" | "same";
+
+function classifyTurnNodeRelationship(
+  state: BackendState,
+  sourceTurnNodeHash: string,
+  targetTurnNodeHash: string
+): TurnNodeRelationship {
+  if (sourceTurnNodeHash === targetTurnNodeHash) {
+    return "same";
+  }
+
+  if (isTurnNodeDescendantOf(state, targetTurnNodeHash, sourceTurnNodeHash)) {
+    return "forward";
+  }
+
+  if (isTurnNodeDescendantOf(state, sourceTurnNodeHash, targetTurnNodeHash)) {
+    return "backward";
+  }
+
+  return "lateral";
+}
+
+function isTurnNodeDescendantOf(
+  state: BackendState,
+  descendantTurnNodeHash: string,
+  ancestorTurnNodeHash: string
+): boolean {
+  const visitedTurnNodes = new Set<string>();
+  let currentTurnNodeHash: string | null = descendantTurnNodeHash;
+
+  while (currentTurnNodeHash !== null) {
+    if (visitedTurnNodes.has(currentTurnNodeHash)) {
+      throw persistenceError(
+        "turn node lineage must not contain cycles",
+        "memory_backend_cyclic_turn_node_lineage",
+        {
+          ancestorTurnNodeHash,
+          descendantTurnNodeHash,
+        }
+      );
+    }
+
+    if (currentTurnNodeHash === ancestorTurnNodeHash) {
+      return true;
+    }
+
+    visitedTurnNodes.add(currentTurnNodeHash);
+    currentTurnNodeHash = ensureTurnNodeExists(
+      state,
+      currentTurnNodeHash,
+      "turnNodeHash"
+    ).previousTurnNodeHash;
+  }
+
+  return false;
+}
+
+function decodeRunCreatedTurnNodeHashes(run: StoredRun): string[] {
+  return decodeHashStringArray(
+    run.createdTurnNodesCbor,
+    "run.createdTurnNodesCbor"
+  );
+}
+
+function decodeTurnNodeConsumedStagedResultObjectHashes(
+  turnNode: StoredTurnNode
+): string[] {
+  const decodedValue = decodeDeterministicKernelRecord(
+    turnNode.consumedStagedResultsCbor
+  );
+
+  if (!Array.isArray(decodedValue)) {
+    throw persistenceError(
+      "stored turn node consumedStagedResultsCbor must decode to an array",
+      "memory_backend_invalid_consumed_staged_results_cbor",
+      {
+        turnNodeHash: turnNode.hash,
+      }
+    );
+  }
+
+  const objectHashes: string[] = [];
+
+  for (const [index, value] of decodedValue.entries()) {
+    if (
+      value === null ||
+      typeof value !== "object" ||
+      Array.isArray(value) ||
+      value instanceof Uint8Array
+    ) {
+      throw persistenceError(
+        "stored turn node consumedStagedResultsCbor entries must decode to staged result objects",
+        "memory_backend_invalid_consumed_staged_result_entry",
+        {
+          index,
+          turnNodeHash: turnNode.hash,
+        }
+      );
+    }
+
+    const objectHash = Reflect.get(value, "objectHash");
+
+    if (typeof objectHash !== "string") {
+      throw persistenceError(
+        "stored turn node consumedStagedResultsCbor entries must include objectHash",
+        "memory_backend_invalid_consumed_staged_result_entry",
+        {
+          index,
+          turnNodeHash: turnNode.hash,
+        }
+      );
+    }
+
+    objectHashes.push(validateHashString(objectHash));
+  }
+
+  return objectHashes;
 }
 
 function assertRunStatusTransition(
