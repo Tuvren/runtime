@@ -110,10 +110,21 @@ class MemoryBackend implements KrakenBackend {
 
     try {
       const draftState = cloneState(this.state);
-      const repositories = createRepositories(draftState, this.now);
-      const result = await this.transactionContext.run(true, () =>
-        work(repositories)
+      let active = true;
+      const repositories = createRepositories(
+        draftState,
+        this.now,
+        () => active && this.transactionContext.getStore() === true
       );
+      let result: T;
+
+      try {
+        result = await this.transactionContext.run(true, () =>
+          work(repositories)
+        );
+      } finally {
+        active = false;
+      }
 
       validateCommittedState(draftState, this.state);
       this.state = draftState;
@@ -132,17 +143,29 @@ export function createMemoryBackend(
 
 function createRepositories(
   state: BackendState,
-  now: () => number
+  now: () => number,
+  isTransactionActive: () => boolean
 ): MutableRepositories {
+  const assertTransactionActive = (): void => {
+    if (!isTransactionActive()) {
+      throw persistenceError(
+        "memory backend transaction handles must not outlive their transaction",
+        "memory_backend_inactive_transaction_handle"
+      );
+    }
+  };
+
   return {
     branches: {
       get(branchId) {
+        assertTransactionActive();
         const branch = state.branches.get(branchId);
         return Promise.resolve(
           branch === undefined ? null : cloneStoredBranch(branch)
         );
       },
       listByThread(threadId) {
+        assertTransactionActive();
         const branches: StoredBranch[] = [];
 
         for (const branch of state.branches.values()) {
@@ -155,6 +178,7 @@ function createRepositories(
         return Promise.resolve(branches);
       },
       set(record) {
+        assertTransactionActive();
         assertStoredBranch(record, "record");
         const thread = ensureThreadExists(
           state,
@@ -252,15 +276,18 @@ function createRepositories(
     now,
     objects: {
       get(hash) {
+        assertTransactionActive();
         const record = state.objects.get(hash);
         return Promise.resolve(
           record === undefined ? null : cloneStoredObject(record)
         );
       },
       has(hash) {
+        assertTransactionActive();
         return Promise.resolve(state.objects.has(hash));
       },
       async put(record) {
+        assertTransactionActive();
         assertStoredObject(record, "record");
         await assertStoredObjectIdentity(record, "record");
         putImmutableRecord(
@@ -275,12 +302,14 @@ function createRepositories(
     },
     orderedPathChunks: {
       get(chunkHash) {
+        assertTransactionActive();
         const record = state.orderedPathChunks.get(chunkHash);
         return Promise.resolve(
           record === undefined ? null : cloneStoredOrderedPathChunk(record)
         );
       },
       async put(record) {
+        assertTransactionActive();
         assertStoredOrderedPathChunk(record, "record");
         await assertStoredOrderedPathChunkIdentity(record, "record");
         putImmutableRecord(
@@ -295,12 +324,14 @@ function createRepositories(
     },
     runs: {
       get(runId) {
+        assertTransactionActive();
         const record = state.runs.get(runId);
         return Promise.resolve(
           record === undefined ? null : cloneStoredRun(record)
         );
       },
       listByBranch(branchId) {
+        assertTransactionActive();
         const runs: StoredRun[] = [];
 
         for (const run of state.runs.values()) {
@@ -313,6 +344,7 @@ function createRepositories(
         return Promise.resolve(runs);
       },
       set(record) {
+        assertTransactionActive();
         assertStoredRun(record, "record");
         const branch = ensureBranchExists(
           state,
@@ -368,6 +400,17 @@ function createRepositories(
 
         const existingRun = state.runs.get(record.runId);
         if (existingRun === undefined) {
+          if (record.status !== "running") {
+            throw persistenceError(
+              "stored runs must be created in the running state",
+              "memory_backend_run_initial_status_invalid",
+              {
+                runId: record.runId,
+                status: record.status,
+              }
+            );
+          }
+
           if (branch.headTurnNodeHash !== record.startTurnNodeHash) {
             throw persistenceError(
               "stored runs must start from the current branch head when first created",
@@ -397,12 +440,14 @@ function createRepositories(
     },
     schemas: {
       get(schemaId) {
+        assertTransactionActive();
         const record = state.schemas.get(schemaId);
         return Promise.resolve(
           record === undefined ? null : cloneStoredSchema(record)
         );
       },
       put(record) {
+        assertTransactionActive();
         assertStoredSchema(record, "record");
         putImmutableRecord(
           state.schemas,
@@ -417,10 +462,12 @@ function createRepositories(
     },
     stagedResults: {
       clearRun(runId) {
+        assertTransactionActive();
         state.stagedResults.delete(runId);
         return Promise.resolve();
       },
       get(runId, taskId) {
+        assertTransactionActive();
         const runResults = state.stagedResults.get(runId);
         const record = runResults?.get(taskId);
 
@@ -429,6 +476,7 @@ function createRepositories(
         );
       },
       listByRun(runId) {
+        assertTransactionActive();
         const runResults = state.stagedResults.get(runId);
 
         if (runResults === undefined) {
@@ -443,6 +491,7 @@ function createRepositories(
         return Promise.resolve(stagedResults);
       },
       set(record) {
+        assertTransactionActive();
         assertStoredStagedResult(record, "record");
         const run = ensureRunExists(state, record.runId, "record.runId");
         ensureObjectExists(state, record.objectHash, "record.objectHash");
@@ -480,12 +529,14 @@ function createRepositories(
     },
     threads: {
       get(threadId) {
+        assertTransactionActive();
         const record = state.threads.get(threadId);
         return Promise.resolve(
           record === undefined ? null : cloneStoredThread(record)
         );
       },
       put(record) {
+        assertTransactionActive();
         assertStoredThread(record, "record");
         ensureSchemaRecordExists(state, record.schemaId, "record.schemaId");
         const rootTurnNode = ensureTurnNodeExists(
@@ -517,12 +568,14 @@ function createRepositories(
     },
     turnNodes: {
       get(hash) {
+        assertTransactionActive();
         const record = state.turnNodes.get(hash);
         return Promise.resolve(
           record === undefined ? null : cloneStoredTurnNode(record)
         );
       },
       async put(record) {
+        assertTransactionActive();
         assertStoredTurnNode(record, "record");
         await assertStoredTurnNodeIdentity(record, "record");
         ensureTurnTreeExists(state, record.turnTreeHash, "record.turnTreeHash");
@@ -562,6 +615,7 @@ function createRepositories(
     },
     turnTreePaths: {
       get(turnTreeHash, path) {
+        assertTransactionActive();
         const treePaths = state.turnTreePaths.get(turnTreeHash);
         const record = treePaths?.get(path);
         return Promise.resolve(
@@ -569,6 +623,7 @@ function createRepositories(
         );
       },
       listByTurnTree(turnTreeHash) {
+        assertTransactionActive();
         const treePaths = state.turnTreePaths.get(turnTreeHash);
 
         if (treePaths === undefined) {
@@ -580,6 +635,7 @@ function createRepositories(
         return Promise.resolve(records);
       },
       async putMany(records) {
+        assertTransactionActive();
         const seenCompositeKeys = new Set<string>();
 
         for (const record of records) {
@@ -632,12 +688,14 @@ function createRepositories(
     },
     turnTrees: {
       get(hash) {
+        assertTransactionActive();
         const record = state.turnTrees.get(hash);
         return Promise.resolve(
           record === undefined ? null : cloneStoredTurnTree(record)
         );
       },
       async put(record) {
+        assertTransactionActive();
         const schema = getSchemaForSchemaId(
           state,
           record.schemaId,
@@ -657,12 +715,14 @@ function createRepositories(
     },
     turns: {
       get(turnId) {
+        assertTransactionActive();
         const record = state.turns.get(turnId);
         return Promise.resolve(
           record === undefined ? null : cloneStoredTurn(record)
         );
       },
       set(record) {
+        assertTransactionActive();
         assertStoredTurn(record, "record");
         const thread = ensureThreadExists(
           state,
@@ -693,29 +753,7 @@ function createRepositories(
           );
         }
 
-        if (record.parentTurnId !== null) {
-          const parentTurn = ensureTurnExists(
-            state,
-            record.parentTurnId,
-            "record.parentTurnId"
-          );
-
-          if (parentTurn.threadId !== thread.threadId) {
-            throw persistenceError(
-              "stored turns must reference a parent turn on the same thread",
-              "memory_backend_turn_parent_thread_mismatch",
-              { parentTurnId: parentTurn.turnId, threadId: thread.threadId }
-            );
-          }
-
-          assertTurnParentIsImmediatePredecessor(
-            state,
-            thread.threadId,
-            parentTurn,
-            record,
-            "record.parentTurnId"
-          );
-        }
+        assertTurnParentLink(state, record, "record.parentTurnId");
 
         const existingTurn = state.turns.get(record.turnId);
         if (existingTurn !== undefined) {
@@ -993,27 +1031,7 @@ function validateTurnInvariants(state: BackendState): void {
       "turn.headTurnNodeHash"
     );
 
-    if (turn.parentTurnId === null) {
-      continue;
-    }
-
-    const parentTurn = ensureTurnExists(
-      state,
-      turn.parentTurnId,
-      "turn.parentTurnId"
-    );
-
-    if (parentTurn.threadId !== thread.threadId) {
-      throw persistenceError(
-        "stored turns must reference a parent turn on the same thread",
-        "memory_backend_turn_parent_thread_mismatch",
-        {
-          parentThreadId: parentTurn.threadId,
-          threadId: thread.threadId,
-          turnId: turn.turnId,
-        }
-      );
-    }
+    assertTurnParentLink(state, turn, "turn.parentTurnId");
   }
 }
 
@@ -1158,7 +1176,7 @@ function validateTurnTreePathInvariants(state: BackendState): void {
   }
 }
 
-function listTurnsByThread(
+function _listTurnsByThread(
   state: BackendState,
   threadId: string,
   excludedTurnId?: string
@@ -1167,6 +1185,25 @@ function listTurnsByThread(
 
   for (const turn of state.turns.values()) {
     if (turn.threadId !== threadId || turn.turnId === excludedTurnId) {
+      continue;
+    }
+
+    turns.push(turn);
+  }
+
+  turns.sort(compareStoredTurn);
+  return turns;
+}
+
+function listTurnsByBranch(
+  state: BackendState,
+  branchId: string,
+  excludedTurnId?: string
+): StoredTurn[] {
+  const turns: StoredTurn[] = [];
+
+  for (const turn of state.turns.values()) {
+    if (turn.branchId !== branchId || turn.turnId === excludedTurnId) {
       continue;
     }
 
@@ -1846,40 +1883,68 @@ function assertRunCreatedTurnNodeWithinTurnSpan(
   }
 }
 
-function assertTurnParentIsImmediatePredecessor(
+function assertTurnParentLink(
   state: BackendState,
-  threadId: string,
-  parentTurn: StoredTurn,
-  nextTurn: StoredTurn,
+  turn: StoredTurn,
   label: string
 ): void {
-  if (parentTurn.headTurnNodeHash !== nextTurn.startTurnNodeHash) {
+  const candidateTurns = listTurnsByBranch(state, turn.branchId, turn.turnId);
+  let immediateParent: StoredTurn | null = null;
+
+  for (const candidateTurn of candidateTurns) {
+    if (candidateTurn.headTurnNodeHash !== turn.startTurnNodeHash) {
+      continue;
+    }
+
+    if (
+      immediateParent === null ||
+      compareStoredTurn(candidateTurn, immediateParent) > 0
+    ) {
+      immediateParent = candidateTurn;
+    }
+  }
+
+  if (turn.parentTurnId === null) {
+    if (immediateParent === null) {
+      return;
+    }
+
+    throw persistenceError(
+      `${label} must reference the immediate previous semantic turn`,
+      "memory_backend_turn_parent_required",
+      {
+        expectedParentTurnId: immediateParent.turnId,
+        startTurnNodeHash: turn.startTurnNodeHash,
+        turnId: turn.turnId,
+      }
+    );
+  }
+
+  const parentTurn = ensureTurnExists(state, turn.parentTurnId, label);
+
+  if (parentTurn.threadId !== turn.threadId) {
+    throw persistenceError(
+      "stored turns must reference a parent turn on the same thread",
+      "memory_backend_turn_parent_thread_mismatch",
+      {
+        parentThreadId: parentTurn.threadId,
+        threadId: turn.threadId,
+        turnId: turn.turnId,
+      }
+    );
+  }
+
+  if (parentTurn.headTurnNodeHash !== turn.startTurnNodeHash) {
     throw persistenceError(
       `${label} must chain contiguously into record.startTurnNodeHash`,
       "memory_backend_turn_parent_start_turn_node_mismatch",
       {
         parentTurnHeadTurnNodeHash: parentTurn.headTurnNodeHash,
         parentTurnId: parentTurn.turnId,
-        startTurnNodeHash: nextTurn.startTurnNodeHash,
-        turnId: nextTurn.turnId,
+        startTurnNodeHash: turn.startTurnNodeHash,
+        turnId: turn.turnId,
       }
     );
-  }
-
-  const threadTurns = listTurnsByThread(state, threadId, nextTurn.turnId);
-  let immediateParent: StoredTurn | null = null;
-
-  for (const turn of threadTurns) {
-    if (turn.headTurnNodeHash !== nextTurn.startTurnNodeHash) {
-      continue;
-    }
-
-    if (
-      immediateParent === null ||
-      compareStoredTurn(turn, immediateParent) > 0
-    ) {
-      immediateParent = turn;
-    }
   }
 
   if (immediateParent === null) {
@@ -1888,8 +1953,8 @@ function assertTurnParentIsImmediatePredecessor(
       "memory_backend_turn_parent_not_immediate_predecessor",
       {
         parentTurnId: parentTurn.turnId,
-        startTurnNodeHash: nextTurn.startTurnNodeHash,
-        turnId: nextTurn.turnId,
+        startTurnNodeHash: turn.startTurnNodeHash,
+        turnId: turn.turnId,
       }
     );
   }
@@ -1901,7 +1966,7 @@ function assertTurnParentIsImmediatePredecessor(
       {
         expectedParentTurnId: immediateParent.turnId,
         parentTurnId: parentTurn.turnId,
-        turnId: nextTurn.turnId,
+        turnId: turn.turnId,
       }
     );
   }
