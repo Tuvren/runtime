@@ -194,6 +194,21 @@ function createRepositories(
               }
             );
           }
+
+          if (
+            existingBranch === undefined &&
+            record.headTurnNodeHash !== sourceBranch.headTurnNodeHash
+          ) {
+            throw persistenceError(
+              "new archive branches must preserve the source branch head they reference",
+              "memory_backend_branch_archive_head_mismatch",
+              {
+                archivedFromBranchId: sourceBranch.branchId,
+                archiveHeadTurnNodeHash: record.headTurnNodeHash,
+                sourceHeadTurnNodeHash: sourceBranch.headTurnNodeHash,
+              }
+            );
+          }
         }
 
         if (existingBranch !== undefined) {
@@ -858,6 +873,28 @@ function validateBranchInvariants(
         }
       );
     }
+
+    const existingBranch = baseState.branches.get(branch.branchId);
+    const sourceBranchBeforeTransaction = baseState.branches.get(
+      branch.archivedFromBranchId
+    );
+
+    if (
+      existingBranch === undefined &&
+      sourceBranchBeforeTransaction !== undefined &&
+      branch.headTurnNodeHash !== sourceBranchBeforeTransaction.headTurnNodeHash
+    ) {
+      throw persistenceError(
+        "new archive branches must preserve the pre-rollback source branch head",
+        "memory_backend_branch_archive_head_mismatch",
+        {
+          archivedFromBranchId: branch.archivedFromBranchId,
+          archiveHeadTurnNodeHash: branch.headTurnNodeHash,
+          sourceHeadTurnNodeHash:
+            sourceBranchBeforeTransaction.headTurnNodeHash,
+        }
+      );
+    }
   }
 
   for (const branch of state.branches.values()) {
@@ -1223,9 +1260,10 @@ async function normalizeStoredTurnTreePath(
     );
     const itemsCbor = encodeHashStringArray(chunkItems);
     const chunkHash = await hashKernelRecord(chunkItems);
+    const existingChunk = state.orderedPathChunks.get(chunkHash);
     const chunkRecord: StoredOrderedPathChunk = {
       chunkHash,
-      createdAtMs: now(),
+      createdAtMs: existingChunk?.createdAtMs ?? now(),
       itemCount: chunkItems.length,
       itemsCbor,
     };
@@ -1623,8 +1661,23 @@ function assertRunUpdateIsLegal(
     "memory_backend_run_updated_at_regressed"
   );
 
-  assertMonotonicRunStepIndex(existingRun, nextRun);
-  assertAppendOnlyRunCreatedTurnNodes(existingRun, nextRun);
+  if (existingRun.status === "running") {
+    assertMonotonicRunStepIndex(existingRun, nextRun);
+    assertAppendOnlyRunCreatedTurnNodes(existingRun, nextRun);
+  } else {
+    assertImmutableField(
+      existingRun.currentStepIndex,
+      nextRun.currentStepIndex,
+      "record.currentStepIndex",
+      "memory_backend_run_step_index_immutable_after_halt"
+    );
+    assertImmutableBytes(
+      existingRun.createdTurnNodesCbor,
+      nextRun.createdTurnNodesCbor,
+      "record.createdTurnNodesCbor",
+      "memory_backend_run_created_turn_nodes_immutable_after_halt"
+    );
+  }
 
   assertRunStatusTransition(existingRun.status, nextRun.status);
 }
@@ -1867,7 +1920,10 @@ function assertBackwardBranchMoveIsArchived(
       continue;
     }
 
+    const branchBeforeTransaction = baseState.branches.get(branch.branchId);
+
     if (
+      branchBeforeTransaction === undefined &&
       branch.archivedFromBranchId === nextBranch.branchId &&
       branch.headTurnNodeHash === previousBranch.headTurnNodeHash
     ) {
@@ -2406,6 +2462,7 @@ function areStoredObjectsEqual(
   return (
     left.hash === right.hash &&
     left.mediaType === right.mediaType &&
+    left.createdAtMs === right.createdAtMs &&
     left.byteLength === right.byteLength &&
     areBytesEqual(left.bytes, right.bytes)
   );
@@ -2417,6 +2474,7 @@ function areStoredSchemasEqual(
 ): boolean {
   return (
     left.schemaId === right.schemaId &&
+    left.createdAtMs === right.createdAtMs &&
     areBytesEqual(left.schemaCbor, right.schemaCbor)
   );
 }
@@ -2428,6 +2486,7 @@ function areStoredTurnTreesEqual(
   return (
     left.hash === right.hash &&
     left.schemaId === right.schemaId &&
+    left.createdAtMs === right.createdAtMs &&
     areBytesEqual(left.manifestCbor, right.manifestCbor)
   );
 }
@@ -2438,6 +2497,7 @@ function areStoredOrderedPathChunksEqual(
 ): boolean {
   return (
     left.chunkHash === right.chunkHash &&
+    left.createdAtMs === right.createdAtMs &&
     left.itemCount === right.itemCount &&
     areBytesEqual(left.itemsCbor, right.itemsCbor)
   );
@@ -2449,6 +2509,7 @@ function areStoredTurnNodesEqual(
 ): boolean {
   return (
     left.hash === right.hash &&
+    left.createdAtMs === right.createdAtMs &&
     left.previousTurnNodeHash === right.previousTurnNodeHash &&
     left.turnTreeHash === right.turnTreeHash &&
     left.schemaId === right.schemaId &&
@@ -2466,6 +2527,7 @@ function areStoredThreadsEqual(
 ): boolean {
   return (
     left.threadId === right.threadId &&
+    left.createdAtMs === right.createdAtMs &&
     left.schemaId === right.schemaId &&
     left.rootTurnNodeHash === right.rootTurnNodeHash
   );

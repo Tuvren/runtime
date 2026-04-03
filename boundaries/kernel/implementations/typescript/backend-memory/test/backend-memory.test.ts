@@ -18,12 +18,14 @@ import { describe, expect, test } from "bun:test";
 import {
   decodeDeterministicKernelRecord,
   encodeDeterministicKernelRecord,
+  hashKernelRecord,
   hashOpaqueObjectBytes,
   hashTurnNodeIdentity,
   hashTurnTreeIdentity,
   type StagedResult,
   type StoredBranch,
   type StoredObject,
+  type StoredOrderedPathChunk,
   type StoredRun,
   type StoredSchema,
   type StoredStagedResult,
@@ -197,10 +199,13 @@ describe("@kraken/backend-memory", () => {
       path: "messages",
       turnTreeHash: "",
     };
-    const singlePath = (turnTreeHash: string): StoredTurnTreePath => ({
+    const singlePath = (
+      turnTreeHash: string,
+      singleHash: string | null
+    ): StoredTurnTreePath => ({
       collectionKind: "single",
       path: "context.manifest",
-      singleHash: null,
+      singleHash,
       turnTreeHash,
     });
     const firstTurnTree = await createStoredTurnTree(
@@ -214,7 +219,7 @@ describe("@kraken/backend-memory", () => {
     const secondTurnTree = await createStoredTurnTree(
       schema,
       {
-        "context.manifest": null,
+        "context.manifest": createHashFromIndex(9010),
         messages: orderedHashes,
       },
       202
@@ -226,11 +231,11 @@ describe("@kraken/backend-memory", () => {
       await tx.turnTrees.put(secondTurnTree);
       await tx.turnTreePaths.putMany([
         { ...orderedPath, turnTreeHash: firstTurnTree.hash },
-        singlePath(firstTurnTree.hash),
+        singlePath(firstTurnTree.hash, null),
       ]);
       await tx.turnTreePaths.putMany([
         { ...orderedPath, turnTreeHash: secondTurnTree.hash },
-        singlePath(secondTurnTree.hash),
+        singlePath(secondTurnTree.hash, createHashFromIndex(9010)),
       ]);
     });
 
@@ -1771,6 +1776,138 @@ describe("@kraken/backend-memory", () => {
     ).rejects.toBeInstanceOf(KrakenPersistenceError);
   });
 
+  test("rejects halted run updates that change progress or created turn nodes", async () => {
+    const backend = createMemoryBackend();
+    const schema = createSchema();
+    const schemaRecord = createStoredSchema(schema, 1);
+    const turnTree = await createStoredTurnTree(
+      schema,
+      { "context.manifest": null, messages: [] },
+      2
+    );
+    const rootNode = await createStoredTurnNode({
+      consumedStagedResults: [],
+      createdAtMs: 3,
+      eventHash: null,
+      previousTurnNodeHash: null,
+      schemaId: schema.schemaId,
+      turnTreeHash: turnTree.hash,
+    });
+    const createdNode = await createStoredTurnNode({
+      consumedStagedResults: [],
+      createdAtMs: 4,
+      eventHash: null,
+      previousTurnNodeHash: rootNode.hash,
+      schemaId: schema.schemaId,
+      turnTreeHash: turnTree.hash,
+    });
+    const extraNode = await createStoredTurnNode({
+      consumedStagedResults: [],
+      createdAtMs: 5,
+      eventHash: null,
+      previousTurnNodeHash: createdNode.hash,
+      schemaId: schema.schemaId,
+      turnTreeHash: turnTree.hash,
+    });
+    const thread: StoredThread = {
+      createdAtMs: 6,
+      rootTurnNodeHash: rootNode.hash,
+      schemaId: schema.schemaId,
+      threadId: "thread_halted_run",
+    };
+    const branch: StoredBranch = {
+      branchId: "branch_halted_run",
+      createdAtMs: 7,
+      headTurnNodeHash: createdNode.hash,
+      threadId: thread.threadId,
+      updatedAtMs: 7,
+    };
+    const turn: StoredTurn = {
+      branchId: branch.branchId,
+      createdAtMs: 8,
+      headTurnNodeHash: createdNode.hash,
+      parentTurnId: null,
+      startTurnNodeHash: rootNode.hash,
+      threadId: thread.threadId,
+      turnId: "turn_halted_run",
+      updatedAtMs: 8,
+    };
+    const failedRun: StoredRun = {
+      branchId: branch.branchId,
+      createdAtMs: 9,
+      createdTurnNodesCbor: encodeDeterministicKernelRecord([createdNode.hash]),
+      currentStepIndex: 0,
+      runId: "run_halted_failed",
+      schemaId: schema.schemaId,
+      startTurnNodeHash: createdNode.hash,
+      status: "failed",
+      stepSequenceCbor: encodeDeterministicKernelRecord([
+        {
+          deterministic: false,
+          id: "model_call",
+          sideEffects: false,
+        },
+        {
+          deterministic: false,
+          id: "tool_execution",
+          sideEffects: true,
+        },
+      ]),
+      turnId: turn.turnId,
+      updatedAtMs: 9,
+    };
+    const pausedRun: StoredRun = {
+      ...failedRun,
+      runId: "run_halted_paused",
+      status: "paused",
+    };
+
+    await backend.transact(async (tx) => {
+      await tx.schemas.put(schemaRecord);
+      await tx.turnTrees.put(turnTree);
+      await tx.turnTreePaths.putMany(
+        createCanonicalTurnTreePaths(turnTree, [])
+      );
+      await tx.turnNodes.put(rootNode);
+      await tx.turnNodes.put(createdNode);
+      await tx.turnNodes.put(extraNode);
+      await tx.threads.put(thread);
+      await tx.branches.set(branch);
+      await tx.turns.set(turn);
+      await tx.runs.set(failedRun);
+      await tx.runs.set(pausedRun);
+    });
+
+    await expect(
+      backend.transact(async (tx) => {
+        await tx.runs.set({
+          ...failedRun,
+          createdTurnNodesCbor: encodeDeterministicKernelRecord([
+            createdNode.hash,
+            extraNode.hash,
+          ]),
+          currentStepIndex: 1,
+          updatedAtMs: 10,
+        });
+      })
+    ).rejects.toBeInstanceOf(KrakenPersistenceError);
+
+    await expect(
+      backend.transact(async (tx) => {
+        await tx.runs.set({
+          ...pausedRun,
+          createdTurnNodesCbor: encodeDeterministicKernelRecord([
+            createdNode.hash,
+            extraNode.hash,
+          ]),
+          currentStepIndex: 1,
+          status: "failed",
+          updatedAtMs: 10,
+        });
+      })
+    ).rejects.toBeInstanceOf(KrakenPersistenceError);
+  });
+
   test("rejects terminal or paused runs that still retain staged results", async () => {
     const backend = createMemoryBackend();
     const schema = createSchema();
@@ -2646,6 +2783,112 @@ describe("@kraken/backend-memory", () => {
     });
   });
 
+  test("rejects forged archive branches and stale archives satisfying rollback checks", async () => {
+    const schema = createSchema();
+    const schemaRecord = createStoredSchema(schema, 1);
+    const turnTree = await createStoredTurnTree(
+      schema,
+      { "context.manifest": null, messages: [] },
+      2
+    );
+    const rootNode = await createStoredTurnNode({
+      consumedStagedResults: [],
+      createdAtMs: 3,
+      eventHash: null,
+      previousTurnNodeHash: null,
+      schemaId: schema.schemaId,
+      turnTreeHash: turnTree.hash,
+    });
+    const middleNode = await createStoredTurnNode({
+      consumedStagedResults: [],
+      createdAtMs: 4,
+      eventHash: null,
+      previousTurnNodeHash: rootNode.hash,
+      schemaId: schema.schemaId,
+      turnTreeHash: turnTree.hash,
+    });
+    const headNode = await createStoredTurnNode({
+      consumedStagedResults: [],
+      createdAtMs: 5,
+      eventHash: null,
+      previousTurnNodeHash: middleNode.hash,
+      schemaId: schema.schemaId,
+      turnTreeHash: turnTree.hash,
+    });
+    const thread: StoredThread = {
+      createdAtMs: 6,
+      rootTurnNodeHash: rootNode.hash,
+      schemaId: schema.schemaId,
+      threadId: "thread_archive_provenance",
+    };
+    const branch: StoredBranch = {
+      branchId: "branch_archive_provenance",
+      createdAtMs: 7,
+      headTurnNodeHash: headNode.hash,
+      threadId: thread.threadId,
+      updatedAtMs: 7,
+    };
+
+    const forgedArchiveBackend = createMemoryBackend();
+    await forgedArchiveBackend.transact(async (tx) => {
+      await tx.schemas.put(schemaRecord);
+      await tx.turnTrees.put(turnTree);
+      await tx.turnTreePaths.putMany(
+        createCanonicalTurnTreePaths(turnTree, [])
+      );
+      await tx.turnNodes.put(rootNode);
+      await tx.turnNodes.put(middleNode);
+      await tx.turnNodes.put(headNode);
+      await tx.threads.put(thread);
+      await tx.branches.set(branch);
+    });
+
+    await expect(
+      forgedArchiveBackend.transact(async (tx) => {
+        await tx.branches.set({
+          archivedFromBranchId: branch.branchId,
+          branchId: "branch_forged_archive",
+          createdAtMs: 8,
+          headTurnNodeHash: middleNode.hash,
+          threadId: thread.threadId,
+          updatedAtMs: 8,
+        });
+      })
+    ).rejects.toBeInstanceOf(KrakenPersistenceError);
+
+    const staleArchiveBackend = createMemoryBackend();
+    await staleArchiveBackend.transact(async (tx) => {
+      await tx.schemas.put(schemaRecord);
+      await tx.turnTrees.put(turnTree);
+      await tx.turnTreePaths.putMany(
+        createCanonicalTurnTreePaths(turnTree, [])
+      );
+      await tx.turnNodes.put(rootNode);
+      await tx.turnNodes.put(middleNode);
+      await tx.turnNodes.put(headNode);
+      await tx.threads.put(thread);
+      await tx.branches.set(branch);
+      await tx.branches.set({
+        archivedFromBranchId: branch.branchId,
+        branchId: "branch_stale_archive",
+        createdAtMs: 8,
+        headTurnNodeHash: headNode.hash,
+        threadId: thread.threadId,
+        updatedAtMs: 8,
+      });
+    });
+
+    await expect(
+      staleArchiveBackend.transact(async (tx) => {
+        await tx.branches.set({
+          ...branch,
+          headTurnNodeHash: middleNode.hash,
+          updatedAtMs: 9,
+        });
+      })
+    ).rejects.toBeInstanceOf(KrakenPersistenceError);
+  });
+
   test("rejects threads whose root turn node is not a genesis node", async () => {
     const backend = createMemoryBackend();
     const schema = createSchema();
@@ -2726,6 +2969,102 @@ describe("@kraken/backend-memory", () => {
             turnTreeHash: turnTree.hash,
           })
         );
+      })
+    ).rejects.toBeInstanceOf(KrakenPersistenceError);
+  });
+
+  test("rejects conflicting createdAtMs on immutable records", async () => {
+    const backend = createMemoryBackend();
+    const schema = createSchema();
+    const schemaRecord = createStoredSchema(schema, 1);
+    const objectRecord = await createStoredObject(new Uint8Array([1, 2, 3]), 2);
+    const turnTree = await createStoredTurnTree(
+      schema,
+      { "context.manifest": null, messages: [] },
+      3
+    );
+    const chunkRecord = await createStoredOrderedPathChunk(
+      [createHashFromIndex(1)],
+      4
+    );
+    const rootNode = await createStoredTurnNode({
+      consumedStagedResults: [],
+      createdAtMs: 5,
+      eventHash: null,
+      previousTurnNodeHash: null,
+      schemaId: schema.schemaId,
+      turnTreeHash: turnTree.hash,
+    });
+    const threadRecord: StoredThread = {
+      createdAtMs: 6,
+      rootTurnNodeHash: rootNode.hash,
+      schemaId: schema.schemaId,
+      threadId: "thread_created_at_conflict",
+    };
+
+    await backend.transact(async (tx) => {
+      await tx.schemas.put(schemaRecord);
+      await tx.objects.put(objectRecord);
+      await tx.turnTrees.put(turnTree);
+      await tx.orderedPathChunks.put(chunkRecord);
+      await tx.turnTreePaths.putMany(
+        createCanonicalTurnTreePaths(turnTree, [])
+      );
+      await tx.turnNodes.put(rootNode);
+      await tx.threads.put(threadRecord);
+    });
+
+    await expect(
+      backend.transact(async (tx) => {
+        await tx.objects.put({
+          ...objectRecord,
+          createdAtMs: 999,
+        });
+      })
+    ).rejects.toBeInstanceOf(KrakenPersistenceError);
+
+    await expect(
+      backend.transact(async (tx) => {
+        await tx.schemas.put({
+          ...schemaRecord,
+          createdAtMs: 999,
+        });
+      })
+    ).rejects.toBeInstanceOf(KrakenPersistenceError);
+
+    await expect(
+      backend.transact(async (tx) => {
+        await tx.turnTrees.put({
+          ...turnTree,
+          createdAtMs: 999,
+        });
+      })
+    ).rejects.toBeInstanceOf(KrakenPersistenceError);
+
+    await expect(
+      backend.transact(async (tx) => {
+        await tx.orderedPathChunks.put({
+          ...chunkRecord,
+          createdAtMs: 999,
+        });
+      })
+    ).rejects.toBeInstanceOf(KrakenPersistenceError);
+
+    await expect(
+      backend.transact(async (tx) => {
+        await tx.turnNodes.put({
+          ...rootNode,
+          createdAtMs: 999,
+        });
+      })
+    ).rejects.toBeInstanceOf(KrakenPersistenceError);
+
+    await expect(
+      backend.transact(async (tx) => {
+        await tx.threads.put({
+          ...threadRecord,
+          createdAtMs: 999,
+        });
       })
     ).rejects.toBeInstanceOf(KrakenPersistenceError);
   });
@@ -2874,6 +3213,20 @@ async function createStoredTurnTree(
     hash: await hashTurnTreeIdentity(schema.schemaId, manifest, schema),
     manifestCbor: encodeDeterministicKernelRecord(manifest),
     schemaId: schema.schemaId,
+  };
+}
+
+async function createStoredOrderedPathChunk(
+  hashes: string[],
+  createdAtMs: number
+): Promise<StoredOrderedPathChunk> {
+  const itemsCbor = encodeDeterministicKernelRecord(hashes);
+
+  return {
+    chunkHash: await hashKernelRecord(hashes),
+    createdAtMs,
+    itemCount: hashes.length,
+    itemsCbor,
   };
 }
 
