@@ -1195,25 +1195,6 @@ function listTurnsByThread(
   return turns;
 }
 
-function _listTurnsByBranch(
-  state: BackendState,
-  branchId: string,
-  excludedTurnId?: string
-): StoredTurn[] {
-  const turns: StoredTurn[] = [];
-
-  for (const turn of state.turns.values()) {
-    if (turn.branchId !== branchId || turn.turnId === excludedTurnId) {
-      continue;
-    }
-
-    turns.push(turn);
-  }
-
-  turns.sort(compareStoredTurn);
-  return turns;
-}
-
 function cloneState(state: BackendState): BackendState {
   return {
     branches: new Map(state.branches),

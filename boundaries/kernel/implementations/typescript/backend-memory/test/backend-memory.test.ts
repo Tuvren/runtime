@@ -408,6 +408,347 @@ describe("@kraken/backend-memory", () => {
     });
   });
 
+  test("supports rollback-safe pause and resume checkpoint flows on the same turn", async () => {
+    const backend = createMemoryBackend();
+    const schema = createSchema();
+    const schemaRecord = createStoredSchema(schema, 1);
+    const rootTurnTree = await createStoredTurnTree(
+      schema,
+      { "context.manifest": null, messages: [] },
+      2
+    );
+    const rootTurnNode = await createStoredTurnNode({
+      consumedStagedResults: [],
+      createdAtMs: 3,
+      eventHash: null,
+      previousTurnNodeHash: null,
+      schemaId: schema.schemaId,
+      turnTreeHash: rootTurnTree.hash,
+    });
+    const thread: StoredThread = {
+      createdAtMs: 4,
+      rootTurnNodeHash: rootTurnNode.hash,
+      schemaId: schema.schemaId,
+      threadId: "thread_pause_resume",
+    };
+    const branch: StoredBranch = {
+      branchId: "branch_pause_resume",
+      createdAtMs: 5,
+      headTurnNodeHash: rootTurnNode.hash,
+      threadId: thread.threadId,
+      updatedAtMs: 5,
+    };
+    const turn: StoredTurn = {
+      branchId: branch.branchId,
+      createdAtMs: 6,
+      headTurnNodeHash: rootTurnNode.hash,
+      parentTurnId: null,
+      startTurnNodeHash: rootTurnNode.hash,
+      threadId: thread.threadId,
+      turnId: "turn_pause_resume",
+      updatedAtMs: 6,
+    };
+    const initialRun: StoredRun = {
+      branchId: branch.branchId,
+      createdAtMs: 7,
+      createdTurnNodesCbor: encodeDeterministicKernelRecord([]),
+      currentStepIndex: 0,
+      runId: "run_pause_initial",
+      schemaId: schema.schemaId,
+      startTurnNodeHash: rootTurnNode.hash,
+      status: "running",
+      stepSequenceCbor: encodeDeterministicKernelRecord([
+        {
+          deterministic: false,
+          id: "model_call",
+          sideEffects: false,
+        },
+      ]),
+      turnId: turn.turnId,
+      updatedAtMs: 7,
+    };
+    const firstObject = await createStoredObject(new Uint8Array([1]), 8);
+    const firstStagedResult: StoredStagedResult = {
+      createdAtMs: 9,
+      objectHash: firstObject.hash,
+      objectType: "message",
+      runId: initialRun.runId,
+      status: "completed",
+      taskId: "task_pause",
+    };
+    const pausedTurnTree = await createStoredTurnTree(
+      schema,
+      { "context.manifest": null, messages: [firstObject.hash] },
+      10
+    );
+    const pausedTurnNode = await createStoredTurnNode({
+      consumedStagedResults: [
+        {
+          objectHash: firstObject.hash,
+          objectType: "message",
+          status: "completed",
+          taskId: firstStagedResult.taskId,
+          timestamp: firstStagedResult.createdAtMs,
+        },
+      ],
+      createdAtMs: 11,
+      eventHash: null,
+      previousTurnNodeHash: rootTurnNode.hash,
+      schemaId: schema.schemaId,
+      turnTreeHash: pausedTurnTree.hash,
+    });
+    const pausedRun: StoredRun = {
+      ...initialRun,
+      createdTurnNodesCbor: encodeDeterministicKernelRecord([
+        pausedTurnNode.hash,
+      ]),
+      currentStepIndex: 1,
+      status: "paused",
+      updatedAtMs: 12,
+    };
+    const resumedRun: StoredRun = {
+      branchId: branch.branchId,
+      createdAtMs: 13,
+      createdTurnNodesCbor: encodeDeterministicKernelRecord([]),
+      currentStepIndex: 0,
+      runId: "run_pause_resumed",
+      schemaId: schema.schemaId,
+      startTurnNodeHash: pausedTurnNode.hash,
+      status: "running",
+      stepSequenceCbor: encodeDeterministicKernelRecord([
+        {
+          deterministic: false,
+          id: "tool_execution",
+          sideEffects: true,
+        },
+      ]),
+      turnId: turn.turnId,
+      updatedAtMs: 13,
+    };
+    const secondObject = await createStoredObject(new Uint8Array([2]), 14);
+    const secondStagedResult: StoredStagedResult = {
+      createdAtMs: 15,
+      objectHash: secondObject.hash,
+      objectType: "message",
+      runId: resumedRun.runId,
+      status: "completed",
+      taskId: "task_resume",
+    };
+    const completedTurnTree = await createStoredTurnTree(
+      schema,
+      {
+        "context.manifest": null,
+        messages: [firstObject.hash, secondObject.hash],
+      },
+      16
+    );
+    const completedTurnNode = await createStoredTurnNode({
+      consumedStagedResults: [
+        {
+          objectHash: secondObject.hash,
+          objectType: "message",
+          status: "completed",
+          taskId: secondStagedResult.taskId,
+          timestamp: secondStagedResult.createdAtMs,
+        },
+      ],
+      createdAtMs: 17,
+      eventHash: null,
+      previousTurnNodeHash: pausedTurnNode.hash,
+      schemaId: schema.schemaId,
+      turnTreeHash: completedTurnTree.hash,
+    });
+    const completedResumedRun: StoredRun = {
+      ...resumedRun,
+      createdTurnNodesCbor: encodeDeterministicKernelRecord([
+        completedTurnNode.hash,
+      ]),
+      currentStepIndex: 1,
+      status: "completed",
+      updatedAtMs: 18,
+    };
+
+    await backend.transact(async (tx) => {
+      await tx.schemas.put(schemaRecord);
+      await tx.turnTrees.put(rootTurnTree);
+      await tx.turnTreePaths.putMany(
+        createCanonicalTurnTreePaths(rootTurnTree, [])
+      );
+      await tx.turnNodes.put(rootTurnNode);
+      await tx.threads.put(thread);
+      await tx.branches.set(branch);
+      await tx.turns.set(turn);
+      await tx.runs.set(initialRun);
+      await tx.objects.put(firstObject);
+      await tx.stagedResults.set(firstStagedResult);
+
+      expect(await tx.objects.has(firstObject.hash)).toBe(true);
+      expect(
+        await tx.stagedResults.get(initialRun.runId, firstStagedResult.taskId)
+      ).toEqual(firstStagedResult);
+    });
+
+    await expect(
+      backend.transact(async (tx) => {
+        await tx.turnTrees.put(pausedTurnTree);
+        await tx.turnTreePaths.putMany(
+          createCanonicalTurnTreePaths(pausedTurnTree, [firstObject.hash])
+        );
+        await tx.turnNodes.put(pausedTurnNode);
+        await tx.turns.set({
+          ...turn,
+          headTurnNodeHash: pausedTurnNode.hash,
+          updatedAtMs: 11,
+        });
+        throw new Error("checkpoint failed");
+      })
+    ).rejects.toThrow("checkpoint failed");
+
+    await backend.transact(async (tx) => {
+      expect(await tx.turnTrees.get(pausedTurnTree.hash)).toBeNull();
+      expect(await tx.turnNodes.get(pausedTurnNode.hash)).toBeNull();
+      expect(await tx.branches.get(branch.branchId)).toEqual(branch);
+      expect(await tx.turns.get(turn.turnId)).toEqual(turn);
+      expect(await tx.runs.get(initialRun.runId)).toEqual(initialRun);
+      expect(await tx.stagedResults.listByRun(initialRun.runId)).toEqual([
+        firstStagedResult,
+      ]);
+    });
+
+    await backend.transact(async (tx) => {
+      await tx.turnTrees.put(pausedTurnTree);
+      await tx.turnTreePaths.putMany(
+        createCanonicalTurnTreePaths(pausedTurnTree, [firstObject.hash])
+      );
+      await tx.turnNodes.put(pausedTurnNode);
+      await tx.turns.set({
+        ...turn,
+        headTurnNodeHash: pausedTurnNode.hash,
+        updatedAtMs: 11,
+      });
+      await tx.branches.set({
+        ...branch,
+        headTurnNodeHash: pausedTurnNode.hash,
+        updatedAtMs: 11,
+      });
+      await tx.runs.set(pausedRun);
+      await tx.stagedResults.clearRun(initialRun.runId);
+    });
+
+    await backend.transact(async (tx) => {
+      expect(await tx.turnTrees.get(pausedTurnTree.hash)).toEqual(
+        pausedTurnTree
+      );
+      expect(
+        await tx.turnTreePaths.get(pausedTurnTree.hash, "messages")
+      ).toEqual({
+        collectionKind: "ordered",
+        orderedCount: 1,
+        orderedEncoding: "flat",
+        orderedInlineCbor: encodeDeterministicKernelRecord([firstObject.hash]),
+        path: "messages",
+        turnTreeHash: pausedTurnTree.hash,
+      });
+      expect(await tx.turnNodes.get(pausedTurnNode.hash)).toEqual(
+        pausedTurnNode
+      );
+      expect(await tx.branches.get(branch.branchId)).toEqual({
+        ...branch,
+        headTurnNodeHash: pausedTurnNode.hash,
+        updatedAtMs: 11,
+      });
+      expect(await tx.turns.get(turn.turnId)).toEqual({
+        ...turn,
+        headTurnNodeHash: pausedTurnNode.hash,
+        updatedAtMs: 11,
+      });
+      expect(await tx.runs.get(initialRun.runId)).toEqual(pausedRun);
+      expect(
+        await tx.stagedResults.get(initialRun.runId, firstStagedResult.taskId)
+      ).toBeNull();
+    });
+
+    await backend.transact(async (tx) => {
+      await tx.runs.set({
+        ...pausedRun,
+        status: "failed",
+        updatedAtMs: 13,
+      });
+      await tx.runs.set(resumedRun);
+      await tx.objects.put(secondObject);
+      await tx.stagedResults.set(secondStagedResult);
+    });
+
+    await backend.transact(async (tx) => {
+      expect(await tx.runs.get(initialRun.runId)).toEqual({
+        ...pausedRun,
+        status: "failed",
+        updatedAtMs: 13,
+      });
+      expect(await tx.runs.get(resumedRun.runId)).toEqual(resumedRun);
+      expect(
+        await tx.stagedResults.get(resumedRun.runId, secondStagedResult.taskId)
+      ).toEqual(secondStagedResult);
+    });
+
+    await backend.transact(async (tx) => {
+      await tx.turnTrees.put(completedTurnTree);
+      await tx.turnTreePaths.putMany(
+        createCanonicalTurnTreePaths(completedTurnTree, [
+          firstObject.hash,
+          secondObject.hash,
+        ])
+      );
+      await tx.turnNodes.put(completedTurnNode);
+      await tx.turns.set({
+        ...turn,
+        headTurnNodeHash: completedTurnNode.hash,
+        updatedAtMs: 17,
+      });
+      await tx.branches.set({
+        ...branch,
+        headTurnNodeHash: completedTurnNode.hash,
+        updatedAtMs: 17,
+      });
+      await tx.runs.set(completedResumedRun);
+      await tx.stagedResults.clearRun(resumedRun.runId);
+    });
+
+    await backend.transact(async (tx) => {
+      expect(await tx.branches.get(branch.branchId)).toEqual({
+        ...branch,
+        headTurnNodeHash: completedTurnNode.hash,
+        updatedAtMs: 17,
+      });
+      expect(await tx.turns.get(turn.turnId)).toEqual({
+        ...turn,
+        headTurnNodeHash: completedTurnNode.hash,
+        updatedAtMs: 17,
+      });
+      expect(await tx.runs.get(resumedRun.runId)).toEqual(completedResumedRun);
+      expect(await tx.turnNodes.get(completedTurnNode.hash)).toEqual(
+        completedTurnNode
+      );
+      expect(await tx.turnTrees.get(completedTurnTree.hash)).toEqual(
+        completedTurnTree
+      );
+      expect(
+        await tx.turnTreePaths.get(completedTurnTree.hash, "messages")
+      ).toEqual({
+        collectionKind: "ordered",
+        orderedCount: 2,
+        orderedEncoding: "flat",
+        orderedInlineCbor: encodeDeterministicKernelRecord([
+          firstObject.hash,
+          secondObject.hash,
+        ]),
+        path: "messages",
+        turnTreeHash: completedTurnTree.hash,
+      });
+      expect(await tx.stagedResults.listByRun(resumedRun.runId)).toEqual([]);
+    });
+  });
+
   test("preserves deterministic list ordering for branches, runs, and staged results", async () => {
     const backend = createMemoryBackend({ now: createNowClock(300) });
     const schema = createSchema();
