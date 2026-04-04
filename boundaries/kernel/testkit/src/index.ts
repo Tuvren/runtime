@@ -14,4 +14,25 @@
  * limitations under the License.
  */
 
-export {};
+// biome-ignore-all lint/performance/noBarrelFile: This package entrypoint is the intentional public contract surface.
+export { registerBackendConformanceSuite } from "./lib/backend-conformance-suite.js";
+export { registerBackendInvariantSuite } from "./lib/backend-invariant-suite.js";
+export { registerBackendRecoverySuite } from "./lib/backend-recovery-suite.js";
+export type {
+  BackendConformanceSuiteOptions,
+  BackendFactory,
+  BackendTestSuiteApi,
+} from "./lib/backend-test-suite-types.js";
+export {
+  createCanonicalKernelTestSchema,
+  createCanonicalTurnTreePaths,
+  createHashFromIndex,
+  createHashSequence,
+  createIncrementingClock,
+  createStoredObjectRecord,
+  createStoredOrderedPathChunkRecord,
+  createStoredSchemaRecord,
+  createStoredTurnNodeRecord,
+  createStoredTurnTreeRecord,
+  delay,
+} from "./lib/kernel-test-fixtures.js";

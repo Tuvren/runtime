@@ -39,10 +39,33 @@ import {
   type TurnTreeSchema,
 } from "@kraken/kernel-contract-protocol";
 import {
+  registerBackendConformanceSuite,
+  registerBackendInvariantSuite,
+  registerBackendRecoverySuite,
+} from "@kraken/kernel-testkit";
+import {
   type KernelRecord,
   KrakenPersistenceError,
 } from "@kraken/shared-core-types";
 import { createMemoryBackend } from "../src/index.ts";
+
+registerBackendConformanceSuite({
+  createBackend: () => createMemoryBackend(),
+  suiteName: "@kraken/backend-memory shared conformance",
+  testApi: { describe, test },
+});
+
+registerBackendInvariantSuite({
+  createBackend: () => createMemoryBackend(),
+  suiteName: "@kraken/backend-memory shared invariants",
+  testApi: { describe, test },
+});
+
+registerBackendRecoverySuite({
+  createBackend: () => createMemoryBackend(),
+  suiteName: "@kraken/backend-memory shared recovery",
+  testApi: { describe, test },
+});
 
 describe("@kraken/backend-memory", () => {
   test("reports healthy status", async () => {
