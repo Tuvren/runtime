@@ -1022,118 +1022,61 @@ export function registerBackendInvariantSuite(
       }
     );
 
-    options.testApi.test(
-      "rejects forged archive branches, stale archival rollback state, invalid thread roots, missing consumed staged result objects, and invalid turn-tree path physical state",
-      async () => {
-        const schema = createCanonicalKernelTestSchema();
-        const schemaRecord = createStoredSchemaRecord(schema, 1);
-        const turnTree = await createStoredTurnTreeRecord(
-          schema,
-          { "context.manifest": null, messages: [] },
-          2
-        );
-        const rootNode = await createStoredTurnNodeRecord({
-          consumedStagedResults: [],
-          createdAtMs: 3,
-          eventHash: null,
-          previousTurnNodeHash: null,
-          schemaId: schema.schemaId,
-          turnTreeHash: turnTree.hash,
-        });
-        const middleNode = await createStoredTurnNodeRecord({
-          consumedStagedResults: [],
-          createdAtMs: 4,
-          eventHash: null,
-          previousTurnNodeHash: rootNode.hash,
-          schemaId: schema.schemaId,
-          turnTreeHash: turnTree.hash,
-        });
-        const headNode = await createStoredTurnNodeRecord({
-          consumedStagedResults: [],
-          createdAtMs: 5,
-          eventHash: null,
-          previousTurnNodeHash: middleNode.hash,
-          schemaId: schema.schemaId,
-          turnTreeHash: turnTree.hash,
-        });
-        const thread: StoredThread = {
-          createdAtMs: 6,
-          rootTurnNodeHash: rootNode.hash,
-          schemaId: schema.schemaId,
-          threadId: "thread_archive_provenance",
-        };
-        const branch: StoredBranch = {
-          branchId: "branch_archive_provenance",
-          createdAtMs: 7,
-          headTurnNodeHash: headNode.hash,
-          threadId: thread.threadId,
-          updatedAtMs: 7,
-        };
+    options.testApi.test("rejects forged archive branches", async () => {
+      const { backend, branch, middleNode, thread } =
+        await createArchiveRollbackScenario(options);
 
-        const forgedArchiveBackend = options.createBackend();
-        await forgedArchiveBackend.transact(async (tx) => {
-          await tx.schemas.put(schemaRecord);
-          await tx.turnTrees.put(turnTree);
-          await tx.turnTreePaths.putMany(
-            createCanonicalTurnTreePaths(turnTree, [])
-          );
-          await tx.turnNodes.put(rootNode);
-          await tx.turnNodes.put(middleNode);
-          await tx.turnNodes.put(headNode);
-          await tx.threads.put(thread);
-          await tx.branches.set(branch);
-        });
-
-        await rejects(
-          forgedArchiveBackend.transact(async (tx) => {
-            await tx.branches.set({
-              archivedFromBranchId: branch.branchId,
-              branchId: "branch_forged_archive",
-              createdAtMs: 8,
-              headTurnNodeHash: middleNode.hash,
-              threadId: thread.threadId,
-              updatedAtMs: 8,
-            });
-          }),
-          KrakenPersistenceError
-        );
-
-        const staleArchiveBackend = options.createBackend();
-        await staleArchiveBackend.transact(async (tx) => {
-          await tx.schemas.put(schemaRecord);
-          await tx.turnTrees.put(turnTree);
-          await tx.turnTreePaths.putMany(
-            createCanonicalTurnTreePaths(turnTree, [])
-          );
-          await tx.turnNodes.put(rootNode);
-          await tx.turnNodes.put(middleNode);
-          await tx.turnNodes.put(headNode);
-          await tx.threads.put(thread);
-          await tx.branches.set(branch);
+      await rejects(
+        backend.transact(async (tx) => {
           await tx.branches.set({
             archivedFromBranchId: branch.branchId,
-            branchId: "branch_stale_archive",
+            branchId: "branch_forged_archive",
             createdAtMs: 8,
-            headTurnNodeHash: headNode.hash,
+            headTurnNodeHash: middleNode.hash,
             threadId: thread.threadId,
             updatedAtMs: 8,
           });
+        }),
+        KrakenPersistenceError
+      );
+    });
+
+    options.testApi.test("rejects stale archival rollback state", async () => {
+      const { backend, branch, headNode, middleNode, thread } =
+        await createArchiveRollbackScenario(options);
+
+      await backend.transact(async (tx) => {
+        await tx.branches.set({
+          archivedFromBranchId: branch.branchId,
+          branchId: "branch_stale_archive",
+          createdAtMs: 8,
+          headTurnNodeHash: headNode.hash,
+          threadId: thread.threadId,
+          updatedAtMs: 8,
         });
+      });
+
+      await rejects(
+        backend.transact(async (tx) => {
+          await tx.branches.set({
+            ...branch,
+            headTurnNodeHash: middleNode.hash,
+            updatedAtMs: 9,
+          });
+        }),
+        KrakenPersistenceError
+      );
+    });
+
+    options.testApi.test(
+      "rejects threads whose root turn node is not genesis",
+      async () => {
+        const backend = options.createBackend();
+        const { schema, schemaRecord, turnTree, rootNode, middleNode } =
+          await createArchiveRollbackFixtures();
 
         await rejects(
-          staleArchiveBackend.transact(async (tx) => {
-            await tx.branches.set({
-              ...branch,
-              headTurnNodeHash: middleNode.hash,
-              updatedAtMs: 9,
-            });
-          }),
-          KrakenPersistenceError
-        );
-
-        const invalidThreadBackend = options.createBackend();
-        await rejects(
-          invalidThreadBackend.transact(async (tx) => {
+          backend.transact(async (tx) => {
             await tx.schemas.put(schemaRecord);
             await tx.turnTrees.put(turnTree);
             await tx.turnTreePaths.putMany(
@@ -1150,10 +1093,18 @@ export function registerBackendInvariantSuite(
           }),
           KrakenPersistenceError
         );
+      }
+    );
 
-        const missingObjectBackend = options.createBackend();
+    options.testApi.test(
+      "rejects turn nodes whose consumed staged results reference missing objects",
+      async () => {
+        const backend = options.createBackend();
+        const { schema, schemaRecord, turnTree } =
+          await createArchiveRollbackFixtures();
+
         await rejects(
-          missingObjectBackend.transact(async (tx) => {
+          backend.transact(async (tx) => {
             await tx.schemas.put(schemaRecord);
             await tx.turnTrees.put(turnTree);
             await tx.turnTreePaths.putMany(
@@ -1180,8 +1131,14 @@ export function registerBackendInvariantSuite(
           }),
           KrakenPersistenceError
         );
+      }
+    );
 
-        const mismatchedManifestBackend = options.createBackend();
+    options.testApi.test(
+      "rejects mismatches between turn tree manifests and indexed path rows",
+      async () => {
+        const backend = options.createBackend();
+        const { schema, schemaRecord } = await createArchiveRollbackFixtures();
         const turnTreeWithMessage = await createStoredTurnTreeRecord(
           schema,
           {
@@ -1190,8 +1147,9 @@ export function registerBackendInvariantSuite(
           },
           2
         );
+
         await rejects(
-          mismatchedManifestBackend.transact(async (tx) => {
+          backend.transact(async (tx) => {
             await tx.schemas.put(schemaRecord);
             await tx.turnTrees.put(turnTreeWithMessage);
             await tx.turnTreePaths.putMany([
@@ -1213,10 +1171,18 @@ export function registerBackendInvariantSuite(
           }),
           KrakenPersistenceError
         );
+      }
+    );
 
-        const missingChunkBackend = options.createBackend();
+    options.testApi.test(
+      "rejects chunked path rows that reference missing chunk records",
+      async () => {
+        const backend = options.createBackend();
+        const { schemaRecord, turnTree } =
+          await createArchiveRollbackFixtures();
+
         await rejects(
-          missingChunkBackend.transact(async (tx) => {
+          backend.transact(async (tx) => {
             await tx.schemas.put(schemaRecord);
             await tx.turnTrees.put(turnTree);
             await tx.turnTreePaths.putMany([
@@ -1243,4 +1209,106 @@ export function registerBackendInvariantSuite(
       }
     );
   });
+}
+
+async function createArchiveRollbackFixtures(): Promise<{
+  branch: StoredBranch;
+  headNode: Awaited<ReturnType<typeof createStoredTurnNodeRecord>>;
+  middleNode: Awaited<ReturnType<typeof createStoredTurnNodeRecord>>;
+  rootNode: Awaited<ReturnType<typeof createStoredTurnNodeRecord>>;
+  schema: ReturnType<typeof createCanonicalKernelTestSchema>;
+  schemaRecord: ReturnType<typeof createStoredSchemaRecord>;
+  thread: StoredThread;
+  turnTree: Awaited<ReturnType<typeof createStoredTurnTreeRecord>>;
+}> {
+  const schema = createCanonicalKernelTestSchema();
+  const schemaRecord = createStoredSchemaRecord(schema, 1);
+  const turnTree = await createStoredTurnTreeRecord(
+    schema,
+    { "context.manifest": null, messages: [] },
+    2
+  );
+  const rootNode = await createStoredTurnNodeRecord({
+    consumedStagedResults: [],
+    createdAtMs: 3,
+    eventHash: null,
+    previousTurnNodeHash: null,
+    schemaId: schema.schemaId,
+    turnTreeHash: turnTree.hash,
+  });
+  const middleNode = await createStoredTurnNodeRecord({
+    consumedStagedResults: [],
+    createdAtMs: 4,
+    eventHash: null,
+    previousTurnNodeHash: rootNode.hash,
+    schemaId: schema.schemaId,
+    turnTreeHash: turnTree.hash,
+  });
+  const headNode = await createStoredTurnNodeRecord({
+    consumedStagedResults: [],
+    createdAtMs: 5,
+    eventHash: null,
+    previousTurnNodeHash: middleNode.hash,
+    schemaId: schema.schemaId,
+    turnTreeHash: turnTree.hash,
+  });
+  const thread: StoredThread = {
+    createdAtMs: 6,
+    rootTurnNodeHash: rootNode.hash,
+    schemaId: schema.schemaId,
+    threadId: "thread_archive_provenance",
+  };
+  const branch: StoredBranch = {
+    branchId: "branch_archive_provenance",
+    createdAtMs: 7,
+    headTurnNodeHash: headNode.hash,
+    threadId: thread.threadId,
+    updatedAtMs: 7,
+  };
+
+  return {
+    branch,
+    headNode,
+    middleNode,
+    rootNode,
+    schema,
+    schemaRecord,
+    thread,
+    turnTree,
+  };
+}
+
+async function createArchiveRollbackScenario(
+  options: BackendConformanceSuiteOptions
+): Promise<{
+  backend: ReturnType<BackendConformanceSuiteOptions["createBackend"]>;
+  branch: StoredBranch;
+  headNode: Awaited<ReturnType<typeof createStoredTurnNodeRecord>>;
+  middleNode: Awaited<ReturnType<typeof createStoredTurnNodeRecord>>;
+  rootNode: Awaited<ReturnType<typeof createStoredTurnNodeRecord>>;
+  schema: ReturnType<typeof createCanonicalKernelTestSchema>;
+  schemaRecord: ReturnType<typeof createStoredSchemaRecord>;
+  thread: StoredThread;
+  turnTree: Awaited<ReturnType<typeof createStoredTurnTreeRecord>>;
+}> {
+  const backend = options.createBackend();
+  const fixtures = await createArchiveRollbackFixtures();
+
+  await backend.transact(async (tx) => {
+    await tx.schemas.put(fixtures.schemaRecord);
+    await tx.turnTrees.put(fixtures.turnTree);
+    await tx.turnTreePaths.putMany(
+      createCanonicalTurnTreePaths(fixtures.turnTree, [])
+    );
+    await tx.turnNodes.put(fixtures.rootNode);
+    await tx.turnNodes.put(fixtures.middleNode);
+    await tx.turnNodes.put(fixtures.headNode);
+    await tx.threads.put(fixtures.thread);
+    await tx.branches.set(fixtures.branch);
+  });
+
+  return {
+    backend,
+    ...fixtures,
+  };
 }
