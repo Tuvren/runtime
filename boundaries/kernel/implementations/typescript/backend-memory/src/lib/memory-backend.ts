@@ -1892,11 +1892,21 @@ function assertRunCreatedTurnNodesAreCanonical(
       turnNodeHash
     );
 
-    if (relationship !== "same" && relationship !== "forward") {
+    const createdTurnNode = ensureTurnNodeExists(
+      state,
+      turnNodeHash,
+      "run.createdTurnNodesCbor"
+    );
+    const isImmediateNextTurnNode =
+      createdTurnNode.previousTurnNodeHash === previousTurnNodeHash;
+
+    if (relationship !== "same" && !isImmediateNextTurnNode) {
       throw persistenceError(
-        "stored runs must keep createdTurnNodesCbor in lineage order",
-        "memory_backend_run_created_turn_nodes_not_lineage_ordered",
+        "stored runs must keep createdTurnNodesCbor as a canonical contiguous lineage",
+        "memory_backend_run_created_turn_nodes_not_contiguous",
         {
+          createdTurnNodePreviousTurnNodeHash:
+            createdTurnNode.previousTurnNodeHash,
           index,
           previousTurnNodeHash,
           runId: run.runId,
@@ -1920,11 +1930,14 @@ function assertTurnParentLink(
     turn.threadId,
     turn.turnId
   ).filter(
-    (candidateTurn) => candidateTurn.headTurnNodeHash === turn.startTurnNodeHash
+    (candidateTurn) =>
+      candidateTurn.branchId === turn.branchId &&
+      candidateTurn.headTurnNodeHash === turn.startTurnNodeHash
   );
+  const immediatelyPreviousTurn = candidateTurns.at(-1);
 
   if (turn.parentTurnId === null) {
-    if (candidateTurns.length === 0) {
+    if (immediatelyPreviousTurn === undefined) {
       return;
     }
 
@@ -1950,6 +1963,19 @@ function assertTurnParentLink(
       {
         parentThreadId: parentTurn.threadId,
         threadId: turn.threadId,
+        turnId: turn.turnId,
+      }
+    );
+  }
+
+  if (parentTurn.branchId !== turn.branchId) {
+    throw persistenceError(
+      "stored turns must reference a parent turn on the same branch",
+      "memory_backend_turn_parent_branch_mismatch",
+      {
+        branchId: turn.branchId,
+        parentBranchId: parentTurn.branchId,
+        parentTurnId: parentTurn.turnId,
         turnId: turn.turnId,
       }
     );
@@ -1981,17 +2007,17 @@ function assertTurnParentLink(
   }
 
   if (
-    !candidateTurns.some(
-      (candidateTurn) => candidateTurn.turnId === parentTurn.turnId
-    )
+    immediatelyPreviousTurn === undefined ||
+    immediatelyPreviousTurn.turnId !== parentTurn.turnId
   ) {
     throw persistenceError(
-      `${label} must reference a previous semantic turn that ends at record.startTurnNodeHash`,
-      "memory_backend_turn_parent_not_contiguous_predecessor",
+      `${label} must reference the immediately previous semantic turn on the same branch`,
+      "memory_backend_turn_parent_not_immediate_predecessor",
       {
         candidateParentTurnIds: candidateTurns.map(
           (candidateTurn) => candidateTurn.turnId
         ),
+        expectedParentTurnId: immediatelyPreviousTurn?.turnId ?? null,
         parentTurnId: parentTurn.turnId,
         turnId: turn.turnId,
       }
@@ -2595,7 +2621,9 @@ function areStoredObjectsEqual(
 ): boolean {
   return (
     left.hash === right.hash &&
+    left.mediaType === right.mediaType &&
     left.byteLength === right.byteLength &&
+    left.createdAtMs === right.createdAtMs &&
     areBytesEqual(left.bytes, right.bytes)
   );
 }
@@ -2618,6 +2646,7 @@ function areStoredTurnTreesEqual(
   return (
     left.hash === right.hash &&
     left.schemaId === right.schemaId &&
+    left.createdAtMs === right.createdAtMs &&
     areBytesEqual(left.manifestCbor, right.manifestCbor)
   );
 }
@@ -2629,6 +2658,7 @@ function areStoredOrderedPathChunksEqual(
   return (
     left.chunkHash === right.chunkHash &&
     left.itemCount === right.itemCount &&
+    left.createdAtMs === right.createdAtMs &&
     areBytesEqual(left.itemsCbor, right.itemsCbor)
   );
 }
@@ -2643,6 +2673,7 @@ function areStoredTurnNodesEqual(
     left.turnTreeHash === right.turnTreeHash &&
     left.schemaId === right.schemaId &&
     left.eventHash === right.eventHash &&
+    left.createdAtMs === right.createdAtMs &&
     areBytesEqual(
       left.consumedStagedResultsCbor,
       right.consumedStagedResultsCbor
@@ -2671,7 +2702,8 @@ function areStoredStagedResultsEqual(
     left.taskId !== right.taskId ||
     left.objectHash !== right.objectHash ||
     left.objectType !== right.objectType ||
-    left.status !== right.status
+    left.status !== right.status ||
+    left.createdAtMs !== right.createdAtMs
   ) {
     return false;
   }
