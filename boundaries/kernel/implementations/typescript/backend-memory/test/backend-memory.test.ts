@@ -22,12 +22,14 @@ import {
   hashOpaqueObjectBytes,
   hashTurnNodeIdentity,
   hashTurnTreeIdentity,
+  type KrakenBackendTx,
   type StagedResult,
   type StoredBranch,
   type StoredObject,
   type StoredOrderedPathChunk,
   type StoredRun,
   type StoredSchema,
+  type StoredStagedResult,
   type StoredThread,
   type StoredTurn,
   type StoredTurnNode,
@@ -66,6 +68,98 @@ registerBackendRecoverySuite({
 });
 
 describe("@kraken/backend-memory", () => {
+  test("rolls back failed transactions and clones stored bytes defensively", async () => {
+    const backend = createMemoryBackend();
+    const objectRecord = await createStoredObject(new Uint8Array([1, 2, 3]), 1);
+
+    await expect(
+      backend.transact(async (tx) => {
+        await tx.objects.put(objectRecord);
+        throw new Error("boom");
+      })
+    ).rejects.toThrow("boom");
+
+    await backend.transact(async (tx) => {
+      expect(await tx.objects.get(objectRecord.hash)).toBeNull();
+    });
+
+    await backend.transact(async (tx) => {
+      await tx.objects.put(objectRecord);
+    });
+
+    objectRecord.bytes[0] = 99;
+
+    await backend.transact(async (tx) => {
+      const firstRead = await tx.objects.get(objectRecord.hash);
+      if (firstRead === null) {
+        throw new Error("expected stored object");
+      }
+
+      firstRead.bytes[1] = 88;
+      const secondRead = await tx.objects.get(objectRecord.hash);
+      if (secondRead === null) {
+        throw new Error("expected stored object");
+      }
+
+      expect(Array.from(secondRead.bytes)).toEqual([1, 2, 3]);
+    });
+  });
+
+  test("serializes concurrent transactions and rejects nested transactions", async () => {
+    const backend = createMemoryBackend();
+    const order: string[] = [];
+
+    const firstTransaction = backend.transact(async () => {
+      order.push("first:start");
+      await delay(20);
+      order.push("first:end");
+    });
+    const secondTransaction = backend.transact(() => {
+      order.push("second:start");
+      order.push("second:end");
+      return Promise.resolve();
+    });
+
+    await Promise.all([firstTransaction, secondTransaction]);
+    expect(order).toEqual([
+      "first:start",
+      "first:end",
+      "second:start",
+      "second:end",
+    ]);
+
+    await expect(
+      backend.transact(async () => {
+        await backend.transact(async () => undefined);
+      })
+    ).rejects.toThrow("must not be nested");
+  });
+
+  test("rejects repository handle use after the transaction ends", async () => {
+    const backend = createMemoryBackend();
+    const objectRecord = await createStoredObject(new Uint8Array([1]), 1);
+    const escapedTransactions: KrakenBackendTx[] = [];
+
+    await backend.transact((tx) => {
+      escapedTransactions.push(tx);
+      return Promise.resolve();
+    });
+
+    const txHandle = escapedTransactions[0];
+
+    if (txHandle === undefined) {
+      throw new Error("expected escaped transaction handle");
+    }
+
+    await expect(txHandle.objects.put(objectRecord)).rejects.toBeInstanceOf(
+      KrakenPersistenceError
+    );
+
+    await backend.transact(async (tx) => {
+      expect(await tx.objects.get(objectRecord.hash)).toBeNull();
+    });
+  });
+
   test("stores schemas, turn trees, and path rows while promoting large ordered paths to chunked storage", async () => {
     const backend = createMemoryBackend({ now: createNowClock(10) });
     const schema = createSchema();
@@ -214,6 +308,188 @@ describe("@kraken/backend-memory", () => {
       ).toEqual(
         decodeDeterministicKernelRecord(secondMessages.orderedChunkListCbor)
       );
+    });
+  });
+
+  test("preserves deterministic list ordering for branches, runs, and staged results", async () => {
+    const backend = createMemoryBackend({ now: createNowClock(300) });
+    const schema = createSchema();
+    const schemaRecord = createStoredSchema(schema, 300);
+    const turnTree = await createStoredTurnTree(
+      schema,
+      {
+        "context.manifest": null,
+        messages: [],
+      },
+      301
+    );
+    const turnNode = await createStoredTurnNode({
+      consumedStagedResults: [],
+      createdAtMs: 302,
+      eventHash: null,
+      previousTurnNodeHash: null,
+      schemaId: schema.schemaId,
+      turnTreeHash: turnTree.hash,
+    });
+    const lateTurnNode = await createStoredTurnNode({
+      consumedStagedResults: [],
+      createdAtMs: 303,
+      eventHash: null,
+      previousTurnNodeHash: turnNode.hash,
+      schemaId: schema.schemaId,
+      turnTreeHash: turnTree.hash,
+    });
+    const thread: StoredThread = {
+      createdAtMs: 304,
+      rootTurnNodeHash: turnNode.hash,
+      schemaId: schema.schemaId,
+      threadId: "thread_ordering",
+    };
+    const earlyBranch: StoredBranch = {
+      branchId: "branch_b",
+      createdAtMs: 305,
+      headTurnNodeHash: turnNode.hash,
+      threadId: thread.threadId,
+      updatedAtMs: 305,
+    };
+    const lateBranch: StoredBranch = {
+      branchId: "branch_a",
+      createdAtMs: 306,
+      headTurnNodeHash: lateTurnNode.hash,
+      threadId: thread.threadId,
+      updatedAtMs: 306,
+    };
+    const stagedTurn: StoredTurn = {
+      branchId: earlyBranch.branchId,
+      createdAtMs: 306,
+      headTurnNodeHash: turnNode.hash,
+      parentTurnId: null,
+      startTurnNodeHash: turnNode.hash,
+      threadId: thread.threadId,
+      turnId: "turn_ordering_staged",
+      updatedAtMs: 306,
+    };
+    const orderedRunsTurn: StoredTurn = {
+      branchId: lateBranch.branchId,
+      createdAtMs: 306,
+      headTurnNodeHash: lateTurnNode.hash,
+      parentTurnId: null,
+      startTurnNodeHash: lateTurnNode.hash,
+      threadId: thread.threadId,
+      turnId: "turn_ordering_runs",
+      updatedAtMs: 307,
+    };
+    const stagedRun: StoredRun = {
+      branchId: earlyBranch.branchId,
+      createdAtMs: 307,
+      createdTurnNodesCbor: encodeDeterministicKernelRecord([turnNode.hash]),
+      currentStepIndex: 0,
+      runId: "run_staged",
+      schemaId: schema.schemaId,
+      startTurnNodeHash: turnNode.hash,
+      status: "running",
+      stepSequenceCbor: encodeDeterministicKernelRecord([
+        {
+          deterministic: false,
+          id: "model_call",
+          sideEffects: false,
+        },
+      ]),
+      turnId: stagedTurn.turnId,
+      updatedAtMs: 308,
+    };
+    const orderedRunB: StoredRun = {
+      branchId: lateBranch.branchId,
+      createdAtMs: 307,
+      createdTurnNodesCbor: encodeDeterministicKernelRecord([
+        lateTurnNode.hash,
+      ]),
+      currentStepIndex: 1,
+      runId: "run_b",
+      schemaId: schema.schemaId,
+      startTurnNodeHash: lateTurnNode.hash,
+      status: "completed",
+      stepSequenceCbor: encodeDeterministicKernelRecord([
+        {
+          deterministic: false,
+          id: "tool_execution",
+          sideEffects: true,
+        },
+      ]),
+      turnId: orderedRunsTurn.turnId,
+      updatedAtMs: 308,
+    };
+    const orderedRunA: StoredRun = {
+      ...orderedRunB,
+      runId: "run_a",
+    };
+    const objectA = await createStoredObject(new Uint8Array([1]), 309);
+    const objectB = await createStoredObject(new Uint8Array([2]), 310);
+    const stagedB: StoredStagedResult = {
+      createdAtMs: 311,
+      objectHash: objectB.hash,
+      objectType: "message",
+      runId: stagedRun.runId,
+      status: "completed",
+      taskId: "task_b",
+    };
+    const stagedA: StoredStagedResult = {
+      createdAtMs: 311,
+      objectHash: objectA.hash,
+      objectType: "message",
+      runId: stagedRun.runId,
+      status: "completed",
+      taskId: "task_a",
+    };
+
+    await backend.transact(async (tx) => {
+      await tx.schemas.put(schemaRecord);
+      await tx.turnTrees.put(turnTree);
+      await tx.turnTreePaths.putMany(
+        createCanonicalTurnTreePaths(turnTree, [])
+      );
+      await tx.turnNodes.put(turnNode);
+      await tx.turnNodes.put(lateTurnNode);
+      await tx.threads.put(thread);
+      await tx.branches.set(earlyBranch);
+      await tx.branches.set(lateBranch);
+      await tx.turns.set(stagedTurn);
+      await tx.turns.set(orderedRunsTurn);
+      await tx.runs.set(stagedRun);
+      await tx.runs.set({
+        ...orderedRunB,
+        status: "running",
+        currentStepIndex: 0,
+      });
+      await tx.runs.set(orderedRunB);
+      await tx.runs.set({
+        ...orderedRunA,
+        status: "running",
+        currentStepIndex: 0,
+      });
+      await tx.runs.set(orderedRunA);
+      await tx.objects.put(objectA);
+      await tx.objects.put(objectB);
+      await tx.stagedResults.set(stagedB);
+      await tx.stagedResults.set(stagedA);
+    });
+
+    await backend.transact(async (tx) => {
+      expect(
+        (await tx.branches.listByThread(thread.threadId)).map(
+          (branch) => branch.branchId
+        )
+      ).toEqual(["branch_b", "branch_a"]);
+      expect(
+        (await tx.runs.listByBranch(lateBranch.branchId)).map(
+          (run) => run.runId
+        )
+      ).toEqual(["run_a", "run_b"]);
+      expect(
+        (await tx.stagedResults.listByRun(stagedRun.runId)).map(
+          (stagedResult) => stagedResult.taskId
+        )
+      ).toEqual(["task_a", "task_b"]);
     });
   });
 
@@ -1965,6 +2241,12 @@ function createNowClock(initialValue: number): () => number {
     currentValue += 1;
     return nextValue;
   };
+}
+
+function delay(durationMs: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, durationMs);
+  });
 }
 
 function createCanonicalTurnTreePaths(

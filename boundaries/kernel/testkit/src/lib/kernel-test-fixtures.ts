@@ -196,20 +196,35 @@ export function delay(durationMs: number): Promise<void> {
 
 export function createCanonicalTurnTreePaths(
   turnTree: StoredTurnTree,
-  messages: string[]
+  manifest: TurnTreeManifest
 ): StoredTurnTreePath[] {
+  const messageHashes = manifest.messages;
+  const contextManifestHash = manifest["context.manifest"];
+
+  if (!Array.isArray(messageHashes)) {
+    throw new Error(
+      "manifest.messages must be an ordered hash array for the canonical kernel test schema"
+    );
+  }
+
+  if (typeof contextManifestHash !== "string" && contextManifestHash !== null) {
+    throw new Error(
+      'manifest["context.manifest"] must be a hash string or null for the canonical kernel test schema'
+    );
+  }
+
   return [
     {
       collectionKind: "single",
       path: "context.manifest",
-      singleHash: null,
+      singleHash: contextManifestHash,
       turnTreeHash: turnTree.hash,
     },
     {
       collectionKind: "ordered",
-      orderedCount: messages.length,
+      orderedCount: messageHashes.length,
       orderedEncoding: "flat",
-      orderedInlineCbor: encodeDeterministicKernelRecord(messages),
+      orderedInlineCbor: encodeDeterministicKernelRecord(messageHashes),
       path: "messages",
       turnTreeHash: turnTree.hash,
     },

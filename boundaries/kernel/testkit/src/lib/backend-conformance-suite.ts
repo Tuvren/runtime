@@ -17,7 +17,6 @@
 import { deepStrictEqual, rejects, strictEqual } from "node:assert/strict";
 import {
   encodeDeterministicKernelRecord,
-  type KrakenBackendTx,
   type StoredBranch,
   type StoredRun,
   type StoredStagedResult,
@@ -34,11 +33,9 @@ import {
   createStoredSchemaRecord,
   createStoredTurnNodeRecord,
   createStoredTurnTreeRecord,
-  delay,
 } from "./kernel-test-fixtures.js";
 
 const BOOM_ERROR_PATTERN = /boom/u;
-const NESTED_TRANSACTION_ERROR_PATTERN = /must not be nested/u;
 
 export function registerBackendConformanceSuite(
   options: BackendConformanceSuiteOptions
@@ -53,7 +50,7 @@ export function registerBackendConformanceSuite(
     });
 
     options.testApi.test(
-      "rolls back failed transactions and clones stored bytes defensively",
+      "rolls back failed transactions without partially visible writes",
       async () => {
         const backend = options.createBackend();
         const objectRecord = await createStoredObjectRecord(
@@ -77,86 +74,14 @@ export function registerBackendConformanceSuite(
           await tx.objects.put(objectRecord);
         });
 
-        objectRecord.bytes[0] = 99;
-
         await backend.transact(async (tx) => {
-          const firstRead = await tx.objects.get(objectRecord.hash);
-          if (firstRead === null) {
+          const storedObject = await tx.objects.get(objectRecord.hash);
+          if (storedObject === null) {
             throw new Error("expected stored object");
           }
 
-          firstRead.bytes[1] = 88;
-          const secondRead = await tx.objects.get(objectRecord.hash);
-          if (secondRead === null) {
-            throw new Error("expected stored object");
-          }
-
-          deepStrictEqual(Array.from(secondRead.bytes), [1, 2, 3]);
-        });
-      }
-    );
-
-    options.testApi.test(
-      "serializes concurrent transactions and rejects nested transactions",
-      async () => {
-        const backend = options.createBackend();
-        const order: string[] = [];
-
-        const firstTransaction = backend.transact(async () => {
-          order.push("first:start");
-          await delay(20);
-          order.push("first:end");
-        });
-        const secondTransaction = backend.transact(() => {
-          order.push("second:start");
-          order.push("second:end");
-          return Promise.resolve();
-        });
-
-        await Promise.all([firstTransaction, secondTransaction]);
-        deepStrictEqual(order, [
-          "first:start",
-          "first:end",
-          "second:start",
-          "second:end",
-        ]);
-
-        await rejects(
-          backend.transact(async () => {
-            await backend.transact(async () => undefined);
-          }),
-          NESTED_TRANSACTION_ERROR_PATTERN
-        );
-      }
-    );
-
-    options.testApi.test(
-      "rejects repository handle use after the transaction ends",
-      async () => {
-        const backend = options.createBackend();
-        const objectRecord = await createStoredObjectRecord(
-          new Uint8Array([1]),
-          1
-        );
-        const escapedTransactions: KrakenBackendTx[] = [];
-
-        await backend.transact((tx) => {
-          escapedTransactions.push(tx);
-          return Promise.resolve();
-        });
-
-        const txHandle = escapedTransactions[0];
-        if (txHandle === undefined) {
-          throw new Error("expected escaped transaction handle");
-        }
-
-        await rejects(
-          txHandle.objects.put(objectRecord),
-          KrakenPersistenceError
-        );
-
-        await backend.transact(async (tx) => {
-          strictEqual(await tx.objects.get(objectRecord.hash), null);
+          strictEqual(storedObject.hash, objectRecord.hash);
+          strictEqual(storedObject.byteLength, objectRecord.byteLength);
         });
       }
     );
@@ -248,7 +173,10 @@ export function registerBackendConformanceSuite(
           await tx.schemas.put(schemaRecord);
           await tx.turnTrees.put(turnTreeRecord);
           await tx.turnTreePaths.putMany(
-            createCanonicalTurnTreePaths(turnTreeRecord, [])
+            createCanonicalTurnTreePaths(turnTreeRecord, {
+              "context.manifest": null,
+              messages: [],
+            })
           );
           await tx.objects.put(eventObject);
           await tx.objects.put(stagedObject);
@@ -373,10 +301,16 @@ export function registerBackendConformanceSuite(
           await tx.turnTrees.put(turnTreeA);
           await tx.turnTrees.put(turnTreeB);
           await tx.turnTreePaths.putMany(
-            createCanonicalTurnTreePaths(turnTreeA, [])
+            createCanonicalTurnTreePaths(turnTreeA, {
+              "context.manifest": null,
+              messages: [],
+            })
           );
           await tx.turnTreePaths.putMany(
-            createCanonicalTurnTreePaths(turnTreeB, [createHashFromIndex(1)])
+            createCanonicalTurnTreePaths(turnTreeB, {
+              "context.manifest": null,
+              messages: [createHashFromIndex(1)],
+            })
           );
           await tx.turnNodes.put(rootNodeA);
           await tx.turnNodes.put(rootNodeB);

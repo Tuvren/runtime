@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-import { describe, test } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import { deepStrictEqual, strictEqual } from "node:assert/strict";
 import { encodeDeterministicKernelRecord } from "@kraken/kernel-contract-protocol";
 import {
@@ -25,6 +25,9 @@ import {
   createStoredSchemaRecord,
   createStoredTurnNodeRecord,
   createStoredTurnTreeRecord,
+  registerBackendConformanceSuite,
+  registerBackendInvariantSuite,
+  registerBackendRecoverySuite,
 } from "../src/index.ts";
 
 describe("@kraken/kernel-testkit fixtures", () => {
@@ -96,7 +99,10 @@ describe("@kraken/kernel-testkit fixtures", () => {
     );
 
     deepStrictEqual(
-      createCanonicalTurnTreePaths(storedTurnTree, [createHashFromIndex(1)]),
+      createCanonicalTurnTreePaths(storedTurnTree, {
+        "context.manifest": null,
+        messages: [createHashFromIndex(1)],
+      }),
       [
         {
           collectionKind: "single",
@@ -116,5 +122,52 @@ describe("@kraken/kernel-testkit fixtures", () => {
         },
       ]
     );
+  });
+
+  test("registers the shared suite entrypoints without executing them eagerly", () => {
+    const registrations: Array<{ kind: "describe" | "test"; name: string }> =
+      [];
+    const testApi = {
+      describe(name: string, register: () => void) {
+        registrations.push({ kind: "describe", name });
+        register();
+      },
+      test(name: string) {
+        registrations.push({ kind: "test", name });
+      },
+    };
+
+    registerBackendConformanceSuite({
+      createBackend: () => {
+        throw new Error("should not be called during registration");
+      },
+      suiteName: "conformance smoke",
+      testApi,
+    });
+    registerBackendInvariantSuite({
+      createBackend: () => {
+        throw new Error("should not be called during registration");
+      },
+      suiteName: "invariant smoke",
+      testApi,
+    });
+    registerBackendRecoverySuite({
+      createBackend: () => {
+        throw new Error("should not be called during registration");
+      },
+      suiteName: "recovery smoke",
+      testApi,
+    });
+
+    expect(
+      registrations.some((entry) => entry.name === "conformance smoke")
+    ).toBe(true);
+    expect(
+      registrations.some((entry) => entry.name === "invariant smoke")
+    ).toBe(true);
+    expect(registrations.some((entry) => entry.name === "recovery smoke")).toBe(
+      true
+    );
+    expect(registrations.some((entry) => entry.kind === "test")).toBe(true);
   });
 });

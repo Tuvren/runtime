@@ -14,7 +14,9 @@
   "types": "./dist/index.d.ts",
   "dependencies": {
     "@kraken/kernel-contract-protocol": "workspace:*",
-    "@kraken/kernel-testkit": "workspace:*",
     "@kraken/shared-core-types": "workspace:*"
+  },
+  "devDependencies": {
+    "@kraken/kernel-testkit": "workspace:*"
   }
 }

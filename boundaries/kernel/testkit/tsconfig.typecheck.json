@@ -16,7 +16,6 @@
     "src/**/*.ts",
     "test/**/*.ts",
     "../contracts/protocol/src/**/*.ts",
-    "../../shared/contracts/core-types/src/**/*.ts",
-    "../implementations/typescript/backend-memory/src/**/*.ts"
+    "../../shared/contracts/core-types/src/**/*.ts"
   ]
 }

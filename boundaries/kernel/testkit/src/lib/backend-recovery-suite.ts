@@ -215,7 +215,10 @@ export function registerBackendRecoverySuite(
           await tx.schemas.put(schemaRecord);
           await tx.turnTrees.put(rootTurnTree);
           await tx.turnTreePaths.putMany(
-            createCanonicalTurnTreePaths(rootTurnTree, [])
+            createCanonicalTurnTreePaths(rootTurnTree, {
+              "context.manifest": null,
+              messages: [],
+            })
           );
           await tx.turnNodes.put(rootTurnNode);
           await tx.threads.put(thread);
@@ -230,7 +233,10 @@ export function registerBackendRecoverySuite(
           backend.transact(async (tx) => {
             await tx.turnTrees.put(pausedTurnTree);
             await tx.turnTreePaths.putMany(
-              createCanonicalTurnTreePaths(pausedTurnTree, [firstObject.hash])
+              createCanonicalTurnTreePaths(pausedTurnTree, {
+                "context.manifest": null,
+                messages: [firstObject.hash],
+              })
             );
             await tx.turnNodes.put(pausedTurnNode);
             await tx.turns.set({
@@ -257,7 +263,10 @@ export function registerBackendRecoverySuite(
         await backend.transact(async (tx) => {
           await tx.turnTrees.put(pausedTurnTree);
           await tx.turnTreePaths.putMany(
-            createCanonicalTurnTreePaths(pausedTurnTree, [firstObject.hash])
+            createCanonicalTurnTreePaths(pausedTurnTree, {
+              "context.manifest": null,
+              messages: [firstObject.hash],
+            })
           );
           await tx.turnNodes.put(pausedTurnNode);
           await tx.turns.set({
@@ -288,10 +297,10 @@ export function registerBackendRecoverySuite(
         await backend.transact(async (tx) => {
           await tx.turnTrees.put(completedTurnTree);
           await tx.turnTreePaths.putMany(
-            createCanonicalTurnTreePaths(completedTurnTree, [
-              firstObject.hash,
-              secondObject.hash,
-            ])
+            createCanonicalTurnTreePaths(completedTurnTree, {
+              "context.manifest": null,
+              messages: [firstObject.hash, secondObject.hash],
+            })
           );
           await tx.turnNodes.put(completedTurnNode);
           await tx.turns.set({
@@ -384,10 +393,16 @@ export function registerBackendRecoverySuite(
           await tx.turnTrees.put(baseTree);
           await tx.turnTrees.put(siblingTree);
           await tx.turnTreePaths.putMany(
-            createCanonicalTurnTreePaths(baseTree, [])
+            createCanonicalTurnTreePaths(baseTree, {
+              "context.manifest": null,
+              messages: [],
+            })
           );
           await tx.turnTreePaths.putMany(
-            createCanonicalTurnTreePaths(siblingTree, [createHashFromIndex(1)])
+            createCanonicalTurnTreePaths(siblingTree, {
+              "context.manifest": null,
+              messages: [createHashFromIndex(1)],
+            })
           );
           await tx.turnNodes.put(rootNode);
           await tx.turnNodes.put(childNode);
@@ -510,7 +525,10 @@ export function registerBackendRecoverySuite(
           await tx.schemas.put(schemaRecord);
           await tx.turnTrees.put(turnTree);
           await tx.turnTreePaths.putMany(
-            createCanonicalTurnTreePaths(turnTree, [])
+            createCanonicalTurnTreePaths(turnTree, {
+              "context.manifest": null,
+              messages: [],
+            })
           );
           await tx.turnNodes.put(rootNode);
           await tx.turnNodes.put(middleNode);

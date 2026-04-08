@@ -189,7 +189,10 @@ export function registerBackendInvariantSuite(
           await tx.schemas.put(schemaRecord);
           await tx.turnTrees.put(turnTree);
           await tx.turnTreePaths.putMany(
-            createCanonicalTurnTreePaths(turnTree, [])
+            createCanonicalTurnTreePaths(turnTree, {
+              "context.manifest": null,
+              messages: [],
+            })
           );
           await tx.turnNodes.put(turnNode);
           await tx.turnNodes.put(lateTurnNode);
@@ -311,7 +314,10 @@ export function registerBackendInvariantSuite(
           await tx.schemas.put(schemaRecordB);
           await tx.turnTrees.put(turnTreeA);
           await tx.turnTreePaths.putMany(
-            createCanonicalTurnTreePaths(turnTreeA, [])
+            createCanonicalTurnTreePaths(turnTreeA, {
+              "context.manifest": null,
+              messages: [],
+            })
           );
           await tx.turnNodes.put(turnNodeA);
         });
@@ -403,7 +409,10 @@ export function registerBackendInvariantSuite(
           await tx.schemas.put(schemaRecord);
           await tx.turnTrees.put(turnTree);
           await tx.turnTreePaths.putMany(
-            createCanonicalTurnTreePaths(turnTree, [])
+            createCanonicalTurnTreePaths(turnTree, {
+              "context.manifest": null,
+              messages: [],
+            })
           );
           await tx.turnNodes.put(turnNode);
           await tx.threads.put(threadA);
@@ -514,7 +523,10 @@ export function registerBackendInvariantSuite(
           await tx.schemas.put(schemaRecordB);
           await tx.turnTrees.put(turnTree);
           await tx.turnTreePaths.putMany(
-            createCanonicalTurnTreePaths(turnTree, [])
+            createCanonicalTurnTreePaths(turnTree, {
+              "context.manifest": null,
+              messages: [],
+            })
           );
           await tx.turnNodes.put(rootNode);
           await tx.turnNodes.put(nextNode);
@@ -732,7 +744,10 @@ export function registerBackendInvariantSuite(
           await tx.schemas.put(schemaRecord);
           await tx.turnTrees.put(turnTree);
           await tx.turnTreePaths.putMany(
-            createCanonicalTurnTreePaths(turnTree, [])
+            createCanonicalTurnTreePaths(turnTree, {
+              "context.manifest": null,
+              messages: [],
+            })
           );
           await tx.turnNodes.put(turnNode);
           await tx.threads.put(thread);
@@ -767,7 +782,10 @@ export function registerBackendInvariantSuite(
           await tx.schemas.put(schemaRecord);
           await tx.turnTrees.put(turnTree);
           await tx.turnTreePaths.putMany(
-            createCanonicalTurnTreePaths(turnTree, [])
+            createCanonicalTurnTreePaths(turnTree, {
+              "context.manifest": null,
+              messages: [],
+            })
           );
           await tx.turnNodes.put(turnNode);
           await tx.threads.put(thread);
@@ -863,7 +881,10 @@ export function registerBackendInvariantSuite(
           await tx.schemas.put(schemaRecord);
           await tx.turnTrees.put(turnTree);
           await tx.turnTreePaths.putMany(
-            createCanonicalTurnTreePaths(turnTree, [])
+            createCanonicalTurnTreePaths(turnTree, {
+              "context.manifest": null,
+              messages: [],
+            })
           );
           await tx.turnNodes.put(rootNode);
           await tx.turnNodes.put(nextNode);
@@ -977,7 +998,10 @@ export function registerBackendInvariantSuite(
           await tx.schemas.put(schemaRecord);
           await tx.turnTrees.put(turnTree);
           await tx.turnTreePaths.putMany(
-            createCanonicalTurnTreePaths(turnTree, [])
+            createCanonicalTurnTreePaths(turnTree, {
+              "context.manifest": null,
+              messages: [],
+            })
           );
           await tx.turnNodes.put(rootNode);
           await tx.turnNodes.put(nextNode);
@@ -1080,7 +1104,10 @@ export function registerBackendInvariantSuite(
             await tx.schemas.put(schemaRecord);
             await tx.turnTrees.put(turnTree);
             await tx.turnTreePaths.putMany(
-              createCanonicalTurnTreePaths(turnTree, [])
+              createCanonicalTurnTreePaths(turnTree, {
+                "context.manifest": null,
+                messages: [],
+              })
             );
             await tx.turnNodes.put(rootNode);
             await tx.turnNodes.put(middleNode);
@@ -1108,7 +1135,10 @@ export function registerBackendInvariantSuite(
             await tx.schemas.put(schemaRecord);
             await tx.turnTrees.put(turnTree);
             await tx.turnTreePaths.putMany(
-              createCanonicalTurnTreePaths(turnTree, [])
+              createCanonicalTurnTreePaths(turnTree, {
+                "context.manifest": null,
+                messages: [],
+              })
             );
             await tx.turnNodes.put(
               await createStoredTurnNodeRecord({
@@ -1298,7 +1328,10 @@ async function createArchiveRollbackScenario(
     await tx.schemas.put(fixtures.schemaRecord);
     await tx.turnTrees.put(fixtures.turnTree);
     await tx.turnTreePaths.putMany(
-      createCanonicalTurnTreePaths(fixtures.turnTree, [])
+      createCanonicalTurnTreePaths(fixtures.turnTree, {
+        "context.manifest": null,
+        messages: [],
+      })
     );
     await tx.turnNodes.put(fixtures.rootNode);
     await tx.turnNodes.put(fixtures.middleNode);
