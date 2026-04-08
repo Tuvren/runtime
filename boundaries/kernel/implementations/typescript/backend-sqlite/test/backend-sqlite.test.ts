@@ -22,6 +22,7 @@ import {
 } from "node:assert/strict";
 import {
   copyFileSync,
+  existsSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -62,7 +63,11 @@ const MISSING_SCHEMA_ERROR_PATTERN =
 const MISSING_INDEX_ERROR_PATTERN =
   /applied migration without its required schema indexes/u;
 const NON_PERSISTENT_DATABASE_ERROR_PATTERN =
-  /requires a filesystem database path/u;
+  /requires a filesystem database path|non-empty filesystem database path/u;
+const NORMALIZED_ENGINE_ERROR_PATTERN =
+  /sqlite backend engine operation failed/u;
+const NORMALIZED_STARTUP_ERROR_PATTERN =
+  /sqlite backend engine operation failed|sqlite backend operation failed/u;
 const NORMALIZED_SQLITE_ERROR_PATTERN =
   /required schema tables|missing schema tables/u;
 const SCHEMA_MISMATCH_ERROR_PATTERN =
@@ -324,6 +329,42 @@ describe("@kraken/backend-sqlite", () => {
     );
   });
 
+  test("rejects empty-string temporary database paths as non-persistent", () => {
+    throws(
+      () => createSqliteBackend({ databasePath: "" }),
+      NON_PERSISTENT_DATABASE_ERROR_PATTERN
+    );
+  });
+
+  test("normalizes accepted file: paths to filesystem database files", {
+    concurrency: false,
+  }, async () => {
+    const tempDirectory = createTempDirectory("kraken-sqlite-uri-");
+    const originalCwd = process.cwd();
+    const relativeDatabasePath = "file:relative-uri.db";
+    const absoluteDatabasePath = `file:${join(tempDirectory, "absolute-uri.db")}`;
+
+    try {
+      process.chdir(tempDirectory);
+
+      const relativeBackend = createSqliteBackend({
+        databasePath: relativeDatabasePath,
+      });
+      const absoluteBackend = createSqliteBackend({
+        databasePath: absoluteDatabasePath,
+      });
+
+      deepStrictEqual(await relativeBackend.health(), { ok: true });
+      deepStrictEqual(await absoluteBackend.health(), { ok: true });
+
+      strictEqual(existsSync(join(tempDirectory, "relative-uri.db")), true);
+      strictEqual(existsSync(join(tempDirectory, relativeDatabasePath)), false);
+      strictEqual(existsSync(join(tempDirectory, "absolute-uri.db")), true);
+    } finally {
+      process.chdir(originalCwd);
+    }
+  });
+
   test("uses package-local migrations when cwd has unrelated SQL files", {
     concurrency: false,
   }, () => {
@@ -446,6 +487,13 @@ describe("@kraken/backend-sqlite", () => {
     const backend = runtimeModule.createSqliteBackend({ databasePath });
 
     deepStrictEqual(await backend.health(), { ok: true });
+  });
+
+  test("normalizes constructor open failures into backend persistence errors", () => {
+    throws(
+      () => createSqliteBackend({ databasePath: process.cwd() }),
+      NORMALIZED_STARTUP_ERROR_PATTERN
+    );
   });
 
   test("allows later migrations to extend baseline tables without revalidating them against 0001 exact shape", async () => {
@@ -695,6 +743,28 @@ describe("@kraken/backend-sqlite", () => {
     await rejects(
       backend.transact(async () => undefined),
       NORMALIZED_SQLITE_ERROR_PATTERN
+    );
+  });
+
+  test("normalizes SQLite engine write failures into backend persistence errors", async () => {
+    const databasePath = createTempDatabasePath();
+    const backend = createSqliteBackend({ databasePath });
+    const probe = new Database(databasePath);
+    probe.exec(`
+      CREATE TRIGGER objects_block_insert
+      BEFORE INSERT ON objects
+      BEGIN
+        SELECT RAISE(FAIL, 'blocked');
+      END;
+    `);
+    probe.close();
+    const objectRecord = await createStoredObjectRecord(new Uint8Array([9]), 1);
+
+    await rejects(
+      backend.transact(async (tx) => {
+        await tx.objects.put(objectRecord);
+      }),
+      NORMALIZED_ENGINE_ERROR_PATTERN
     );
   });
 

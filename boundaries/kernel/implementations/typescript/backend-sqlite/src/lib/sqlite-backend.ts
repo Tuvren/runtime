@@ -57,6 +57,7 @@ import {
   assertHashString,
   type EpochMs,
   KrakenPersistenceError,
+  KrakenValidationError,
 } from "@kraken/shared-core-types";
 import Database from "better-sqlite3";
 
@@ -824,13 +825,18 @@ class SqliteBackend implements KrakenBackend {
 
   constructor(options: SqliteBackendOptions) {
     this.now = options.now ?? Date.now;
-    assertPersistentDatabasePath(options.databasePath);
-    ensureDatabaseDirectory(options.databasePath);
-    this.db = new Database(options.databasePath, {
-      timeout: SQLITE_BUSY_TIMEOUT_MS,
-    });
-    configureDatabase(this.db);
-    runMigrations(this.db, this.now);
+    const databasePath = normalizePersistentDatabasePath(options.databasePath);
+
+    try {
+      ensureDatabaseDirectory(databasePath);
+      this.db = new Database(databasePath, {
+        timeout: SQLITE_BUSY_TIMEOUT_MS,
+      });
+      configureDatabase(this.db);
+      runMigrations(this.db, this.now);
+    } catch (error: unknown) {
+      throw normalizeBackendError(error);
+    }
   }
 
   private async queueConnectionWork<T>(work: () => Promise<T>): Promise<T> {
@@ -853,7 +859,7 @@ class SqliteBackend implements KrakenBackend {
   health(): Promise<{ ok: true } | { ok: false; reason: string }> {
     return this.queueConnectionWork(async () => {
       try {
-        this.db.exec("BEGIN");
+        this.db.exec("BEGIN IMMEDIATE");
         await loadValidatedState(this.db);
         this.db.exec("ROLLBACK");
         return { ok: true as const };
@@ -1580,12 +1586,18 @@ function createRepositories(
 }
 
 function ensureDatabaseDirectory(databasePath: string): void {
-  mkdirSync(dirname(resolveFilesystemDatabasePath(databasePath)), {
-    recursive: true,
-  });
+  mkdirSync(dirname(databasePath), { recursive: true });
 }
 
 function assertPersistentDatabasePath(databasePath: string): void {
+  if (databasePath.length === 0) {
+    throw persistenceError(
+      "sqlite persistent backend requires a non-empty filesystem database path",
+      "sqlite_backend_requires_persistent_database_path",
+      { databasePath }
+    );
+  }
+
   if (databasePath === SQLITE_TRANSIENT_MEMORY_PATH) {
     throw persistenceError(
       "sqlite persistent backend requires a filesystem database path instead of :memory:",
@@ -1610,12 +1622,23 @@ function assertPersistentDatabasePath(databasePath: string): void {
   );
 }
 
+function normalizePersistentDatabasePath(databasePath: string): string {
+  assertPersistentDatabasePath(databasePath);
+  return resolveFilesystemDatabasePath(databasePath);
+}
+
 function resolveFilesystemDatabasePath(databasePath: string): string {
   if (!databasePath.startsWith("file:")) {
     return databasePath;
   }
 
-  return fileURLToPath(new URL(databasePath));
+  const [pathComponent] = databasePath.slice("file:".length).split("?", 1);
+
+  if (pathComponent.startsWith("//")) {
+    return fileURLToPath(new URL(databasePath));
+  }
+
+  return decodeURIComponent(pathComponent);
 }
 
 async function insertTurnTreePathBatchEntry(
@@ -3010,11 +3033,36 @@ function normalizeBackendError(error: unknown): Error {
     return error;
   }
 
-  if (error instanceof Error) {
+  if (error instanceof KrakenValidationError) {
     return error;
   }
 
-  return new Error(String(error));
+  if (error instanceof Error) {
+    const sqliteCode =
+      typeof Reflect.get(error, "code") === "string"
+        ? (Reflect.get(error, "code") as string)
+        : undefined;
+
+    if (sqliteCode?.startsWith("SQLITE_") === true) {
+      return persistenceError(
+        `sqlite backend engine operation failed: ${error.message}`,
+        "sqlite_backend_engine_error",
+        {
+          message: error.message,
+          sqliteCode,
+        },
+        error
+      );
+    }
+
+    return error;
+  }
+
+  return persistenceError(
+    "sqlite backend operation failed",
+    "sqlite_backend_operation_failed",
+    { value: String(error) }
+  );
 }
 
 function getErrorMessage(error: unknown): string {
@@ -5218,7 +5266,8 @@ function areBytesEqual(left: Uint8Array, right: Uint8Array): boolean {
 function persistenceError(
   message: string,
   code: string,
-  details?: unknown
+  details?: unknown,
+  cause?: unknown
 ): KrakenPersistenceError {
-  return new KrakenPersistenceError(message, { code, details });
+  return new KrakenPersistenceError(message, { cause, code, details });
 }
