@@ -11,6 +11,7 @@
       "@kraken/kernel-contract-protocol": [
         "../../../contracts/protocol/src/index.ts"
       ],
+      "@kraken/kernel-testkit": ["../../../testkit/src/index.ts"],
       "@kraken/backend-memory": ["./src/index.ts"]
     },
     "types": ["bun", "node"]
@@ -19,6 +20,7 @@
     "src/**/*.ts",
     "test/**/*.ts",
     "../../../contracts/protocol/src/**/*.ts",
+    "../../../testkit/src/**/*.ts",
     "../../../../shared/contracts/core-types/src/**/*.ts"
   ]
 }

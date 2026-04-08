@@ -14,6 +14,17 @@
  * limitations under the License.
  */
 
-export type { MemoryBackendOptions } from "./lib/memory-backend.js";
-// biome-ignore lint/performance/noBarrelFile: This package entrypoint is the intentional public contract surface.
-export { createMemoryBackend } from "./lib/memory-backend.js";
+import type { KrakenBackend } from "@kraken/kernel-contract-protocol";
+
+export interface BackendTestSuiteApi {
+  describe(name: string, register: () => void): void;
+  test(name: string, run: () => Promise<void> | void): void;
+}
+
+export type BackendFactory = () => KrakenBackend;
+
+export interface BackendConformanceSuiteOptions {
+  createBackend: BackendFactory;
+  suiteName?: string;
+  testApi: BackendTestSuiteApi;
+}

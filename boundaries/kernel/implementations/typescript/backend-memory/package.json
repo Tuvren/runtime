@@ -15,5 +15,8 @@
   "dependencies": {
     "@kraken/kernel-contract-protocol": "workspace:*",
     "@kraken/shared-core-types": "workspace:*"
+  },
+  "devDependencies": {
+    "@kraken/kernel-testkit": "workspace:*"
   }
 }

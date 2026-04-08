@@ -673,12 +673,10 @@ export interface KrakenBackendTx {
   stagedResults: StagedResultRepository;
 }
 
-export interface MemoryBackendOptions {
-  now?: () => EpochMs;
-}
-
 export declare function createMemoryBackend(
-  options?: MemoryBackendOptions
+  options?: {
+    now?: () => EpochMs;
+  }
 ): KrakenBackend;
 ```
 

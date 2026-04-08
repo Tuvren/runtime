@@ -37,7 +37,6 @@ import {
   hashKernelRecord,
   type KrakenBackend,
   type KrakenBackendTx,
-  type MemoryBackendOptions,
   type StoredBranch,
   type StoredObject,
   type StoredOrderedPathChunk,
@@ -53,6 +52,7 @@ import {
 } from "@kraken/kernel-contract-protocol";
 import {
   assertHashString,
+  type EpochMs,
   KrakenPersistenceError,
 } from "@kraken/shared-core-types";
 
@@ -75,6 +75,10 @@ interface BackendState {
 
 interface MutableRepositories extends KrakenBackendTx {
   readonly now: () => number;
+}
+
+export interface MemoryBackendOptions {
+  now?: () => EpochMs;
 }
 
 class MemoryBackend implements KrakenBackend {
@@ -215,21 +219,6 @@ function createRepositories(
                 branchId: record.branchId,
                 branchThreadId: record.threadId,
                 sourceThreadId: sourceBranch.threadId,
-              }
-            );
-          }
-
-          if (
-            existingBranch === undefined &&
-            record.headTurnNodeHash !== sourceBranch.headTurnNodeHash
-          ) {
-            throw persistenceError(
-              "new archive branches must preserve the source branch head they reference",
-              "memory_backend_branch_archive_head_mismatch",
-              {
-                archivedFromBranchId: sourceBranch.branchId,
-                archiveHeadTurnNodeHash: record.headTurnNodeHash,
-                sourceHeadTurnNodeHash: sourceBranch.headTurnNodeHash,
               }
             );
           }
@@ -420,14 +409,6 @@ function createRepositories(
                 runId: record.runId,
                 startTurnNodeHash: record.startTurnNodeHash,
               }
-            );
-          }
-
-          if (record.status === "running" || record.status === "paused") {
-            assertBranchHasNoOtherActiveRuns(
-              state,
-              record.branchId,
-              record.runId
             );
           }
         } else {
@@ -753,8 +734,6 @@ function createRepositories(
           );
         }
 
-        assertTurnParentLink(state, record, "record.parentTurnId");
-
         const existingTurn = state.turns.get(record.turnId);
         if (existingTurn !== undefined) {
           assertImmutableField(
@@ -837,6 +816,8 @@ function validateCommittedState(
 }
 
 function validateThreadInvariants(state: BackendState): void {
+  const rootTurnNodeOwners = new Map<string, string>();
+
   for (const thread of state.threads.values()) {
     const rootTurnNode = ensureTurnNodeExists(
       state,
@@ -868,6 +849,26 @@ function validateThreadInvariants(state: BackendState): void {
         }
       );
     }
+
+    const existingOwnerThreadId = rootTurnNodeOwners.get(
+      thread.rootTurnNodeHash
+    );
+    if (
+      existingOwnerThreadId !== undefined &&
+      existingOwnerThreadId !== thread.threadId
+    ) {
+      throw persistenceError(
+        "stored thread roots must be unique across threads",
+        "memory_backend_thread_root_not_unique",
+        {
+          existingOwnerThreadId,
+          rootTurnNodeHash: thread.rootTurnNodeHash,
+          threadId: thread.threadId,
+        }
+      );
+    }
+
+    rootTurnNodeOwners.set(thread.rootTurnNodeHash, thread.threadId);
   }
 }
 
@@ -916,6 +917,20 @@ function validateBranchInvariants(
     const sourceBranchBeforeTransaction = baseState.branches.get(
       branch.archivedFromBranchId
     );
+
+    if (
+      existingBranch === undefined &&
+      sourceBranchBeforeTransaction === undefined
+    ) {
+      throw persistenceError(
+        "new archive branches must reference a source branch that existed before the transaction",
+        "memory_backend_branch_archive_source_missing_before_transaction",
+        {
+          archivedFromBranchId: branch.archivedFromBranchId,
+          branchId: branch.branchId,
+        }
+      );
+    }
 
     if (
       existingBranch === undefined &&
@@ -1108,6 +1123,8 @@ function validateRunInvariants(state: BackendState): void {
       );
     }
 
+    assertRunCreatedTurnNodesAreCanonical(state, run);
+
     if (run.status === "running" || run.status === "paused") {
       const currentActiveCount = activeRunCounts.get(run.branchId) ?? 0;
       activeRunCounts.set(run.branchId, currentActiveCount + 1);
@@ -1236,13 +1253,25 @@ async function normalizeStoredTurnTreePath(
       "record.orderedChunkListCbor"
     );
 
+    if (record.orderedCount <= ORDERED_PATH_CHUNK_THRESHOLD) {
+      throw persistenceError(
+        "chunked ordered turn tree paths must only be used after crossing the promotion threshold",
+        "memory_backend_chunked_turn_tree_path_below_threshold",
+        {
+          orderedCount: record.orderedCount,
+          threshold: ORDERED_PATH_CHUNK_THRESHOLD,
+        }
+      );
+    }
+
     let totalCount = 0;
-    for (const chunkHash of chunkHashes) {
+    for (const [index, chunkHash] of chunkHashes.entries()) {
       const chunk = ensureOrderedPathChunkExists(
         state,
         chunkHash,
         "record.orderedChunkListCbor"
       );
+      assertChunkedTurnTreePathChunkLayout(chunk, index, chunkHashes.length);
       totalCount += chunk.itemCount;
     }
 
@@ -1608,30 +1637,6 @@ function encodeHashStringArray(hashes: string[]): Uint8Array {
   );
 }
 
-function assertBranchHasNoOtherActiveRuns(
-  state: BackendState,
-  branchId: string,
-  runId: string
-): void {
-  for (const run of state.runs.values()) {
-    if (
-      run.branchId === branchId &&
-      run.runId !== runId &&
-      (run.status === "running" || run.status === "paused")
-    ) {
-      throw persistenceError(
-        "stored branches must not have more than one active run",
-        "memory_backend_multiple_active_runs",
-        {
-          branchId,
-          conflictingRunId: run.runId,
-          runId,
-        }
-      );
-    }
-  }
-}
-
 function assertRunUpdateIsLegal(
   existingRun: StoredRun,
   nextRun: StoredRun
@@ -1864,6 +1869,61 @@ function assertRunCreatedTurnNodeWithinTurnSpan(
   }
 }
 
+function assertRunCreatedTurnNodesAreCanonical(
+  state: BackendState,
+  run: StoredRun
+): void {
+  const createdTurnNodeHashes = decodeRunCreatedTurnNodeHashes(run);
+  const seenTurnNodeHashes = new Set<string>();
+  let previousTurnNodeHash = run.startTurnNodeHash;
+
+  for (const [index, turnNodeHash] of createdTurnNodeHashes.entries()) {
+    if (seenTurnNodeHashes.has(turnNodeHash)) {
+      throw persistenceError(
+        "stored runs must keep createdTurnNodesCbor unique",
+        "memory_backend_run_created_turn_nodes_duplicate",
+        {
+          duplicateTurnNodeHash: turnNodeHash,
+          index,
+          runId: run.runId,
+        }
+      );
+    }
+
+    const relationship = classifyTurnNodeRelationship(
+      state,
+      previousTurnNodeHash,
+      turnNodeHash
+    );
+
+    const createdTurnNode = ensureTurnNodeExists(
+      state,
+      turnNodeHash,
+      "run.createdTurnNodesCbor"
+    );
+    const isImmediateNextTurnNode =
+      createdTurnNode.previousTurnNodeHash === previousTurnNodeHash;
+
+    if (relationship !== "same" && !isImmediateNextTurnNode) {
+      throw persistenceError(
+        "stored runs must keep createdTurnNodesCbor as a canonical contiguous lineage",
+        "memory_backend_run_created_turn_nodes_not_contiguous",
+        {
+          createdTurnNodePreviousTurnNodeHash:
+            createdTurnNode.previousTurnNodeHash,
+          index,
+          previousTurnNodeHash,
+          runId: run.runId,
+          turnNodeHash,
+        }
+      );
+    }
+
+    seenTurnNodeHashes.add(turnNodeHash);
+    previousTurnNodeHash = turnNodeHash;
+  }
+}
+
 function assertTurnParentLink(
   state: BackendState,
   turn: StoredTurn,
@@ -1874,11 +1934,14 @@ function assertTurnParentLink(
     turn.threadId,
     turn.turnId
   ).filter(
-    (candidateTurn) => candidateTurn.headTurnNodeHash === turn.startTurnNodeHash
+    (candidateTurn) =>
+      candidateTurn.branchId === turn.branchId &&
+      candidateTurn.headTurnNodeHash === turn.startTurnNodeHash
   );
+  const immediatelyPreviousTurn = candidateTurns.at(-1);
 
   if (turn.parentTurnId === null) {
-    if (candidateTurns.length === 0) {
+    if (immediatelyPreviousTurn === undefined) {
       return;
     }
 
@@ -1904,6 +1967,19 @@ function assertTurnParentLink(
       {
         parentThreadId: parentTurn.threadId,
         threadId: turn.threadId,
+        turnId: turn.turnId,
+      }
+    );
+  }
+
+  if (parentTurn.branchId !== turn.branchId) {
+    throw persistenceError(
+      "stored turns must reference a parent turn on the same branch",
+      "memory_backend_turn_parent_branch_mismatch",
+      {
+        branchId: turn.branchId,
+        parentBranchId: parentTurn.branchId,
+        parentTurnId: parentTurn.turnId,
         turnId: turn.turnId,
       }
     );
@@ -1935,17 +2011,17 @@ function assertTurnParentLink(
   }
 
   if (
-    !candidateTurns.some(
-      (candidateTurn) => candidateTurn.turnId === parentTurn.turnId
-    )
+    immediatelyPreviousTurn === undefined ||
+    immediatelyPreviousTurn.turnId !== parentTurn.turnId
   ) {
     throw persistenceError(
-      `${label} must reference a previous semantic turn that ends at record.startTurnNodeHash`,
-      "memory_backend_turn_parent_not_contiguous_predecessor",
+      `${label} must reference the immediately previous semantic turn on the same branch`,
+      "memory_backend_turn_parent_not_immediate_predecessor",
       {
         candidateParentTurnIds: candidateTurns.map(
           (candidateTurn) => candidateTurn.turnId
         ),
+        expectedParentTurnId: immediatelyPreviousTurn?.turnId ?? null,
         parentTurnId: parentTurn.turnId,
         turnId: turn.turnId,
       }
@@ -1990,7 +2066,7 @@ function assertBackwardBranchMoveIsArchived(
     );
   }
 
-  for (const run of baseState.runs.values()) {
+  for (const run of state.runs.values()) {
     if (
       run.branchId !== nextBranch.branchId ||
       (run.status !== "running" && run.status !== "paused")
@@ -1998,19 +2074,24 @@ function assertBackwardBranchMoveIsArchived(
       continue;
     }
 
-    const finalRun = ensureRunExists(state, run.runId, "run.runId");
+    const activeTurnNodeHash = getRunActiveTurnNodeHash(run);
 
-    if (finalRun.status !== "failed") {
-      throw persistenceError(
-        "stored backward branch moves must fail active runs from the abandoned segment",
-        "memory_backend_backward_branch_move_active_run_not_failed",
-        {
-          branchId: nextBranch.branchId,
-          runId: run.runId,
-          status: finalRun.status,
-        }
-      );
+    if (activeTurnNodeHash === nextBranch.headTurnNodeHash) {
+      continue;
     }
+
+    throw persistenceError(
+      "stored backward branch moves must fail active runs from the abandoned segment",
+      "memory_backend_backward_branch_move_active_run_not_failed",
+      {
+        activeTurnNodeHash,
+        branchHeadTurnNodeHash: nextBranch.headTurnNodeHash,
+        branchId: nextBranch.branchId,
+        runId: run.runId,
+        startTurnNodeHash: run.startTurnNodeHash,
+        status: run.status,
+      }
+    );
   }
 }
 
@@ -2076,6 +2157,43 @@ function decodeRunCreatedTurnNodeHashes(run: StoredRun): string[] {
     run.createdTurnNodesCbor,
     "run.createdTurnNodesCbor"
   );
+}
+
+function getRunActiveTurnNodeHash(run: StoredRun): string {
+  const createdTurnNodeHashes = decodeRunCreatedTurnNodeHashes(run);
+  return createdTurnNodeHashes.at(-1) ?? run.startTurnNodeHash;
+}
+
+function assertChunkedTurnTreePathChunkLayout(
+  chunk: StoredOrderedPathChunk,
+  index: number,
+  totalChunks: number
+): void {
+  if (chunk.itemCount < 1 || chunk.itemCount > ORDERED_PATH_CHUNK_SIZE) {
+    throw persistenceError(
+      "ordered path chunks must contain between one and the fixed chunk size number of items",
+      "memory_backend_ordered_path_chunk_size_invalid",
+      {
+        chunkHash: chunk.chunkHash,
+        chunkItemCount: chunk.itemCount,
+        chunkSize: ORDERED_PATH_CHUNK_SIZE,
+      }
+    );
+  }
+
+  if (index < totalChunks - 1 && chunk.itemCount !== ORDERED_PATH_CHUNK_SIZE) {
+    throw persistenceError(
+      "non-final ordered path chunks must use the fixed chunk size",
+      "memory_backend_ordered_path_chunk_not_fixed_size",
+      {
+        chunkHash: chunk.chunkHash,
+        chunkIndex: index,
+        chunkItemCount: chunk.itemCount,
+        chunkSize: ORDERED_PATH_CHUNK_SIZE,
+        totalChunks,
+      }
+    );
+  }
 }
 
 function decodeTurnNodeConsumedStagedResultObjectHashes(
@@ -2509,6 +2627,7 @@ function areStoredObjectsEqual(
     left.hash === right.hash &&
     left.mediaType === right.mediaType &&
     left.byteLength === right.byteLength &&
+    left.createdAtMs === right.createdAtMs &&
     areBytesEqual(left.bytes, right.bytes)
   );
 }
@@ -2531,6 +2650,7 @@ function areStoredTurnTreesEqual(
   return (
     left.hash === right.hash &&
     left.schemaId === right.schemaId &&
+    left.createdAtMs === right.createdAtMs &&
     areBytesEqual(left.manifestCbor, right.manifestCbor)
   );
 }
@@ -2542,6 +2662,7 @@ function areStoredOrderedPathChunksEqual(
   return (
     left.chunkHash === right.chunkHash &&
     left.itemCount === right.itemCount &&
+    left.createdAtMs === right.createdAtMs &&
     areBytesEqual(left.itemsCbor, right.itemsCbor)
   );
 }
@@ -2556,6 +2677,7 @@ function areStoredTurnNodesEqual(
     left.turnTreeHash === right.turnTreeHash &&
     left.schemaId === right.schemaId &&
     left.eventHash === right.eventHash &&
+    left.createdAtMs === right.createdAtMs &&
     areBytesEqual(
       left.consumedStagedResultsCbor,
       right.consumedStagedResultsCbor
@@ -2584,7 +2706,8 @@ function areStoredStagedResultsEqual(
     left.taskId !== right.taskId ||
     left.objectHash !== right.objectHash ||
     left.objectType !== right.objectType ||
-    left.status !== right.status
+    left.status !== right.status ||
+    left.createdAtMs !== right.createdAtMs
   ) {
     return false;
   }
