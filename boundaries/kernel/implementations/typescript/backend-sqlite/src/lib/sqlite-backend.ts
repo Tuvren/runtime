@@ -236,6 +236,7 @@ class SqliteBackend implements KrakenBackend {
     try {
       this.db.exec("BEGIN IMMEDIATE");
       const baseState = loadState(this.db);
+      await validateLoadedState(baseState);
       let active = true;
       const repositories = createRepositories(
         this.db,
@@ -248,7 +249,9 @@ class SqliteBackend implements KrakenBackend {
           work(repositories)
         );
         active = false;
-        validateCommittedState(loadState(this.db), baseState);
+        const committedState = loadState(this.db);
+        await validateLoadedState(committedState);
+        validateCommittedState(committedState, baseState);
         this.db.exec("COMMIT");
         return result;
       } catch (error: unknown) {
@@ -1594,30 +1597,35 @@ function insertOrderedPathChunk(
 }
 
 function decodeObjectRow(row: SqliteObjectRow): StoredObject {
-  return {
+  const record: StoredObject = {
     byteLength: row.byte_length,
     bytes: cloneBytes(toUint8Array(row.bytes)),
     createdAtMs: row.created_at_ms,
     hash: row.hash,
     mediaType: row.media_type,
   };
+  assertStoredObject(record, "stored object row");
+  return record;
 }
 
 function decodeSchemaRow(row: SqliteSchemaRow): StoredSchema {
-  return {
+  const record: StoredSchema = {
     createdAtMs: row.created_at_ms,
     schemaCbor: cloneEncodedBytes(toUint8Array(row.schema_cbor)),
     schemaId: row.schema_id,
   };
+  assertStoredSchema(record, "stored schema row");
+  return record;
 }
 
 function decodeTurnTreeRow(row: SqliteTurnTreeRow): StoredTurnTree {
-  return {
+  const record: StoredTurnTree = {
     createdAtMs: row.created_at_ms,
     hash: row.hash,
     manifestCbor: cloneEncodedBytes(toUint8Array(row.manifest_cbor)),
     schemaId: row.schema_id,
   };
+  return record;
 }
 
 function decodeTurnTreePathRow(row: SqliteTurnTreePathRow): StoredTurnTreePath {
@@ -1714,7 +1722,7 @@ function decodeOrderedPathChunkRow(
 }
 
 function decodeTurnNodeRow(row: SqliteTurnNodeRow): StoredTurnNode {
-  return {
+  const record: StoredTurnNode = {
     consumedStagedResultsCbor: cloneEncodedBytes(
       toUint8Array(row.consumed_staged_results_cbor)
     ),
@@ -1725,19 +1733,23 @@ function decodeTurnNodeRow(row: SqliteTurnNodeRow): StoredTurnNode {
     schemaId: row.schema_id,
     turnTreeHash: row.turn_tree_hash,
   };
+  assertStoredTurnNode(record, "stored turn node row");
+  return record;
 }
 
 function decodeThreadRow(row: SqliteThreadRow): StoredThread {
-  return {
+  const record: StoredThread = {
     createdAtMs: row.created_at_ms,
     rootTurnNodeHash: row.root_turn_node_hash,
     schemaId: row.schema_id,
     threadId: row.thread_id,
   };
+  assertStoredThread(record, "stored thread row");
+  return record;
 }
 
 function decodeBranchRow(row: SqliteBranchRow): StoredBranch {
-  return {
+  const record: StoredBranch = {
     ...(row.archived_from_branch_id === null
       ? {}
       : { archivedFromBranchId: row.archived_from_branch_id }),
@@ -1747,10 +1759,12 @@ function decodeBranchRow(row: SqliteBranchRow): StoredBranch {
     threadId: row.thread_id,
     updatedAtMs: row.updated_at_ms,
   };
+  assertStoredBranch(record, "stored branch row");
+  return record;
 }
 
 function decodeTurnRow(row: SqliteTurnRow): StoredTurn {
-  return {
+  const record: StoredTurn = {
     branchId: row.branch_id,
     createdAtMs: row.created_at_ms,
     headTurnNodeHash: row.head_turn_node_hash,
@@ -1760,12 +1774,14 @@ function decodeTurnRow(row: SqliteTurnRow): StoredTurn {
     turnId: row.turn_id,
     updatedAtMs: row.updated_at_ms,
   };
+  assertStoredTurn(record, "stored turn row");
+  return record;
 }
 
 function decodeRunRow(row: SqliteRunRow): StoredRun {
   const status = decodeStoredRunStatus(row.status, row.run_id);
 
-  return {
+  const record: StoredRun = {
     branchId: row.branch_id,
     createdAtMs: row.created_at_ms,
     createdTurnNodesCbor: cloneEncodedBytes(
@@ -1780,6 +1796,8 @@ function decodeRunRow(row: SqliteRunRow): StoredRun {
     turnId: row.turn_id,
     updatedAtMs: row.updated_at_ms,
   };
+  assertStoredRun(record, "stored run row");
+  return record;
 }
 
 function decodeStagedResultRow(row: SqliteStagedResultRow): StoredStagedResult {
@@ -1792,7 +1810,7 @@ function decodeStagedResultRow(row: SqliteStagedResultRow): StoredStagedResult {
       );
     }
 
-    return {
+    const record: StoredStagedResult = {
       createdAtMs: row.created_at_ms,
       interruptPayloadCbor: cloneEncodedBytes(
         toUint8Array(row.interrupt_payload_cbor)
@@ -1803,6 +1821,8 @@ function decodeStagedResultRow(row: SqliteStagedResultRow): StoredStagedResult {
       status: "interrupted",
       taskId: row.task_id,
     };
+    assertStoredStagedResult(record, "stored staged result row");
+    return record;
   }
 
   if (row.interrupt_payload_cbor !== null) {
@@ -1821,7 +1841,7 @@ function decodeStagedResultRow(row: SqliteStagedResultRow): StoredStagedResult {
     );
   }
 
-  return {
+  const record: StoredStagedResult = {
     createdAtMs: row.created_at_ms,
     objectHash: row.object_hash,
     objectType: row.object_type,
@@ -1829,6 +1849,8 @@ function decodeStagedResultRow(row: SqliteStagedResultRow): StoredStagedResult {
     status: row.status,
     taskId: row.task_id,
   };
+  assertStoredStagedResult(record, "stored staged result row");
+  return record;
 }
 
 function decodeStoredNonNegativeInteger(
@@ -1910,6 +1932,78 @@ function createEmptyState(): BackendState {
     turnTrees: new Map(),
     turns: new Map(),
   };
+}
+
+async function validateLoadedState(state: BackendState): Promise<void> {
+  for (const objectRecord of state.objects.values()) {
+    await assertStoredObjectIdentity(objectRecord, "stored object row");
+  }
+
+  for (const schemaRecord of state.schemas.values()) {
+    assertStoredSchema(schemaRecord, "stored schema row");
+  }
+
+  for (const turnTree of state.turnTrees.values()) {
+    const schema = getSchemaForSchemaId(
+      state,
+      turnTree.schemaId,
+      "turnTree.schemaId"
+    );
+    await assertStoredTurnTreeIdentity(
+      turnTree,
+      schema,
+      "stored turn tree row"
+    );
+  }
+
+  for (const chunkRecord of state.orderedPathChunks.values()) {
+    await assertStoredOrderedPathChunkIdentity(
+      chunkRecord,
+      "stored ordered path chunk row"
+    );
+  }
+
+  for (const storedPaths of state.turnTreePaths.values()) {
+    for (const storedPath of storedPaths.values()) {
+      const turnTree = ensureTurnTreeExists(
+        state,
+        storedPath.turnTreeHash,
+        "turnTreePath.turnTreeHash"
+      );
+      const schema = getSchemaForSchemaId(
+        state,
+        turnTree.schemaId,
+        "turnTree.schemaId"
+      );
+      assertStoredTurnTreePath(storedPath, schema, "stored turn tree path row");
+    }
+  }
+
+  for (const turnNode of state.turnNodes.values()) {
+    await assertStoredTurnNodeIdentity(turnNode, "stored turn node row");
+  }
+
+  for (const thread of state.threads.values()) {
+    assertStoredThread(thread, "stored thread row");
+  }
+
+  for (const branch of state.branches.values()) {
+    assertStoredBranch(branch, "stored branch row");
+  }
+
+  for (const turn of state.turns.values()) {
+    assertStoredTurn(turn, "stored turn row");
+  }
+
+  for (const run of state.runs.values()) {
+    assertStoredRun(run, "stored run row");
+  }
+
+  for (const stagedResults of state.stagedResults.values()) {
+    for (const stagedResult of stagedResults.values()) {
+      assertStoredStagedResult(stagedResult, "stored staged result row");
+    }
+  }
 }
 
 function validateCommittedState(

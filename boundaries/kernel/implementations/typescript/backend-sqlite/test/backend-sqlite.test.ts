@@ -56,11 +56,17 @@ import { createSqliteBackend } from "../src/index.js";
 const NESTED_TRANSACTION_ERROR_PATTERN = /must not be nested/u;
 const MIGRATION_CONFLICT_ERROR_PATTERN = /table turn_trees already exists/u;
 const RUN_STATUS_ERROR_PATTERN = /valid run status/u;
+const RUN_SHAPE_ERROR_PATTERN = /currentStepIndex/u;
 const STAGED_RESULT_ROW_ERROR_PATTERN =
   /valid staged result status|interrupt_payload_cbor/u;
 const TURN_TREE_PATH_ROW_ERROR_PATTERN = /valid ordered or single variant/u;
 const ORDERED_CARDINALITY_ERROR_PATTERN =
-  /orderedCount aligned|item_count aligned/u;
+  /orderedCount aligned|item_count aligned|decoded item count/u;
+const OBJECT_ROW_ERROR_PATTERN = /byteLength|SHA-256 digest/u;
+const TURN_NODE_ROW_ERROR_PATTERN = /consumedStagedResultsCbor/u;
+const THREAD_ROW_ERROR_PATTERN = /createdAtMs|epoch millisecond value/u;
+const BRANCH_ROW_ERROR_PATTERN = /updatedAtMs/u;
+const TURN_ROW_ERROR_PATTERN = /updatedAtMs/u;
 const tempDirectories = new Set<string>();
 
 function createTempDirectory(prefix = "kraken-sqlite-"): string {
@@ -394,6 +400,48 @@ describe("@kraken/backend-sqlite", () => {
     );
   });
 
+  test("rejects stored object rows with invalid byteLength metadata", async () => {
+    const seeded = await seedCorruptionDatabase();
+    const probe = new Database(seeded.databasePath);
+    probe
+      .prepare("UPDATE objects SET byte_length = 999 WHERE hash = ?")
+      .run(seeded.objectHash);
+    probe.close();
+
+    await expectCorruptedStateRejection(
+      seeded.databasePath,
+      OBJECT_ROW_ERROR_PATTERN
+    );
+  });
+
+  test("rejects stored object rows whose hash no longer matches bytes", async () => {
+    const seeded = await seedCorruptionDatabase();
+    const probe = new Database(seeded.databasePath);
+    probe
+      .prepare("UPDATE objects SET hash = ? WHERE hash = ?")
+      .run(createHashFromIndex(999), seeded.objectHash);
+    probe.close();
+
+    await expectCorruptedStateRejection(
+      seeded.databasePath,
+      OBJECT_ROW_ERROR_PATTERN
+    );
+  });
+
+  test("rejects stored run rows with invalid currentStepIndex metadata", async () => {
+    const seeded = await seedCorruptionDatabase();
+    const probe = new Database(seeded.databasePath);
+    probe
+      .prepare("UPDATE runs SET current_step_index = -1 WHERE run_id = ?")
+      .run(seeded.runId);
+    probe.close();
+
+    await expectCorruptedStateRejection(
+      seeded.databasePath,
+      RUN_SHAPE_ERROR_PATTERN
+    );
+  });
+
   test("rejects stored staged result rows with interrupted status and null payload", async () => {
     const seeded = await seedCorruptionDatabase();
     const probe = new Database(seeded.databasePath);
@@ -425,6 +473,73 @@ describe("@kraken/backend-sqlite", () => {
     await expectCorruptedStateRejection(
       seeded.databasePath,
       STAGED_RESULT_ROW_ERROR_PATTERN
+    );
+  });
+
+  test("rejects stored turn node rows with malformed consumed staged results payloads", async () => {
+    const seeded = await seedCorruptionDatabase();
+    const probe = new Database(seeded.databasePath);
+    probe
+      .prepare(
+        "UPDATE turn_nodes SET consumed_staged_results_cbor = ? WHERE hash = ?"
+      )
+      .run(
+        Buffer.from(
+          encodeDeterministicKernelRecord([{ objectHash: seeded.objectHash }])
+        ),
+        seeded.runStartTurnNodeHash
+      );
+    probe.close();
+
+    await expectCorruptedStateRejection(
+      seeded.databasePath,
+      TURN_NODE_ROW_ERROR_PATTERN
+    );
+  });
+
+  test("rejects stored thread rows with invalid createdAtMs metadata", async () => {
+    const seeded = await seedCorruptionDatabase();
+    const probe = new Database(seeded.databasePath);
+    probe
+      .prepare("UPDATE threads SET created_at_ms = 1.5 WHERE thread_id = ?")
+      .run("thread_corruption");
+    probe.close();
+
+    await expectCorruptedStateRejection(
+      seeded.databasePath,
+      THREAD_ROW_ERROR_PATTERN
+    );
+  });
+
+  test("rejects stored branch rows with regressed updatedAtMs metadata", async () => {
+    const seeded = await seedCorruptionDatabase();
+    const probe = new Database(seeded.databasePath);
+    probe
+      .prepare(
+        "UPDATE branches SET updated_at_ms = created_at_ms - 1 WHERE branch_id = ?"
+      )
+      .run("branch_corruption");
+    probe.close();
+
+    await expectCorruptedStateRejection(
+      seeded.databasePath,
+      BRANCH_ROW_ERROR_PATTERN
+    );
+  });
+
+  test("rejects stored turn rows with regressed updatedAtMs metadata", async () => {
+    const seeded = await seedCorruptionDatabase();
+    const probe = new Database(seeded.databasePath);
+    probe
+      .prepare(
+        "UPDATE turns SET updated_at_ms = created_at_ms - 1 WHERE turn_id = ?"
+      )
+      .run("turn_corruption");
+    probe.close();
+
+    await expectCorruptedStateRejection(
+      seeded.databasePath,
+      TURN_ROW_ERROR_PATTERN
     );
   });
 
