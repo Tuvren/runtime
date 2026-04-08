@@ -37,7 +37,6 @@ import {
   hashKernelRecord,
   type KrakenBackend,
   type KrakenBackendTx,
-  type MemoryBackendOptions,
   type StoredBranch,
   type StoredObject,
   type StoredOrderedPathChunk,
@@ -53,6 +52,7 @@ import {
 } from "@kraken/kernel-contract-protocol";
 import {
   assertHashString,
+  type EpochMs,
   KrakenPersistenceError,
 } from "@kraken/shared-core-types";
 
@@ -75,6 +75,10 @@ interface BackendState {
 
 interface MutableRepositories extends KrakenBackendTx {
   readonly now: () => number;
+}
+
+export interface MemoryBackendOptions {
+  now?: () => EpochMs;
 }
 
 class MemoryBackend implements KrakenBackend {

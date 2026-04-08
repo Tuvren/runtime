@@ -18,35 +18,34 @@ import { describe, expect, test } from "bun:test";
 import {
   decodeDeterministicKernelRecord,
   encodeDeterministicKernelRecord,
-  hashKernelRecord,
-  hashOpaqueObjectBytes,
-  hashTurnNodeIdentity,
-  hashTurnTreeIdentity,
   type KrakenBackendTx,
-  type StagedResult,
   type StoredBranch,
   type StoredObject,
-  type StoredOrderedPathChunk,
   type StoredRun,
-  type StoredSchema,
   type StoredStagedResult,
   type StoredThread,
   type StoredTurn,
-  type StoredTurnNode,
   type StoredTurnTree,
   type StoredTurnTreePath,
   type TurnTreeManifest,
-  type TurnTreeSchema,
 } from "@kraken/kernel-contract-protocol";
 import {
+  createHashFromIndex,
+  createHashSequence,
+  createIncrementingClock as createNowClock,
+  createCanonicalKernelTestSchema as createSchema,
+  createCanonicalTurnTreePaths as createSharedCanonicalTurnTreePaths,
+  createStoredObjectRecord as createStoredObject,
+  createStoredOrderedPathChunkRecord as createStoredOrderedPathChunk,
+  createStoredSchemaRecord as createStoredSchema,
+  createStoredTurnNodeRecord as createStoredTurnNode,
+  createStoredTurnTreeRecord as createStoredTurnTree,
+  delay,
   registerBackendConformanceSuite,
   registerBackendInvariantSuite,
   registerBackendRecoverySuite,
 } from "@kraken/kernel-testkit";
-import {
-  type KernelRecord,
-  KrakenPersistenceError,
-} from "@kraken/shared-core-types";
+import { KrakenPersistenceError } from "@kraken/shared-core-types";
 import { createMemoryBackend } from "../src/index.ts";
 
 registerBackendConformanceSuite({
@@ -3203,188 +3202,12 @@ describe("@kraken/backend-memory", () => {
   });
 });
 
-function createSchema(): TurnTreeSchema {
-  return {
-    incorporationRules: [
-      {
-        objectType: "message",
-        targetPath: "messages",
-      },
-      {
-        objectType: "context_manifest",
-        targetPath: "context.manifest",
-      },
-    ],
-    paths: [
-      {
-        collection: "ordered",
-        path: "messages",
-      },
-      {
-        collection: "single",
-        path: "context.manifest",
-      },
-    ],
-    schemaId: "schema_main",
-  };
-}
-
-function createStoredSchema(
-  schema: TurnTreeSchema,
-  createdAtMs: number
-): StoredSchema {
-  return {
-    createdAtMs,
-    schemaCbor: encodeDeterministicKernelRecord({
-      incorporationRules: schema.incorporationRules.map((rule) => ({
-        objectType: rule.objectType,
-        targetPath: rule.targetPath,
-      })),
-      paths: schema.paths.map((path) => ({
-        collection: path.collection,
-        path: path.path,
-      })),
-      schemaId: schema.schemaId,
-    }),
-    schemaId: schema.schemaId,
-  };
-}
-
-async function createStoredObject(
-  bytes: Uint8Array,
-  createdAtMs: number
-): Promise<StoredObject> {
-  return {
-    byteLength: bytes.byteLength,
-    bytes: Uint8Array.from(bytes),
-    createdAtMs,
-    hash: await hashOpaqueObjectBytes(bytes),
-    mediaType: "application/octet-stream",
-  };
-}
-
-async function createStoredTurnTree(
-  schema: TurnTreeSchema,
-  manifest: TurnTreeManifest,
-  createdAtMs: number
-): Promise<StoredTurnTree> {
-  return {
-    createdAtMs,
-    hash: await hashTurnTreeIdentity(schema.schemaId, manifest, schema),
-    manifestCbor: encodeDeterministicKernelRecord(manifest),
-    schemaId: schema.schemaId,
-  };
-}
-
-async function createStoredOrderedPathChunk(
-  hashes: string[],
-  createdAtMs: number
-): Promise<StoredOrderedPathChunk> {
-  const itemsCbor = encodeDeterministicKernelRecord(hashes);
-
-  return {
-    chunkHash: await hashKernelRecord(hashes),
-    createdAtMs,
-    itemCount: hashes.length,
-    itemsCbor,
-  };
-}
-
-async function createStoredTurnNode(input: {
-  consumedStagedResults: StagedResult[];
-  createdAtMs: number;
-  eventHash: string | null;
-  previousTurnNodeHash: string | null;
-  schemaId: string;
-  turnTreeHash: string;
-}): Promise<StoredTurnNode> {
-  const encodedConsumedStagedResults: KernelRecord[] = [];
-
-  for (const stagedResult of input.consumedStagedResults) {
-    if (stagedResult.status === "interrupted") {
-      encodedConsumedStagedResults.push({
-        interruptPayload: stagedResult.interruptPayload,
-        objectHash: stagedResult.objectHash,
-        objectType: stagedResult.objectType,
-        status: stagedResult.status,
-        taskId: stagedResult.taskId,
-        timestamp: stagedResult.timestamp,
-      });
-      continue;
-    }
-
-    encodedConsumedStagedResults.push({
-      objectHash: stagedResult.objectHash,
-      objectType: stagedResult.objectType,
-      status: stagedResult.status,
-      taskId: stagedResult.taskId,
-      timestamp: stagedResult.timestamp,
-    });
-  }
-
-  return {
-    consumedStagedResultsCbor: encodeDeterministicKernelRecord(
-      encodedConsumedStagedResults
-    ),
-    createdAtMs: input.createdAtMs,
-    eventHash: input.eventHash,
-    hash: await hashTurnNodeIdentity({
-      consumedStagedResults: input.consumedStagedResults,
-      eventHash: input.eventHash,
-      previousTurnNodeHash: input.previousTurnNodeHash,
-      schemaId: input.schemaId,
-      turnTreeHash: input.turnTreeHash,
-    }),
-    previousTurnNodeHash: input.previousTurnNodeHash,
-    schemaId: input.schemaId,
-    turnTreeHash: input.turnTreeHash,
-  };
-}
-
-function createHashSequence(count: number, offset = 0): string[] {
-  return Array.from({ length: count }, (_, index) =>
-    createHashFromIndex(index + offset)
-  );
-}
-
-function createHashFromIndex(index: number): string {
-  return index.toString(16).padStart(64, "0");
-}
-
-function createNowClock(initialValue: number): () => number {
-  let currentValue = initialValue;
-
-  return () => {
-    const nextValue = currentValue;
-    currentValue += 1;
-    return nextValue;
-  };
-}
-
-function delay(durationMs: number): Promise<void> {
-  return new Promise((resolve) => {
-    setTimeout(resolve, durationMs);
-  });
-}
-
 function createCanonicalTurnTreePaths(
   turnTree: StoredTurnTree,
   messages: string[]
 ): StoredTurnTreePath[] {
-  return [
-    {
-      collectionKind: "single",
-      path: "context.manifest",
-      singleHash: null,
-      turnTreeHash: turnTree.hash,
-    },
-    {
-      collectionKind: "ordered",
-      orderedCount: messages.length,
-      orderedEncoding: "flat",
-      orderedInlineCbor: encodeDeterministicKernelRecord(messages),
-      path: "messages",
-      turnTreeHash: turnTree.hash,
-    },
-  ];
+  return createSharedCanonicalTurnTreePaths(turnTree, {
+    "context.manifest": null,
+    messages,
+  });
 }

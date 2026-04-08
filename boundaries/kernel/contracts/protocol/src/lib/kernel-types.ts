@@ -509,7 +509,3 @@ export interface KrakenKernel {
     compose(verdicts: Verdict[]): Promise<ComposedVerdict>;
   };
 }
-
-export interface MemoryBackendOptions {
-  now?: () => EpochMs;
-}

@@ -37,7 +37,6 @@ export type {
   KrakenBackend,
   KrakenBackendTx,
   KrakenKernel,
-  MemoryBackendOptions,
   ModifyVerdict,
   ObjectRepository,
   ObserveResult,
