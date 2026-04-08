@@ -1,0 +1,70 @@
+{
+  "name": "backend-sqlite",
+  "$schema": "../../../../../node_modules/nx/schemas/project-schema.json",
+  "root": "boundaries/kernel/implementations/typescript/backend-sqlite",
+  "sourceRoot": "boundaries/kernel/implementations/typescript/backend-sqlite/src",
+  "projectType": "library",
+  "tags": ["boundary:kernel", "layer:implementation"],
+  "targets": {
+    "build": {
+      "executor": "nx:run-commands",
+      "dependsOn": ["^build"],
+      "options": {
+        "cwd": "boundaries/kernel/implementations/typescript/backend-sqlite",
+        "commands": [
+          {
+            "command": "bunx --bun tsup --config tsup.config.ts"
+          },
+          {
+            "command": "bunx --bun tsc --project tsconfig.dts.json --pretty false"
+          },
+          {
+            "command": "mkdir -p dist/migrations && cp migrations/*.sql dist/migrations/"
+          }
+        ],
+        "parallel": false
+      }
+    },
+    "smoke-native": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "boundaries/kernel/implementations/typescript/backend-sqlite",
+        "command": "node -e \"const Database=require('better-sqlite3'); const db=new Database(':memory:'); console.log(db.prepare('SELECT 1 AS value').get().value); db.close();\""
+      }
+    },
+    "test": {
+      "executor": "nx:run-commands",
+      "dependsOn": ["smoke-native"],
+      "options": {
+        "cwd": "boundaries/kernel/implementations/typescript/backend-sqlite",
+        "commands": [
+          {
+            "command": "rm -rf .tmp-tests"
+          },
+          {
+            "command": "bunx --bun tsc --project tsconfig.test.json --pretty false"
+          },
+          {
+            "command": "node --test .tmp-tests/boundaries/kernel/implementations/typescript/backend-sqlite/test/backend-sqlite.test.js"
+          }
+        ],
+        "parallel": false
+      }
+    },
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "boundaries/kernel/implementations/typescript/backend-sqlite",
+        "commands": [
+          {
+            "command": "bunx --bun tsc --project tsconfig.lib.json --noEmit --pretty false"
+          },
+          {
+            "command": "bunx --bun tsc --project tsconfig.typecheck.json --noEmit --pretty false"
+          }
+        ],
+        "parallel": false
+      }
+    }
+  }
+}
