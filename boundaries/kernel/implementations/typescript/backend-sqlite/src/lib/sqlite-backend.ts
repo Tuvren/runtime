@@ -1055,6 +1055,7 @@ function runMigrations(db: Database.Database, now: () => number): void {
 
 function resolveMigrationDirectory(): string {
   const candidates = [
+    fileURLToPath(new URL("./migrations", import.meta.url)),
     fileURLToPath(new URL("../../migrations", import.meta.url)),
     fileURLToPath(new URL("../migrations", import.meta.url)),
   ];
@@ -1629,10 +1630,25 @@ function decodeTurnTreePathRow(row: SqliteTurnTreePathRow): StoredTurnTreePath {
     };
   }
 
+  if (row.collection_kind !== "ordered") {
+    throw persistenceError(
+      "stored turn tree path rows must decode to a valid ordered or single variant",
+      "sqlite_backend_invalid_turn_tree_path_row",
+      { path: row.path, turnTreeHash: row.turn_tree_hash }
+    );
+  }
+
+  const orderedCount = decodeStoredNonNegativeInteger(
+    row.ordered_count,
+    "ordered_count",
+    "sqlite_backend_invalid_turn_tree_path_row",
+    { path: row.path, turnTreeHash: row.turn_tree_hash }
+  );
+
   if (row.ordered_encoding === "flat" && row.ordered_inline_cbor !== null) {
     return {
       collectionKind: "ordered",
-      orderedCount: row.ordered_count ?? 0,
+      orderedCount,
       orderedEncoding: "flat",
       orderedInlineCbor: cloneEncodedBytes(
         toUint8Array(row.ordered_inline_cbor)
@@ -1651,7 +1667,7 @@ function decodeTurnTreePathRow(row: SqliteTurnTreePathRow): StoredTurnTreePath {
       orderedChunkListCbor: cloneEncodedBytes(
         toUint8Array(row.ordered_chunk_list_cbor)
       ),
-      orderedCount: row.ordered_count ?? 0,
+      orderedCount,
       orderedEncoding: "chunked",
       path: row.path,
       turnTreeHash: row.turn_tree_hash,
@@ -1668,11 +1684,32 @@ function decodeTurnTreePathRow(row: SqliteTurnTreePathRow): StoredTurnTreePath {
 function decodeOrderedPathChunkRow(
   row: SqliteOrderedPathChunkRow
 ): StoredOrderedPathChunk {
+  const itemsCbor = cloneEncodedBytes(toUint8Array(row.items_cbor));
+  const itemHashes = decodeHashStringArray(itemsCbor, "chunk.itemsCbor");
+  const itemCount = decodeStoredNonNegativeInteger(
+    row.item_count,
+    "item_count",
+    "sqlite_backend_invalid_ordered_path_chunk_row",
+    { chunkHash: row.chunk_hash }
+  );
+
+  if (itemCount !== itemHashes.length) {
+    throw persistenceError(
+      "stored ordered path chunk rows must keep item_count aligned with items_cbor",
+      "sqlite_backend_ordered_path_chunk_item_count_mismatch",
+      {
+        chunkHash: row.chunk_hash,
+        decodedCount: itemHashes.length,
+        itemCount,
+      }
+    );
+  }
+
   return {
     chunkHash: row.chunk_hash,
     createdAtMs: row.created_at_ms,
-    itemCount: row.item_count,
-    itemsCbor: cloneEncodedBytes(toUint8Array(row.items_cbor)),
+    itemCount,
+    itemsCbor,
   };
 }
 
@@ -1726,6 +1763,8 @@ function decodeTurnRow(row: SqliteTurnRow): StoredTurn {
 }
 
 function decodeRunRow(row: SqliteRunRow): StoredRun {
+  const status = decodeStoredRunStatus(row.status, row.run_id);
+
   return {
     branchId: row.branch_id,
     createdAtMs: row.created_at_ms,
@@ -1736,7 +1775,7 @@ function decodeRunRow(row: SqliteRunRow): StoredRun {
     runId: row.run_id,
     schemaId: row.schema_id,
     startTurnNodeHash: row.start_turn_node_hash,
-    status: row.status,
+    status,
     stepSequenceCbor: cloneEncodedBytes(toUint8Array(row.step_sequence_cbor)),
     turnId: row.turn_id,
     updatedAtMs: row.updated_at_ms,
@@ -1744,7 +1783,15 @@ function decodeRunRow(row: SqliteRunRow): StoredRun {
 }
 
 function decodeStagedResultRow(row: SqliteStagedResultRow): StoredStagedResult {
-  if (row.status === "interrupted" && row.interrupt_payload_cbor !== null) {
+  if (row.status === "interrupted") {
+    if (row.interrupt_payload_cbor === null) {
+      throw persistenceError(
+        "stored staged result rows with interrupted status must include interrupt_payload_cbor",
+        "sqlite_backend_invalid_staged_result_row",
+        { runId: row.run_id, status: row.status, taskId: row.task_id }
+      );
+    }
+
     return {
       createdAtMs: row.created_at_ms,
       interruptPayloadCbor: cloneEncodedBytes(
@@ -1758,14 +1805,67 @@ function decodeStagedResultRow(row: SqliteStagedResultRow): StoredStagedResult {
     };
   }
 
+  if (row.interrupt_payload_cbor !== null) {
+    throw persistenceError(
+      "stored staged result rows may only include interrupt_payload_cbor for interrupted status",
+      "sqlite_backend_invalid_staged_result_row",
+      { runId: row.run_id, status: row.status, taskId: row.task_id }
+    );
+  }
+
+  if (row.status !== "completed" && row.status !== "failed") {
+    throw persistenceError(
+      "stored staged result rows must decode to a valid staged result status",
+      "sqlite_backend_invalid_staged_result_row",
+      { runId: row.run_id, status: row.status, taskId: row.task_id }
+    );
+  }
+
   return {
     createdAtMs: row.created_at_ms,
     objectHash: row.object_hash,
     objectType: row.object_type,
     runId: row.run_id,
-    status: row.status === "failed" ? "failed" : "completed",
+    status: row.status,
     taskId: row.task_id,
   };
+}
+
+function decodeStoredNonNegativeInteger(
+  value: number | null,
+  field: string,
+  code: string,
+  details: Record<string, unknown>
+): number {
+  if (value === null || !Number.isSafeInteger(value) || value < 0) {
+    throw persistenceError(
+      `stored rows must keep ${field} as a non-negative safe integer`,
+      code,
+      details
+    );
+  }
+
+  return value;
+}
+
+function decodeStoredRunStatus(
+  value: unknown,
+  runId: string
+): StoredRun["status"] {
+  if (
+    value === "running" ||
+    value === "paused" ||
+    value === "completed" ||
+    value === "failed"
+  ) {
+    return value;
+  }
+
+  throw persistenceError(
+    "stored run rows must decode to a valid run status",
+    "sqlite_backend_invalid_run_status",
+    { runId, status: value }
+  );
 }
 
 function toUint8Array(bytes: Uint8Array): Uint8Array {
@@ -2197,8 +2297,106 @@ function validateTurnTreePathInvariants(state: BackendState): void {
     }
   }
 
+  validateTurnTreePathCardinalityMetadata(state);
+
   for (const turnTree of state.turnTrees.values()) {
     assertTurnTreeManifestMatchesStoredPaths(state, turnTree);
+  }
+}
+
+function validateTurnTreePathCardinalityMetadata(state: BackendState): void {
+  for (const storedPaths of state.turnTreePaths.values()) {
+    for (const storedPath of storedPaths.values()) {
+      if (storedPath.collectionKind === "single") {
+        continue;
+      }
+
+      if (storedPath.orderedEncoding === "flat") {
+        validateOrderedFlatPathCardinality(storedPath);
+        continue;
+      }
+
+      validateOrderedChunkedPathCardinality(state, storedPath);
+    }
+  }
+}
+
+function validateOrderedFlatPathCardinality(
+  storedPath: Extract<
+    StoredTurnTreePath,
+    { collectionKind: "ordered"; orderedEncoding: "flat" }
+  >
+): void {
+  const hashes = decodeHashStringArray(
+    storedPath.orderedInlineCbor,
+    "storedPath.orderedInlineCbor"
+  );
+
+  if (storedPath.orderedCount !== hashes.length) {
+    throw persistenceError(
+      "stored ordered turn tree paths must keep orderedCount aligned with encoded hashes",
+      "sqlite_backend_turn_tree_path_ordered_count_mismatch",
+      {
+        decodedCount: hashes.length,
+        orderedCount: storedPath.orderedCount,
+        path: storedPath.path,
+        turnTreeHash: storedPath.turnTreeHash,
+      }
+    );
+  }
+}
+
+function validateOrderedChunkedPathCardinality(
+  state: BackendState,
+  storedPath: Extract<
+    StoredTurnTreePath,
+    { collectionKind: "ordered"; orderedEncoding: "chunked" }
+  >
+): void {
+  const chunkHashes = decodeHashStringArray(
+    storedPath.orderedChunkListCbor,
+    "storedPath.orderedChunkListCbor"
+  );
+  let totalCount = 0;
+
+  for (const [index, chunkHash] of chunkHashes.entries()) {
+    const chunk = ensureOrderedPathChunkExists(
+      state,
+      chunkHash,
+      "storedPath.orderedChunkListCbor"
+    );
+    const chunkItemHashes = decodeHashStringArray(
+      chunk.itemsCbor,
+      "chunk.itemsCbor"
+    );
+
+    if (chunk.itemCount !== chunkItemHashes.length) {
+      throw persistenceError(
+        "stored ordered path chunk rows must keep itemCount aligned with itemsCbor",
+        "sqlite_backend_ordered_path_chunk_item_count_mismatch",
+        {
+          chunkHash: chunk.chunkHash,
+          decodedCount: chunkItemHashes.length,
+          itemCount: chunk.itemCount,
+        }
+      );
+    }
+
+    assertChunkedTurnTreePathChunkLayout(chunk, index, chunkHashes.length);
+    totalCount += chunk.itemCount;
+  }
+
+  if (totalCount !== storedPath.orderedCount) {
+    throw persistenceError(
+      "stored ordered turn tree paths must keep orderedCount aligned with referenced chunk cardinality",
+      "sqlite_backend_turn_tree_path_ordered_count_mismatch",
+      {
+        orderedCount: storedPath.orderedCount,
+        path: storedPath.path,
+        totalCount,
+        turnTreeHash: storedPath.turnTreeHash,
+      }
+    );
   }
 }
 

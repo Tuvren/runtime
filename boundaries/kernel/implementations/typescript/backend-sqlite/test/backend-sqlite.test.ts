@@ -20,13 +20,30 @@ import {
   strictEqual,
   throws,
 } from "node:assert/strict";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import {
+  copyFileSync,
+  mkdirSync,
+  mkdtempSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, describe, test } from "node:test";
-import type { KrakenBackendTx } from "@kraken/kernel-contract-protocol";
+import { pathToFileURL } from "node:url";
 import {
+  encodeDeterministicKernelRecord,
+  type KrakenBackendTx,
+} from "@kraken/kernel-contract-protocol";
+import {
+  createCanonicalKernelTestSchema,
+  createCanonicalTurnTreePaths,
+  createHashFromIndex,
   createIncrementingClock as createNowClock,
+  createStoredObjectRecord,
+  createStoredSchemaRecord,
+  createStoredTurnNodeRecord,
+  createStoredTurnTreeRecord,
   delay,
   registerBackendConformanceSuite,
   registerBackendInvariantSuite,
@@ -38,6 +55,12 @@ import { createSqliteBackend } from "../src/index.js";
 
 const NESTED_TRANSACTION_ERROR_PATTERN = /must not be nested/u;
 const MIGRATION_CONFLICT_ERROR_PATTERN = /table turn_trees already exists/u;
+const RUN_STATUS_ERROR_PATTERN = /valid run status/u;
+const STAGED_RESULT_ROW_ERROR_PATTERN =
+  /valid staged result status|interrupt_payload_cbor/u;
+const TURN_TREE_PATH_ROW_ERROR_PATTERN = /valid ordered or single variant/u;
+const ORDERED_CARDINALITY_ERROR_PATTERN =
+  /orderedCount aligned|item_count aligned/u;
 const tempDirectories = new Set<string>();
 
 function createTempDirectory(prefix = "kraken-sqlite-"): string {
@@ -49,6 +72,149 @@ function createTempDirectory(prefix = "kraken-sqlite-"): string {
 function createTempDatabasePath(): string {
   const tempDirectory = createTempDirectory();
   return join(tempDirectory, "kraken.db");
+}
+
+function createWorkspaceTempDirectory(prefix: string): string {
+  const tempDirectory = mkdtempSync(join(process.cwd(), prefix));
+  tempDirectories.add(tempDirectory);
+  return tempDirectory;
+}
+
+interface CorruptionSeed {
+  databasePath: string;
+  objectHash: string;
+  runId: string;
+  runStartTurnNodeHash: string;
+  turnTreeHash: string;
+}
+
+function getCompiledSqliteRuntimePath(): string {
+  return join(
+    process.cwd(),
+    ".tmp-tests",
+    "boundaries",
+    "kernel",
+    "implementations",
+    "typescript",
+    "backend-sqlite",
+    "src",
+    "lib",
+    "sqlite-backend.js"
+  );
+}
+
+async function seedCorruptionDatabase(
+  options: { messageCount?: number } = {}
+): Promise<CorruptionSeed> {
+  const databasePath = createTempDatabasePath();
+  const backend = createSqliteBackend({ databasePath });
+  const messageCount = options.messageCount ?? 0;
+  const messages = Array.from({ length: messageCount }, (_, index) =>
+    createHashFromIndex(index + 1)
+  );
+  const schema = createCanonicalKernelTestSchema();
+  const schemaRecord = createStoredSchemaRecord(schema, 1);
+  const turnTree = await createStoredTurnTreeRecord(
+    schema,
+    { "context.manifest": null, messages },
+    2
+  );
+  const objectRecord = await createStoredObjectRecord(new Uint8Array([7]), 3);
+  const rootTurnNode = await createStoredTurnNodeRecord({
+    consumedStagedResults: [],
+    createdAtMs: 4,
+    eventHash: null,
+    previousTurnNodeHash: null,
+    schemaId: schema.schemaId,
+    turnTreeHash: turnTree.hash,
+  });
+  const headTurnNode = await createStoredTurnNodeRecord({
+    consumedStagedResults: [],
+    createdAtMs: 5,
+    eventHash: null,
+    previousTurnNodeHash: rootTurnNode.hash,
+    schemaId: schema.schemaId,
+    turnTreeHash: turnTree.hash,
+  });
+  const thread = {
+    createdAtMs: 6,
+    rootTurnNodeHash: rootTurnNode.hash,
+    schemaId: schema.schemaId,
+    threadId: "thread_corruption",
+  };
+  const branch = {
+    branchId: "branch_corruption",
+    createdAtMs: 7,
+    headTurnNodeHash: headTurnNode.hash,
+    threadId: thread.threadId,
+    updatedAtMs: 7,
+  };
+  const turn = {
+    branchId: branch.branchId,
+    createdAtMs: 8,
+    headTurnNodeHash: headTurnNode.hash,
+    parentTurnId: null,
+    startTurnNodeHash: rootTurnNode.hash,
+    threadId: thread.threadId,
+    turnId: "turn_corruption",
+    updatedAtMs: 8,
+  };
+  const run = {
+    branchId: branch.branchId,
+    createdAtMs: 9,
+    createdTurnNodesCbor: encodeDeterministicKernelRecord([]),
+    currentStepIndex: 0,
+    runId: "run_corruption",
+    schemaId: schema.schemaId,
+    startTurnNodeHash: headTurnNode.hash,
+    status: "running" as const,
+    stepSequenceCbor: encodeDeterministicKernelRecord([
+      {
+        deterministic: false,
+        id: "model_call",
+        sideEffects: false,
+      },
+    ]),
+    turnId: turn.turnId,
+    updatedAtMs: 9,
+  };
+
+  await backend.transact(async (tx) => {
+    await tx.objects.put(objectRecord);
+    await tx.schemas.put(schemaRecord);
+    await tx.turnTrees.put(turnTree);
+    await tx.turnTreePaths.putMany(
+      createCanonicalTurnTreePaths(turnTree, {
+        "context.manifest": null,
+        messages,
+      })
+    );
+    await tx.turnNodes.put(rootTurnNode);
+    await tx.turnNodes.put(headTurnNode);
+    await tx.threads.put(thread);
+    await tx.branches.set(branch);
+    await tx.turns.set(turn);
+    await tx.runs.set(run);
+  });
+
+  return {
+    databasePath,
+    objectHash: objectRecord.hash,
+    runId: run.runId,
+    runStartTurnNodeHash: run.startTurnNodeHash,
+    turnTreeHash: turnTree.hash,
+  };
+}
+
+async function expectCorruptedStateRejection(
+  databasePath: string,
+  pattern: RegExp
+): Promise<void> {
+  const backend = createSqliteBackend({ databasePath });
+  await rejects(
+    backend.transact(async () => undefined),
+    pattern
+  );
 }
 
 after(() => {
@@ -188,6 +354,143 @@ describe("@kraken/backend-sqlite", () => {
     strictEqual(schemasTable, undefined);
     deepStrictEqual(turnTreesTable, { name: "turn_trees" });
     deepStrictEqual(migrationRows, []);
+  });
+
+  test("loads migrations from dist-local paths in dist-style layouts", async () => {
+    const tempDirectory = createWorkspaceTempDirectory(
+      ".tmp-sqlite-dist-layout-"
+    );
+    const fakeDistDirectory = join(tempDirectory, "deeper", "deep");
+    const fakeMigrationsDirectory = join(fakeDistDirectory, "migrations");
+    const runtimePath = join(fakeDistDirectory, "index.js");
+    const databasePath = join(tempDirectory, "dist-only.sqlite");
+
+    mkdirSync(fakeMigrationsDirectory, { recursive: true });
+    copyFileSync(getCompiledSqliteRuntimePath(), runtimePath);
+    copyFileSync(
+      join(process.cwd(), "migrations", "0001_initial_schema.sql"),
+      join(fakeMigrationsDirectory, "0001_initial_schema.sql")
+    );
+
+    const runtimeModule = (await import(pathToFileURL(runtimePath).href)) as {
+      createSqliteBackend: typeof createSqliteBackend;
+    };
+    const backend = runtimeModule.createSqliteBackend({ databasePath });
+
+    deepStrictEqual(await backend.health(), { ok: true });
+  });
+
+  test("rejects stored run rows with invalid status values", async () => {
+    const seeded = await seedCorruptionDatabase();
+    const probe = new Database(seeded.databasePath);
+    probe
+      .prepare("UPDATE runs SET status = 'bogus' WHERE run_id = ?")
+      .run(seeded.runId);
+    probe.close();
+
+    await expectCorruptedStateRejection(
+      seeded.databasePath,
+      RUN_STATUS_ERROR_PATTERN
+    );
+  });
+
+  test("rejects stored staged result rows with interrupted status and null payload", async () => {
+    const seeded = await seedCorruptionDatabase();
+    const probe = new Database(seeded.databasePath);
+    probe
+      .prepare(
+        `
+          INSERT INTO staged_results (
+            run_id,
+            task_id,
+            object_hash,
+            object_type,
+            status,
+            interrupt_payload_cbor,
+            created_at_ms
+          ) VALUES (?, ?, ?, ?, ?, ?, ?)
+        `
+      )
+      .run(
+        seeded.runId,
+        "task_corrupted",
+        seeded.objectHash,
+        "message",
+        "interrupted",
+        null,
+        10
+      );
+    probe.close();
+
+    await expectCorruptedStateRejection(
+      seeded.databasePath,
+      STAGED_RESULT_ROW_ERROR_PATTERN
+    );
+  });
+
+  test("rejects ordered turn tree rows with invalid collection kind", async () => {
+    const seeded = await seedCorruptionDatabase();
+    const probe = new Database(seeded.databasePath);
+    probe
+      .prepare(
+        `
+          UPDATE turn_tree_paths
+          SET collection_kind = 'bogus'
+          WHERE turn_tree_hash = ? AND path = 'messages'
+        `
+      )
+      .run(seeded.turnTreeHash);
+    probe.close();
+
+    await expectCorruptedStateRejection(
+      seeded.databasePath,
+      TURN_TREE_PATH_ROW_ERROR_PATTERN
+    );
+  });
+
+  test("rejects corrupted orderedCount metadata on persisted path rows", async () => {
+    const seeded = await seedCorruptionDatabase();
+    const probe = new Database(seeded.databasePath);
+    probe
+      .prepare(
+        `
+          UPDATE turn_tree_paths
+          SET ordered_count = 999
+          WHERE turn_tree_hash = ? AND path = 'messages'
+        `
+      )
+      .run(seeded.turnTreeHash);
+    probe.close();
+
+    await expectCorruptedStateRejection(
+      seeded.databasePath,
+      ORDERED_CARDINALITY_ERROR_PATTERN
+    );
+  });
+
+  test("rejects corrupted chunk item_count metadata on persisted chunk rows", async () => {
+    const seeded = await seedCorruptionDatabase({ messageCount: 40 });
+    const probe = new Database(seeded.databasePath);
+    probe
+      .prepare(
+        `
+          UPDATE ordered_path_chunks
+          SET item_count = item_count + 1
+          WHERE chunk_hash = (
+            SELECT chunk_hash
+            FROM ordered_path_chunks
+            ORDER BY chunk_hash
+            LIMIT 1
+          )
+        `
+      )
+      .run();
+    probe.close();
+
+    await expectCorruptedStateRejection(
+      seeded.databasePath,
+      ORDERED_CARDINALITY_ERROR_PATTERN
+    );
   });
 
   test("serializes concurrent transactions and rejects nested transactions", async () => {
