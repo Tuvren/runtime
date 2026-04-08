@@ -1,0 +1,26 @@
+{
+  "extends": "./tsconfig.lib.json",
+  "compilerOptions": {
+    "composite": false,
+    "rootDir": "../../../../../",
+    "allowImportingTsExtensions": true,
+    "paths": {
+      "@kraken/shared-core-types": [
+        "../../../../shared/contracts/core-types/src/index.ts"
+      ],
+      "@kraken/kernel-contract-protocol": [
+        "../../../contracts/protocol/src/index.ts"
+      ],
+      "@kraken/kernel-testkit": ["../../../testkit/src/index.ts"],
+      "@kraken/backend-sqlite": ["./src/index.ts"]
+    },
+    "types": ["bun", "node"]
+  },
+  "include": [
+    "src/**/*.ts",
+    "test/**/*.ts",
+    "../../../contracts/protocol/src/**/*.ts",
+    "../../../testkit/src/**/*.ts",
+    "../../../../shared/contracts/core-types/src/**/*.ts"
+  ]
+}
