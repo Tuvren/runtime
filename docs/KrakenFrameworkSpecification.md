@@ -1,18 +1,35 @@
 # Kraken Framework Specification
 
-**Version**: v0.14
+**Version**: v0.15
 **Status**: Authoritative
 **Basis**: Kernel Specification v0.9 (frozen)
 
-Read this after the kernel specification. This document is authoritative for framework behavior built on the frozen kernel.
+Read this after the kernel specification. This document is authoritative for the initial Kraken framework driver behavior built on the frozen kernel.
 
-This is the single authoritative specification for framework execution semantics. All framework behavior — execution model, extension system, multi-agent orchestration, streaming, host contract, and tool dispatch — is defined in this document. The companion rationale document is explanatory only.
+This is the single authoritative specification for the shared framework semantic model plus the initial ReAct Driver execution semantics. It does not claim that ReAct is the only possible Kraken driver. Future drivers may reuse the shared framework types and kernel primitives defined here while specifying different control-flow behavior. The companion rationale document is explanatory only.
+
+---
+
+## 0. Driver Framing
+
+Kraken is organized in three semantic layers:
+
+- **Kernel:** durable mechanism only
+- **Framework:** shared runtime model, host-facing concepts, and integration vocabulary built on the kernel
+- **Driver:** one concrete execution model implemented over the shared framework and kernel primitives
+
+This document therefore serves two purposes:
+
+- define the shared semantic types that drivers and framework integrations rely on
+- define the first production-depth driver, the **ReAct Driver**
+
+Unless a section says otherwise, terms such as messages, tool calls, structured output, approvals, event shapes, and context manifests are framework-level semantics. Iterative loop behavior, runtime resolution precedence in the active agent loop, and model-tool-feedback execution are specified here as the ReAct Driver baseline rather than as the only possible Kraken execution model.
 
 ---
 
 ## 1. Shared Types
 
-All types used across the framework are defined here.
+All shared framework types and all types used by the initial ReAct Driver are defined here.
 
 ### 1.1 Content Parts
 
@@ -79,7 +96,7 @@ Separate `tool` role even though some providers merge tool results into user mes
 
 ### 1.3 InputSignal
 
-Canonical inbound signal accepted by the framework.
+Canonical inbound signal accepted by the framework and its drivers.
 
 ```
 InputSignal
@@ -130,7 +147,7 @@ KrakenModelResponse
 
 ### 1.5 RuntimeResolution
 
-The exhaustive type for all framework control flow outcomes. Every framework control decision — loop policy, extension verdict, handoff, error — maps into this type.
+The exhaustive type for runtime control flow outcomes in the shared framework model. The initial ReAct Driver maps its loop policy, extension verdicts, handoff detection, and error handling into this type.
 
 ```
 RuntimeResolution =
@@ -195,7 +212,7 @@ The handoff builder returns the complete replacement hash array for the active `
 
 **Resolution precedence**: `fail(hard) > pause > handoff > end_turn > fail(soft) > continue_iteration`. `fail(soft)` is uniformly non-terminal: it records the error condition, may emit events and state effects, and does not by itself terminate the Turn or iteration loop. When extension verdicts, loop policy, and handoff detection all produce resolutions in the same iteration, the highest-precedence resolution wins.
 
-**Kernel verdict algebra**: The kernel provides a five-verdict algebra (`Abort > Pause > Modify > Retry > Proceed`). The framework currently consumes three of these (`Abort` variants via intercept verdicts, `Pause` via tool approval, `Proceed` as the default). The kernel's `Modify` and `Retry` verdicts are reserved for future framework use.
+**Kernel verdict algebra**: The kernel provides a five-verdict algebra (`Abort > Pause > Modify > Retry > Proceed`). The initial ReAct Driver currently consumes three of these (`Abort` variants via intercept verdicts, `Pause` via tool approval, `Proceed` as the default). The kernel's `Modify` and `Retry` verdicts are reserved for future framework or driver use.
 
 ### 1.6 ContextManifest
 
