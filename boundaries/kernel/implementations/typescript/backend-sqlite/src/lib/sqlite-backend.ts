@@ -63,6 +63,20 @@ import Database from "better-sqlite3";
 const ORDERED_PATH_CHUNK_THRESHOLD = 32;
 const ORDERED_PATH_CHUNK_SIZE = 32;
 const SQLITE_BUSY_TIMEOUT_MS = 5000;
+const INITIAL_SCHEMA_MIGRATION_NAME = "0001_initial_schema.sql";
+const INITIAL_SCHEMA_REQUIRED_TABLES = [
+  "objects",
+  "schemas",
+  "turn_trees",
+  "turn_tree_paths",
+  "ordered_path_chunks",
+  "turn_nodes",
+  "threads",
+  "branches",
+  "turns",
+  "runs",
+  "staged_results",
+] as const;
 
 interface BackendState {
   branches: Map<string, StoredBranch>;
@@ -209,8 +223,14 @@ class SqliteBackend implements KrakenBackend {
 
   health(): Promise<{ ok: true } | { ok: false; reason: string }> {
     try {
-      this.db.prepare("SELECT 1 AS ok").get();
-      return Promise.resolve({ ok: true });
+      validateMigrationState(this.db);
+      const state = loadState(this.db);
+      return validateLoadedState(state)
+        .then(() => ({ ok: true as const }))
+        .catch((error: unknown) => ({
+          ok: false as const,
+          reason: getErrorMessage(normalizeBackendError(error)),
+        }));
     } catch (error: unknown) {
       return Promise.resolve({ ok: false, reason: getErrorMessage(error) });
     }
@@ -232,12 +252,14 @@ class SqliteBackend implements KrakenBackend {
     });
 
     await priorTransaction;
+    let active = false;
 
     try {
       this.db.exec("BEGIN IMMEDIATE");
+      validateMigrationState(this.db);
       const baseState = loadState(this.db);
       await validateLoadedState(baseState);
-      let active = true;
+      active = true;
       const repositories = createRepositories(
         this.db,
         this.now,
@@ -261,6 +283,12 @@ class SqliteBackend implements KrakenBackend {
         }
         throw normalizeBackendError(error);
       }
+    } catch (error: unknown) {
+      active = false;
+      if (this.db.inTransaction) {
+        this.db.exec("ROLLBACK");
+      }
+      throw normalizeBackendError(error);
     } finally {
       releaseQueue?.();
     }
@@ -1054,6 +1082,8 @@ function runMigrations(db: Database.Database, now: () => number): void {
     const sql = readFileSync(`${migrationDirectory}/${fileName}`, "utf8");
     applyMigration(fileName, sql);
   }
+
+  validateMigrationState(db);
 }
 
 function resolveMigrationDirectory(): string {
@@ -1072,6 +1102,46 @@ function resolveMigrationDirectory(): string {
   throw persistenceError(
     "sqlite backend could not locate its migrations directory",
     "sqlite_backend_missing_migrations_directory"
+  );
+}
+
+function validateMigrationState(db: Database.Database): void {
+  const appliedMigrations = new Set(
+    (
+      db
+        .prepare("SELECT name FROM backend_sqlite_migrations ORDER BY name")
+        .all() as SqliteMigrationRow[]
+    ).map((row) => row.name)
+  );
+
+  if (!appliedMigrations.has(INITIAL_SCHEMA_MIGRATION_NAME)) {
+    return;
+  }
+
+  const existingTables = new Set(
+    (
+      db
+        .prepare(
+          "SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name"
+        )
+        .all() as Array<{ name: string }>
+    ).map((row) => row.name)
+  );
+  const missingTables = INITIAL_SCHEMA_REQUIRED_TABLES.filter(
+    (tableName) => !existingTables.has(tableName)
+  );
+
+  if (missingTables.length === 0) {
+    return;
+  }
+
+  throw persistenceError(
+    "sqlite backend found an applied migration without its required schema tables",
+    "sqlite_backend_applied_migration_schema_missing",
+    {
+      migrationName: INITIAL_SCHEMA_MIGRATION_NAME,
+      missingTables,
+    }
   );
 }
 

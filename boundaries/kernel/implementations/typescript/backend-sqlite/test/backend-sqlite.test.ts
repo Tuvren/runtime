@@ -55,6 +55,10 @@ import { createSqliteBackend } from "../src/index.js";
 
 const NESTED_TRANSACTION_ERROR_PATTERN = /must not be nested/u;
 const MIGRATION_CONFLICT_ERROR_PATTERN = /table turn_trees already exists/u;
+const MISSING_SCHEMA_ERROR_PATTERN =
+  /applied migration without its required schema tables/u;
+const NORMALIZED_SQLITE_ERROR_PATTERN =
+  /required schema tables|missing schema tables/u;
 const RUN_STATUS_ERROR_PATTERN = /valid run status/u;
 const RUN_SHAPE_ERROR_PATTERN = /currentStepIndex/u;
 const STAGED_RESULT_ROW_ERROR_PATTERN =
@@ -362,6 +366,31 @@ describe("@kraken/backend-sqlite", () => {
     deepStrictEqual(migrationRows, []);
   });
 
+  test("rejects databases that record the baseline migration without its tables", () => {
+    const databasePath = createTempDatabasePath();
+    const seed = new Database(databasePath);
+    seed.exec(`
+      CREATE TABLE backend_sqlite_migrations (
+        name TEXT PRIMARY KEY,
+        applied_at_ms INTEGER NOT NULL
+      )
+    `);
+    seed
+      .prepare(
+        `
+          INSERT INTO backend_sqlite_migrations (name, applied_at_ms)
+          VALUES (?, ?)
+        `
+      )
+      .run("0001_initial_schema.sql", 1);
+    seed.close();
+
+    throws(
+      () => createSqliteBackend({ databasePath }),
+      MISSING_SCHEMA_ERROR_PATTERN
+    );
+  });
+
   test("loads migrations from dist-local paths in dist-style layouts", async () => {
     const tempDirectory = createWorkspaceTempDirectory(
       ".tmp-sqlite-dist-layout-"
@@ -384,6 +413,54 @@ describe("@kraken/backend-sqlite", () => {
     const backend = runtimeModule.createSqliteBackend({ databasePath });
 
     deepStrictEqual(await backend.health(), { ok: true });
+  });
+
+  test("reports unhealthy status when required schema tables are missing", async () => {
+    const databasePath = createTempDatabasePath();
+    const backend = createSqliteBackend({ databasePath });
+    const probe = new Database(databasePath);
+    probe.exec("DROP TABLE objects");
+    probe.close();
+
+    const health = await backend.health();
+    deepStrictEqual(health.ok, false);
+    if (health.ok) {
+      throw new Error("expected unhealthy status");
+    }
+    strictEqual(MISSING_SCHEMA_ERROR_PATTERN.test(health.reason), true);
+  });
+
+  test("rolls back and normalizes preflight failures before the user callback runs", async () => {
+    const seeded = await seedCorruptionDatabase();
+    const backend = createSqliteBackend({ databasePath: seeded.databasePath });
+    const probe = new Database(seeded.databasePath);
+    probe
+      .prepare("UPDATE objects SET hash = ? WHERE hash = ?")
+      .run(createHashFromIndex(999), seeded.objectHash);
+    probe.close();
+
+    await rejects(
+      backend.transact(async () => undefined),
+      OBJECT_ROW_ERROR_PATTERN
+    );
+
+    await rejects(
+      backend.transact(async () => undefined),
+      OBJECT_ROW_ERROR_PATTERN
+    );
+  });
+
+  test("normalizes missing-table preflight failures into backend errors", async () => {
+    const databasePath = createTempDatabasePath();
+    const backend = createSqliteBackend({ databasePath });
+    const probe = new Database(databasePath);
+    probe.exec("DROP TABLE objects");
+    probe.close();
+
+    await rejects(
+      backend.transact(async () => undefined),
+      NORMALIZED_SQLITE_ERROR_PATTERN
+    );
   });
 
   test("rejects stored run rows with invalid status values", async () => {
