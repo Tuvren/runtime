@@ -825,18 +825,8 @@ class SqliteBackend implements KrakenBackend {
 
   constructor(options: SqliteBackendOptions) {
     this.now = options.now ?? Date.now;
-    const databasePath = normalizePersistentDatabasePath(options.databasePath);
-
-    try {
-      ensureDatabaseDirectory(databasePath);
-      this.db = new Database(databasePath, {
-        timeout: SQLITE_BUSY_TIMEOUT_MS,
-      });
-      configureDatabase(this.db);
-      runMigrations(this.db, this.now);
-    } catch (error: unknown) {
-      throw normalizeBackendError(error);
-    }
+    this.db = openConfiguredDatabase(options.databasePath);
+    runMigrations(this.db, this.now);
   }
 
   private async queueConnectionWork<T>(work: () => Promise<T>): Promise<T> {
@@ -1728,6 +1718,21 @@ function configureDatabase(db: Database.Database): void {
   }
 }
 
+function openConfiguredDatabase(databasePath: string): Database.Database {
+  const normalizedDatabasePath = normalizePersistentDatabasePath(databasePath);
+
+  try {
+    ensureDatabaseDirectory(normalizedDatabasePath);
+    const db = new Database(normalizedDatabasePath, {
+      timeout: SQLITE_BUSY_TIMEOUT_MS,
+    });
+    configureDatabase(db);
+    return db;
+  } catch (error: unknown) {
+    throw normalizeBackendError(error);
+  }
+}
+
 function runMigrations(db: Database.Database, now: () => number): void {
   db.exec(`
     CREATE TABLE IF NOT EXISTS backend_sqlite_migrations (
@@ -1790,15 +1795,10 @@ function resolveMigrationDirectory(): string {
 
 function validateMigrationState(db: Database.Database): void {
   const knownMigrationFiles = listMigrationFiles(resolveMigrationDirectory());
-  const knownMigrationFileSet = new Set(knownMigrationFiles);
-  const appliedMigrationNames = (
-    db
-      .prepare("SELECT name FROM backend_sqlite_migrations ORDER BY name")
-      .all() as SqliteMigrationRow[]
-  ).map((row) => row.name);
+  const appliedMigrationNames = loadAppliedMigrationNames(db);
   const appliedMigrations = new Set(appliedMigrationNames);
   const unknownAppliedMigrations = [...appliedMigrations].filter(
-    (migrationName) => !knownMigrationFileSet.has(migrationName)
+    (migrationName) => !knownMigrationFiles.includes(migrationName)
   );
 
   if (unknownAppliedMigrations.length > 0) {
@@ -1816,15 +1816,26 @@ function validateMigrationState(db: Database.Database): void {
     return;
   }
 
-  const existingTables = new Set(
-    (
-      db
-        .prepare(
-          "SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name"
-        )
-        .all() as Array<{ name: string }>
-    ).map((row) => row.name)
-  );
+  validateBaselineSchemaPresence(db);
+
+  const latestAppliedMigrationName = appliedMigrationNames.at(-1);
+  if (latestAppliedMigrationName !== INITIAL_SCHEMA_MIGRATION_NAME) {
+    return;
+  }
+
+  validateBaselineSchemaShape(db);
+}
+
+function loadAppliedMigrationNames(db: Database.Database): string[] {
+  return (
+    db
+      .prepare("SELECT name FROM backend_sqlite_migrations ORDER BY name")
+      .all() as SqliteMigrationRow[]
+  ).map((row) => row.name);
+}
+
+function validateBaselineSchemaPresence(db: Database.Database): void {
+  const existingTables = loadSqliteMasterNames(db, "table");
   const missingTables = INITIAL_SCHEMA_REQUIRED_TABLES.filter(
     (tableName) => !existingTables.has(tableName)
   );
@@ -1840,15 +1851,7 @@ function validateMigrationState(db: Database.Database): void {
     );
   }
 
-  const existingIndexes = new Set(
-    (
-      db
-        .prepare(
-          "SELECT name FROM sqlite_master WHERE type = 'index' ORDER BY name"
-        )
-        .all() as Array<{ name: string }>
-    ).map((row) => row.name)
-  );
+  const existingIndexes = loadSqliteMasterNames(db, "index");
   const missingIndexes = INITIAL_SCHEMA_REQUIRED_INDEXES.filter(
     (indexName) => !existingIndexes.has(indexName)
   );
@@ -1863,12 +1866,9 @@ function validateMigrationState(db: Database.Database): void {
       }
     );
   }
+}
 
-  const latestAppliedMigrationName = appliedMigrationNames.at(-1);
-  if (latestAppliedMigrationName !== INITIAL_SCHEMA_MIGRATION_NAME) {
-    return;
-  }
-
+function validateBaselineSchemaShape(db: Database.Database): void {
   for (const tableName of INITIAL_SCHEMA_REQUIRED_TABLES) {
     validateBaselineTableSchema(
       db,
@@ -1884,6 +1884,21 @@ function validateMigrationState(db: Database.Database): void {
       INITIAL_SCHEMA_INDEX_DEFINITIONS[indexName]
     );
   }
+}
+
+function loadSqliteMasterNames(
+  db: Database.Database,
+  type: "index" | "table"
+): Set<string> {
+  return new Set(
+    (
+      db
+        .prepare(
+          `SELECT name FROM sqlite_master WHERE type = '${type}' ORDER BY name`
+        )
+        .all() as Array<{ name: string }>
+    ).map((row) => row.name)
+  );
 }
 
 function listMigrationFiles(migrationDirectory: string): string[] {
