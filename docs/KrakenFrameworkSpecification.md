@@ -860,10 +860,22 @@ function executeIteration(turnId, branchId, schemaId, toolRegistry, config, iter
 ### 4.7 Complete Turn Protocol
 
 ```
-function executeTurn(signal, threadId, branchId, schemaId, tools, config, steering?, parentTurnId?):
+function executeTurn(input):
   → ExecutionHandle
 
+  signal = input.signal
+  threadId = input.threadId
+  branchId = input.branchId
+  schemaId = input.schemaId
+  driverId = input.driverId
+  tools = input.tools
+  config = input.config
+  steering = input.steering
+  parentTurnId = input.parentTurnId
+
   turnId = generateId()
+  activeDriverId = driverId ?? resolveDefaultDriverId()
+  activeDriver = getDriver(activeDriverId)
 
   function* driver():
     branch = kernel.branch.get(branchId)
@@ -885,10 +897,10 @@ function executeTurn(signal, threadId, branchId, schemaId, tools, config, steeri
     else if turnHookResolution == fail(soft):
       log soft failure
       enteredIterationLoop = true
-      resolution = iterationLoop(turnId, branchId, schemaId, toolRegistry, activeConfig, steering)
+      resolution = activeDriver.iterationLoop(turnId, branchId, schemaId, toolRegistry, activeConfig, steering)
     else:
       enteredIterationLoop = true
-      resolution = iterationLoop(turnId, branchId, schemaId, toolRegistry, activeConfig, steering)
+      resolution = activeDriver.iterationLoop(turnId, branchId, schemaId, toolRegistry, activeConfig, steering)
 
     if enteredIterationLoop && resolution.type != "pause":
       runAfterTurnHooks(activeConfig.extensions)
@@ -899,10 +911,12 @@ function executeTurn(signal, threadId, branchId, schemaId, tools, config, steeri
     kernel.turn.updateHead(turnId, latestHead())
     yield { type: "turn.end", turnId, status: resolutionToStatus(resolution), timestamp: now() }
 
-  return wrapAsHandle(driver(), turnId, branchId, steering)
+  return wrapAsHandle(driver(), turnId, branchId, steering, activeDriverId)
 ```
 
 `executeTurn` returns an `ExecutionHandle` (§7.1), not a bare `AsyncIterable`. The handle wraps the internal driver generator. The `events()` method on the handle provides the iterable that drives execution.
+
+`driverId` is optional. When omitted, the framework resolves its configured default driver before execution begins. In the current baseline, the default driver is ReAct. Hosts may pass an explicit `driverId` when they need a concrete driver instead of the configured default.
 
 For a Thread's first semantic Turn, `parentTurnId` is `null`. For every subsequent semantic Turn, `parentTurnId` MUST identify the immediately previous semantic Turn on the active Branch and still belong to the same Thread. When the framework resolves this parent implicitly, the resolver must be branch-aware (`resolveParentTurnId(threadId, branchId)`), so branching and rollback do not make semantic lineage ambiguous. Approval resumes stay within the existing Turn and do not create a new Turn.
 
@@ -1296,7 +1310,15 @@ The host is responsible for:
 
 ```
 // Start a Turn
-handle = framework.executeTurn(signal, threadId, branchId, schemaId, tools, config)
+handle = framework.executeTurn({
+  signal,
+  threadId,
+  branchId,
+  schemaId,
+  driverId: "react",
+  tools,
+  config
+})
 
 // Consume events (drives execution)
 while (handle) {
@@ -1764,7 +1786,15 @@ tools: [{
   inputSchema: { query: "string", depth: "string" },
   execute: async (input, ctx) => {
     const { threadId, branchId } = kernel.thread.create(...)
-    const workerHandle = executeTurn(input, threadId, branchId, schemaId, researchConfig.tools, researchConfig)
+    const workerHandle = executeTurn({
+      signal: input,
+      threadId,
+      branchId,
+      schemaId,
+      driverId: "react",
+      tools: researchConfig.tools,
+      config: researchConfig
+    })
 
     let result = ""
     for await (const event of workerHandle.events()) {
@@ -1976,7 +2006,7 @@ The framework-provided runtime for multi-agent coordination. Owns worker lifecyc
 
 ```
 OrchestrationRuntime
-├─ executeTurn(signal, threadId, branchId, schemaId) → OrchestrationHandle
+├─ executeTurn(input: { signal, threadId, branchId, schemaId?, driverId? }) → OrchestrationHandle
 ├─ launchWorker(agent: string, task: unknown) → string (workerId)
 ├─ awaitWorker(workerId: string) → Promise<unknown>
 └─ cancel(): void
