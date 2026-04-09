@@ -110,8 +110,56 @@ describe("runtime-api contracts", () => {
     expect(isProviderStreamChunk({ type: "tool_call_start" })).toBe(false);
   });
 
+  test("rejects approval requests with incomplete tool results", () => {
+    expect(
+      isApprovalRequest({
+        completedResults: [
+          { callId: "call-1", name: "search", type: "tool_result" },
+        ],
+        toolCalls: [],
+      })
+    ).toBe(false);
+  });
+
+  test("rejects approval requests with incomplete pending tool calls", () => {
+    expect(
+      isApprovalRequest({
+        completedResults: [],
+        toolCalls: [
+          {
+            callId: "call-2",
+            decisions: ["approve"],
+            message: "Approve?",
+            name: "search",
+          },
+        ],
+      })
+    ).toBe(false);
+  });
+
   test("rejects stream events that omit required fields", () => {
     expect(isKrakenStreamEvent({ type: "turn.end", timestamp: 1 })).toBe(false);
+  });
+
+  test("rejects stream events with invalid hash references", () => {
+    expect(
+      isKrakenStreamEvent({
+        resumedFrom: "not-a-hash",
+        threadId: "thread-1",
+        timestamp: 1,
+        turnId: "turn-1",
+        type: "turn.start",
+      })
+    ).toBe(false);
+
+    expect(
+      isKrakenStreamEvent({
+        iterationCount: 1,
+        timestamp: 1,
+        turnNodeHash: "not-a-hash",
+        type: "state.checkpoint",
+      })
+    ).toBe(false);
   });
 
   test("rejects assistant messages with incomplete content parts", () => {
@@ -119,6 +167,29 @@ describe("runtime-api contracts", () => {
       isKrakenMessage({
         parts: [{ type: "text" }],
         role: "assistant",
+      })
+    ).toBe(false);
+  });
+
+  test("rejects execution statuses with malformed optional fields", () => {
+    expect(
+      isExecutionStatus({
+        approval: "oops",
+        iterationCount: 1,
+        phase: "paused",
+      })
+    ).toBe(false);
+  });
+
+  test("rejects tool definitions with invalid schemas", () => {
+    expect(
+      isKrakenToolDefinition({
+        description: "Search",
+        execute() {
+          return undefined;
+        },
+        inputSchema: 123,
+        name: "search",
       })
     ).toBe(false);
   });

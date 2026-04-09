@@ -19,7 +19,11 @@ import type {
   HashString,
   KernelRecord,
 } from "@kraken/shared-core-types";
-import { KrakenValidationError } from "@kraken/shared-core-types";
+import {
+  isHashString,
+  isKernelRecord,
+  KrakenValidationError,
+} from "@kraken/shared-core-types";
 
 const CONTENT_PART_TYPES = new Set([
   "text",
@@ -966,7 +970,7 @@ function hasValidStreamEventPayload(
       return (
         typeof value.turnId === "string" &&
         typeof value.threadId === "string" &&
-        isOptionalStringProperty(value, "resumedFrom")
+        isOptionalHashStringProperty(value, "resumedFrom")
       );
     case "turn.end":
       return (
@@ -1050,7 +1054,7 @@ function hasValidStreamEventPayload(
     case "state.checkpoint":
       return (
         isSafeIntegerProperty(value, "iterationCount") &&
-        typeof value.turnNodeHash === "string"
+        isHashString(value.turnNodeHash)
       );
     case "error":
       return (
@@ -1083,7 +1087,7 @@ export function isKrakenToolDefinition(
     typeof value.name === "string" &&
     typeof value.description === "string" &&
     typeof value.execute === "function" &&
-    value.inputSchema !== undefined
+    isKrakenToolSchema(value.inputSchema)
   );
 }
 
@@ -1104,8 +1108,11 @@ export function isExecutionStatus(value: unknown): value is ExecutionStatus {
     isPlainObject(value) &&
     isStringProperty(value, "phase") &&
     EXECUTION_PHASES.has(value.phase) &&
-    typeof value.iterationCount === "number" &&
-    Number.isSafeInteger(value.iterationCount)
+    isSafeIntegerProperty(value, "iterationCount") &&
+    isOptionalApprovalRequest(value, "approval") &&
+    isOptionalStringProperty(value, "activeAgent") &&
+    isOptionalContextManifest(value, "manifest") &&
+    isOptionalStringProperty(value, "pauseReason")
   );
 }
 
@@ -1186,7 +1193,10 @@ function isToolResultPart(value: unknown): value is ToolResultPart {
     isPlainObject(value) &&
     value.type === "tool_result" &&
     typeof value.callId === "string" &&
-    typeof value.name === "string"
+    typeof value.name === "string" &&
+    "output" in value &&
+    isOptionalBooleanProperty(value, "isError") &&
+    isOptionalPlainObjectProperty(value, "providerMetadata")
   );
 }
 
@@ -1196,6 +1206,7 @@ function isPendingToolCall(value: unknown): value is PendingToolCall {
     typeof value.callId === "string" &&
     typeof value.name === "string" &&
     typeof value.message === "string" &&
+    "input" in value &&
     Array.isArray(value.decisions) &&
     value.decisions.every((item) => typeof item === "string")
   );
@@ -1295,6 +1306,27 @@ function isOptionalBooleanProperty<
   return value[key] === undefined || typeof value[key] === "boolean";
 }
 
+function isOptionalApprovalRequest<
+  TKey extends string,
+  TObject extends Record<string, unknown>,
+>(value: TObject, key: TKey): boolean {
+  return value[key] === undefined || isApprovalRequest(value[key]);
+}
+
+function isOptionalContextManifest<
+  TKey extends string,
+  TObject extends Record<string, unknown>,
+>(value: TObject, key: TKey): boolean {
+  return value[key] === undefined || isContextManifest(value[key]);
+}
+
+function isOptionalHashStringProperty<
+  TKey extends string,
+  TObject extends Record<string, unknown>,
+>(value: TObject, key: TKey): boolean {
+  return value[key] === undefined || isHashString(value[key]);
+}
+
 function isOptionalPlainObjectProperty<
   TKey extends string,
   TObject extends Record<string, unknown>,
@@ -1314,6 +1346,27 @@ function isOptionalStringProperty<
   TObject extends Record<string, unknown>,
 >(value: TObject, key: TKey): boolean {
   return value[key] === undefined || typeof value[key] === "string";
+}
+
+function isKrakenJsonSchema(value: unknown): value is KrakenJsonSchema {
+  return (
+    typeof value === "boolean" ||
+    (isPlainObject(value) && isKernelRecord(value))
+  );
+}
+
+function isKrakenToolSchema(
+  value: unknown
+): value is KrakenJsonSchema | CustomSchema {
+  return isKrakenJsonSchema(value) || isCustomSchema(value);
+}
+
+function isCustomSchema(value: unknown): value is CustomSchema {
+  return (
+    isPlainObject(value) &&
+    typeof value.toJSONSchema === "function" &&
+    typeof value.validate === "function"
+  );
 }
 
 function isProviderUsage(value: unknown): value is ProviderUsage {
