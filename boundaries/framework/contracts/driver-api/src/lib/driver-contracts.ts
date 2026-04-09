@@ -22,7 +22,10 @@ import type {
   RuntimeResolution,
   ToolRegistry,
 } from "@kraken/framework-runtime-api";
-import { KrakenValidationError } from "@kraken/shared-core-types";
+import {
+  type HashString,
+  KrakenValidationError,
+} from "@kraken/shared-core-types";
 
 export interface DriverRuntimePort {
   emit(event: KrakenStreamEvent): Promise<void> | void;
@@ -41,7 +44,7 @@ export interface DriverExecutionContext {
 
 export interface DriverResumeContext extends DriverExecutionContext {
   approval: ApprovalResponse;
-  resumedFrom?: string;
+  resumedFrom?: HashString;
 }
 
 export interface DriverExecutionResult {

@@ -830,8 +830,12 @@ export function isKrakenMessage(value: unknown): value is KrakenMessage {
     case "system":
       return typeof value.content === "string";
     case "user":
-    case "assistant":
       return isContentPartArray(value.parts);
+    case "assistant":
+      return (
+        isContentPartArray(value.parts) &&
+        isOptionalPlainObjectProperty(value, "providerMetadata")
+      );
     case "tool":
       return Array.isArray(value.parts) && value.parts.every(isToolResultPart);
     default:
@@ -1087,7 +1091,10 @@ export function isKrakenToolDefinition(
     typeof value.name === "string" &&
     typeof value.description === "string" &&
     typeof value.execute === "function" &&
-    isKrakenToolSchema(value.inputSchema)
+    isKrakenToolSchema(value.inputSchema) &&
+    isOptionalApprovalPolicy(value, "approval") &&
+    isOptionalPlainObjectProperty(value, "metadata") &&
+    isOptionalTimeoutProperty(value, "timeout")
   );
 }
 
@@ -1221,12 +1228,22 @@ function isApprovalResponse(value: unknown): value is ApprovalResponse {
 }
 
 function isApprovalDecision(value: unknown): value is ApprovalDecision {
-  return (
-    isPlainObject(value) &&
-    typeof value.callId === "string" &&
-    typeof value.type === "string" &&
-    isOptionalStringProperty(value, "message")
-  );
+  if (
+    !(
+      isPlainObject(value) &&
+      typeof value.callId === "string" &&
+      typeof value.type === "string" &&
+      isOptionalStringProperty(value, "message")
+    )
+  ) {
+    return false;
+  }
+
+  if (value.type === "edit" && !("editedInput" in value)) {
+    return false;
+  }
+
+  return true;
 }
 
 function isKrakenErrorProjection(
@@ -1247,7 +1264,7 @@ function isContextManifest(value: unknown): value is ContextManifest {
     isSafeIntegerProperty(value, "lastAssistantMessageIndex") &&
     isSafeIntegerProperty(value, "lastUserMessageIndex") &&
     isSafeIntegerProperty(value, "messageCount") &&
-    typeof value.tokenEstimate === "number" &&
+    isFiniteNumberProperty(value, "tokenEstimate") &&
     isContextManifestNameCounters(value.toolCalls) &&
     isContextManifestNameCounters(value.toolResults) &&
     Array.isArray(value.turnBoundaries) &&
@@ -1306,6 +1323,13 @@ function isOptionalBooleanProperty<
   return value[key] === undefined || typeof value[key] === "boolean";
 }
 
+function isOptionalApprovalPolicy<
+  TKey extends string,
+  TObject extends Record<string, unknown>,
+>(value: TObject, key: TKey): boolean {
+  return value[key] === undefined || isApprovalPolicy(value[key]);
+}
+
 function isOptionalApprovalRequest<
   TKey extends string,
   TObject extends Record<string, unknown>,
@@ -1348,6 +1372,24 @@ function isOptionalStringProperty<
   return value[key] === undefined || typeof value[key] === "string";
 }
 
+function isOptionalTimeoutProperty<
+  TKey extends string,
+  TObject extends Record<string, unknown>,
+>(value: TObject, key: TKey): boolean {
+  return value[key] === undefined || isTimeoutMs(value[key]);
+}
+
+function isApprovalPolicy(value: unknown): value is ApprovalPolicy {
+  return typeof value === "boolean" || typeof value === "function";
+}
+
+function isFiniteNumberProperty<
+  TKey extends string,
+  TObject extends Record<string, unknown>,
+>(value: TObject, key: TKey): boolean {
+  return typeof value[key] === "number" && Number.isFinite(value[key]);
+}
+
 function isKrakenJsonSchema(value: unknown): value is KrakenJsonSchema {
   return (
     typeof value === "boolean" ||
@@ -1375,6 +1417,10 @@ function isProviderUsage(value: unknown): value is ProviderUsage {
     isSafeIntegerProperty(value, "inputTokens") &&
     isSafeIntegerProperty(value, "outputTokens")
   );
+}
+
+function isTimeoutMs(value: unknown): boolean {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0;
 }
 
 function isSafeIntegerProperty<

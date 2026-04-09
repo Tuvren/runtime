@@ -171,6 +171,16 @@ describe("runtime-api contracts", () => {
     ).toBe(false);
   });
 
+  test("rejects assistant messages with malformed provider metadata", () => {
+    expect(
+      isKrakenMessage({
+        parts: [],
+        providerMetadata: 7,
+        role: "assistant",
+      })
+    ).toBe(false);
+  });
+
   test("rejects execution statuses with malformed optional fields", () => {
     expect(
       isExecutionStatus({
@@ -194,6 +204,56 @@ describe("runtime-api contracts", () => {
     ).toBe(false);
   });
 
+  test("rejects tool definitions with malformed optional behavior fields", () => {
+    expect(
+      isKrakenToolDefinition({
+        approval: 7,
+        description: "Search",
+        execute() {
+          return undefined;
+        },
+        inputSchema: true,
+        name: "search",
+      })
+    ).toBe(false);
+
+    expect(
+      isKrakenToolDefinition({
+        description: "Search",
+        execute() {
+          return undefined;
+        },
+        inputSchema: true,
+        metadata: 7,
+        name: "search",
+      })
+    ).toBe(false);
+
+    expect(
+      isKrakenToolDefinition({
+        description: "Search",
+        execute() {
+          return undefined;
+        },
+        inputSchema: true,
+        name: "search",
+        timeout: Number.POSITIVE_INFINITY,
+      })
+    ).toBe(false);
+  });
+
+  test("rejects approval resolved events with edit decisions missing edited input", () => {
+    expect(
+      isKrakenStreamEvent({
+        response: {
+          decisions: [{ callId: "call-1", type: "edit" }],
+        },
+        timestamp: 1,
+        type: "approval.resolved",
+      })
+    ).toBe(false);
+  });
+
   test("rejects event sources with a non-string workerId", () => {
     expect(
       isKrakenStreamEvent({
@@ -202,6 +262,31 @@ describe("runtime-api contracts", () => {
         type: "turn.end",
         turnId: "turn-1",
         status: "completed",
+      })
+    ).toBe(false);
+  });
+
+  test("rejects execution statuses with non-finite manifest token estimates", () => {
+    expect(
+      isExecutionStatus({
+        iterationCount: 1,
+        manifest: {
+          byRole: {
+            assistant: 1,
+            system: 0,
+            tool: 0,
+            user: 1,
+          },
+          extensions: {},
+          lastAssistantMessageIndex: 0,
+          lastUserMessageIndex: 1,
+          messageCount: 2,
+          tokenEstimate: Number.NaN,
+          toolCalls: { byName: {}, total: 0 },
+          toolResults: { byName: {}, total: 0 },
+          turnBoundaries: [0],
+        },
+        phase: "running",
       })
     ).toBe(false);
   });
