@@ -42,6 +42,13 @@ const PROVIDER_STREAM_CHUNK_TYPES = new Set([
   "finish",
   "error",
 ]);
+const FINISH_REASONS = new Set([
+  "stop",
+  "tool_call",
+  "length",
+  "error",
+  "content_filter",
+]);
 const STREAM_EVENT_TYPES = new Set([
   "turn.start",
   "turn.end",
@@ -68,6 +75,7 @@ const STREAM_EVENT_TYPES = new Set([
   "error",
   "custom",
 ]);
+const TURN_END_STATUSES = new Set(["completed", "paused", "failed"]);
 const EXECUTION_PHASES = new Set(["running", "paused", "completed", "failed"]);
 
 export type KrakenJsonSchema = KernelRecord | boolean;
@@ -864,11 +872,58 @@ export function assertApprovalRequest(
 export function isProviderStreamChunk(
   value: unknown
 ): value is ProviderStreamChunk {
-  return (
-    isPlainObject(value) &&
-    isStringProperty(value, "type") &&
-    PROVIDER_STREAM_CHUNK_TYPES.has(value.type)
-  );
+  if (
+    !(
+      isPlainObject(value) &&
+      isStringProperty(value, "type") &&
+      PROVIDER_STREAM_CHUNK_TYPES.has(value.type)
+    )
+  ) {
+    return false;
+  }
+
+  switch (value.type) {
+    case "text_delta":
+      return typeof value.text === "string";
+    case "reasoning_delta":
+      return (
+        typeof value.text === "string" &&
+        isOptionalStringProperty(value, "signature")
+      );
+    case "reasoning_done":
+      return true;
+    case "structured_delta":
+      return typeof value.delta === "string";
+    case "structured_done":
+      return "data" in value && isOptionalStringProperty(value, "name");
+    case "tool_call_start":
+      return (
+        typeof value.providerCallId === "string" &&
+        typeof value.name === "string"
+      );
+    case "tool_call_args_delta":
+      return (
+        typeof value.providerCallId === "string" &&
+        typeof value.delta === "string"
+      );
+    case "tool_call_done":
+      return (
+        typeof value.providerCallId === "string" &&
+        typeof value.name === "string" &&
+        "input" in value
+      );
+    case "finish":
+      return (
+        isStringProperty(value, "finishReason") &&
+        FINISH_REASONS.has(value.finishReason) &&
+        isOptionalProviderUsage(value, "usage") &&
+        isOptionalPlainObjectProperty(value, "providerMetadata")
+      );
+    case "error":
+      return "error" in value;
+    default:
+      return false;
+  }
 }
 
 export function assertProviderStreamChunk(
@@ -896,7 +951,116 @@ export function isKrakenStreamEvent(
     return false;
   }
 
-  return hasEpochMsTimestamp(value);
+  if (!hasEpochMsTimestamp(value)) {
+    return false;
+  }
+
+  return hasValidStreamEventPayload(value);
+}
+
+function hasValidStreamEventPayload(
+  value: Record<string, unknown> & { timestamp: EpochMs; type: string }
+): boolean {
+  switch (value.type) {
+    case "turn.start":
+      return (
+        typeof value.turnId === "string" &&
+        typeof value.threadId === "string" &&
+        isOptionalStringProperty(value, "resumedFrom")
+      );
+    case "turn.end":
+      return (
+        typeof value.turnId === "string" &&
+        isStringProperty(value, "status") &&
+        TURN_END_STATUSES.has(value.status)
+      );
+    case "iteration.start":
+    case "iteration.end":
+      return isSafeIntegerProperty(value, "iterationCount");
+    case "message.start":
+      return typeof value.messageId === "string" && value.role === "assistant";
+    case "text.delta":
+      return (
+        typeof value.messageId === "string" && typeof value.delta === "string"
+      );
+    case "text.done":
+      return (
+        typeof value.messageId === "string" && typeof value.text === "string"
+      );
+    case "reasoning.delta":
+      return (
+        typeof value.messageId === "string" && typeof value.delta === "string"
+      );
+    case "reasoning.done":
+      return typeof value.messageId === "string";
+    case "structured.delta":
+      return (
+        typeof value.messageId === "string" && typeof value.delta === "string"
+      );
+    case "structured.done":
+      return (
+        typeof value.messageId === "string" &&
+        "data" in value &&
+        isOptionalStringProperty(value, "name")
+      );
+    case "tool_call.start":
+      return (
+        typeof value.messageId === "string" &&
+        typeof value.callId === "string" &&
+        typeof value.name === "string"
+      );
+    case "tool_call.args_delta":
+      return (
+        typeof value.callId === "string" && typeof value.delta === "string"
+      );
+    case "tool_call.done":
+      return (
+        typeof value.callId === "string" &&
+        typeof value.name === "string" &&
+        "input" in value
+      );
+    case "message.done":
+      return (
+        typeof value.messageId === "string" &&
+        isStringProperty(value, "finishReason") &&
+        FINISH_REASONS.has(value.finishReason) &&
+        isOptionalProviderUsage(value, "usage")
+      );
+    case "tool.start":
+      return (
+        typeof value.callId === "string" &&
+        typeof value.name === "string" &&
+        "input" in value
+      );
+    case "tool.result":
+      return (
+        typeof value.callId === "string" &&
+        typeof value.name === "string" &&
+        "output" in value &&
+        isOptionalBooleanProperty(value, "isError")
+      );
+    case "approval.requested":
+      return isApprovalRequest(value.request);
+    case "approval.resolved":
+      return isApprovalResponse(value.response);
+    case "steering.incorporated":
+      return typeof value.messageId === "string";
+    case "state.snapshot":
+      return isContextManifest(value.manifest);
+    case "state.checkpoint":
+      return (
+        isSafeIntegerProperty(value, "iterationCount") &&
+        typeof value.turnNodeHash === "string"
+      );
+    case "error":
+      return (
+        isKrakenErrorProjection(value.error) && typeof value.fatal === "boolean"
+      );
+    case "custom":
+      return typeof value.name === "string" && "data" in value;
+    default:
+      return false;
+  }
 }
 
 export function assertKrakenStreamEvent(
@@ -962,11 +1126,59 @@ function isContentPartArray(value: unknown): value is ContentPart[] {
 }
 
 function isContentPart(value: unknown): value is ContentPart {
-  return (
-    isPlainObject(value) &&
-    isStringProperty(value, "type") &&
-    CONTENT_PART_TYPES.has(value.type)
-  );
+  if (
+    !(
+      isPlainObject(value) &&
+      isStringProperty(value, "type") &&
+      CONTENT_PART_TYPES.has(value.type)
+    )
+  ) {
+    return false;
+  }
+
+  switch (value.type) {
+    case "text":
+      return (
+        typeof value.text === "string" &&
+        isOptionalPlainObjectProperty(value, "providerMetadata")
+      );
+    case "reasoning":
+      return (
+        typeof value.text === "string" &&
+        typeof value.redacted === "boolean" &&
+        isOptionalPlainObjectProperty(value, "providerMetadata")
+      );
+    case "tool_call":
+      return (
+        typeof value.callId === "string" &&
+        typeof value.name === "string" &&
+        "input" in value &&
+        isOptionalPlainObjectProperty(value, "providerMetadata")
+      );
+    case "tool_result":
+      return (
+        typeof value.callId === "string" &&
+        typeof value.name === "string" &&
+        "output" in value &&
+        isOptionalBooleanProperty(value, "isError") &&
+        isOptionalPlainObjectProperty(value, "providerMetadata")
+      );
+    case "file":
+      return (
+        (typeof value.data === "string" || value.data instanceof Uint8Array) &&
+        typeof value.mediaType === "string" &&
+        isOptionalStringProperty(value, "filename") &&
+        isOptionalPlainObjectProperty(value, "providerMetadata")
+      );
+    case "structured":
+      return (
+        "data" in value &&
+        isOptionalStringProperty(value, "name") &&
+        isOptionalPlainObjectProperty(value, "providerMetadata")
+      );
+    default:
+      return false;
+  }
 }
 
 function isToolResultPart(value: unknown): value is ToolResultPart {
@@ -989,6 +1201,72 @@ function isPendingToolCall(value: unknown): value is PendingToolCall {
   );
 }
 
+function isApprovalResponse(value: unknown): value is ApprovalResponse {
+  return (
+    isPlainObject(value) &&
+    Array.isArray(value.decisions) &&
+    value.decisions.every(isApprovalDecision)
+  );
+}
+
+function isApprovalDecision(value: unknown): value is ApprovalDecision {
+  return (
+    isPlainObject(value) &&
+    typeof value.callId === "string" &&
+    typeof value.type === "string" &&
+    isOptionalStringProperty(value, "message")
+  );
+}
+
+function isKrakenErrorProjection(
+  value: unknown
+): value is KrakenErrorProjection {
+  return (
+    isPlainObject(value) &&
+    typeof value.message === "string" &&
+    isOptionalStringProperty(value, "code")
+  );
+}
+
+function isContextManifest(value: unknown): value is ContextManifest {
+  return (
+    isPlainObject(value) &&
+    isContextManifestCounters(value.byRole) &&
+    isPlainObject(value.extensions) &&
+    isSafeIntegerProperty(value, "lastAssistantMessageIndex") &&
+    isSafeIntegerProperty(value, "lastUserMessageIndex") &&
+    isSafeIntegerProperty(value, "messageCount") &&
+    typeof value.tokenEstimate === "number" &&
+    isContextManifestNameCounters(value.toolCalls) &&
+    isContextManifestNameCounters(value.toolResults) &&
+    Array.isArray(value.turnBoundaries) &&
+    value.turnBoundaries.every((item) => Number.isSafeInteger(item))
+  );
+}
+
+function isContextManifestCounters(
+  value: unknown
+): value is ContextManifestCounters {
+  return (
+    isPlainObject(value) &&
+    isSafeIntegerProperty(value, "assistant") &&
+    isSafeIntegerProperty(value, "system") &&
+    isSafeIntegerProperty(value, "tool") &&
+    isSafeIntegerProperty(value, "user")
+  );
+}
+
+function isContextManifestNameCounters(
+  value: unknown
+): value is ContextManifestNameCounters {
+  return (
+    isPlainObject(value) &&
+    isPlainObject(value.byName) &&
+    Object.values(value.byName).every((count) => Number.isSafeInteger(count)) &&
+    isSafeIntegerProperty(value, "total")
+  );
+}
+
 function hasEpochMsTimestamp(
   value: Record<string, unknown>
 ): value is Record<string, unknown> & { timestamp: EpochMs } {
@@ -1008,6 +1286,49 @@ function hasEpochMsTimestamp(
   }
 
   return true;
+}
+
+function isOptionalBooleanProperty<
+  TKey extends string,
+  TObject extends Record<string, unknown>,
+>(value: TObject, key: TKey): boolean {
+  return value[key] === undefined || typeof value[key] === "boolean";
+}
+
+function isOptionalPlainObjectProperty<
+  TKey extends string,
+  TObject extends Record<string, unknown>,
+>(value: TObject, key: TKey): boolean {
+  return value[key] === undefined || isPlainObject(value[key]);
+}
+
+function isOptionalProviderUsage<
+  TKey extends string,
+  TObject extends Record<string, unknown>,
+>(value: TObject, key: TKey): boolean {
+  return value[key] === undefined || isProviderUsage(value[key]);
+}
+
+function isOptionalStringProperty<
+  TKey extends string,
+  TObject extends Record<string, unknown>,
+>(value: TObject, key: TKey): boolean {
+  return value[key] === undefined || typeof value[key] === "string";
+}
+
+function isProviderUsage(value: unknown): value is ProviderUsage {
+  return (
+    isPlainObject(value) &&
+    isSafeIntegerProperty(value, "inputTokens") &&
+    isSafeIntegerProperty(value, "outputTokens")
+  );
+}
+
+function isSafeIntegerProperty<
+  TKey extends string,
+  TObject extends Record<string, unknown>,
+>(value: TObject, key: TKey): boolean {
+  return typeof value[key] === "number" && Number.isSafeInteger(value[key]);
 }
 
 function isEventSource(value: unknown): value is EventSource {

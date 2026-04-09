@@ -106,6 +106,23 @@ describe("runtime-api contracts", () => {
     ).toBe(false);
   });
 
+  test("rejects provider chunks that omit required fields", () => {
+    expect(isProviderStreamChunk({ type: "tool_call_start" })).toBe(false);
+  });
+
+  test("rejects stream events that omit required fields", () => {
+    expect(isKrakenStreamEvent({ type: "turn.end", timestamp: 1 })).toBe(false);
+  });
+
+  test("rejects assistant messages with incomplete content parts", () => {
+    expect(
+      isKrakenMessage({
+        parts: [{ type: "text" }],
+        role: "assistant",
+      })
+    ).toBe(false);
+  });
+
   test("rejects event sources with a non-string workerId", () => {
     expect(
       isKrakenStreamEvent({
