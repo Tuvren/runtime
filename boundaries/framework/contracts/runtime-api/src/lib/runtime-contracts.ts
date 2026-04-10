@@ -161,8 +161,8 @@ const TOOL_DEFINITION_KEYS = new Set([
 const EXECUTION_STATUS_KEYS = new Set([
   "phase",
   "iterationCount",
-  "approval",
   "activeAgent",
+  "approval",
   "manifest",
   "pauseReason",
 ]);
@@ -184,10 +184,31 @@ const PENDING_TOOL_CALL_KEYS = new Set([
 const APPROVAL_RESPONSE_KEYS = new Set(["decisions"]);
 const APPROVAL_DECISION_KEYS = new Set([
   "callId",
+  "type",
   "editedInput",
   "message",
-  "type",
 ]);
+const KRAKEN_ERROR_PROJECTION_KEYS = new Set(["message", "code", "details"]);
+const CONTEXT_MANIFEST_KEYS = new Set([
+  "byRole",
+  "extensions",
+  "lastAssistantMessageIndex",
+  "lastUserMessageIndex",
+  "messageCount",
+  "tokenEstimate",
+  "toolCalls",
+  "toolResults",
+  "turnBoundaries",
+]);
+const CONTEXT_MANIFEST_COUNTER_KEYS = new Set([
+  "assistant",
+  "system",
+  "tool",
+  "user",
+]);
+const CONTEXT_MANIFEST_NAME_COUNTER_KEYS = new Set(["byName", "total"]);
+const EVENT_SOURCE_KEYS = new Set(["agent", "driver", "threadId", "workerId"]);
+const PROVIDER_USAGE_KEYS = new Set(["inputTokens", "outputTokens"]);
 
 export type KrakenJsonValue =
   | null
@@ -1351,7 +1372,7 @@ export function isKrakenToolDefinition(
       typeof value.execute === "function" &&
       isKrakenToolSchema(value.inputSchema) &&
       isOptionalApprovalPolicy(value, "approval") &&
-      isOptionalPlainObjectProperty(value, "metadata") &&
+      isOptionalSerializableRecordProperty(value, "metadata") &&
       isOptionalTimeoutProperty(value, "timeout")
   );
 }
@@ -1576,6 +1597,7 @@ function isKrakenErrorProjection(
 ): value is KrakenErrorProjection {
   return (
     isPlainObject(value) &&
+    hasOnlyAllowedKeys(value, KRAKEN_ERROR_PROJECTION_KEYS) &&
     typeof value.message === "string" &&
     isOptionalStringProperty(value, "code") &&
     isOptionalSerializableContractValueProperty(value, "details")
@@ -1597,6 +1619,7 @@ function isContextManifest(value: unknown): value is ContextManifest {
   if (
     !(
       isPlainObject(value) &&
+      hasOnlyAllowedKeys(value, CONTEXT_MANIFEST_KEYS) &&
       isContextManifestCounters(byRole) &&
       isSerializableRecord(value.extensions) &&
       isNonNegativeSafeInteger(messageCount) &&
@@ -1669,6 +1692,7 @@ function isContextManifestCounters(
 ): value is ContextManifestCounters {
   return (
     isPlainObject(value) &&
+    hasOnlyAllowedKeys(value, CONTEXT_MANIFEST_COUNTER_KEYS) &&
     isNonNegativeSafeIntegerProperty(value, "assistant") &&
     isNonNegativeSafeIntegerProperty(value, "system") &&
     isNonNegativeSafeIntegerProperty(value, "tool") &&
@@ -1681,6 +1705,7 @@ function isContextManifestNameCounters(
 ): value is ContextManifestNameCounters {
   return (
     isPlainObject(value) &&
+    hasOnlyAllowedKeys(value, CONTEXT_MANIFEST_NAME_COUNTER_KEYS) &&
     isPlainObject(value.byName) &&
     Object.keys(value.byName).every(isNonEmptyStringValue) &&
     Object.values(value.byName).every(
@@ -1860,13 +1885,6 @@ function isOptionalHashStringProperty<
   TObject extends Record<string, unknown>,
 >(value: TObject, key: TKey): boolean {
   return value[key] === undefined || isHashString(value[key]);
-}
-
-function isOptionalPlainObjectProperty<
-  TKey extends string,
-  TObject extends Record<string, unknown>,
->(value: TObject, key: TKey): boolean {
-  return value[key] === undefined || isPlainObject(value[key]);
 }
 
 function isOptionalSerializableRecordProperty<
@@ -2103,6 +2121,7 @@ function isCustomSchema(value: unknown): value is CustomSchema {
 function isProviderUsage(value: unknown): value is ProviderUsage {
   return (
     isPlainObject(value) &&
+    hasOnlyAllowedKeys(value, PROVIDER_USAGE_KEYS) &&
     isNonNegativeSafeIntegerProperty(value, "inputTokens") &&
     isNonNegativeSafeIntegerProperty(value, "outputTokens")
   );
@@ -2164,7 +2183,13 @@ function hasUniqueStrings(values: string[]): boolean {
 }
 
 function isEventSource(value: unknown): value is EventSource {
-  if (!(isPlainObject(value) && isNonEmptyStringProperty(value, "agent"))) {
+  if (
+    !(
+      isPlainObject(value) &&
+      hasOnlyAllowedKeys(value, EVENT_SOURCE_KEYS) &&
+      isNonEmptyStringProperty(value, "agent")
+    )
+  ) {
     return false;
   }
 

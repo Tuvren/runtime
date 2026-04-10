@@ -140,6 +140,34 @@ describe("runtime-api contracts", () => {
     ).toBe(false);
   });
 
+  test("rejects provider usage payloads with undeclared fields", () => {
+    expect(
+      isProviderStreamChunk({
+        finishReason: "stop",
+        type: "finish",
+        usage: {
+          extra: 3,
+          inputTokens: 1,
+          outputTokens: 2,
+        },
+      })
+    ).toBe(false);
+
+    expect(
+      isKrakenStreamEvent({
+        finishReason: "stop",
+        messageId: "message-1",
+        timestamp: 1,
+        type: "message.done",
+        usage: {
+          extra: 3,
+          inputTokens: 1,
+          outputTokens: 2,
+        },
+      })
+    ).toBe(false);
+  });
+
   test("rejects approval requests with incomplete tool results", () => {
     expect(
       isApprovalRequest({
@@ -703,6 +731,60 @@ describe("runtime-api contracts", () => {
     ).toBe(false);
   });
 
+  test("rejects manifests with undeclared nested fields", () => {
+    expect(
+      isExecutionStatus({
+        iterationCount: 0,
+        manifest: {
+          byRole: {
+            assistant: 0,
+            extra: 1,
+            system: 0,
+            tool: 0,
+            user: 1,
+          },
+          extensions: {},
+          lastAssistantMessageIndex: -1,
+          lastUserMessageIndex: 0,
+          messageCount: 1,
+          tokenEstimate: 12,
+          toolCalls: {
+            byName: {},
+            extra: 1,
+            total: 0,
+          },
+          toolResults: { byName: {}, total: 0 },
+          turnBoundaries: [0],
+        },
+        phase: "running",
+      })
+    ).toBe(false);
+
+    expect(
+      isExecutionStatus({
+        iterationCount: 0,
+        manifest: {
+          byRole: {
+            assistant: 0,
+            system: 0,
+            tool: 0,
+            user: 1,
+          },
+          extensions: {},
+          extra: 1,
+          lastAssistantMessageIndex: -1,
+          lastUserMessageIndex: 0,
+          messageCount: 1,
+          tokenEstimate: 12,
+          toolCalls: { byName: {}, total: 0 },
+          toolResults: { byName: {}, total: 0 },
+          turnBoundaries: [0],
+        },
+        phase: "running",
+      })
+    ).toBe(false);
+  });
+
   test("rejects execution statuses with invalid phase invariants", () => {
     expect(
       isExecutionStatus({
@@ -1006,6 +1088,24 @@ describe("runtime-api contracts", () => {
     ).toBe(false);
   });
 
+  test("rejects tool definitions with non-serializable metadata", () => {
+    expect(
+      isKrakenToolDefinition({
+        description: "Search",
+        execute() {
+          return undefined;
+        },
+        inputSchema: true,
+        metadata: {
+          fn() {
+            return 1;
+          },
+        },
+        name: "search",
+      })
+    ).toBe(false);
+  });
+
   test("rejects tool definitions with malformed optional behavior fields", () => {
     expect(
       isKrakenToolDefinition({
@@ -1195,6 +1295,30 @@ describe("runtime-api contracts", () => {
         type: "turn.end",
         turnId: "turn-1",
         status: "completed",
+      })
+    ).toBe(false);
+  });
+
+  test("rejects event sources and error payloads with undeclared fields", () => {
+    expect(
+      isKrakenStreamEvent({
+        source: { agent: "primary", extra: 1 },
+        status: "completed",
+        timestamp: 1,
+        turnId: "turn-1",
+        type: "turn.end",
+      })
+    ).toBe(false);
+
+    expect(
+      isKrakenStreamEvent({
+        error: {
+          extra: 1,
+          message: "boom",
+        },
+        fatal: true,
+        timestamp: 1,
+        type: "error",
       })
     ).toBe(false);
   });

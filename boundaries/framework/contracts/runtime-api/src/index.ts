@@ -21,6 +21,9 @@ export type {
   KernelRecord,
 } from "@kraken/shared-core-types";
 export { KrakenValidationError } from "@kraken/shared-core-types";
+// Focused facade packages are the preferred import homes for event, tool,
+// provider, and driver-specific contracts. These re-exports remain here as a
+// compatibility bridge while the partitioned surface settles across packages.
 export type {
   AfterIterationContext,
   AfterIterationHandler,
