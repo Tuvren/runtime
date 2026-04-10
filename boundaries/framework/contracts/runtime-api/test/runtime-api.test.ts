@@ -216,6 +216,40 @@ describe("runtime-api contracts", () => {
     ).toBe(false);
   });
 
+  test("returns false instead of throwing for hostile accessor payloads", () => {
+    const hostileProviderMetadata = {
+      get foo() {
+        throw new Error("boom");
+      },
+    };
+
+    expect(() =>
+      isKrakenMessage({
+        parts: [
+          {
+            providerMetadata: hostileProviderMetadata,
+            text: "hello",
+            type: "text",
+          },
+        ],
+        role: "assistant",
+      })
+    ).not.toThrow();
+
+    expect(
+      isKrakenMessage({
+        parts: [
+          {
+            providerMetadata: hostileProviderMetadata,
+            text: "hello",
+            type: "text",
+          },
+        ],
+        role: "assistant",
+      })
+    ).toBe(false);
+  });
+
   test("rejects approval requests with no pending tool calls", () => {
     expect(
       isApprovalRequest({
@@ -275,6 +309,31 @@ describe("runtime-api contracts", () => {
     ).toBe(true);
   });
 
+  test("rejects manifests that skip the earliest possible first user turn", () => {
+    expect(
+      isExecutionStatus({
+        iterationCount: 0,
+        manifest: {
+          byRole: {
+            assistant: 0,
+            system: 0,
+            tool: 0,
+            user: 2,
+          },
+          extensions: {},
+          lastAssistantMessageIndex: -1,
+          lastUserMessageIndex: 1,
+          messageCount: 2,
+          tokenEstimate: 12,
+          toolCalls: { byName: {}, total: 0 },
+          toolResults: { byName: {}, total: 0 },
+          turnBoundaries: [1],
+        },
+        phase: "running",
+      })
+    ).toBe(false);
+  });
+
   test("rejects stream events that omit required fields", () => {
     expect(isKrakenStreamEvent({ type: "turn.end", timestamp: 1 })).toBe(false);
   });
@@ -287,6 +346,21 @@ describe("runtime-api contracts", () => {
         name: "",
         timestamp: 1,
         type: "tool.start",
+      })
+    ).toBe(false);
+  });
+
+  test("rejects file parts with empty media types", () => {
+    expect(
+      isKrakenMessage({
+        parts: [
+          {
+            data: "YWJj",
+            mediaType: "",
+            type: "file",
+          },
+        ],
+        role: "assistant",
       })
     ).toBe(false);
   });
@@ -598,6 +672,32 @@ describe("runtime-api contracts", () => {
         name: "bad-nested-properties",
       })
     ).toBe(false);
+
+    expect(
+      isKrakenToolDefinition({
+        description: "Bad schema type",
+        execute() {
+          return undefined;
+        },
+        inputSchema: {
+          type: "banana",
+        },
+        name: "bad-type",
+      })
+    ).toBe(false);
+
+    expect(
+      isKrakenToolDefinition({
+        description: "Bad schema type array",
+        execute() {
+          return undefined;
+        },
+        inputSchema: {
+          type: ["object", "banana"],
+        },
+        name: "bad-type-array",
+      })
+    ).toBe(false);
   });
 
   test("accepts CustomSchema class instances", () => {
@@ -719,7 +819,7 @@ describe("runtime-api contracts", () => {
     ).toBe(false);
   });
 
-  test("rejects approval responses whose reject or custom decisions omit message", () => {
+  test("accepts approval responses whose reject or custom decisions omit message", () => {
     expect(
       isApprovalResponse({
         decisions: [{ callId: "call-1", type: "reject" }],
@@ -877,6 +977,54 @@ describe("runtime-api contracts", () => {
         timestamp: 1,
         turnId: "turn-1",
         type: "turn.end",
+      })
+    ).toBe(false);
+  });
+
+  test("rejects serializable-boundary objects with hidden or symbol-backed state", () => {
+    const symbolBackedMetadata = {
+      visible: 1,
+      [Symbol("hidden")]: 2,
+    };
+    const hiddenPropertyExtensions = {};
+    Object.defineProperty(hiddenPropertyExtensions, "hidden", {
+      enumerable: false,
+      value: 1,
+    });
+
+    expect(
+      isKrakenMessage({
+        parts: [
+          {
+            providerMetadata: symbolBackedMetadata,
+            text: "hello",
+            type: "text",
+          },
+        ],
+        role: "assistant",
+      })
+    ).toBe(false);
+
+    expect(
+      isExecutionStatus({
+        iterationCount: 0,
+        manifest: {
+          byRole: {
+            assistant: 0,
+            system: 0,
+            tool: 0,
+            user: 1,
+          },
+          extensions: hiddenPropertyExtensions,
+          lastAssistantMessageIndex: -1,
+          lastUserMessageIndex: 0,
+          messageCount: 1,
+          tokenEstimate: 12,
+          toolCalls: { byName: {}, total: 0 },
+          toolResults: { byName: {}, total: 0 },
+          turnBoundaries: [0],
+        },
+        phase: "running",
       })
     ).toBe(false);
   });

@@ -73,6 +73,15 @@ const STREAM_EVENT_TYPES = new Set([
 ]);
 const TURN_END_STATUSES = new Set(["completed", "paused", "failed"]);
 const EXECUTION_PHASES = new Set(["running", "paused", "completed", "failed"]);
+const JSON_SCHEMA_TYPE_NAMES = new Set([
+  "null",
+  "boolean",
+  "object",
+  "array",
+  "number",
+  "integer",
+  "string",
+]);
 
 export type KrakenJsonValue =
   | null
@@ -826,46 +835,48 @@ export interface KrakenRuntime {
 }
 
 export function isKrakenMessage(value: unknown): value is KrakenMessage {
-  if (!isPlainObject(value)) {
-    return false;
-  }
-
-  if (!(isStringProperty(value, "role") && MESSAGE_ROLES.has(value.role))) {
-    return false;
-  }
-
-  switch (value.role) {
-    case "system":
-      return (
-        // Durable framework messages should always carry meaningful content.
-        isNonEmptyStringProperty(value, "content") &&
-        !("parts" in value) &&
-        !("providerMetadata" in value)
-      );
-    case "user":
-      return (
-        isNonEmptyArray(value.parts) &&
-        value.parts.every(isContentPart) &&
-        !("content" in value) &&
-        !("providerMetadata" in value)
-      );
-    case "assistant":
-      return (
-        isNonEmptyArray(value.parts) &&
-        value.parts.every(isContentPart) &&
-        !("content" in value) &&
-        isOptionalSerializableRecordProperty(value, "providerMetadata")
-      );
-    case "tool":
-      return (
-        isNonEmptyArray(value.parts) &&
-        value.parts.every(isToolResultPart) &&
-        !("content" in value) &&
-        !("providerMetadata" in value)
-      );
-    default:
+  return safePredicate(() => {
+    if (!isPlainObject(value)) {
       return false;
-  }
+    }
+
+    if (!(isStringProperty(value, "role") && MESSAGE_ROLES.has(value.role))) {
+      return false;
+    }
+
+    switch (value.role) {
+      case "system":
+        return (
+          // Durable framework messages should always carry meaningful content.
+          isNonEmptyStringProperty(value, "content") &&
+          !("parts" in value) &&
+          !("providerMetadata" in value)
+        );
+      case "user":
+        return (
+          isNonEmptyArray(value.parts) &&
+          value.parts.every(isContentPart) &&
+          !("content" in value) &&
+          !("providerMetadata" in value)
+        );
+      case "assistant":
+        return (
+          isNonEmptyArray(value.parts) &&
+          value.parts.every(isContentPart) &&
+          !("content" in value) &&
+          isOptionalSerializableRecordProperty(value, "providerMetadata")
+        );
+      case "tool":
+        return (
+          isNonEmptyArray(value.parts) &&
+          value.parts.every(isToolResultPart) &&
+          !("content" in value) &&
+          !("providerMetadata" in value)
+        );
+      default:
+        return false;
+    }
+  });
 }
 
 export function assertKrakenMessage(
@@ -881,23 +892,25 @@ export function assertKrakenMessage(
 }
 
 export function isApprovalRequest(value: unknown): value is ApprovalRequest {
-  if (
-    !(
-      isPlainObject(value) &&
-      Array.isArray(value.toolCalls) &&
-      value.toolCalls.length > 0 &&
-      value.toolCalls.every(isPendingToolCall) &&
-      Array.isArray(value.completedResults) &&
-      value.completedResults.every(isToolResultPart)
-    )
-  ) {
-    return false;
-  }
+  return safePredicate(() => {
+    if (
+      !(
+        isPlainObject(value) &&
+        Array.isArray(value.toolCalls) &&
+        value.toolCalls.length > 0 &&
+        value.toolCalls.every(isPendingToolCall) &&
+        Array.isArray(value.completedResults) &&
+        value.completedResults.every(isToolResultPart)
+      )
+    ) {
+      return false;
+    }
 
-  return hasDistinctApprovalRequestCallIds(
-    value.toolCalls,
-    value.completedResults
-  );
+    return hasDistinctApprovalRequestCallIds(
+      value.toolCalls,
+      value.completedResults
+    );
+  });
 }
 
 export function assertApprovalRequest(
@@ -915,63 +928,65 @@ export function assertApprovalRequest(
 export function isProviderStreamChunk(
   value: unknown
 ): value is ProviderStreamChunk {
-  if (
-    !(
-      isPlainObject(value) &&
-      isStringProperty(value, "type") &&
-      PROVIDER_STREAM_CHUNK_TYPES.has(value.type)
-    )
-  ) {
-    return false;
-  }
-
-  switch (value.type) {
-    case "text_delta":
-      return typeof value.text === "string";
-    case "reasoning_delta":
-      return (
-        typeof value.text === "string" &&
-        isOptionalStringProperty(value, "signature")
-      );
-    case "reasoning_done":
-      return true;
-    case "structured_delta":
-      return typeof value.delta === "string";
-    case "structured_done":
-      return (
-        "data" in value &&
-        isSerializableContractValue(value.data) &&
-        isOptionalStringProperty(value, "name")
-      );
-    case "tool_call_start":
-      return (
-        isNonEmptyStringProperty(value, "providerCallId") &&
-        isNonEmptyStringProperty(value, "name")
-      );
-    case "tool_call_args_delta":
-      return (
-        isNonEmptyStringProperty(value, "providerCallId") &&
-        typeof value.delta === "string"
-      );
-    case "tool_call_done":
-      return (
-        isNonEmptyStringProperty(value, "providerCallId") &&
-        isNonEmptyStringProperty(value, "name") &&
-        "input" in value &&
-        isSerializableContractValue(value.input)
-      );
-    case "finish":
-      return (
-        isStringProperty(value, "finishReason") &&
-        FINISH_REASONS.has(value.finishReason) &&
-        isOptionalProviderUsage(value, "usage") &&
-        isOptionalSerializableRecordProperty(value, "providerMetadata")
-      );
-    case "error":
-      return "error" in value;
-    default:
+  return safePredicate(() => {
+    if (
+      !(
+        isPlainObject(value) &&
+        isStringProperty(value, "type") &&
+        PROVIDER_STREAM_CHUNK_TYPES.has(value.type)
+      )
+    ) {
       return false;
-  }
+    }
+
+    switch (value.type) {
+      case "text_delta":
+        return typeof value.text === "string";
+      case "reasoning_delta":
+        return (
+          typeof value.text === "string" &&
+          isOptionalStringProperty(value, "signature")
+        );
+      case "reasoning_done":
+        return true;
+      case "structured_delta":
+        return typeof value.delta === "string";
+      case "structured_done":
+        return (
+          "data" in value &&
+          isSerializableContractValue(value.data) &&
+          isOptionalStringProperty(value, "name")
+        );
+      case "tool_call_start":
+        return (
+          isNonEmptyStringProperty(value, "providerCallId") &&
+          isNonEmptyStringProperty(value, "name")
+        );
+      case "tool_call_args_delta":
+        return (
+          isNonEmptyStringProperty(value, "providerCallId") &&
+          typeof value.delta === "string"
+        );
+      case "tool_call_done":
+        return (
+          isNonEmptyStringProperty(value, "providerCallId") &&
+          isNonEmptyStringProperty(value, "name") &&
+          "input" in value &&
+          isSerializableContractValue(value.input)
+        );
+      case "finish":
+        return (
+          isStringProperty(value, "finishReason") &&
+          FINISH_REASONS.has(value.finishReason) &&
+          isOptionalProviderUsage(value, "usage") &&
+          isOptionalSerializableRecordProperty(value, "providerMetadata")
+        );
+      case "error":
+        return "error" in value;
+      default:
+        return false;
+    }
+  });
 }
 
 export function assertProviderStreamChunk(
@@ -989,21 +1004,23 @@ export function assertProviderStreamChunk(
 export function isKrakenStreamEvent(
   value: unknown
 ): value is KrakenStreamEvent {
-  if (
-    !(
-      isPlainObject(value) &&
-      isStringProperty(value, "type") &&
-      STREAM_EVENT_TYPES.has(value.type)
-    )
-  ) {
-    return false;
-  }
+  return safePredicate(() => {
+    if (
+      !(
+        isPlainObject(value) &&
+        isStringProperty(value, "type") &&
+        STREAM_EVENT_TYPES.has(value.type)
+      )
+    ) {
+      return false;
+    }
 
-  if (!hasEpochMsTimestamp(value)) {
-    return false;
-  }
+    if (!hasEpochMsTimestamp(value)) {
+      return false;
+    }
 
-  return hasValidStreamEventPayload(value);
+    return hasValidStreamEventPayload(value);
+  });
 }
 
 function hasValidStreamEventPayload(
@@ -1142,15 +1159,16 @@ export function assertKrakenStreamEvent(
 export function isKrakenToolDefinition(
   value: unknown
 ): value is KrakenToolDefinition {
-  return (
-    isPlainObject(value) &&
-    isNonEmptyStringProperty(value, "name") &&
-    typeof value.description === "string" &&
-    typeof value.execute === "function" &&
-    isKrakenToolSchema(value.inputSchema) &&
-    isOptionalApprovalPolicy(value, "approval") &&
-    isOptionalPlainObjectProperty(value, "metadata") &&
-    isOptionalTimeoutProperty(value, "timeout")
+  return safePredicate(
+    () =>
+      isPlainObject(value) &&
+      isNonEmptyStringProperty(value, "name") &&
+      typeof value.description === "string" &&
+      typeof value.execute === "function" &&
+      isKrakenToolSchema(value.inputSchema) &&
+      isOptionalApprovalPolicy(value, "approval") &&
+      isOptionalPlainObjectProperty(value, "metadata") &&
+      isOptionalTimeoutProperty(value, "timeout")
   );
 }
 
@@ -1167,37 +1185,41 @@ export function assertKrakenToolDefinition(
 }
 
 export function isExecutionStatus(value: unknown): value is ExecutionStatus {
-  if (
-    !(
-      isPlainObject(value) &&
-      isStringProperty(value, "phase") &&
-      EXECUTION_PHASES.has(value.phase) &&
-      isNonNegativeSafeIntegerProperty(value, "iterationCount") &&
-      isOptionalApprovalRequest(value, "approval") &&
-      isOptionalNonEmptyStringProperty(value, "activeAgent") &&
-      isOptionalContextManifest(value, "manifest") &&
-      isOptionalNonEmptyStringProperty(value, "pauseReason")
-    )
-  ) {
-    return false;
-  }
+  return safePredicate(() => {
+    if (
+      !(
+        isPlainObject(value) &&
+        isStringProperty(value, "phase") &&
+        EXECUTION_PHASES.has(value.phase) &&
+        isNonNegativeSafeIntegerProperty(value, "iterationCount") &&
+        isOptionalApprovalRequest(value, "approval") &&
+        isOptionalNonEmptyStringProperty(value, "activeAgent") &&
+        isOptionalContextManifest(value, "manifest") &&
+        isOptionalNonEmptyStringProperty(value, "pauseReason")
+      )
+    ) {
+      return false;
+    }
 
-  if (value.approval !== undefined && value.phase !== "paused") {
-    return false;
-  }
+    if (value.approval !== undefined && value.phase !== "paused") {
+      return false;
+    }
 
-  if (value.pauseReason !== undefined && value.phase !== "paused") {
-    return false;
-  }
+    if (value.pauseReason !== undefined && value.phase !== "paused") {
+      return false;
+    }
 
-  if (
-    value.phase === "paused" &&
-    (value.approval === undefined || value.pauseReason === undefined)
-  ) {
-    return false;
-  }
+    // The current framework semantics only pause for tool approval, so a
+    // paused status must carry both the approval payload and its reason.
+    if (
+      value.phase === "paused" &&
+      (value.approval === undefined || value.pauseReason === undefined)
+    ) {
+      return false;
+    }
 
-  return true;
+    return true;
+  });
 }
 
 export function assertExecutionStatus(
@@ -1255,7 +1277,7 @@ function isContentPart(value: unknown): value is ContentPart {
     case "file":
       return (
         (typeof value.data === "string" || value.data instanceof Uint8Array) &&
-        typeof value.mediaType === "string" &&
+        isNonEmptyStringProperty(value, "mediaType") &&
         isOptionalStringProperty(value, "filename") &&
         isOptionalSerializableRecordProperty(value, "providerMetadata")
       );
@@ -1299,12 +1321,13 @@ function isPendingToolCall(value: unknown): value is PendingToolCall {
 }
 
 export function isApprovalResponse(value: unknown): value is ApprovalResponse {
-  return (
-    isPlainObject(value) &&
-    Array.isArray(value.decisions) &&
-    value.decisions.length > 0 &&
-    hasUniqueApprovalDecisionCallIds(value.decisions) &&
-    value.decisions.every(isApprovalDecision)
+  return safePredicate(
+    () =>
+      isPlainObject(value) &&
+      Array.isArray(value.decisions) &&
+      value.decisions.length > 0 &&
+      hasUniqueApprovalDecisionCallIds(value.decisions) &&
+      value.decisions.every(isApprovalDecision)
   );
 }
 
@@ -1537,6 +1560,15 @@ function hasValidTurnBoundaries(
     );
   }
 
+  // There must still be enough index space before the last user message to
+  // fit the declared number of user-role messages, even when the first user
+  // turn starts after leading system or assistant messages.
+  const earliestPossibleFirstUserIndex = lastUserMessageIndex - userCount + 1;
+
+  if (turnBoundaries[0] > earliestPossibleFirstUserIndex) {
+    return false;
+  }
+
   if (
     turnBoundaries.length === userCount &&
     turnBoundaries.at(-1) !== lastUserMessageIndex
@@ -1737,13 +1769,7 @@ function isValidJsonSchemaObject(value: {
   if ("type" in value) {
     const schemaType = value.type;
 
-    if (
-      !(
-        typeof schemaType === "string" ||
-        (Array.isArray(schemaType) &&
-          schemaType.every((item) => typeof item === "string"))
-      )
-    ) {
+    if (!isValidJsonSchemaType(schemaType)) {
       return false;
     }
   }
@@ -1983,12 +2009,29 @@ function isEventSource(value: unknown): value is EventSource {
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
-  if (value === null || typeof value !== "object") {
+  try {
+    if (value === null || typeof value !== "object") {
+      return false;
+    }
+
+    const prototype = Object.getPrototypeOf(value);
+
+    if (!(prototype === Object.prototype || prototype === null)) {
+      return false;
+    }
+
+    if (Object.getOwnPropertySymbols(value).length > 0) {
+      return false;
+    }
+
+    // Contract-boundary objects must be fully enumerable so they round-trip
+    // through normal JSON-like serialization without hidden state.
+    return Object.values(Object.getOwnPropertyDescriptors(value)).every(
+      (descriptor) => descriptor.enumerable
+    );
+  } catch {
     return false;
   }
-
-  const prototype = Object.getPrototypeOf(value);
-  return prototype === Object.prototype || prototype === null;
 }
 
 function isStringProperty<
@@ -1996,4 +2039,24 @@ function isStringProperty<
   TObject extends Record<string, unknown>,
 >(value: TObject, key: TKey): value is TObject & Record<TKey, string> {
   return typeof value[key] === "string";
+}
+
+function isValidJsonSchemaType(value: unknown): boolean {
+  return (
+    (typeof value === "string" && JSON_SCHEMA_TYPE_NAMES.has(value)) ||
+    (Array.isArray(value) &&
+      value.every(
+        (item) => typeof item === "string" && JSON_SCHEMA_TYPE_NAMES.has(item)
+      ))
+  );
+}
+
+function safePredicate(check: () => boolean): boolean {
+  try {
+    return check();
+  } catch {
+    // `is*` guards are used to probe untrusted input, so malformed accessors
+    // must collapse to `false` instead of escaping as thrown errors.
+    return false;
+  }
 }
