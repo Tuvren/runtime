@@ -69,16 +69,17 @@ export interface DriverRegistry {
 }
 
 export function isKrakenDriver(value: unknown): value is KrakenDriver {
-  return (
-    value !== null &&
-    typeof value === "object" &&
-    "id" in value &&
-    typeof value.id === "string" &&
-    value.id.trim().length > 0 &&
-    "execute" in value &&
-    typeof value.execute === "function" &&
-    "resume" in value &&
-    typeof value.resume === "function"
+  return safePredicate(
+    () =>
+      value !== null &&
+      typeof value === "object" &&
+      "id" in value &&
+      typeof value.id === "string" &&
+      value.id.trim().length > 0 &&
+      "execute" in value &&
+      typeof value.execute === "function" &&
+      "resume" in value &&
+      typeof value.resume === "function"
   );
 }
 
@@ -91,5 +92,13 @@ export function assertKrakenDriver(
       code: "invalid_driver_contract",
       details: value,
     });
+  }
+}
+
+function safePredicate(check: () => boolean): boolean {
+  try {
+    return check();
+  } catch {
+    return false;
   }
 }

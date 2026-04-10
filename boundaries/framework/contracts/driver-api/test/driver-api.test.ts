@@ -24,18 +24,21 @@ import {
 
 describe("driver-api", () => {
   test("accepts explicit driver contracts", async () => {
+    const continueIteration = {
+      type: "continue_iteration",
+    } satisfies { type: "continue_iteration" };
     const driver = {
       execute(_context) {
         return Promise.resolve({
           activeAgent: "primary",
-          resolution: { type: "continue_iteration" as const },
+          resolution: continueIteration,
         });
       },
       id: "react",
       resume(_context) {
         return Promise.resolve({
           activeAgent: "primary",
-          resolution: { type: "continue_iteration" as const },
+          resolution: continueIteration,
         });
       },
     } satisfies KrakenDriver;
@@ -67,6 +70,9 @@ describe("driver-api", () => {
   });
 
   test("rejects malformed driver contracts", () => {
+    const continueIteration = {
+      type: "continue_iteration",
+    } satisfies { type: "continue_iteration" };
     expect(isKrakenDriver({ id: "react" })).toBe(false);
     expect(() => assertKrakenDriver({ id: "react" })).toThrow(
       "must be a valid KrakenDriver"
@@ -85,5 +91,24 @@ describe("driver-api", () => {
         resume: () => undefined,
       })
     ).toBe(false);
+
+    const hostileDriver = {
+      execute: () =>
+        Promise.resolve({
+          activeAgent: "primary",
+          resolution: continueIteration,
+        }),
+      get id() {
+        throw new Error("boom");
+      },
+      resume: () =>
+        Promise.resolve({
+          activeAgent: "primary",
+          resolution: continueIteration,
+        }),
+    };
+
+    expect(() => isKrakenDriver(hostileDriver)).not.toThrow();
+    expect(isKrakenDriver(hostileDriver)).toBe(false);
   });
 });

@@ -1778,7 +1778,8 @@ function isValidJsonSchemaObject(value: {
     "required" in value &&
     !(
       Array.isArray(value.required) &&
-      value.required.every((item) => typeof item === "string")
+      value.required.every((item) => typeof item === "string") &&
+      hasUniqueStrings(value.required)
     )
   ) {
     return false;
@@ -1868,27 +1869,14 @@ function isKrakenToolSchema(
 }
 
 function isCustomSchema(value: unknown): value is CustomSchema {
-  if (
-    !(
-      value !== null &&
-      typeof value === "object" &&
-      "toJSONSchema" in value &&
-      typeof value.toJSONSchema === "function" &&
-      "validate" in value &&
-      typeof value.validate === "function"
-    )
-  ) {
-    return false;
-  }
-
-  try {
-    return (
-      isKrakenJsonSchema(value.toJSONSchema()) &&
-      isValidationResult(value.validate(undefined))
-    );
-  } catch {
-    return false;
-  }
+  return (
+    value !== null &&
+    typeof value === "object" &&
+    "toJSONSchema" in value &&
+    typeof value.toJSONSchema === "function" &&
+    "validate" in value &&
+    typeof value.validate === "function"
+  );
 }
 
 function isProviderUsage(value: unknown): value is ProviderUsage {
@@ -1950,30 +1938,8 @@ function hasUniqueApprovalDecisionCallIds(
   return true;
 }
 
-function isValidationResult(value: unknown): value is ValidationResult {
-  if (!(isPlainObject(value) && "valid" in value)) {
-    return false;
-  }
-
-  if (value.valid === true) {
-    return "value" in value;
-  }
-
-  return (
-    value.valid === false &&
-    "error" in value &&
-    isValidationErrorPayload(value.error)
-  );
-}
-
-function isValidationErrorPayload(
-  value: unknown
-): value is ValidationErrorPayload {
-  return (
-    isPlainObject(value) &&
-    typeof value.message === "string" &&
-    isOptionalSerializableContractValueProperty(value, "details")
-  );
+function hasUniqueStrings(values: string[]): boolean {
+  return new Set(values).size === values.length;
 }
 
 function isEventSource(value: unknown): value is EventSource {
@@ -2045,6 +2011,8 @@ function isValidJsonSchemaType(value: unknown): boolean {
   return (
     (typeof value === "string" && JSON_SCHEMA_TYPE_NAMES.has(value)) ||
     (Array.isArray(value) &&
+      value.length > 0 &&
+      hasUniqueStrings(value) &&
       value.every(
         (item) => typeof item === "string" && JSON_SCHEMA_TYPE_NAMES.has(item)
       ))

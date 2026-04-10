@@ -35,7 +35,6 @@ import {
   isKrakenStreamEvent,
   isKrakenToolDefinition,
   isProviderStreamChunk,
-  type KrakenRuntime,
 } from "../src/index.ts";
 
 describe("runtime-api contracts", () => {
@@ -698,9 +697,52 @@ describe("runtime-api contracts", () => {
         name: "bad-type-array",
       })
     ).toBe(false);
+
+    expect(
+      isKrakenToolDefinition({
+        description: "Bad empty schema type array",
+        execute() {
+          return undefined;
+        },
+        inputSchema: {
+          type: [],
+        },
+        name: "bad-empty-type-array",
+      })
+    ).toBe(false);
+
+    expect(
+      isKrakenToolDefinition({
+        description: "Bad duplicate schema type array",
+        execute() {
+          return undefined;
+        },
+        inputSchema: {
+          type: ["string", "string"],
+        },
+        name: "bad-duplicate-type-array",
+      })
+    ).toBe(false);
+
+    expect(
+      isKrakenToolDefinition({
+        description: "Bad duplicate required entries",
+        execute() {
+          return undefined;
+        },
+        inputSchema: {
+          properties: {
+            a: { type: "string" },
+          },
+          required: ["a", "a"],
+          type: "object",
+        },
+        name: "bad-duplicate-required",
+      })
+    ).toBe(false);
   });
 
-  test("accepts CustomSchema class instances", () => {
+  test("accepts structurally valid CustomSchema class instances", () => {
     class ExampleSchema {
       toJSONSchema() {
         return { type: "string" };
@@ -730,27 +772,31 @@ describe("runtime-api contracts", () => {
     ).toBe(true);
   });
 
-  test("rejects malformed CustomSchema implementations", () => {
-    class BadSchema {
+  test("accepts structurally valid CustomSchema shapes without executing them", () => {
+    let methodCalls = 0;
+    class LazySchema {
       toJSONSchema() {
+        methodCalls += 1;
         return 123;
       }
 
       validate() {
+        methodCalls += 1;
         return { valid: true, value: "ok" };
       }
     }
 
     expect(
       isKrakenToolDefinition({
-        description: "Bad custom schema",
+        description: "Lazy custom schema",
         execute() {
           return undefined;
         },
-        inputSchema: new BadSchema(),
-        name: "bad-custom-schema",
+        inputSchema: new LazySchema(),
+        name: "lazy-custom-schema",
       })
-    ).toBe(false);
+    ).toBe(true);
+    expect(methodCalls).toBe(0);
   });
 
   test("accepts JSON Schema numeric keywords with fractional values", () => {
@@ -1436,7 +1482,7 @@ describe("runtime-api contracts", () => {
   });
 
   test("exposes a host-facing type surface that composes with the shared fixtures", () => {
-    const runtime = frameworkContractFixtures.runtime as KrakenRuntime;
+    const runtime = frameworkContractFixtures.runtime;
     const config = frameworkContractFixtures.agentConfig satisfies AgentConfig;
 
     expect(typeof runtime.executeTurn).toBe("function");

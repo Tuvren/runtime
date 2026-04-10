@@ -5,7 +5,10 @@
     "outDir": "./dist",
     "paths": {
       "@kraken/framework-runtime-api": [
-        "../../../framework/contracts/runtime-api/src/index.ts"
+        "../../../framework/contracts/runtime-api/dist/index.d.ts"
+      ],
+      "@kraken/shared-core-types": [
+        "../../../shared/contracts/core-types/dist/index.d.ts"
       ],
       "@kraken/provider-api": ["./src/index.ts"]
     }
