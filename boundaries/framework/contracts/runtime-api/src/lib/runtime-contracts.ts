@@ -14,16 +14,8 @@
  * limitations under the License.
  */
 
-import type {
-  EpochMs,
-  HashString,
-  KernelRecord,
-} from "@kraken/shared-core-types";
-import {
-  isHashString,
-  isKernelRecord,
-  KrakenValidationError,
-} from "@kraken/shared-core-types";
+import type { EpochMs, HashString } from "@kraken/shared-core-types";
+import { isHashString, KrakenValidationError } from "@kraken/shared-core-types";
 
 const CONTENT_PART_TYPES = new Set([
   "text",
@@ -82,7 +74,14 @@ const STREAM_EVENT_TYPES = new Set([
 const TURN_END_STATUSES = new Set(["completed", "paused", "failed"]);
 const EXECUTION_PHASES = new Set(["running", "paused", "completed", "failed"]);
 
-export type KrakenJsonSchema = KernelRecord | boolean;
+export type KrakenJsonValue =
+  | null
+  | boolean
+  | number
+  | string
+  | KrakenJsonValue[]
+  | { [key: string]: KrakenJsonValue };
+export type KrakenJsonSchema = { [key: string]: KrakenJsonValue } | boolean;
 
 export interface TextPart {
   providerMetadata?: Record<string, unknown>;
@@ -860,6 +859,7 @@ export function isApprovalRequest(value: unknown): value is ApprovalRequest {
     !(
       isPlainObject(value) &&
       Array.isArray(value.toolCalls) &&
+      value.toolCalls.length > 0 &&
       value.toolCalls.every(isPendingToolCall) &&
       Array.isArray(value.completedResults) &&
       value.completedResults.every(isToolResultPart)
@@ -1251,6 +1251,7 @@ export function isApprovalResponse(value: unknown): value is ApprovalResponse {
   return (
     isPlainObject(value) &&
     Array.isArray(value.decisions) &&
+    value.decisions.length > 0 &&
     hasUniqueApprovalDecisionCallIds(value.decisions) &&
     value.decisions.every(isApprovalDecision)
   );
@@ -1378,6 +1379,10 @@ function isContextManifest(value: unknown): value is ContextManifest {
   }
 
   if (value.turnBoundaries.length !== byRole.user) {
+    return false;
+  }
+
+  if (byRole.user > 0 && !value.turnBoundaries.includes(lastUserMessageIndex)) {
     return false;
   }
 
@@ -1577,10 +1582,71 @@ function isFiniteNumberProperty<
 }
 
 function isKrakenJsonSchema(value: unknown): value is KrakenJsonSchema {
-  return (
-    typeof value === "boolean" ||
-    (isPlainObject(value) && isKernelRecord(value))
-  );
+  return typeof value === "boolean" || isKrakenJsonObject(value, new WeakSet());
+}
+
+function isKrakenJsonObject(
+  value: unknown,
+  activeParents: WeakSet<object>
+): value is { [key: string]: KrakenJsonValue } {
+  if (!isPlainObject(value)) {
+    return false;
+  }
+
+  if (activeParents.has(value)) {
+    return false;
+  }
+
+  activeParents.add(value);
+
+  for (const key of Object.keys(value)) {
+    if (!isKrakenJsonValue(value[key], activeParents)) {
+      activeParents.delete(value);
+      return false;
+    }
+  }
+
+  activeParents.delete(value);
+  return true;
+}
+
+function isKrakenJsonValue(
+  value: unknown,
+  activeParents: WeakSet<object>
+): value is KrakenJsonValue {
+  if (value === null) {
+    return true;
+  }
+
+  switch (typeof value) {
+    case "boolean":
+    case "string":
+      return true;
+    case "number":
+      return Number.isFinite(value);
+    case "object":
+      if (Array.isArray(value)) {
+        if (activeParents.has(value)) {
+          return false;
+        }
+
+        activeParents.add(value);
+
+        for (const item of value) {
+          if (!isKrakenJsonValue(item, activeParents)) {
+            activeParents.delete(value);
+            return false;
+          }
+        }
+
+        activeParents.delete(value);
+        return true;
+      }
+
+      return isKrakenJsonObject(value, activeParents);
+    default:
+      return false;
+  }
 }
 
 function isKrakenToolSchema(

@@ -19,6 +19,7 @@ import type {
   ApprovalResponse,
   EpochMs,
   HashString,
+  InputSignal,
   KrakenStreamEvent,
   RuntimeResolution,
   ToolRegistry,
@@ -35,7 +36,7 @@ export interface DriverExecutionContext {
   config: AgentConfig;
   runtime: DriverRuntimePort;
   schemaId: string;
-  steering?: AsyncIterable<unknown>;
+  steering?: AsyncIterable<InputSignal>;
   toolRegistry: ToolRegistry;
   turnId: string;
 }

@@ -814,7 +814,7 @@ export interface DriverExecutionContext {
   schemaId: string;
   config: AgentConfig;
   toolRegistry: ToolRegistry;
-  steering?: AsyncIterable<unknown>;
+  steering?: AsyncIterable<InputSignal>;
   runtime: DriverRuntimePort;
 }
 

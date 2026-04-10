@@ -180,6 +180,15 @@ describe("runtime-api contracts", () => {
     ).toBe(false);
   });
 
+  test("rejects approval requests with no pending tool calls", () => {
+    expect(
+      isApprovalRequest({
+        completedResults: [],
+        toolCalls: [],
+      })
+    ).toBe(false);
+  });
+
   test("rejects stream events that omit required fields", () => {
     expect(isKrakenStreamEvent({ type: "turn.end", timestamp: 1 })).toBe(false);
   });
@@ -291,6 +300,22 @@ describe("runtime-api contracts", () => {
     ).toBe(false);
   });
 
+  test("accepts JSON Schema numeric keywords with fractional values", () => {
+    expect(
+      isKrakenToolDefinition({
+        description: "Constrained number tool",
+        execute() {
+          return undefined;
+        },
+        inputSchema: {
+          multipleOf: 0.1,
+          type: "number",
+        },
+        name: "fractional-schema",
+      })
+    ).toBe(true);
+  });
+
   test("rejects tool definitions with malformed optional behavior fields", () => {
     expect(
       isKrakenToolDefinition({
@@ -351,6 +376,14 @@ describe("runtime-api contracts", () => {
     expect(
       isApprovalResponse({
         decisions: [{ callId: "call-1", type: "needs_human" }],
+      })
+    ).toBe(false);
+  });
+
+  test("rejects approval responses with no decisions", () => {
+    expect(
+      isApprovalResponse({
+        decisions: [],
       })
     ).toBe(false);
   });
@@ -523,6 +556,31 @@ describe("runtime-api contracts", () => {
           },
           extensions: {},
           lastAssistantMessageIndex: -1,
+          lastUserMessageIndex: 1,
+          messageCount: 2,
+          tokenEstimate: 12,
+          toolCalls: { byName: {}, total: 0 },
+          toolResults: { byName: {}, total: 0 },
+          turnBoundaries: [0],
+        },
+        phase: "running",
+      })
+    ).toBe(false);
+  });
+
+  test("rejects manifests whose turn boundaries contradict the last user index", () => {
+    expect(
+      isExecutionStatus({
+        iterationCount: 0,
+        manifest: {
+          byRole: {
+            assistant: 1,
+            system: 0,
+            tool: 0,
+            user: 1,
+          },
+          extensions: {},
+          lastAssistantMessageIndex: 0,
           lastUserMessageIndex: 1,
           messageCount: 2,
           tokenEstimate: 12,
