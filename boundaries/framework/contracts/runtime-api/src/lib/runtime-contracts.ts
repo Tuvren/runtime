@@ -856,12 +856,21 @@ export function assertKrakenMessage(
 }
 
 export function isApprovalRequest(value: unknown): value is ApprovalRequest {
-  return (
-    isPlainObject(value) &&
-    Array.isArray(value.toolCalls) &&
-    value.toolCalls.every(isPendingToolCall) &&
-    Array.isArray(value.completedResults) &&
-    value.completedResults.every(isToolResultPart)
+  if (
+    !(
+      isPlainObject(value) &&
+      Array.isArray(value.toolCalls) &&
+      value.toolCalls.every(isPendingToolCall) &&
+      Array.isArray(value.completedResults) &&
+      value.completedResults.every(isToolResultPart)
+    )
+  ) {
+    return false;
+  }
+
+  return hasDistinctApprovalRequestCallIds(
+    value.toolCalls,
+    value.completedResults
   );
 }
 
@@ -1233,6 +1242,7 @@ function isPendingToolCall(value: unknown): value is PendingToolCall {
     typeof value.message === "string" &&
     "input" in value &&
     Array.isArray(value.decisions) &&
+    value.decisions.length > 0 &&
     value.decisions.every((item) => typeof item === "string")
   );
 }
@@ -1271,6 +1281,14 @@ function isApprovalDecision(value: unknown): value is ApprovalDecision {
   }
 
   if (value.type === "edit" && !("editedInput" in value)) {
+    return false;
+  }
+
+  if (
+    value.type !== "approve" &&
+    value.type !== "edit" &&
+    !isNonEmptyStringProperty(value, "message")
+  ) {
     return false;
   }
 
@@ -1359,6 +1377,10 @@ function isContextManifest(value: unknown): value is ContextManifest {
     return false;
   }
 
+  if (value.turnBoundaries.length !== byRole.user) {
+    return false;
+  }
+
   return true;
 }
 
@@ -1422,6 +1444,31 @@ function hasOrderedTurnBoundaries(
     }
 
     previousBoundary = boundary;
+  }
+
+  return true;
+}
+
+function hasDistinctApprovalRequestCallIds(
+  toolCalls: PendingToolCall[],
+  completedResults: ToolResultPart[]
+): boolean {
+  const seenCallIds = new Set<string>();
+
+  for (const toolCall of toolCalls) {
+    if (seenCallIds.has(toolCall.callId)) {
+      return false;
+    }
+
+    seenCallIds.add(toolCall.callId);
+  }
+
+  for (const result of completedResults) {
+    if (seenCallIds.has(result.callId)) {
+      return false;
+    }
+
+    seenCallIds.add(result.callId);
   }
 
   return true;
@@ -1502,6 +1549,13 @@ function isOptionalStringProperty<
   TObject extends Record<string, unknown>,
 >(value: TObject, key: TKey): boolean {
   return value[key] === undefined || typeof value[key] === "string";
+}
+
+function isNonEmptyStringProperty<
+  TKey extends string,
+  TObject extends Record<string, unknown>,
+>(value: TObject, key: TKey): boolean {
+  return typeof value[key] === "string" && value[key].length > 0;
 }
 
 function isOptionalTimeoutProperty<

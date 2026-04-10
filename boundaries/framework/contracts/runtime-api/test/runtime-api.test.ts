@@ -139,6 +139,47 @@ describe("runtime-api contracts", () => {
     ).toBe(false);
   });
 
+  test("rejects approval requests with duplicate callIds across pending and completed work", () => {
+    expect(
+      isApprovalRequest({
+        completedResults: [
+          {
+            callId: "call-1",
+            name: "search",
+            output: { hits: 1 },
+            type: "tool_result",
+          },
+        ],
+        toolCalls: [
+          {
+            callId: "call-1",
+            decisions: ["approve"],
+            input: { query: "status" },
+            message: "Approve?",
+            name: "search",
+          },
+        ],
+      })
+    ).toBe(false);
+  });
+
+  test("rejects approval requests with empty decision lists", () => {
+    expect(
+      isApprovalRequest({
+        completedResults: [],
+        toolCalls: [
+          {
+            callId: "call-1",
+            decisions: [],
+            input: { query: "status" },
+            message: "Approve?",
+            name: "search",
+          },
+        ],
+      })
+    ).toBe(false);
+  });
+
   test("rejects stream events that omit required fields", () => {
     expect(isKrakenStreamEvent({ type: "turn.end", timestamp: 1 })).toBe(false);
   });
@@ -300,6 +341,20 @@ describe("runtime-api contracts", () => {
     ).toBe(false);
   });
 
+  test("rejects approval responses whose reject or custom decisions omit message", () => {
+    expect(
+      isApprovalResponse({
+        decisions: [{ callId: "call-1", type: "reject" }],
+      })
+    ).toBe(false);
+
+    expect(
+      isApprovalResponse({
+        decisions: [{ callId: "call-1", type: "needs_human" }],
+      })
+    ).toBe(false);
+  });
+
   test("rejects approval responses with duplicate decision callIds", () => {
     expect(
       isApprovalResponse({
@@ -426,6 +481,54 @@ describe("runtime-api contracts", () => {
           toolCalls: { byName: { search: 2 }, total: 0 },
           toolResults: { byName: {}, total: 0 },
           turnBoundaries: [5, 0, 5],
+        },
+        phase: "running",
+      })
+    ).toBe(false);
+  });
+
+  test("rejects manifests whose turn boundaries do not match user-turn count", () => {
+    expect(
+      isExecutionStatus({
+        iterationCount: 0,
+        manifest: {
+          byRole: {
+            assistant: 1,
+            system: 0,
+            tool: 0,
+            user: 0,
+          },
+          extensions: {},
+          lastAssistantMessageIndex: 0,
+          lastUserMessageIndex: -1,
+          messageCount: 1,
+          tokenEstimate: 12,
+          toolCalls: { byName: {}, total: 0 },
+          toolResults: { byName: {}, total: 0 },
+          turnBoundaries: [0],
+        },
+        phase: "running",
+      })
+    ).toBe(false);
+
+    expect(
+      isExecutionStatus({
+        iterationCount: 0,
+        manifest: {
+          byRole: {
+            assistant: 0,
+            system: 0,
+            tool: 0,
+            user: 2,
+          },
+          extensions: {},
+          lastAssistantMessageIndex: -1,
+          lastUserMessageIndex: 1,
+          messageCount: 2,
+          tokenEstimate: 12,
+          toolCalls: { byName: {}, total: 0 },
+          toolResults: { byName: {}, total: 0 },
+          turnBoundaries: [0],
         },
         phase: "running",
       })
