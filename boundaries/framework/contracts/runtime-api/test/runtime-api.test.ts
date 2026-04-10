@@ -329,6 +329,36 @@ describe("runtime-api contracts", () => {
     ).toBe(false);
   });
 
+  test("rejects empty durable messages across roles", () => {
+    expect(
+      isKrakenMessage({
+        content: "",
+        role: "system",
+      })
+    ).toBe(false);
+
+    expect(
+      isKrakenMessage({
+        parts: [],
+        role: "user",
+      })
+    ).toBe(false);
+
+    expect(
+      isKrakenMessage({
+        parts: [],
+        role: "assistant",
+      })
+    ).toBe(false);
+
+    expect(
+      isKrakenMessage({
+        parts: [],
+        role: "tool",
+      })
+    ).toBe(false);
+  });
+
   test("rejects content parts with non-serializable payloads", () => {
     expect(
       isKrakenMessage({
@@ -598,11 +628,40 @@ describe("runtime-api contracts", () => {
       isApprovalResponse({
         decisions: [{ callId: "call-1", type: "reject" }],
       })
-    ).toBe(false);
+    ).toBe(true);
 
     expect(
       isApprovalResponse({
         decisions: [{ callId: "call-1", type: "needs_human" }],
+      })
+    ).toBe(true);
+  });
+
+  test("accepts approval response messages as optional annotations", () => {
+    expect(
+      isApprovalResponse({
+        decisions: [
+          { callId: "call-1", message: "Proceed with care.", type: "approve" },
+        ],
+      })
+    ).toBe(true);
+
+    expect(
+      isApprovalResponse({
+        decisions: [
+          {
+            callId: "call-1",
+            message: "Please revise and continue.",
+            type: "edit",
+            editedInput: { query: "updated status" },
+          },
+        ],
+      })
+    ).toBe(true);
+
+    expect(
+      isApprovalResponse({
+        decisions: [{ callId: "call-1", message: "", type: "reject" }],
       })
     ).toBe(false);
   });

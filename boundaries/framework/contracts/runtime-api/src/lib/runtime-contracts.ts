@@ -837,25 +837,28 @@ export function isKrakenMessage(value: unknown): value is KrakenMessage {
   switch (value.role) {
     case "system":
       return (
-        typeof value.content === "string" &&
+        // Durable framework messages should always carry meaningful content.
+        isNonEmptyStringProperty(value, "content") &&
         !("parts" in value) &&
         !("providerMetadata" in value)
       );
     case "user":
       return (
-        isContentPartArray(value.parts) &&
+        isNonEmptyArray(value.parts) &&
+        value.parts.every(isContentPart) &&
         !("content" in value) &&
         !("providerMetadata" in value)
       );
     case "assistant":
       return (
-        isContentPartArray(value.parts) &&
+        isNonEmptyArray(value.parts) &&
+        value.parts.every(isContentPart) &&
         !("content" in value) &&
         isOptionalSerializableRecordProperty(value, "providerMetadata")
       );
     case "tool":
       return (
-        Array.isArray(value.parts) &&
+        isNonEmptyArray(value.parts) &&
         value.parts.every(isToolResultPart) &&
         !("content" in value) &&
         !("providerMetadata" in value)
@@ -1206,10 +1209,6 @@ export function assertExecutionStatus(
   }
 }
 
-function isContentPartArray(value: unknown): value is ContentPart[] {
-  return Array.isArray(value) && value.every(isContentPart);
-}
-
 function isContentPart(value: unknown): value is ContentPart {
   if (
     !(
@@ -1324,7 +1323,7 @@ function isApprovalDecision(value: unknown): value is ApprovalDecision {
       isPlainObject(value) &&
       isNonEmptyStringProperty(value, "callId") &&
       isNonEmptyStringProperty(value, "type") &&
-      isOptionalStringProperty(value, "message")
+      isOptionalNonEmptyStringProperty(value, "message")
     )
   ) {
     return false;
@@ -1341,14 +1340,8 @@ function isApprovalDecision(value: unknown): value is ApprovalDecision {
     return false;
   }
 
-  if (value.type === "reject") {
-    return isNonEmptyStringProperty(value, "message");
-  }
-
-  if (value.type !== "approve" && value.type !== "edit") {
-    return isNonEmptyStringProperty(value, "message");
-  }
-
+  // Approval notes are optional for all decision types, but if present they
+  // should carry real explanatory text instead of an empty placeholder.
   return true;
 }
 
@@ -1661,11 +1654,22 @@ function isOptionalStringProperty<
   return value[key] === undefined || typeof value[key] === "string";
 }
 
+function isOptionalNonEmptyStringProperty<
+  TKey extends string,
+  TObject extends Record<string, unknown>,
+>(value: TObject, key: TKey): boolean {
+  return value[key] === undefined || isNonEmptyStringProperty(value, key);
+}
+
 function isNonEmptyStringProperty<
   TKey extends string,
   TObject extends Record<string, unknown>,
 >(value: TObject, key: TKey): boolean {
   return typeof value[key] === "string" && value[key].length > 0;
+}
+
+function isNonEmptyArray(value: unknown): value is [unknown, ...unknown[]] {
+  return Array.isArray(value) && value.length > 0;
 }
 
 function isOptionalTimeoutProperty<
