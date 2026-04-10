@@ -851,7 +851,7 @@ export function isKrakenMessage(value: unknown): value is KrakenMessage {
       return (
         isContentPartArray(value.parts) &&
         !("content" in value) &&
-        isOptionalPlainObjectProperty(value, "providerMetadata")
+        isOptionalSerializableRecordProperty(value, "providerMetadata")
       );
     case "tool":
       return (
@@ -935,7 +935,11 @@ export function isProviderStreamChunk(
     case "structured_delta":
       return typeof value.delta === "string";
     case "structured_done":
-      return "data" in value && isOptionalStringProperty(value, "name");
+      return (
+        "data" in value &&
+        isSerializableContractValue(value.data) &&
+        isOptionalStringProperty(value, "name")
+      );
     case "tool_call_start":
       return (
         isNonEmptyStringProperty(value, "providerCallId") &&
@@ -950,14 +954,15 @@ export function isProviderStreamChunk(
       return (
         isNonEmptyStringProperty(value, "providerCallId") &&
         isNonEmptyStringProperty(value, "name") &&
-        "input" in value
+        "input" in value &&
+        isSerializableContractValue(value.input)
       );
     case "finish":
       return (
         isStringProperty(value, "finishReason") &&
         FINISH_REASONS.has(value.finishReason) &&
         isOptionalProviderUsage(value, "usage") &&
-        isOptionalPlainObjectProperty(value, "providerMetadata")
+        isOptionalSerializableRecordProperty(value, "providerMetadata")
       );
     case "error":
       return "error" in value;
@@ -1004,13 +1009,13 @@ function hasValidStreamEventPayload(
   switch (value.type) {
     case "turn.start":
       return (
-        typeof value.turnId === "string" &&
-        typeof value.threadId === "string" &&
+        isNonEmptyStringProperty(value, "turnId") &&
+        isNonEmptyStringProperty(value, "threadId") &&
         isOptionalHashStringProperty(value, "resumedFrom")
       );
     case "turn.end":
       return (
-        typeof value.turnId === "string" &&
+        isNonEmptyStringProperty(value, "turnId") &&
         isStringProperty(value, "status") &&
         TURN_END_STATUSES.has(value.status)
       );
@@ -1018,29 +1023,37 @@ function hasValidStreamEventPayload(
     case "iteration.end":
       return isNonNegativeSafeIntegerProperty(value, "iterationCount");
     case "message.start":
-      return typeof value.messageId === "string" && value.role === "assistant";
+      return (
+        isNonEmptyStringProperty(value, "messageId") &&
+        value.role === "assistant"
+      );
     case "text.delta":
       return (
-        typeof value.messageId === "string" && typeof value.delta === "string"
+        isNonEmptyStringProperty(value, "messageId") &&
+        typeof value.delta === "string"
       );
     case "text.done":
       return (
-        typeof value.messageId === "string" && typeof value.text === "string"
+        isNonEmptyStringProperty(value, "messageId") &&
+        typeof value.text === "string"
       );
     case "reasoning.delta":
       return (
-        typeof value.messageId === "string" && typeof value.delta === "string"
+        isNonEmptyStringProperty(value, "messageId") &&
+        typeof value.delta === "string"
       );
     case "reasoning.done":
-      return typeof value.messageId === "string";
+      return isNonEmptyStringProperty(value, "messageId");
     case "structured.delta":
       return (
-        typeof value.messageId === "string" && typeof value.delta === "string"
+        isNonEmptyStringProperty(value, "messageId") &&
+        typeof value.delta === "string"
       );
     case "structured.done":
       return (
-        typeof value.messageId === "string" &&
+        isNonEmptyStringProperty(value, "messageId") &&
         "data" in value &&
+        isSerializableContractValue(value.data) &&
         isOptionalStringProperty(value, "name")
       );
     case "tool_call.start":
@@ -1058,11 +1071,12 @@ function hasValidStreamEventPayload(
       return (
         isNonEmptyStringProperty(value, "callId") &&
         isNonEmptyStringProperty(value, "name") &&
-        "input" in value
+        "input" in value &&
+        isSerializableContractValue(value.input)
       );
     case "message.done":
       return (
-        typeof value.messageId === "string" &&
+        isNonEmptyStringProperty(value, "messageId") &&
         isStringProperty(value, "finishReason") &&
         FINISH_REASONS.has(value.finishReason) &&
         isOptionalProviderUsage(value, "usage")
@@ -1071,13 +1085,15 @@ function hasValidStreamEventPayload(
       return (
         isNonEmptyStringProperty(value, "callId") &&
         isNonEmptyStringProperty(value, "name") &&
-        "input" in value
+        "input" in value &&
+        isSerializableContractValue(value.input)
       );
     case "tool.result":
       return (
         isNonEmptyStringProperty(value, "callId") &&
         isNonEmptyStringProperty(value, "name") &&
         "output" in value &&
+        isSerializableContractValue(value.output) &&
         isOptionalBooleanProperty(value, "isError")
       );
     case "approval.requested":
@@ -1085,7 +1101,7 @@ function hasValidStreamEventPayload(
     case "approval.resolved":
       return isApprovalResponse(value.response);
     case "steering.incorporated":
-      return typeof value.messageId === "string";
+      return isNonEmptyStringProperty(value, "messageId");
     case "state.snapshot":
       return isContextManifest(value.manifest);
     case "state.checkpoint":
@@ -1098,7 +1114,11 @@ function hasValidStreamEventPayload(
         isKrakenErrorProjection(value.error) && typeof value.fatal === "boolean"
       );
     case "custom":
-      return typeof value.name === "string" && "data" in value;
+      return (
+        isNonEmptyStringProperty(value, "name") &&
+        "data" in value &&
+        isSerializableContractValue(value.data)
+      );
     default:
       return false;
   }
@@ -1205,41 +1225,44 @@ function isContentPart(value: unknown): value is ContentPart {
     case "text":
       return (
         typeof value.text === "string" &&
-        isOptionalPlainObjectProperty(value, "providerMetadata")
+        isOptionalSerializableRecordProperty(value, "providerMetadata")
       );
     case "reasoning":
       return (
         typeof value.text === "string" &&
         typeof value.redacted === "boolean" &&
-        isOptionalPlainObjectProperty(value, "providerMetadata")
+        isOptionalSerializableRecordProperty(value, "providerMetadata")
       );
     case "tool_call":
       return (
-        typeof value.callId === "string" &&
-        typeof value.name === "string" &&
+        isNonEmptyStringProperty(value, "callId") &&
+        isNonEmptyStringProperty(value, "name") &&
         "input" in value &&
-        isOptionalPlainObjectProperty(value, "providerMetadata")
+        isSerializableContractValue(value.input) &&
+        isOptionalSerializableRecordProperty(value, "providerMetadata")
       );
     case "tool_result":
       return (
-        typeof value.callId === "string" &&
-        typeof value.name === "string" &&
+        isNonEmptyStringProperty(value, "callId") &&
+        isNonEmptyStringProperty(value, "name") &&
         "output" in value &&
+        isSerializableContractValue(value.output) &&
         isOptionalBooleanProperty(value, "isError") &&
-        isOptionalPlainObjectProperty(value, "providerMetadata")
+        isOptionalSerializableRecordProperty(value, "providerMetadata")
       );
     case "file":
       return (
         (typeof value.data === "string" || value.data instanceof Uint8Array) &&
         typeof value.mediaType === "string" &&
         isOptionalStringProperty(value, "filename") &&
-        isOptionalPlainObjectProperty(value, "providerMetadata")
+        isOptionalSerializableRecordProperty(value, "providerMetadata")
       );
     case "structured":
       return (
         "data" in value &&
+        isSerializableContractValue(value.data) &&
         isOptionalStringProperty(value, "name") &&
-        isOptionalPlainObjectProperty(value, "providerMetadata")
+        isOptionalSerializableRecordProperty(value, "providerMetadata")
       );
     default:
       return false;
@@ -1253,8 +1276,9 @@ function isToolResultPart(value: unknown): value is ToolResultPart {
     isNonEmptyStringProperty(value, "callId") &&
     isNonEmptyStringProperty(value, "name") &&
     "output" in value &&
+    isSerializableContractValue(value.output) &&
     isOptionalBooleanProperty(value, "isError") &&
-    isOptionalPlainObjectProperty(value, "providerMetadata")
+    isOptionalSerializableRecordProperty(value, "providerMetadata")
   );
 }
 
@@ -1265,6 +1289,7 @@ function isPendingToolCall(value: unknown): value is PendingToolCall {
     isNonEmptyStringProperty(value, "name") &&
     isNonEmptyStringProperty(value, "message") &&
     "input" in value &&
+    isSerializableContractValue(value.input) &&
     Array.isArray(value.decisions) &&
     value.decisions.length > 0 &&
     value.decisions.every((item) => typeof item === "string" && item.length > 0)
@@ -1310,12 +1335,18 @@ function isApprovalDecision(value: unknown): value is ApprovalDecision {
   }
 
   if (
-    value.type !== "approve" &&
-    value.type !== "edit" &&
-    value.message !== undefined &&
-    typeof value.message !== "string"
+    value.type === "edit" &&
+    !isSerializableContractValue(value.editedInput)
   ) {
     return false;
+  }
+
+  if (value.type === "reject") {
+    return isNonEmptyStringProperty(value, "message");
+  }
+
+  if (value.type !== "approve" && value.type !== "edit") {
+    return isNonEmptyStringProperty(value, "message");
   }
 
   return true;
@@ -1347,7 +1378,7 @@ function isContextManifest(value: unknown): value is ContextManifest {
     !(
       isPlainObject(value) &&
       isContextManifestCounters(byRole) &&
-      isPlainObject(value.extensions) &&
+      isSerializableRecord(value.extensions) &&
       isNonNegativeSafeInteger(messageCount) &&
       isFiniteNumberProperty(value, "tokenEstimate") &&
       isContextManifestNameCounters(toolCalls) &&
@@ -1431,6 +1462,7 @@ function isContextManifestNameCounters(
   return (
     isPlainObject(value) &&
     isPlainObject(value.byName) &&
+    Object.keys(value.byName).every((name) => name.length > 0) &&
     Object.values(value.byName).every(
       (count) =>
         typeof count === "number" && Number.isSafeInteger(count) && count >= 0
@@ -1608,6 +1640,13 @@ function isOptionalPlainObjectProperty<
   return value[key] === undefined || isPlainObject(value[key]);
 }
 
+function isOptionalSerializableRecordProperty<
+  TKey extends string,
+  TObject extends Record<string, unknown>,
+>(value: TObject, key: TKey): boolean {
+  return value[key] === undefined || isSerializableRecord(value[key]);
+}
+
 function isOptionalProviderUsage<
   TKey extends string,
   TObject extends Record<string, unknown>,
@@ -1652,6 +1691,16 @@ function isKrakenJsonSchema(value: unknown): value is KrakenJsonSchema {
     typeof value === "boolean" ||
     (isKrakenJsonObject(value, new WeakSet()) && isValidJsonSchemaObject(value))
   );
+}
+
+function isSerializableContractValue(value: unknown): value is KrakenJsonValue {
+  return isKrakenJsonValue(value, new WeakSet());
+}
+
+function isSerializableRecord(
+  value: unknown
+): value is { [key: string]: KrakenJsonValue } {
+  return isKrakenJsonObject(value, new WeakSet());
 }
 
 function isValidJsonSchemaObject(value: {

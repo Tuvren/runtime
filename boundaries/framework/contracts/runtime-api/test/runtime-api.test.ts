@@ -249,6 +249,27 @@ describe("runtime-api contracts", () => {
     ).toBe(false);
   });
 
+  test("rejects stream events with empty lifecycle identifiers", () => {
+    expect(
+      isKrakenStreamEvent({
+        text: "ok",
+        messageId: "",
+        timestamp: 1,
+        type: "text.done",
+      })
+    ).toBe(false);
+
+    expect(
+      isKrakenStreamEvent({
+        resumedFrom: "1".repeat(64),
+        threadId: "",
+        timestamp: 1,
+        turnId: "turn-1",
+        type: "turn.start",
+      })
+    ).toBe(false);
+  });
+
   test("rejects stream events with invalid hash references", () => {
     expect(
       isKrakenStreamEvent({
@@ -304,6 +325,103 @@ describe("runtime-api contracts", () => {
         parts: [],
         providerMetadata: 7,
         role: "assistant",
+      })
+    ).toBe(false);
+  });
+
+  test("rejects content parts with non-serializable payloads", () => {
+    expect(
+      isKrakenMessage({
+        parts: [
+          {
+            callId: "call-1",
+            input: {
+              fn() {
+                return 1;
+              },
+            },
+            name: "search",
+            type: "tool_call",
+          },
+        ],
+        role: "assistant",
+      })
+    ).toBe(false);
+
+    expect(
+      isKrakenMessage({
+        parts: [
+          {
+            data: {
+              nested: {
+                fn() {
+                  return 1;
+                },
+              },
+            },
+            type: "structured",
+          },
+        ],
+        role: "assistant",
+      })
+    ).toBe(false);
+
+    expect(
+      isKrakenMessage({
+        parts: [
+          {
+            providerMetadata: {
+              nested: {
+                fn() {
+                  return 1;
+                },
+              },
+            },
+            text: "hi",
+            type: "text",
+          },
+        ],
+        role: "assistant",
+      })
+    ).toBe(false);
+  });
+
+  test("rejects stream payloads with non-serializable structured data", () => {
+    expect(
+      isProviderStreamChunk({
+        data: {
+          fn() {
+            return 1;
+          },
+        },
+        type: "structured_done",
+      })
+    ).toBe(false);
+
+    expect(
+      isKrakenStreamEvent({
+        data: {
+          fn() {
+            return 1;
+          },
+        },
+        messageId: "message-1",
+        timestamp: 1,
+        type: "structured.done",
+      })
+    ).toBe(false);
+
+    expect(
+      isKrakenStreamEvent({
+        callId: "call-1",
+        input: {
+          fn() {
+            return 1;
+          },
+        },
+        name: "search",
+        timestamp: 1,
+        type: "tool_call.done",
       })
     ).toBe(false);
   });
@@ -480,13 +598,13 @@ describe("runtime-api contracts", () => {
       isApprovalResponse({
         decisions: [{ callId: "call-1", type: "reject" }],
       })
-    ).toBe(true);
+    ).toBe(false);
 
     expect(
       isApprovalResponse({
         decisions: [{ callId: "call-1", type: "needs_human" }],
       })
-    ).toBe(true);
+    ).toBe(false);
   });
 
   test("rejects approval responses with no decisions", () => {
@@ -585,6 +703,37 @@ describe("runtime-api contracts", () => {
           lastUserMessageIndex: 1,
           messageCount: 2,
           tokenEstimate: Number.NaN,
+          toolCalls: { byName: {}, total: 0 },
+          toolResults: { byName: {}, total: 0 },
+          turnBoundaries: [0],
+        },
+        phase: "running",
+      })
+    ).toBe(false);
+  });
+
+  test("rejects execution statuses with non-serializable extension state", () => {
+    expect(
+      isExecutionStatus({
+        iterationCount: 1,
+        manifest: {
+          byRole: {
+            assistant: 1,
+            system: 0,
+            tool: 0,
+            user: 1,
+          },
+          extensions: {
+            myExt: {
+              fn() {
+                return 1;
+              },
+            },
+          },
+          lastAssistantMessageIndex: 0,
+          lastUserMessageIndex: 1,
+          messageCount: 2,
+          tokenEstimate: 12,
           toolCalls: { byName: {}, total: 0 },
           toolResults: { byName: {}, total: 0 },
           turnBoundaries: [0],
@@ -734,6 +883,31 @@ describe("runtime-api contracts", () => {
           messageCount: 2,
           tokenEstimate: 12,
           toolCalls: { byName: {}, total: 0 },
+          toolResults: { byName: {}, total: 0 },
+          turnBoundaries: [0],
+        },
+        phase: "running",
+      })
+    ).toBe(false);
+  });
+
+  test("rejects manifests with empty tool-name buckets", () => {
+    expect(
+      isExecutionStatus({
+        iterationCount: 0,
+        manifest: {
+          byRole: {
+            assistant: 1,
+            system: 0,
+            tool: 0,
+            user: 1,
+          },
+          extensions: {},
+          lastAssistantMessageIndex: 0,
+          lastUserMessageIndex: 1,
+          messageCount: 2,
+          tokenEstimate: 12,
+          toolCalls: { byName: { "": 1 }, total: 1 },
           toolResults: { byName: {}, total: 0 },
           turnBoundaries: [0],
         },
