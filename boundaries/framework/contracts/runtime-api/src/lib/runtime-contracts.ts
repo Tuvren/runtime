@@ -1294,7 +1294,7 @@ function isPendingToolCall(value: unknown): value is PendingToolCall {
     isSerializableContractValue(value.input) &&
     Array.isArray(value.decisions) &&
     value.decisions.length > 0 &&
-    value.decisions.every((item) => typeof item === "string" && item.length > 0)
+    value.decisions.every(isNonEmptyStringValue)
   );
 }
 
@@ -1336,6 +1336,10 @@ function isApprovalDecision(value: unknown): value is ApprovalDecision {
     return false;
   }
 
+  if (value.type !== "edit" && "editedInput" in value) {
+    return false;
+  }
+
   if (
     value.type === "edit" &&
     !isSerializableContractValue(value.editedInput)
@@ -1354,7 +1358,8 @@ function isKrakenErrorProjection(
   return (
     isPlainObject(value) &&
     typeof value.message === "string" &&
-    isOptionalStringProperty(value, "code")
+    isOptionalStringProperty(value, "code") &&
+    isOptionalSerializableContractValueProperty(value, "details")
   );
 }
 
@@ -1458,7 +1463,7 @@ function isContextManifestNameCounters(
   return (
     isPlainObject(value) &&
     isPlainObject(value.byName) &&
-    Object.keys(value.byName).every((name) => name.length > 0) &&
+    Object.keys(value.byName).every(isNonEmptyStringValue) &&
     Object.values(value.byName).every(
       (count) =>
         typeof count === "number" && Number.isSafeInteger(count) && count >= 0
@@ -1542,7 +1547,7 @@ function hasValidTurnBoundaries(
   const lastBoundary = turnBoundaries.at(-1);
 
   return (
-    turnBoundaries[0] === 0 &&
+    turnBoundaries[0] <= lastUserMessageIndex &&
     lastBoundary !== undefined &&
     lastBoundary <= lastUserMessageIndex
   );
@@ -1643,6 +1648,13 @@ function isOptionalSerializableRecordProperty<
   return value[key] === undefined || isSerializableRecord(value[key]);
 }
 
+function isOptionalSerializableContractValueProperty<
+  TKey extends string,
+  TObject extends Record<string, unknown>,
+>(value: TObject, key: TKey): boolean {
+  return value[key] === undefined || isSerializableContractValue(value[key]);
+}
+
 function isOptionalProviderUsage<
   TKey extends string,
   TObject extends Record<string, unknown>,
@@ -1668,7 +1680,11 @@ function isNonEmptyStringProperty<
   TKey extends string,
   TObject extends Record<string, unknown>,
 >(value: TObject, key: TKey): boolean {
-  return typeof value[key] === "string" && value[key].trim().length > 0;
+  return isNonEmptyStringValue(value[key]);
+}
+
+function isNonEmptyStringValue(value: unknown): value is string {
+  return typeof value === "string" && value.trim().length > 0;
 }
 
 function isNonEmptyArray(value: unknown): value is [unknown, ...unknown[]] {
@@ -1826,14 +1842,27 @@ function isKrakenToolSchema(
 }
 
 function isCustomSchema(value: unknown): value is CustomSchema {
-  return (
-    value !== null &&
-    typeof value === "object" &&
-    "toJSONSchema" in value &&
-    typeof value.toJSONSchema === "function" &&
-    "validate" in value &&
-    typeof value.validate === "function"
-  );
+  if (
+    !(
+      value !== null &&
+      typeof value === "object" &&
+      "toJSONSchema" in value &&
+      typeof value.toJSONSchema === "function" &&
+      "validate" in value &&
+      typeof value.validate === "function"
+    )
+  ) {
+    return false;
+  }
+
+  try {
+    return (
+      isKrakenJsonSchema(value.toJSONSchema()) &&
+      isValidationResult(value.validate(undefined))
+    );
+  } catch {
+    return false;
+  }
 }
 
 function isProviderUsage(value: unknown): value is ProviderUsage {
@@ -1893,6 +1922,32 @@ function hasUniqueApprovalDecisionCallIds(
   }
 
   return true;
+}
+
+function isValidationResult(value: unknown): value is ValidationResult {
+  if (!(isPlainObject(value) && "valid" in value)) {
+    return false;
+  }
+
+  if (value.valid === true) {
+    return "value" in value;
+  }
+
+  return (
+    value.valid === false &&
+    "error" in value &&
+    isValidationErrorPayload(value.error)
+  );
+}
+
+function isValidationErrorPayload(
+  value: unknown
+): value is ValidationErrorPayload {
+  return (
+    isPlainObject(value) &&
+    typeof value.message === "string" &&
+    isOptionalSerializableContractValueProperty(value, "details")
+  );
 }
 
 function isEventSource(value: unknown): value is EventSource {

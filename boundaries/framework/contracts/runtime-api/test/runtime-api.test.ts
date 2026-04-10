@@ -199,6 +199,23 @@ describe("runtime-api contracts", () => {
     ).toBe(false);
   });
 
+  test("rejects approval requests with blank decision labels", () => {
+    expect(
+      isApprovalRequest({
+        completedResults: [],
+        toolCalls: [
+          {
+            callId: "call-1",
+            decisions: ["   "],
+            input: { query: "status" },
+            message: "Approve?",
+            name: "search",
+          },
+        ],
+      })
+    ).toBe(false);
+  });
+
   test("rejects approval requests with no pending tool calls", () => {
     expect(
       isApprovalRequest({
@@ -227,6 +244,31 @@ describe("runtime-api contracts", () => {
           toolCalls: { byName: {}, total: 0 },
           toolResults: { byName: {}, total: 0 },
           turnBoundaries: [0],
+        },
+        phase: "running",
+      })
+    ).toBe(true);
+  });
+
+  test("accepts manifests whose first user turn starts after a system message", () => {
+    expect(
+      isExecutionStatus({
+        iterationCount: 0,
+        manifest: {
+          byRole: {
+            assistant: 1,
+            system: 1,
+            tool: 0,
+            user: 2,
+          },
+          extensions: {},
+          lastAssistantMessageIndex: 2,
+          lastUserMessageIndex: 3,
+          messageCount: 4,
+          tokenEstimate: 12,
+          toolCalls: { byName: {}, total: 0 },
+          toolResults: { byName: {}, total: 0 },
+          turnBoundaries: [1, 3],
         },
         phase: "running",
       })
@@ -561,11 +603,18 @@ describe("runtime-api contracts", () => {
   test("accepts CustomSchema class instances", () => {
     class ExampleSchema {
       toJSONSchema() {
-        return { type: "string" } as const;
+        return { type: "string" };
       }
 
       validate(input: unknown) {
-        return { valid: typeof input === "string", value: input } as const;
+        if (typeof input === "string") {
+          return { valid: true, value: input };
+        }
+
+        return {
+          error: { message: "Expected string" },
+          valid: false,
+        };
       }
     }
 
@@ -579,6 +628,29 @@ describe("runtime-api contracts", () => {
         name: "class-schema",
       })
     ).toBe(true);
+  });
+
+  test("rejects malformed CustomSchema implementations", () => {
+    class BadSchema {
+      toJSONSchema() {
+        return 123;
+      }
+
+      validate() {
+        return { valid: true, value: "ok" };
+      }
+    }
+
+    expect(
+      isKrakenToolDefinition({
+        description: "Bad custom schema",
+        execute() {
+          return undefined;
+        },
+        inputSchema: new BadSchema(),
+        name: "bad-custom-schema",
+      })
+    ).toBe(false);
   });
 
   test("accepts JSON Schema numeric keywords with fractional values", () => {
@@ -688,6 +760,18 @@ describe("runtime-api contracts", () => {
         decisions: [{ callId: "call-1", message: "", type: "reject" }],
       })
     ).toBe(false);
+
+    expect(
+      isApprovalResponse({
+        decisions: [
+          {
+            callId: "call-1",
+            editedInput: { query: "updated" },
+            type: "approve",
+          },
+        ],
+      })
+    ).toBe(false);
   });
 
   test("rejects approval responses with no decisions", () => {
@@ -793,6 +877,24 @@ describe("runtime-api contracts", () => {
         timestamp: 1,
         turnId: "turn-1",
         type: "turn.end",
+      })
+    ).toBe(false);
+  });
+
+  test("rejects error events with non-serializable details", () => {
+    expect(
+      isKrakenStreamEvent({
+        error: {
+          details: {
+            fn() {
+              return 1;
+            },
+          },
+          message: "boom",
+        },
+        fatal: true,
+        timestamp: 1,
+        type: "error",
       })
     ).toBe(false);
   });
