@@ -547,6 +547,17 @@ describe("runtime-api contracts", () => {
     ).toBe(false);
   });
 
+  test("rejects non-canonical epoch timestamps in stream events", () => {
+    expect(
+      isKrakenStreamEvent({
+        status: "completed",
+        timestamp: -0,
+        turnId: "turn-1",
+        type: "turn.end",
+      })
+    ).toBe(false);
+  });
+
   test("rejects assistant messages with incomplete content parts", () => {
     expect(
       isKrakenMessage({

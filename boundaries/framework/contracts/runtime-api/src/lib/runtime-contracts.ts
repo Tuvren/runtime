@@ -15,7 +15,11 @@
  */
 
 import type { EpochMs, HashString } from "@kraken/shared-core-types";
-import { isHashString, KrakenValidationError } from "@kraken/shared-core-types";
+import {
+  isEpochMs,
+  isHashString,
+  KrakenValidationError,
+} from "@kraken/shared-core-types";
 
 const CONTENT_PART_TYPES = new Set([
   "text",
@@ -229,14 +233,6 @@ const EXECUTION_STATUS_KEYS = new Set([
   "pauseReason",
 ]);
 const APPROVAL_REQUEST_KEYS = new Set(["toolCalls", "completedResults"]);
-const TOOL_RESULT_MESSAGE_KEYS = new Set([
-  "type",
-  "callId",
-  "name",
-  "output",
-  "isError",
-  "providerMetadata",
-]);
 const PENDING_TOOL_CALL_KEYS = new Set([
   "callId",
   "decisions",
@@ -1208,7 +1204,7 @@ export function isKrakenStreamEvent(
       return false;
     }
 
-    if (!hasEpochMsTimestamp(value)) {
+    if (!hasEpochMsTimestampAndValidSource(value)) {
       return false;
     }
 
@@ -1562,7 +1558,7 @@ function isContentPart(value: unknown): value is ContentPart {
 function isToolResultPart(value: unknown): value is ToolResultPart {
   return (
     isPlainObject(value) &&
-    hasOnlyAllowedKeys(value, TOOL_RESULT_MESSAGE_KEYS) &&
+    hasOnlyAllowedKeys(value, TOOL_RESULT_PART_KEYS) &&
     value.type === "tool_result" &&
     isNonEmptyStringProperty(value, "callId") &&
     isNonEmptyStringProperty(value, "name") &&
@@ -1599,8 +1595,8 @@ export function isApprovalResponse(value: unknown): value is ApprovalResponse {
       hasOnlyAllowedKeys(value, APPROVAL_RESPONSE_KEYS) &&
       Array.isArray(value.decisions) &&
       value.decisions.length > 0 &&
-      hasUniqueApprovalDecisionCallIds(value.decisions) &&
-      value.decisions.every(isApprovalDecision)
+      value.decisions.every(isApprovalDecision) &&
+      hasUniqueApprovalDecisionCallIds(value.decisions)
   );
 }
 
@@ -1914,13 +1910,10 @@ function hasDistinctApprovalRequestCallIds(
   return true;
 }
 
-function hasEpochMsTimestamp(
+function hasEpochMsTimestampAndValidSource(
   value: Record<string, unknown>
 ): value is Record<string, unknown> & { timestamp: EpochMs } {
-  if (
-    typeof value.timestamp !== "number" ||
-    !Number.isSafeInteger(value.timestamp)
-  ) {
+  if (!isEpochMs(value.timestamp)) {
     return false;
   }
 

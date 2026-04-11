@@ -39,6 +39,9 @@
             "command": "tsc --project tsconfig.lib.json --noEmit --pretty false"
           },
           {
+            "command": "tsc --project tsconfig.dts.json --noEmit --pretty false"
+          },
+          {
             "command": "tsc --project tsconfig.typecheck.json --noEmit --pretty false"
           }
         ],
