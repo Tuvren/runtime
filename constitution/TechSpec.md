@@ -1,6 +1,7 @@
 # Technical Specification
 
 ## 0. Version History & Changelog
+- v0.3.1 - Corrected the brownfield framework baseline to include the implemented contract packages, added the shared orchestration runtime contract surface, and expanded the driver seam so runtime-core can execute against explicit shared-runtime state.
 - v0.3.0 - Reframed the framework implementation as driver-oriented, added the initial ReAct-driver posture, and updated package structure and build sequence to separate shared framework services from driver implementations.
 - v0.2.3 - Defined the backend adapter repository interfaces and the `createMemoryBackend` factory surface so backend implementations no longer depend on implied persistence contracts.
 - v0.2.2 - Defined the concrete TypeScript kernel-contract shapes for `StepContext`, `ObserveResult`, and kernel observe signals so the run lifecycle surface no longer depends on implied upstream payload structure.
@@ -24,7 +25,7 @@
 - **Backend posture:** All official backends implement one strict kernel-visible contract. Backend-specific optimizations may exist internally, but they must not change kernel semantics or require capability negotiation at the kernel layer in v0.1.
 
 ### 1.2 Current-State vs Target-State
-- **Current repository reality:** The repository already contains the workspace scaffold, `@kraken/shared-core-types`, `@kraken/kernel-contract-protocol`, `@kraken/backend-memory`, and `@kraken/kernel-testkit`. SQLite, framework, provider, stream, and host packages remain target-state work.
+- **Current repository reality:** The repository already contains the workspace scaffold, `@kraken/shared-core-types`, `@kraken/kernel-contract-protocol`, `@kraken/backend-memory`, `@kraken/backend-sqlite`, `@kraken/kernel-testkit`, `@kraken/framework-runtime-api`, `@kraken/framework-driver-api`, `@kraken/framework-event-stream`, `@kraken/framework-tool-contracts`, and `@kraken/provider-api`. `runtime-core`, the first concrete driver, provider bridges, stream adapters, and hosts remain target-state work.
 - **Target implementation state:** The package layout and interfaces defined below are the intended implementation target for the first authoritative code line.
 - **Drift rule:** The future codebase must conform to this TechSpec. The TechSpec must not be treated as a loose commentary on whatever structure happens to emerge.
 
@@ -445,6 +446,36 @@ export interface ExecutionHandle {
   status(): ExecutionStatus;
 }
 
+export interface WorkerStatus {
+  workerId: string;
+  agent: string;
+  threadId: string;
+  status: "running" | "completed" | "failed";
+  result?: unknown;
+}
+
+export interface OrchestrationHandle extends ExecutionHandle {
+  parentEvents(): AsyncIterable<KrakenStreamEvent>;
+  workerEvents(workerId: string): AsyncIterable<KrakenStreamEvent>;
+  allEvents(): AsyncIterable<KrakenStreamEvent>;
+  workers(): ReadonlyMap<string, WorkerStatus>;
+}
+
+export interface OrchestrationRuntime {
+  executeTurn(input: {
+    signal: InputSignal;
+    threadId: string;
+    branchId: string;
+    schemaId?: string;
+    driverId?: string;
+    tools?: KrakenToolDefinition[];
+    parentTurnId?: string | null;
+  }): OrchestrationHandle;
+  launchWorker(agent: string, task: unknown): Promise<string>;
+  awaitWorker(workerId: string): Promise<unknown>;
+  cancel(): void;
+}
+
 export interface ExecutionStatus {
   phase: "running" | "paused" | "completed" | "failed";
   iterationCount: number;
@@ -814,11 +845,15 @@ export interface DriverRuntimePort {
 
 export interface DriverExecutionContext {
   turnId: string;
+  threadId: string;
   branchId: string;
   schemaId: string;
+  iterationCount: number;
   config: AgentConfig;
+  messages: KrakenMessage[];
+  manifest: ContextManifest;
   toolRegistry: ToolRegistry;
-  steering?: AsyncIterable<InputSignal>;
+  signal?: AbortSignal;
   runtime: DriverRuntimePort;
 }
 
@@ -830,6 +865,7 @@ export interface DriverResumeContext extends DriverExecutionContext {
 export interface DriverExecutionResult {
   resolution: RuntimeResolution;
   activeAgent: string;
+  messages?: KrakenMessage[];
 }
 
 export interface KrakenDriver {
@@ -999,7 +1035,7 @@ Target implementation layout after code generation begins:
 ### 5.2 Coding Standards
 - **Formatting / Linting:** Use Biome configured to follow the repository’s Ultracite-aligned standards.
 - **Workspace Tooling:** Use `devenv` for reproducible developer environments and `nx@22.6.3` with aligned `@nx/*` packages for project orchestration, affected-graph analysis, caching, generators, and task coordination across the TypeScript subtree.
-- **Build Tooling:** Use `tsup` for TypeScript package builds. Core packages emit ESM-first builds.
+- **Build Tooling:** Use `tsup` for TypeScript package builds. Core packages emit ESM-first builds and do not publish JavaScript sourcemaps or TypeScript declaration maps by default.
 - **TypeScript Settings:**
   - `"strict": true`
   - `"module": "esnext"`

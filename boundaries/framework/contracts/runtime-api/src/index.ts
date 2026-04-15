@@ -87,6 +87,8 @@ export type {
   LoopPolicy,
   MessageDoneEvent,
   MessageStartEvent,
+  OrchestrationHandle,
+  OrchestrationRuntime,
   PendingToolCall,
   ProviderStreamChunk,
   ProviderUsage,
@@ -122,6 +124,7 @@ export type {
   TurnStartEvent,
   ValidationErrorPayload,
   ValidationResult,
+  WorkerStatus,
 } from "./lib/runtime-contracts.js";
 export {
   assertApprovalRequest,

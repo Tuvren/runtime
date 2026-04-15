@@ -1007,6 +1007,36 @@ export interface ExecutionHandle {
   steer(signal: InputSignal): void;
 }
 
+export interface WorkerStatus {
+  agent: string;
+  result?: unknown;
+  status: "running" | "completed" | "failed";
+  threadId: string;
+  workerId: string;
+}
+
+export interface OrchestrationHandle extends ExecutionHandle {
+  allEvents(): AsyncIterable<KrakenStreamEvent>;
+  parentEvents(): AsyncIterable<KrakenStreamEvent>;
+  workerEvents(workerId: string): AsyncIterable<KrakenStreamEvent>;
+  workers(): ReadonlyMap<string, WorkerStatus>;
+}
+
+export interface OrchestrationRuntime {
+  awaitWorker(workerId: string): Promise<unknown>;
+  cancel(): void;
+  executeTurn(input: {
+    branchId: string;
+    driverId?: string;
+    parentTurnId?: string | null;
+    schemaId?: string;
+    signal: InputSignal;
+    threadId: string;
+    tools?: KrakenToolDefinition[];
+  }): OrchestrationHandle;
+  launchWorker(agent: string, task: unknown): Promise<string>;
+}
+
 export interface KrakenRuntime {
   createBranch(input: {
     branchId?: string;

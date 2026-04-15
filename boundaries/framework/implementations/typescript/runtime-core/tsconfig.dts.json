@@ -8,12 +8,18 @@
     "outDir": "./dist",
     "paths": {
       "@kraken/shared-core-types": [
-        "../../../shared/contracts/core-types/dist/index.d.ts"
+        "../../../../shared/contracts/core-types/dist/index.d.ts"
       ],
       "@kraken/framework-runtime-api": [
-        "../../../framework/contracts/runtime-api/dist/index.d.ts"
+        "../../../contracts/runtime-api/dist/index.d.ts"
       ],
-      "@kraken/provider-api": ["./src/index.ts"]
+      "@kraken/framework-driver-api": [
+        "../../../contracts/driver-api/dist/index.d.ts"
+      ],
+      "@kraken/kernel-contract-protocol": [
+        "../../../../kernel/contracts/protocol/dist/index.d.ts"
+      ],
+      "@kraken/framework-runtime-core": ["./src/index.ts"]
     },
     "rootDir": "./src",
     "target": "esnext",

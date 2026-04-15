@@ -48,11 +48,36 @@ describe("driver-api", () => {
     const context: DriverExecutionContext = {
       branchId: "branch-1",
       config: { name: "primary" },
+      iterationCount: 1,
+      manifest: {
+        byRole: {
+          assistant: 0,
+          system: 0,
+          tool: 0,
+          user: 0,
+        },
+        extensions: {},
+        lastAssistantMessageIndex: -1,
+        lastUserMessageIndex: -1,
+        messageCount: 0,
+        tokenEstimate: 0,
+        toolCalls: {
+          byName: {},
+          total: 0,
+        },
+        toolResults: {
+          byName: {},
+          total: 0,
+        },
+        turnBoundaries: [],
+      },
+      messages: [],
       runtime: {
         emit: () => undefined,
         now: () => 0,
       },
       schemaId: "schema-1",
+      threadId: "thread-1",
       toolRegistry: {
         get: () => undefined,
         has: () => false,

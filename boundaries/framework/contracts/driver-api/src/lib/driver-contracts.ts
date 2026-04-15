@@ -17,9 +17,10 @@
 import type {
   AgentConfig,
   ApprovalResponse,
+  ContextManifest,
   EpochMs,
   HashString,
-  InputSignal,
+  KrakenMessage,
   KrakenStreamEvent,
   RuntimeResolution,
   ToolRegistry,
@@ -34,9 +35,13 @@ export interface DriverRuntimePort {
 export interface DriverExecutionContext {
   branchId: string;
   config: AgentConfig;
+  iterationCount: number;
+  manifest: ContextManifest;
+  messages: KrakenMessage[];
   runtime: DriverRuntimePort;
   schemaId: string;
-  steering?: AsyncIterable<InputSignal>;
+  signal?: AbortSignal;
+  threadId: string;
   toolRegistry: ToolRegistry;
   turnId: string;
 }
@@ -48,6 +53,7 @@ export interface DriverResumeContext extends DriverExecutionContext {
 
 export interface DriverExecutionResult {
   activeAgent: string;
+  messages?: KrakenMessage[];
   resolution: RuntimeResolution;
 }
 

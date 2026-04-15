@@ -1,0 +1,931 @@
+/**
+ * Copyright 2026 Oscar Yáñez Cisterna (@SkrOYC)
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+import type {
+  ApprovalDecision,
+  ApprovalRequest,
+  ApprovalResponse,
+  AroundToolContext,
+  AroundToolHandler,
+  AroundToolResult,
+  ContextManifest,
+  EpochMs,
+  EventSource,
+  KrakenExtension,
+  KrakenStreamEvent,
+  KrakenToolDefinition,
+  PendingToolCall,
+  ToolCallPart,
+  ToolExecutionContext,
+  ToolRegistry,
+  ToolResultPart,
+} from "@kraken/framework-runtime-api";
+import Ajv, { type ErrorObject, type ValidateFunction } from "ajv";
+import {
+  buildSharedExports,
+  type ExtensionStateUpdate,
+} from "./extension-runtime.js";
+
+const DEFAULT_APPROVAL_DECISIONS = ["approve", "edit", "reject"];
+const ajv = new Ajv({
+  allErrors: true,
+  strict: false,
+});
+const validatorCache = new WeakMap<object, ValidateFunction>();
+
+export interface ToolBatchEnvironment {
+  activeAgent: string;
+  branchId: string;
+  extensions: KrakenExtension[];
+  iterationCount: number;
+  manifest: ContextManifest;
+  now(): EpochMs;
+  publishCustom(event: { data: unknown; name: string }): void;
+  publishEvent(event: KrakenStreamEvent): void;
+  runId: string;
+  signal?: AbortSignal;
+  stageResult(result: ToolResultPart): Promise<void>;
+  threadId: string;
+  toolRegistry: ToolRegistry;
+  turnId: string;
+}
+
+export interface ToolBatchOutcome {
+  approval?: ApprovalRequest;
+  results: ToolResultPart[];
+  updates: ExtensionStateUpdate[];
+}
+
+interface ExecutableToolCall {
+  approvalDecision?: ApprovalDecision;
+  input: unknown;
+  tool: KrakenToolDefinition;
+  toolCall: ToolCallPart;
+}
+
+type SingleToolOutcome =
+  | {
+      approval?: never;
+      result: ToolResultPart;
+      updates: ExtensionStateUpdate[];
+    }
+  | {
+      approval: ApprovalRequest;
+      result?: never;
+      updates: ExtensionStateUpdate[];
+    };
+
+class ToolPauseSignal extends Error {
+  readonly approval: ApprovalRequest;
+  readonly updates: ExtensionStateUpdate[];
+
+  constructor(approval: ApprovalRequest, updates: ExtensionStateUpdate[]) {
+    super("tool execution paused");
+    this.approval = approval;
+    this.updates = updates;
+  }
+}
+
+export async function executeToolBatch(
+  toolCalls: ToolCallPart[],
+  environment: ToolBatchEnvironment
+): Promise<ToolBatchOutcome> {
+  const results: ToolResultPart[] = [];
+  const pendingToolCalls: PendingToolCall[] = [];
+  const updates: ExtensionStateUpdate[] = [];
+  const executable: ExecutableToolCall[] = [];
+
+  for (const toolCall of toolCalls) {
+    const resolved = await resolveExecutableToolCall(toolCall, environment);
+
+    if ("pendingToolCall" in resolved) {
+      pendingToolCalls.push(resolved.pendingToolCall);
+      continue;
+    }
+
+    if ("result" in resolved) {
+      await stageAndEmitResult(environment, resolved.result);
+      results.push(resolved.result);
+      continue;
+    }
+
+    executable.push(resolved.executable);
+  }
+
+  emitToolStarts(environment, executable);
+  const executableOutcomes = await Promise.all(
+    executable.map((toolCall) => executeSingleTool(toolCall, environment))
+  );
+
+  for (const outcome of executableOutcomes) {
+    updates.push(...outcome.updates);
+
+    if (outcome.approval !== undefined) {
+      pendingToolCalls.push(...outcome.approval.toolCalls);
+      results.push(...outcome.approval.completedResults);
+      continue;
+    }
+
+    environment.publishEvent({
+      callId: outcome.result.callId,
+      isError: outcome.result.isError,
+      name: outcome.result.name,
+      output: outcome.result.output,
+      timestamp: environment.now(),
+      type: "tool.result",
+    });
+    results.push(outcome.result);
+  }
+
+  return pendingToolCalls.length === 0
+    ? { results, updates }
+    : {
+        approval: {
+          completedResults: results,
+          toolCalls: pendingToolCalls,
+        },
+        results,
+        updates,
+      };
+}
+
+export async function resumeToolBatch(
+  request: ApprovalRequest,
+  response: ApprovalResponse,
+  environment: ToolBatchEnvironment
+): Promise<ToolBatchOutcome> {
+  const immediateResults: ToolResultPart[] = [];
+  const results: ToolResultPart[] = [];
+  const updates: ExtensionStateUpdate[] = [];
+  const executable: ExecutableToolCall[] = [];
+  const responseMap = new Map<string, ApprovalDecision>();
+
+  for (const decision of response.decisions) {
+    responseMap.set(decision.callId, decision);
+  }
+
+  for (const pendingToolCall of request.toolCalls) {
+    const decision = responseMap.get(pendingToolCall.callId);
+
+    if (decision === undefined) {
+      continue;
+    }
+
+    const resumePlan = await resolveResumeDecision(
+      pendingToolCall,
+      decision,
+      environment
+    );
+
+    if ("result" in resumePlan) {
+      immediateResults.push(resumePlan.result);
+      continue;
+    }
+
+    executable.push(resumePlan.executable);
+  }
+
+  emitToolStarts(environment, executable);
+  for (const result of immediateResults) {
+    await stageAndEmitResult(environment, result);
+    results.push(result);
+  }
+
+  const executedOutcomes = await Promise.all(
+    executable.map((toolCall) => executeSingleTool(toolCall, environment))
+  );
+
+  for (const outcome of executedOutcomes) {
+    updates.push(...outcome.updates);
+
+    if (outcome.approval !== undefined) {
+      results.push(...outcome.approval.completedResults);
+      return {
+        approval: {
+          completedResults: results,
+          toolCalls: outcome.approval.toolCalls,
+        },
+        results,
+        updates,
+      };
+    }
+
+    environment.publishEvent({
+      callId: outcome.result.callId,
+      isError: outcome.result.isError,
+      name: outcome.result.name,
+      output: outcome.result.output,
+      timestamp: environment.now(),
+      type: "tool.result",
+    });
+    results.push(outcome.result);
+  }
+
+  return {
+    results,
+    updates,
+  };
+}
+
+async function resolveExecutableToolCall(
+  toolCall: ToolCallPart,
+  environment: ToolBatchEnvironment
+): Promise<
+  | { executable: ExecutableToolCall }
+  | { pendingToolCall: PendingToolCall }
+  | { result: ToolResultPart }
+> {
+  const tool = environment.toolRegistry.get(toolCall.name);
+
+  if (tool === undefined) {
+    return {
+      result: createErrorToolResult(
+        toolCall,
+        `Tool "${toolCall.name}" is not registered.`
+      ),
+    };
+  }
+
+  const validation = validateToolInput(tool, toolCall.input);
+
+  if (!validation.valid) {
+    return {
+      result: createErrorToolResult(
+        toolCall,
+        "Tool input failed validation.",
+        validation.details
+      ),
+    };
+  }
+
+  const toolContext = createToolExecutionContext(toolCall, tool, environment);
+  const approvalRequired =
+    tool.approval === undefined
+      ? false
+      : await evaluateApprovalPolicy(
+          tool.approval,
+          validation.value,
+          toolContext
+        );
+
+  if (approvalRequired) {
+    return {
+      pendingToolCall: createPendingToolCall(toolCall),
+    };
+  }
+
+  return {
+    executable: {
+      input: validation.value,
+      tool,
+      toolCall,
+    },
+  };
+}
+
+function resolveResumeDecision(
+  pendingToolCall: PendingToolCall,
+  decision: ApprovalDecision,
+  environment: ToolBatchEnvironment
+): { executable: ExecutableToolCall } | { result: ToolResultPart } {
+  if (decision.type === "reject" || !isExecutableApprovalDecision(decision)) {
+    return {
+      result: createRejectedToolResult(pendingToolCall, decision),
+    };
+  }
+
+  const tool = environment.toolRegistry.get(pendingToolCall.name);
+
+  if (tool === undefined) {
+    return {
+      result: createErrorToolResult(
+        {
+          callId: pendingToolCall.callId,
+          input: pendingToolCall.input,
+          name: pendingToolCall.name,
+          type: "tool_call",
+        },
+        `Tool "${pendingToolCall.name}" is not registered.`,
+        {
+          decisionType: decision.type,
+        }
+      ),
+    };
+  }
+
+  const input =
+    decision.type === "edit" ? decision.editedInput : pendingToolCall.input;
+
+  if (decision.type === "edit" && decision.editedInput === undefined) {
+    return {
+      result: createErrorToolResult(
+        {
+          callId: pendingToolCall.callId,
+          input,
+          name: pendingToolCall.name,
+          type: "tool_call",
+        },
+        `Approval decision "edit" for tool "${pendingToolCall.name}" requires editedInput.`,
+        {
+          decisionType: decision.type,
+        }
+      ),
+    };
+  }
+
+  const validation = validateToolInput(tool, input);
+
+  if (!validation.valid) {
+    return {
+      result: createErrorToolResult(
+        {
+          callId: pendingToolCall.callId,
+          input,
+          name: pendingToolCall.name,
+          type: "tool_call",
+        },
+        "Approved tool input failed validation.",
+        {
+          decisionType: decision.type,
+          validation: validation.details,
+        }
+      ),
+    };
+  }
+
+  return {
+    executable: {
+      approvalDecision: decision,
+      input: validation.value,
+      tool,
+      toolCall: {
+        callId: pendingToolCall.callId,
+        input,
+        name: pendingToolCall.name,
+        type: "tool_call",
+      },
+    },
+  };
+}
+
+async function executeSingleTool(
+  toolCall: ExecutableToolCall,
+  environment: ToolBatchEnvironment
+): Promise<SingleToolOutcome> {
+  try {
+    const sharedExports = buildSharedExports(
+      environment.extensions,
+      environment.manifest
+    );
+    const outcome = await runAroundToolHandlers(
+      getAroundToolHandlers(environment.extensions, toolCall.tool.name),
+      0,
+      toolCall,
+      environment,
+      sharedExports
+    );
+
+    if (outcome.approval !== undefined) {
+      return outcome;
+    }
+
+    const result = applyApprovalDecisionMetadata(
+      outcome.result,
+      toolCall.approvalDecision
+    );
+    await environment.stageResult(result);
+
+    return {
+      result,
+      updates: outcome.updates,
+    };
+  } catch (error: unknown) {
+    if (error instanceof ToolPauseSignal) {
+      return {
+        approval: error.approval,
+        updates: error.updates,
+      };
+    }
+
+    const result = createExecutionFailureResult(
+      toolCall.toolCall,
+      error,
+      toolCall.approvalDecision
+    );
+    await environment.stageResult(result);
+
+    return {
+      result,
+      updates: [],
+    };
+  }
+}
+
+async function runAroundToolHandlers(
+  handlers: Array<{
+    extensionName: string;
+    handler: AroundToolHandler;
+  }>,
+  index: number,
+  toolCall: ExecutableToolCall,
+  environment: ToolBatchEnvironment,
+  sharedExports: Record<string, Record<string, unknown>>
+): Promise<SingleToolOutcome> {
+  if (index >= handlers.length) {
+    const output = await toolCall.tool.execute(
+      toolCall.input,
+      createToolExecutionContext(toolCall.toolCall, toolCall.tool, environment)
+    );
+
+    return {
+      result: {
+        callId: toolCall.toolCall.callId,
+        name: toolCall.tool.name,
+        output,
+        type: "tool_result",
+      },
+      updates: [],
+    };
+  }
+
+  const { extensionName, handler } = handlers[index];
+  const nestedUpdates: ExtensionStateUpdate[] = [];
+  let nestedResult: ToolResultPart | undefined;
+  const context = createAroundToolContext(
+    toolCall,
+    extensionName,
+    environment,
+    sharedExports
+  );
+
+  try {
+    const handlerResult = await handler(context, async (nextContext) => {
+      const outcome = await runAroundToolHandlers(
+        handlers,
+        index + 1,
+        toExecutableToolCall(toolCall, nextContext),
+        environment,
+        sharedExports
+      );
+
+      if (outcome.approval !== undefined) {
+        throw new ToolPauseSignal(outcome.approval, outcome.updates);
+      }
+
+      nestedUpdates.push(...outcome.updates);
+      nestedResult = outcome.result;
+      return outcome.result;
+    });
+
+    return normalizeAroundToolResult(
+      extensionName,
+      handlerResult,
+      nestedUpdates,
+      nestedResult,
+      context
+    );
+  } catch (error: unknown) {
+    if (error instanceof ToolPauseSignal) {
+      throw new ToolPauseSignal(error.approval, [
+        ...nestedUpdates,
+        ...error.updates,
+      ]);
+    }
+
+    if (nestedResult !== undefined) {
+      return {
+        result: nestedResult,
+        updates: nestedUpdates,
+      };
+    }
+
+    return {
+      result: createExecutionFailureResult(
+        context.toolCall,
+        error,
+        context.approvalDecision
+      ),
+      updates: nestedUpdates,
+    };
+  }
+}
+
+function normalizeAroundToolResult(
+  extensionName: string,
+  result: AroundToolResult,
+  nestedUpdates: ExtensionStateUpdate[],
+  nestedResult: ToolResultPart | undefined,
+  context: AroundToolContext
+): SingleToolOutcome {
+  if (isPauseResult(result)) {
+    return {
+      approval: normalizeApprovalRequest(context.toolCall, result.approval),
+      updates: collectExtensionStateUpdate(
+        extensionName,
+        result.state,
+        nestedUpdates
+      ),
+    };
+  }
+
+  if (isResultWithState(result)) {
+    return {
+      result: result.result,
+      updates: collectExtensionStateUpdate(
+        extensionName,
+        result.state,
+        nestedUpdates
+      ),
+    };
+  }
+
+  if (nestedResult !== undefined && result === nestedResult) {
+    return {
+      result,
+      updates: nestedUpdates,
+    };
+  }
+
+  return {
+    result,
+    updates: nestedUpdates,
+  };
+}
+
+function collectExtensionStateUpdate(
+  extensionName: string,
+  state: Record<string, unknown> | undefined,
+  nestedUpdates: ExtensionStateUpdate[]
+): ExtensionStateUpdate[] {
+  if (state === undefined) {
+    return nestedUpdates;
+  }
+
+  return [...nestedUpdates, { extensionName, state }];
+}
+
+function getAroundToolHandlers(
+  extensions: KrakenExtension[],
+  toolName: string
+): Array<{
+  extensionName: string;
+  handler: AroundToolHandler;
+}> {
+  const handlers: Array<{
+    extensionName: string;
+    handler: AroundToolHandler;
+  }> = [];
+
+  for (const extension of extensions) {
+    const spec = extension.aroundTool;
+
+    if (spec === undefined) {
+      continue;
+    }
+
+    if (typeof spec === "function") {
+      handlers.push({
+        extensionName: extension.name,
+        handler: spec,
+      });
+      continue;
+    }
+
+    if (spec.tools.includes(toolName)) {
+      handlers.push({
+        extensionName: extension.name,
+        handler: spec.handler,
+      });
+    }
+  }
+
+  return handlers;
+}
+
+function createToolExecutionContext(
+  toolCall: ToolCallPart,
+  tool: KrakenToolDefinition,
+  environment: ToolBatchEnvironment
+): ToolExecutionContext {
+  return {
+    callId: toolCall.callId,
+    emit: (event: { data: unknown; name: string }) => {
+      environment.publishCustom(event);
+    },
+    forward: (event: KrakenStreamEvent, source: EventSource) => {
+      environment.publishEvent({
+        ...event,
+        source,
+      });
+    },
+    metadata: tool.metadata,
+    name: tool.name,
+    signal: environment.signal,
+  };
+}
+
+function createAroundToolContext(
+  toolCall: ExecutableToolCall,
+  extensionName: string,
+  environment: ToolBatchEnvironment,
+  sharedExports: Record<string, Record<string, unknown>>
+): AroundToolContext {
+  return {
+    approvalDecision: toolCall.approvalDecision,
+    callId: toolCall.toolCall.callId,
+    emit: (event: { data: unknown; name: string }) => {
+      environment.publishCustom(event);
+    },
+    extensionState: asRecord(environment.manifest.extensions[extensionName]),
+    forward: (event: KrakenStreamEvent, source: EventSource) => {
+      environment.publishEvent({
+        ...event,
+        source,
+      });
+    },
+    input: toolCall.input,
+    iterationCount: environment.iterationCount,
+    manifest: environment.manifest,
+    sharedExports,
+    tool: toolCall.tool,
+    toolCall: toolCall.toolCall,
+  };
+}
+
+function toExecutableToolCall(
+  base: ExecutableToolCall,
+  nextContext: AroundToolContext | undefined
+): ExecutableToolCall {
+  if (nextContext === undefined) {
+    return base;
+  }
+
+  return {
+    approvalDecision: nextContext.approvalDecision ?? base.approvalDecision,
+    input: nextContext.input,
+    tool: nextContext.tool,
+    toolCall: nextContext.toolCall,
+  };
+}
+
+function emitToolStarts(
+  environment: ToolBatchEnvironment,
+  toolCalls: ExecutableToolCall[]
+): void {
+  for (const toolCall of toolCalls) {
+    environment.publishEvent({
+      callId: toolCall.toolCall.callId,
+      input: toolCall.input,
+      name: toolCall.tool.name,
+      timestamp: environment.now(),
+      type: "tool.start",
+    });
+  }
+}
+
+function createPendingToolCall(toolCall: ToolCallPart): PendingToolCall {
+  return {
+    callId: toolCall.callId,
+    decisions: [...DEFAULT_APPROVAL_DECISIONS],
+    input: toolCall.input,
+    message: `Approve tool "${toolCall.name}"?`,
+    name: toolCall.name,
+  };
+}
+
+function normalizeApprovalRequest(
+  toolCall: ToolCallPart,
+  request: ApprovalRequest
+): ApprovalRequest {
+  if (request.toolCalls.some((pending) => pending.callId === toolCall.callId)) {
+    return request;
+  }
+
+  return {
+    completedResults: request.completedResults,
+    toolCalls: [
+      ...request.toolCalls,
+      {
+        callId: toolCall.callId,
+        decisions: [...DEFAULT_APPROVAL_DECISIONS],
+        input: toolCall.input,
+        message: `Approve tool "${toolCall.name}"?`,
+        name: toolCall.name,
+      },
+    ],
+  };
+}
+
+async function evaluateApprovalPolicy(
+  policy: NonNullable<KrakenToolDefinition["approval"]>,
+  input: unknown,
+  context: ToolExecutionContext
+): Promise<boolean> {
+  return typeof policy === "function" ? await policy(input, context) : policy;
+}
+
+function validateToolInput(
+  tool: KrakenToolDefinition,
+  input: unknown
+):
+  | { details?: unknown; valid: true; value: unknown }
+  | { details?: unknown; valid: false } {
+  const schema = tool.inputSchema;
+
+  if (
+    schema !== null &&
+    typeof schema === "object" &&
+    "validate" in schema &&
+    typeof schema.validate === "function"
+  ) {
+    const result = schema.validate(input);
+    return result.valid
+      ? { valid: true, value: result.value }
+      : { details: result.error, valid: false };
+  }
+
+  const validator = getCompiledValidator(schema);
+  const valid = validator(input);
+
+  if (valid) {
+    return {
+      valid: true,
+      value: input,
+    };
+  }
+
+  return {
+    details: formatAjvErrors(validator.errors),
+    valid: false,
+  };
+}
+
+function getCompiledValidator(
+  schema: KrakenToolDefinition["inputSchema"]
+): ValidateFunction {
+  if (typeof schema === "boolean") {
+    return ajv.compile(schema);
+  }
+
+  const cached = validatorCache.get(schema);
+
+  if (cached !== undefined) {
+    return cached;
+  }
+
+  const validator = ajv.compile(schema);
+  validatorCache.set(schema, validator);
+  return validator;
+}
+
+function formatAjvErrors(errors: ErrorObject[] | null | undefined): unknown {
+  return errors?.map((error) => ({
+    instancePath: error.instancePath,
+    keyword: error.keyword,
+    message: error.message,
+    params: error.params,
+    schemaPath: error.schemaPath,
+  }));
+}
+
+function applyApprovalDecisionMetadata(
+  result: ToolResultPart,
+  decision: ApprovalDecision | undefined
+): ToolResultPart {
+  if (
+    decision === undefined ||
+    decision.message === undefined ||
+    decision.type === "reject" ||
+    !isExecutableApprovalDecision(decision)
+  ) {
+    return result;
+  }
+
+  return {
+    ...result,
+    output: {
+      approval: {
+        message: decision.message,
+        type: decision.type,
+      },
+      result: result.output,
+    },
+  };
+}
+
+function createRejectedToolResult(
+  toolCall: PendingToolCall,
+  decision: ApprovalDecision
+): ToolResultPart {
+  const message =
+    decision.message ??
+    (decision.type === "reject"
+      ? `Tool "${toolCall.name}" was rejected during approval.`
+      : `Tool "${toolCall.name}" was blocked by approval decision "${decision.type}".`);
+
+  return {
+    callId: toolCall.callId,
+    isError: true,
+    name: toolCall.name,
+    output: {
+      decisionType: decision.type,
+      error: message,
+    },
+    type: "tool_result",
+  };
+}
+
+function createExecutionFailureResult(
+  toolCall: ToolCallPart,
+  error: unknown,
+  decision: ApprovalDecision | undefined
+): ToolResultPart {
+  const message =
+    error instanceof Error ? error.message : `Tool "${toolCall.name}" failed.`;
+
+  return {
+    callId: toolCall.callId,
+    isError: true,
+    name: toolCall.name,
+    output: {
+      approval:
+        decision === undefined
+          ? undefined
+          : {
+              message: decision.message,
+              type: decision.type,
+            },
+      error: message,
+    },
+    type: "tool_result",
+  };
+}
+
+function createErrorToolResult(
+  toolCall: ToolCallPart,
+  message: string,
+  details?: unknown
+): ToolResultPart {
+  return {
+    callId: toolCall.callId,
+    isError: true,
+    name: toolCall.name,
+    output:
+      details === undefined ? { error: message } : { details, error: message },
+    type: "tool_result",
+  };
+}
+
+async function stageAndEmitResult(
+  environment: ToolBatchEnvironment,
+  result: ToolResultPart
+): Promise<void> {
+  await environment.stageResult(result);
+  environment.publishEvent({
+    callId: result.callId,
+    isError: result.isError,
+    name: result.name,
+    output: result.output,
+    timestamp: environment.now(),
+    type: "tool.result",
+  });
+}
+
+function asRecord(value: unknown): Record<string, unknown> {
+  if (value !== null && typeof value === "object" && !Array.isArray(value)) {
+    return value as Record<string, unknown>;
+  }
+
+  return {};
+}
+
+function isExecutableApprovalDecision(
+  decision: ApprovalDecision
+): decision is ApprovalDecision & { type: "approve" | "edit" } {
+  return decision.type === "approve" || decision.type === "edit";
+}
+
+function isPauseResult(
+  result: AroundToolResult
+): result is Extract<AroundToolResult, { verdict: "pause" }> {
+  return "verdict" in result && result.verdict === "pause";
+}
+
+function isResultWithState(
+  result: AroundToolResult
+): result is Extract<AroundToolResult, { result: ToolResultPart }> {
+  return "result" in result;
+}
