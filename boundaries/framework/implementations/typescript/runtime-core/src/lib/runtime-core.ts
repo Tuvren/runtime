@@ -626,9 +626,9 @@ class RuntimeCore implements KrakenRuntime {
       const loopState: LoopState = {
         activeConfig: handle.request.config,
         activeDriverId: handle.request.driverId ?? this.options.defaultDriverId,
-        activeToolRegistry: createToolRegistry(
-          handle.request.tools ?? handle.request.config.tools ?? [],
-          handle.request.config.extensions ?? []
+        activeToolRegistry: createActiveToolRegistry(
+          handle.request.tools,
+          handle.request.config
         ),
         carriedStateUpdates: [],
         enteredIterationLoop: false,
@@ -2040,9 +2040,9 @@ class RuntimeCore implements KrakenRuntime {
 
     return {
       activeConfig: targetConfig,
-      activeToolRegistry: createToolRegistry(
-        targetConfig.tools ?? [],
-        targetConfig.extensions ?? []
+      activeToolRegistry: createActiveToolRegistry(
+        handle.request.tools,
+        targetConfig
       ),
     };
   }
@@ -2461,7 +2461,7 @@ class OrchestrationHandleImpl implements OrchestrationHandle {
   private readonly pendingWorkerSignals: InputSignal[] = [];
   private readonly openWorkers = new Set<string>();
   private readonly runtime: OrchestrationRuntimeImpl;
-  private parentHandle: ExecutionHandle;
+  private readonly parentHandle: ExecutionHandle;
   private readonly workerEventFanouts = new Map<
     string,
     EventFanout<KrakenStreamEvent>
@@ -2469,10 +2469,20 @@ class OrchestrationHandleImpl implements OrchestrationHandle {
 
   constructor(
     runtime: OrchestrationRuntimeImpl,
-    parentHandle: ExecutionHandle
+    parentHandle: ExecutionHandle,
+    options?: {
+      openWorkers?: string[];
+      pendingWorkerSignals?: InputSignal[];
+    }
   ) {
     this.runtime = runtime;
     this.parentHandle = parentHandle;
+    for (const workerId of options?.openWorkers ?? []) {
+      this.openWorkers.add(workerId);
+    }
+    for (const signal of options?.pendingWorkerSignals ?? []) {
+      this.pendingWorkerSignals.push(signal);
+    }
     detachPromise(this.watchParent());
   }
 
@@ -2511,10 +2521,19 @@ class OrchestrationHandleImpl implements OrchestrationHandle {
   }
 
   resolveApproval(response: ApprovalResponse): ExecutionHandle {
-    this.parentHandle = this.parentHandle.resolveApproval(response);
-    detachPromise(this.watchParent());
-    this.flushQueuedWorkerSignals();
-    return this;
+    const resumedParentHandle = this.parentHandle.resolveApproval(response);
+    const resumedHandle = new OrchestrationHandleImpl(
+      this.runtime,
+      resumedParentHandle,
+      {
+        openWorkers: [...this.openWorkers],
+        pendingWorkerSignals: [...this.pendingWorkerSignals],
+      }
+    );
+    this.runtime.setCurrentHandle(resumedHandle);
+    this.closeForResume();
+    resumedHandle.flushQueuedWorkerSignals();
+    return resumedHandle;
   }
 
   status(): ExecutionStatus {
@@ -2598,6 +2617,19 @@ class OrchestrationHandleImpl implements OrchestrationHandle {
 
     this.allEventsClosed = true;
     this.allEventsFanout.close();
+  }
+
+  private closeForResume(): void {
+    this.parentCompleted = true;
+    this.parentEventsFanout.close();
+    this.allEventsClosed = true;
+    this.allEventsFanout.close();
+
+    for (const fanout of this.workerEventFanouts.values()) {
+      fanout.close();
+    }
+
+    this.workerEventFanouts.clear();
   }
 }
 
@@ -2683,6 +2715,10 @@ class OrchestrationRuntimeImpl implements OrchestrationRuntime {
     const orchestrationHandle = new OrchestrationHandleImpl(this, parentHandle);
     this.currentHandle = orchestrationHandle;
     return orchestrationHandle;
+  }
+
+  setCurrentHandle(handle: OrchestrationHandleImpl): void {
+    this.currentHandle = handle;
   }
 
   getWorkerStatuses(): ReadonlyMap<
@@ -2922,9 +2958,9 @@ function buildSequenceResolver(
 function cloneExecutionStatus(status: ExecutionStatus): ExecutionStatus {
   return {
     activeAgent: status.activeAgent,
-    approval: status.approval,
+    approval: cloneValue(status.approval),
     iterationCount: status.iterationCount,
-    manifest: status.manifest,
+    manifest: cloneValue(status.manifest),
     pauseReason: status.pauseReason,
     phase: status.phase,
   };
@@ -2959,6 +2995,19 @@ function createDeferred<T>(): {
       resolveValue?.(value);
     },
   };
+}
+
+function createActiveToolRegistry(
+  requestTools: KrakenToolDefinition[] | undefined,
+  config: AgentConfig
+): ToolRegistry {
+  const mergedTools = [...(config.tools ?? []), ...(requestTools ?? [])];
+
+  return createToolRegistry(mergedTools, config.extensions ?? []);
+}
+
+function cloneValue<T>(value: T): T {
+  return globalThis.structuredClone(value);
 }
 
 function encodeKernelRecord(value: unknown, label: string): Uint8Array {

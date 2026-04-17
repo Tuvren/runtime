@@ -531,6 +531,17 @@ function normalizeAroundToolResult(
   toolStartState: ToolStartState
 ): SingleToolOutcome {
   if (isPauseResult(result)) {
+    if (nestedResult !== undefined) {
+      return {
+        result: nestedResult,
+        updates: collectExtensionStateUpdate(
+          extensionName,
+          result.state,
+          nestedUpdates
+        ),
+      };
+    }
+
     return {
       approval: normalizeApprovalRequest(context.toolCall, result.approval),
       updates: collectExtensionStateUpdate(

@@ -276,6 +276,18 @@ function extractMessagesByRole(
 ): string[] {
   const excerpts: string[] = [];
 
+  if (role === "assistant") {
+    for (const message of messages) {
+      if (message.role !== "assistant") {
+        continue;
+      }
+
+      excerpts.push(summarizeAssistantMessage(message));
+    }
+
+    return excerpts;
+  }
+
   for (const message of messages) {
     if (message.role !== role) {
       continue;
@@ -344,12 +356,56 @@ function renderToolResult(part: ToolResultPart): string {
     : JSON.stringify(part.output);
 }
 
+function summarizeAssistantMessage(
+  message: Extract<KrakenMessage, { role: "assistant" }>
+): string {
+  const summaryParts: string[] = [];
+  let structuredCount = 0;
+  let fileCount = 0;
+
+  for (const part of message.parts) {
+    switch (part.type) {
+      case "text":
+        summaryParts.push(part.text);
+        break;
+      case "structured":
+        structuredCount += 1;
+        break;
+      case "file":
+        fileCount += 1;
+        break;
+      default:
+        break;
+    }
+  }
+
+  if (structuredCount > 0) {
+    summaryParts.push(
+      structuredCount === 1
+        ? "[Structured output produced]"
+        : `[${structuredCount} structured outputs produced]`
+    );
+  }
+
+  if (fileCount > 0) {
+    summaryParts.push(
+      fileCount === 1
+        ? "[File attachment produced]"
+        : `[${fileCount} file attachments produced]`
+    );
+  }
+
+  return summaryParts.length > 0
+    ? summaryParts.join("\n")
+    : "[Previous agent work omitted for compatibility]";
+}
+
 function extractLastAssistantOutput(context: HandoffSourceContext): string {
   for (let index = context.messages.length - 1; index >= 0; index -= 1) {
     const message = context.messages[index];
 
     if (message.role === "assistant") {
-      return renderMessageText(message);
+      return summarizeAssistantMessage(message);
     }
   }
 
