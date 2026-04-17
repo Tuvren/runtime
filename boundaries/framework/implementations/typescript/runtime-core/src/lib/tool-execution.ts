@@ -76,6 +76,10 @@ interface ExecutableToolCall {
   toolCall: ToolCallPart;
 }
 
+interface ToolStartState {
+  emitted: boolean;
+}
+
 type SingleToolOutcome =
   | {
       approval?: never;
@@ -125,7 +129,6 @@ export async function executeToolBatch(
     executable.push(resolved.executable);
   }
 
-  emitToolStarts(environment, executable);
   const executableOutcomes = await Promise.all(
     executable.map((toolCall) => executeSingleTool(toolCall, environment))
   );
@@ -198,7 +201,6 @@ export async function resumeToolBatch(
     executable.push(resumePlan.executable);
   }
 
-  emitToolStarts(environment, executable);
   for (const result of immediateResults) {
     await stageAndEmitResult(environment, result);
     results.push(result);
@@ -207,20 +209,15 @@ export async function resumeToolBatch(
   const executedOutcomes = await Promise.all(
     executable.map((toolCall) => executeSingleTool(toolCall, environment))
   );
+  const pendingToolCalls: PendingToolCall[] = [];
 
   for (const outcome of executedOutcomes) {
     updates.push(...outcome.updates);
 
     if (outcome.approval !== undefined) {
       results.push(...outcome.approval.completedResults);
-      return {
-        approval: {
-          completedResults: results,
-          toolCalls: outcome.approval.toolCalls,
-        },
-        results,
-        updates,
-      };
+      pendingToolCalls.push(...outcome.approval.toolCalls);
+      continue;
     }
 
     environment.publishEvent({
@@ -235,6 +232,13 @@ export async function resumeToolBatch(
   }
 
   return {
+    approval:
+      pendingToolCalls.length === 0
+        ? undefined
+        : {
+            completedResults: results,
+            toolCalls: pendingToolCalls,
+          },
     results,
     updates,
   };
@@ -385,6 +389,10 @@ async function executeSingleTool(
   toolCall: ExecutableToolCall,
   environment: ToolBatchEnvironment
 ): Promise<SingleToolOutcome> {
+  const toolStartState: ToolStartState = {
+    emitted: false,
+  };
+
   try {
     const sharedExports = buildSharedExports(
       environment.extensions,
@@ -395,7 +403,8 @@ async function executeSingleTool(
       0,
       toolCall,
       environment,
-      sharedExports
+      sharedExports,
+      toolStartState
     );
 
     if (outcome.approval !== undefined) {
@@ -442,9 +451,11 @@ async function runAroundToolHandlers(
   index: number,
   toolCall: ExecutableToolCall,
   environment: ToolBatchEnvironment,
-  sharedExports: Record<string, Record<string, unknown>>
+  sharedExports: Record<string, Record<string, unknown>>,
+  toolStartState: ToolStartState
 ): Promise<SingleToolOutcome> {
   if (index >= handlers.length) {
+    emitToolStartIfNeeded(toolCall, environment, toolStartState);
     const output = await toolCall.tool.execute(
       toolCall.input,
       createToolExecutionContext(toolCall.toolCall, toolCall.tool, environment)
@@ -478,7 +489,8 @@ async function runAroundToolHandlers(
         index + 1,
         toExecutableToolCall(toolCall, nextContext),
         environment,
-        sharedExports
+        sharedExports,
+        toolStartState
       );
 
       if (outcome.approval !== undefined) {
@@ -495,7 +507,9 @@ async function runAroundToolHandlers(
       handlerResult,
       nestedUpdates,
       nestedResult,
-      context
+      context,
+      environment,
+      toolStartState
     );
   } catch (error: unknown) {
     if (error instanceof ToolPauseSignal) {
@@ -528,7 +542,9 @@ function normalizeAroundToolResult(
   result: AroundToolResult,
   nestedUpdates: ExtensionStateUpdate[],
   nestedResult: ToolResultPart | undefined,
-  context: AroundToolContext
+  context: AroundToolContext,
+  environment: ToolBatchEnvironment,
+  toolStartState: ToolStartState
 ): SingleToolOutcome {
   if (isPauseResult(result)) {
     return {
@@ -542,6 +558,19 @@ function normalizeAroundToolResult(
   }
 
   if (isResultWithState(result)) {
+    emitToolStartIfNeeded(
+      toExecutableToolCall(
+        {
+          approvalDecision: context.approvalDecision,
+          input: context.input,
+          tool: context.tool,
+          toolCall: context.toolCall,
+        },
+        undefined
+      ),
+      environment,
+      toolStartState
+    );
     return {
       result: result.result,
       updates: collectExtensionStateUpdate(
@@ -559,6 +588,19 @@ function normalizeAroundToolResult(
     };
   }
 
+  emitToolStartIfNeeded(
+    toExecutableToolCall(
+      {
+        approvalDecision: context.approvalDecision,
+        input: context.input,
+        tool: context.tool,
+        toolCall: context.toolCall,
+      },
+      undefined
+    ),
+    environment,
+    toolStartState
+  );
   return {
     result,
     updates: nestedUpdates,
@@ -681,19 +723,23 @@ function toExecutableToolCall(
   };
 }
 
-function emitToolStarts(
+function emitToolStartIfNeeded(
+  toolCall: ExecutableToolCall,
   environment: ToolBatchEnvironment,
-  toolCalls: ExecutableToolCall[]
+  toolStartState: ToolStartState
 ): void {
-  for (const toolCall of toolCalls) {
-    environment.publishEvent({
-      callId: toolCall.toolCall.callId,
-      input: toolCall.input,
-      name: toolCall.tool.name,
-      timestamp: environment.now(),
-      type: "tool.start",
-    });
+  if (toolStartState.emitted) {
+    return;
   }
+
+  toolStartState.emitted = true;
+  environment.publishEvent({
+    callId: toolCall.toolCall.callId,
+    input: toolCall.input,
+    name: toolCall.tool.name,
+    timestamp: environment.now(),
+    type: "tool.start",
+  });
 }
 
 function createPendingToolCall(toolCall: ToolCallPart): PendingToolCall {

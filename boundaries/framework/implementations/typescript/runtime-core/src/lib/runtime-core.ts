@@ -35,6 +35,8 @@ import type {
   HandoffContextPlan,
   HandoffSourceContext,
   InputSignal,
+  KrakenErrorProjection,
+  KrakenExtension,
   KrakenMessage,
   KrakenModelResponse,
   KrakenRuntime,
@@ -204,6 +206,7 @@ interface HelperBundle {
 
 interface WorkerRecord {
   agent: string;
+  branchId: string;
   handle: ExecutionHandle;
   resolveResult(value: unknown): void;
   result?: unknown;
@@ -318,6 +321,7 @@ function detachPromise(task: Promise<unknown>): void {
 class RuntimeExecutionHandle implements ExecutionHandle {
   private readonly abortController = new AbortController();
   private readonly eventsFanout = new EventFanout<KrakenStreamEvent>();
+  private lastErrorProjection?: KrakenErrorProjection;
   private pauseContext?: PauseContext;
   private readonly runtime: RuntimeCore;
   private readonly steeringQueue: InputSignal[] = [];
@@ -378,6 +382,10 @@ class RuntimeExecutionHandle implements ExecutionHandle {
     this.eventsFanout.emit(event);
   }
 
+  rememberError(error: KrakenErrorProjection): void {
+    this.lastErrorProjection = error;
+  }
+
   rememberPauseContext(context: PauseContext): void {
     this.pauseContext = context;
     this.replaceStatus({
@@ -423,6 +431,10 @@ class RuntimeExecutionHandle implements ExecutionHandle {
 
   status(): ExecutionStatus {
     return cloneExecutionStatus(this.statusSnapshot);
+  }
+
+  getLastErrorProjection(): KrakenErrorProjection | undefined {
+    return this.lastErrorProjection;
   }
 
   steer(signal: InputSignal): void {
@@ -789,13 +801,14 @@ class RuntimeCore implements KrakenRuntime {
       );
     } catch (error: unknown) {
       const runtimeError = normalizeError(error);
+      handle.rememberError(projectError(runtimeError));
       const loopState: LoopState = {
-        activeConfig: handle.request.config,
+        activeConfig: {
+          ...handle.request.config,
+          extensions: [],
+        },
         activeDriverId: handle.request.driverId ?? this.options.defaultDriverId,
-        activeToolRegistry: createToolRegistry(
-          handle.request.tools ?? handle.request.config.tools ?? [],
-          handle.request.config.extensions ?? []
-        ),
+        activeToolRegistry: createToolRegistry(),
         carriedStateUpdates: [],
         enteredIterationLoop: false,
       };
@@ -840,6 +853,10 @@ class RuntimeCore implements KrakenRuntime {
         runId: this.createId(),
         turnId: handle.turnId,
       });
+    }
+
+    if (resolution.type === "fail" && resolution.fatality === "hard") {
+      this.publishProjectedError(handle, resolution.error, true, loopState);
     }
 
     await this.finalizeTurnStatus(handle, resolution, loopState);
@@ -1585,7 +1602,14 @@ class RuntimeCore implements KrakenRuntime {
       parts: handle.request.signal.parts,
       role: "user",
     };
-    const manifest = updateContextManifest(headState.manifest, [userMessage]);
+    const manifest = updateContextManifest(
+      headState.manifest,
+      [userMessage],
+      collectInitialExtensionStateUpdates(
+        loopState.activeConfig.extensions ?? [],
+        headState.manifest
+      )
+    );
 
     await this.options.kernel.run.create(
       runId,
@@ -1664,7 +1688,11 @@ class RuntimeCore implements KrakenRuntime {
       ]
     );
     await this.options.kernel.run.beginStep(runId, "incorporate_steering");
-    await this.stageMessage(runId, steeringMessage, "steering_message");
+    const steeringMessageHash = await this.stageMessage(
+      runId,
+      steeringMessage,
+      "steering_message"
+    );
     await this.stageManifest(runId, manifest);
     const stepResult = await this.options.kernel.run.completeStep(
       runId,
@@ -1692,7 +1720,7 @@ class RuntimeCore implements KrakenRuntime {
     this.publishEvent(
       handle,
       {
-        messageId: stepResult.turnNodeHash ?? this.createId(),
+        messageId: steeringMessageHash,
         timestamp: this.now(),
         type: "steering.incorporated",
       },
@@ -2197,14 +2225,16 @@ class RuntimeCore implements KrakenRuntime {
     runId: string,
     message: KrakenMessage,
     taskId: string
-  ): Promise<void> {
-    await this.options.kernel.staging.stage(
+  ): Promise<HashString> {
+    const staged = await this.options.kernel.staging.stage(
       runId,
       encodeKernelRecord(message, "message"),
       taskId,
       "message",
       "completed"
     );
+
+    return staged.objectHash;
   }
 
   private async stageRuntimeStatus(
@@ -2268,20 +2298,12 @@ class RuntimeCore implements KrakenRuntime {
     fatal: boolean,
     loopState: LoopState
   ): void {
+    const projection = projectError(error);
+    handle.rememberError(projection);
     this.publishEvent(
       handle,
       {
-        error: {
-          code:
-            "code" in error
-              ? String((error as { code: unknown }).code)
-              : undefined,
-          details:
-            "details" in error
-              ? (error as { details: unknown }).details
-              : undefined,
-          message: error.message,
-        },
+        error: projection,
         fatal,
         timestamp: this.now(),
         type: "error",
@@ -2434,7 +2456,6 @@ class OrchestrationHandleImpl implements OrchestrationHandle {
 
     this.parentCompleted = true;
     this.parentEventsFanout.close();
-    this.runtime.cancelWorkers();
     this.closeAllEventsIfSettled();
   }
 
@@ -2468,18 +2489,21 @@ class OrchestrationRuntimeImpl implements OrchestrationRuntime {
   private readonly defaultDriverId?: string;
   private readonly entrypoint: string;
   private readonly framework: KrakenRuntime;
+  private readonly kernel: KrakenKernel;
   private readonly now: () => EpochMs;
   private readonly pendingWorkerSignals: InputSignal[] = [];
   private readonly workers = new Map<string, WorkerRecord>();
 
   constructor(
     framework: KrakenRuntime,
+    kernel: KrakenKernel,
     agents: Record<string, AgentConfig>,
     entrypoint: string,
     now: () => EpochMs,
     defaultDriverId?: string
   ) {
     this.framework = framework;
+    this.kernel = kernel;
     this.agents = agents;
     this.entrypoint = entrypoint;
     this.now = now;
@@ -2631,6 +2655,7 @@ class OrchestrationRuntimeImpl implements OrchestrationRuntime {
     });
     const record: WorkerRecord = {
       agent,
+      branchId: thread.branchId,
       handle,
       resolveResult: deferred.resolve,
       resultPromise: deferred.promise,
@@ -2664,11 +2689,11 @@ class OrchestrationRuntimeImpl implements OrchestrationRuntime {
     worker: WorkerRecord,
     parentHandle: OrchestrationHandleImpl
   ): Promise<void> {
-    let lastText = "";
+    let lastError: KrakenErrorProjection | undefined;
 
     for await (const event of worker.handle.events()) {
-      if (event.type === "text.done") {
-        lastText = event.text;
+      if (event.type === "error") {
+        lastError = event.error;
       }
 
       parentHandle.emitWorkerEvent(worker.workerId, {
@@ -2682,10 +2707,10 @@ class OrchestrationRuntimeImpl implements OrchestrationRuntime {
       });
     }
 
-    worker.result = lastText;
     worker.status =
       worker.handle.status().phase === "failed" ? "failed" : "completed";
-    worker.resolveResult(lastText);
+    worker.result = await this.resolveWorkerResult(worker, lastError);
+    worker.resolveResult(worker.result);
     parentHandle.emitWorkerEvent(worker.workerId, {
       data: {
         agent: worker.agent,
@@ -2716,6 +2741,31 @@ class OrchestrationRuntimeImpl implements OrchestrationRuntime {
 
     parentHandle.workerFinished(worker.workerId);
   }
+
+  private async resolveWorkerResult(
+    worker: WorkerRecord,
+    lastError: KrakenErrorProjection | undefined
+  ): Promise<unknown> {
+    const messages = await readBranchMessages(this.kernel, worker.branchId);
+    const projectedOutput = extractWorkerOutput(messages);
+    const handleError =
+      "getLastErrorProjection" in worker.handle &&
+      typeof worker.handle.getLastErrorProjection === "function"
+        ? worker.handle.getLastErrorProjection()
+        : undefined;
+
+    if (worker.handle.status().phase === "failed") {
+      return (
+        lastError ??
+        handleError ??
+        projectedOutput ?? {
+          message: `worker "${worker.workerId}" failed`,
+        }
+      );
+    }
+
+    return projectedOutput;
+  }
 }
 
 export function createKrakenRuntimeCore(
@@ -2745,6 +2795,7 @@ export function createOrchestrationRuntime(
 
   return new OrchestrationRuntimeImpl(
     framework,
+    options.kernel,
     options.agents,
     options.entrypoint,
     options.now ?? Date.now,
@@ -2817,6 +2868,29 @@ function encodeKernelRecord(value: unknown, label: string): Uint8Array {
   return encodeDeterministicKernelRecord(value);
 }
 
+function collectInitialExtensionStateUpdates(
+  extensions: KrakenExtension[],
+  manifest: ContextManifest
+): ExtensionStateUpdate[] {
+  const updates: ExtensionStateUpdate[] = [];
+
+  for (const extension of extensions) {
+    if (
+      extension.state === undefined ||
+      Object.hasOwn(manifest.extensions, extension.name)
+    ) {
+      continue;
+    }
+
+    updates.push({
+      extensionName: extension.name,
+      state: { ...extension.state },
+    });
+  }
+
+  return updates;
+}
+
 function extractToolCallsFromMessages(
   messages: KrakenMessage[]
 ): ToolCallPart[] {
@@ -2841,6 +2915,122 @@ function hashRecord(value: Uint8Array): HashString {
   return createHash("sha256").update(value).digest("hex");
 }
 
+async function readBranchMessages(
+  kernel: KrakenKernel,
+  branchId: string
+): Promise<KrakenMessage[]> {
+  const branch = await kernel.branch.get(branchId);
+
+  if (branch === null) {
+    throw new KrakenLineageError(`branch "${branchId}" does not exist`, {
+      code: "missing_branch",
+    });
+  }
+
+  const turnNode = await kernel.node.get(branch.headTurnNodeHash);
+
+  if (turnNode === null) {
+    throw new KrakenLineageError(
+      `turn node "${branch.headTurnNodeHash}" does not exist`,
+      {
+        code: "missing_turn_node",
+      }
+    );
+  }
+
+  const messageHashes = toOrderedHashArray(
+    await kernel.tree.resolve(turnNode.turnTreeHash, "messages")
+  );
+  const messages: KrakenMessage[] = [];
+
+  for (const hash of messageHashes) {
+    messages.push(await readKernelMessage(kernel, hash));
+  }
+
+  return messages;
+}
+
+async function readKernelMessage(
+  kernel: KrakenKernel,
+  hash: HashString
+): Promise<KrakenMessage> {
+  const payload = await kernel.store.get(hash);
+
+  if (payload === null) {
+    throw new KrakenLineageError(`message "${hash}" does not exist`, {
+      code: "missing_message",
+      details: {
+        hash,
+      },
+    });
+  }
+
+  return decodeDeterministicKernelRecord(payload) as KrakenMessage;
+}
+
+function extractWorkerOutput(messages: KrakenMessage[]): unknown {
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index];
+
+    if (message.role === "assistant" || message.role === "tool") {
+      return projectMessageOutput(message);
+    }
+  }
+
+  return undefined;
+}
+
+function projectMessageOutput(
+  message: Extract<KrakenMessage, { role: "assistant" | "tool" }>
+): unknown {
+  if (message.parts.length === 1) {
+    return projectContentPart(message.parts[0]);
+  }
+
+  return message.parts.map((part) => projectContentPart(part));
+}
+
+function projectContentPart(
+  part: Extract<KrakenMessage, { role: "assistant" | "tool" }>["parts"][number]
+): unknown {
+  switch (part.type) {
+    case "file":
+      return {
+        data: part.data,
+        filename: part.filename,
+        mediaType: part.mediaType,
+        type: part.type,
+      };
+    case "reasoning":
+      return {
+        redacted: part.redacted,
+        text: part.text,
+        type: part.type,
+      };
+    case "structured":
+      return part.data;
+    case "text":
+      return part.text;
+    case "tool_call":
+      return {
+        callId: part.callId,
+        input: part.input,
+        name: part.name,
+        type: part.type,
+      };
+    case "tool_result":
+      return {
+        callId: part.callId,
+        isError: part.isError,
+        name: part.name,
+        output: part.output,
+        type: part.type,
+      };
+    default:
+      return part;
+  }
+}
+
 function inferFinishReason(
   message: Extract<KrakenMessage, { role: "assistant" }>
 ): "content_filter" | "error" | "length" | "stop" | "tool_call" {
@@ -2857,6 +3047,16 @@ function isContextEngineeringPlan(
 
 function normalizeError(error: unknown): Error {
   return error instanceof Error ? error : new Error(String(error));
+}
+
+function projectError(error: Error): KrakenErrorProjection {
+  return {
+    code:
+      "code" in error ? String((error as { code: unknown }).code) : undefined,
+    details:
+      "details" in error ? (error as { details: unknown }).details : undefined,
+    message: error.message,
+  };
 }
 
 function normalizeWorkerTask(task: unknown): InputSignal {

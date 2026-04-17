@@ -71,6 +71,7 @@ export function createToolRegistry(
   explicitTools: KrakenToolDefinition[] = [],
   extensions: KrakenExtension[] = []
 ): ToolRegistry {
+  assertUniqueExtensionNames(extensions);
   const registry = new BasicToolRegistry();
 
   for (const tool of explicitTools) {
@@ -84,6 +85,26 @@ export function createToolRegistry(
   }
 
   return registry;
+}
+
+function assertUniqueExtensionNames(extensions: KrakenExtension[]): void {
+  const names = new Set<string>();
+
+  for (const extension of extensions) {
+    if (names.has(extension.name)) {
+      throw new KrakenRuntimeError(
+        `extension "${extension.name}" is already registered`,
+        {
+          code: "duplicate_extension_registration",
+          details: {
+            extensionName: extension.name,
+          },
+        }
+      );
+    }
+
+    names.add(extension.name);
+  }
 }
 
 function isCustomSchema(
