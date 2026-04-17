@@ -72,6 +72,7 @@ export interface FakeKernelHarness {
   kernel: KrakenKernel;
   readBranchManifest(branchId: string): Promise<TurnTreeManifest>;
   readBranchMessages(branchId: string): Promise<unknown[]>;
+  readBranchRuntimeStatus(branchId: string): Promise<unknown | null>;
 }
 
 export function createFakeKernelHarness(): FakeKernelHarness {
@@ -454,11 +455,35 @@ export function createFakeKernelHarness(): FakeKernelHarness {
         return [];
       }
 
-      return hashes.map((hash) =>
-        decodeDeterministicKernelRecord(
-          state.objects.get(hash as HashString) as Uint8Array
-        )
-      );
+      const messages: unknown[] = [];
+
+      for (const hash of hashes) {
+        if (!isHashString(hash)) {
+          continue;
+        }
+
+        const payload = state.objects.get(hash);
+
+        if (payload !== undefined) {
+          messages.push(decodeDeterministicKernelRecord(payload));
+        }
+      }
+
+      return messages;
+    },
+    async readBranchRuntimeStatus(branchId) {
+      const manifest = await this.readBranchManifest(branchId);
+      const runtimeStatusHash = manifest["runtime.status"];
+
+      if (!isHashString(runtimeStatusHash)) {
+        return null;
+      }
+
+      const payload = state.objects.get(runtimeStatusHash);
+
+      return payload === undefined
+        ? null
+        : decodeDeterministicKernelRecord(payload);
     },
   };
 }
@@ -719,4 +744,8 @@ function requireTurnNode(
   }
 
   return turnNode;
+}
+
+function isHashString(value: unknown): value is HashString {
+  return typeof value === "string" && value.length > 0;
 }

@@ -681,6 +681,14 @@ class RuntimeCore implements KrakenRuntime {
               loopState
             );
           } else {
+            await this.commitPendingExtensionStateUpdates(
+              handle,
+              schemaId,
+              loopState,
+              loopState.carriedStateUpdates,
+              0
+            );
+            loopState.carriedStateUpdates = [];
             await this.completeExecution(
               handle,
               beforeTurn.resolution,
@@ -812,6 +820,16 @@ class RuntimeCore implements KrakenRuntime {
         carriedStateUpdates: [],
         enteredIterationLoop: false,
       };
+      const failureResolution: RuntimeResolution = {
+        error: runtimeError,
+        fatality: "hard",
+        type: "fail",
+      };
+
+      if ((await this.options.kernel.turn.get(handle.turnId)) !== null) {
+        await this.finalizeTurnStatus(handle, failureResolution, loopState);
+      }
+
       this.publishProjectedError(handle, runtimeError, true, loopState);
       handle.replaceStatus({
         activeAgent: handle.request.config.name,
@@ -963,6 +981,14 @@ class RuntimeCore implements KrakenRuntime {
             loopState
           );
         } else {
+          await this.commitPendingExtensionStateUpdates(
+            handle,
+            schemaId,
+            loopState,
+            loopState.carriedStateUpdates,
+            nextIteration
+          );
+          loopState.carriedStateUpdates = [];
           this.publishEvent(
             handle,
             {
@@ -1132,6 +1158,7 @@ class RuntimeCore implements KrakenRuntime {
             iterationCount: nextIteration,
             pauseReason: resolution.reason,
             state: "paused",
+            turnId: handle.turnId,
           },
           "runtime_status"
         );
@@ -1337,6 +1364,7 @@ class RuntimeCore implements KrakenRuntime {
         activeAgent: loopState.activeConfig.name,
         iterationCount: pausedIteration.iterationCount,
         state: "running",
+        turnId: handle.turnId,
       },
       "runtime_status_running"
     );
@@ -1380,6 +1408,7 @@ class RuntimeCore implements KrakenRuntime {
           iterationCount: pausedIteration.iterationCount,
           pauseReason: resolution.reason,
           state: "paused",
+          turnId: handle.turnId,
         },
         "runtime_status_paused"
       );
@@ -1633,6 +1662,7 @@ class RuntimeCore implements KrakenRuntime {
       {
         activeAgent: loopState.activeConfig.name,
         state: "running",
+        turnId: handle.turnId,
       },
       "runtime_status"
     );
@@ -1726,6 +1756,62 @@ class RuntimeCore implements KrakenRuntime {
       },
       loopState
     );
+  }
+
+  private async commitPendingExtensionStateUpdates(
+    handle: RuntimeExecutionHandle,
+    schemaId: string,
+    loopState: LoopState,
+    updates: ExtensionStateUpdate[],
+    iterationCount: number
+  ): Promise<void> {
+    if (updates.length === 0) {
+      return;
+    }
+
+    const headState = await this.loadHeadState(handle.request.branchId);
+    const manifest = updateContextManifest(headState.manifest, [], updates);
+    const runId = this.createId();
+
+    await this.options.kernel.run.create(
+      runId,
+      handle.turnId,
+      handle.request.branchId,
+      schemaId,
+      headState.branchHeadHash,
+      [
+        {
+          deterministic: false,
+          id: "commit_extension_state",
+          sideEffects: false,
+        },
+      ]
+    );
+    await this.options.kernel.run.beginStep(runId, "commit_extension_state");
+    await this.stageManifest(runId, manifest);
+    const stepResult = await this.options.kernel.run.completeStep(
+      runId,
+      "commit_extension_state"
+    );
+    await this.options.kernel.run.complete(runId, "completed");
+
+    if (stepResult.turnNodeHash !== undefined) {
+      await this.options.kernel.turn.updateHead(
+        handle.turnId,
+        stepResult.turnNodeHash
+      );
+      await this.emitStateObservability(
+        handle,
+        loopState,
+        stepResult.turnNodeHash,
+        manifest,
+        iterationCount
+      );
+    }
+
+    handle.updateStatus({
+      manifest,
+    });
   }
 
   private async applyContextEngineeringPlan(
@@ -1879,6 +1965,7 @@ class RuntimeCore implements KrakenRuntime {
       {
         activeAgent: targetConfig.name,
         state: "running",
+        turnId: handle.turnId,
       },
       "handoff_runtime_status"
     );
@@ -2031,7 +2118,9 @@ class RuntimeCore implements KrakenRuntime {
     await this.stageRuntimeStatus(
       runId,
       {
+        activeAgent: loopState.activeConfig.name,
         state: phase,
+        turnId: handle.turnId,
       },
       "runtime_status_final"
     );
@@ -2167,7 +2256,18 @@ class RuntimeCore implements KrakenRuntime {
       threadId,
       branchId
     );
-    return resolved ?? null;
+
+    if (resolved !== undefined) {
+      return resolved;
+    }
+
+    const runtimeStatus = await readBranchRuntimeStatus(
+      this.options.kernel,
+      branchId
+    );
+    return runtimeStatus !== null && typeof runtimeStatus.turnId === "string"
+      ? runtimeStatus.turnId
+      : null;
   }
 
   private resolveDriver(driverId: string): KrakenDriver {
@@ -2358,6 +2458,7 @@ class OrchestrationHandleImpl implements OrchestrationHandle {
   private allEventsClosed = false;
   private parentCompleted = false;
   private readonly parentEventsFanout = new EventFanout<KrakenStreamEvent>();
+  private readonly pendingWorkerSignals: InputSignal[] = [];
   private readonly openWorkers = new Set<string>();
   private readonly runtime: OrchestrationRuntimeImpl;
   private parentHandle: ExecutionHandle;
@@ -2405,10 +2506,14 @@ class OrchestrationHandleImpl implements OrchestrationHandle {
     return this.parentEventsFanout.subscribe();
   }
 
+  queueWorkerSignal(signal: InputSignal): void {
+    this.pendingWorkerSignals.push(signal);
+  }
+
   resolveApproval(response: ApprovalResponse): ExecutionHandle {
     this.parentHandle = this.parentHandle.resolveApproval(response);
     detachPromise(this.watchParent());
-    this.runtime.flushQueuedWorkerResults();
+    this.flushQueuedWorkerSignals();
     return this;
   }
 
@@ -2418,6 +2523,19 @@ class OrchestrationHandleImpl implements OrchestrationHandle {
 
   steer(signal: InputSignal): void {
     this.parentHandle.steer(signal);
+  }
+
+  private flushQueuedWorkerSignals(): void {
+    while (
+      this.pendingWorkerSignals.length > 0 &&
+      this.parentHandle.status().phase === "running"
+    ) {
+      const signal = this.pendingWorkerSignals.shift();
+
+      if (signal !== undefined) {
+        this.parentHandle.steer(signal);
+      }
+    }
   }
 
   workerEvents(workerId: string): AsyncIterable<KrakenStreamEvent> {
@@ -2491,7 +2609,6 @@ class OrchestrationRuntimeImpl implements OrchestrationRuntime {
   private readonly framework: KrakenRuntime;
   private readonly kernel: KrakenKernel;
   private readonly now: () => EpochMs;
-  private readonly pendingWorkerSignals: InputSignal[] = [];
   private readonly workers = new Map<string, WorkerRecord>();
 
   constructor(
@@ -2566,25 +2683,6 @@ class OrchestrationRuntimeImpl implements OrchestrationRuntime {
     const orchestrationHandle = new OrchestrationHandleImpl(this, parentHandle);
     this.currentHandle = orchestrationHandle;
     return orchestrationHandle;
-  }
-
-  flushQueuedWorkerResults(): void {
-    const handle = this.currentHandle;
-
-    if (handle === undefined) {
-      return;
-    }
-
-    while (
-      this.pendingWorkerSignals.length > 0 &&
-      handle.status().phase === "running"
-    ) {
-      const signal = this.pendingWorkerSignals.shift();
-
-      if (signal !== undefined) {
-        handle.steer(signal);
-      }
-    }
   }
 
   getWorkerStatuses(): ReadonlyMap<
@@ -2735,7 +2833,7 @@ class OrchestrationRuntimeImpl implements OrchestrationRuntime {
       if (parentHandle.status().phase === "running") {
         parentHandle.steer(signal);
       } else if (parentHandle.status().phase === "paused") {
-        this.pendingWorkerSignals.push(signal);
+        parentHandle.queueWorkerSignal(signal);
       }
     }
 
@@ -2950,6 +3048,55 @@ async function readBranchMessages(
   return messages;
 }
 
+async function readBranchRuntimeStatus(
+  kernel: KrakenKernel,
+  branchId: string
+): Promise<Record<string, unknown> | null> {
+  const branch = await kernel.branch.get(branchId);
+
+  if (branch === null) {
+    throw new KrakenLineageError(`branch "${branchId}" does not exist`, {
+      code: "missing_branch",
+    });
+  }
+
+  const turnNode = await kernel.node.get(branch.headTurnNodeHash);
+
+  if (turnNode === null) {
+    throw new KrakenLineageError(
+      `turn node "${branch.headTurnNodeHash}" does not exist`,
+      {
+        code: "missing_turn_node",
+      }
+    );
+  }
+
+  const runtimeStatusHash = toOptionalHash(
+    await kernel.tree.resolve(turnNode.turnTreeHash, "runtime.status")
+  );
+
+  if (runtimeStatusHash === null) {
+    return null;
+  }
+
+  const payload = await kernel.store.get(runtimeStatusHash);
+
+  if (payload === null) {
+    throw new KrakenLineageError(
+      `runtime status "${runtimeStatusHash}" does not exist`,
+      {
+        code: "missing_runtime_status",
+        details: {
+          hash: runtimeStatusHash,
+        },
+      }
+    );
+  }
+
+  const status = decodeDeterministicKernelRecord(payload);
+  return isRecord(status) ? status : null;
+}
+
 async function readKernelMessage(
   kernel: KrakenKernel,
   hash: HashString
@@ -3047,6 +3194,10 @@ function isContextEngineeringPlan(
 
 function normalizeError(error: unknown): Error {
   return error instanceof Error ? error : new Error(String(error));
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
 function projectError(error: Error): KrakenErrorProjection {

@@ -142,14 +142,6 @@ export async function executeToolBatch(
       continue;
     }
 
-    environment.publishEvent({
-      callId: outcome.result.callId,
-      isError: outcome.result.isError,
-      name: outcome.result.name,
-      output: outcome.result.output,
-      timestamp: environment.now(),
-      type: "tool.result",
-    });
     results.push(outcome.result);
   }
 
@@ -220,14 +212,6 @@ export async function resumeToolBatch(
       continue;
     }
 
-    environment.publishEvent({
-      callId: outcome.result.callId,
-      isError: outcome.result.isError,
-      name: outcome.result.name,
-      output: outcome.result.output,
-      timestamp: environment.now(),
-      type: "tool.result",
-    });
     results.push(outcome.result);
   }
 
@@ -415,7 +399,7 @@ async function executeSingleTool(
       outcome.result,
       toolCall.approvalDecision
     );
-    await environment.stageResult(result);
+    await stageAndEmitResult(environment, result);
 
     return {
       result,
@@ -434,7 +418,7 @@ async function executeSingleTool(
       error,
       toolCall.approvalDecision
     );
-    await environment.stageResult(result);
+    await stageAndEmitResult(environment, result);
 
     return {
       result,
