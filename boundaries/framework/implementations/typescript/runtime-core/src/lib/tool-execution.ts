@@ -33,6 +33,7 @@ import type {
   ToolRegistry,
   ToolResultPart,
 } from "@kraken/framework-runtime-api";
+import type { HashString } from "@kraken/shared-core-types";
 import Ajv, { type ErrorObject, type ValidateFunction } from "ajv";
 import { runWithTimeout } from "./execution-timeouts.js";
 import {
@@ -59,7 +60,7 @@ export interface ToolBatchEnvironment {
   reportSoftError(error: Error): void;
   runId: string;
   signal?: AbortSignal;
-  stageResults(results: ToolResultPart[]): Promise<void>;
+  stageResult(result: ToolResultPart, orderIndex: number): Promise<HashString>;
   threadId: string;
   toolRegistry: ToolRegistry;
   turnId: string;
@@ -67,6 +68,7 @@ export interface ToolBatchEnvironment {
 
 export interface ToolBatchOutcome {
   approval?: ApprovalRequest;
+  resultHashes: HashString[];
   results: ToolResultPart[];
   updates: ExtensionStateUpdate[];
 }
@@ -83,11 +85,30 @@ interface OrderedExecutableToolCall {
   index: number;
 }
 
+interface StagedToolResult {
+  hash: HashString;
+  result: ToolResultPart;
+}
+
 interface ToolStartState {
   emitted: boolean;
 }
 
 type SingleToolOutcome =
+  | {
+      approval?: never;
+      resultHash: HashString;
+      result: ToolResultPart;
+      updates: ExtensionStateUpdate[];
+    }
+  | {
+      approval: ApprovalRequest;
+      completedResultHashes: HashString[];
+      result?: never;
+      updates: ExtensionStateUpdate[];
+    };
+
+type RawSingleToolOutcome =
   | {
       approval?: never;
       result: ToolResultPart;
@@ -114,7 +135,7 @@ export async function executeToolBatch(
   toolCalls: ToolCallPart[],
   environment: ToolBatchEnvironment
 ): Promise<ToolBatchOutcome> {
-  const orderedResults = toolCalls.map((): ToolResultPart[] => []);
+  const orderedResults = toolCalls.map((): StagedToolResult[] => []);
   const pendingToolCalls: PendingToolCall[] = [];
   const updates: ExtensionStateUpdate[] = [];
   const executable: OrderedExecutableToolCall[] = [];
@@ -128,8 +149,15 @@ export async function executeToolBatch(
     }
 
     if ("result" in resolved) {
-      emitToolResultEvent(environment, resolved.result);
-      orderedResults[index].push(resolved.result);
+      const hash = await stageAndEmitResult(
+        environment,
+        resolved.result,
+        index
+      );
+      orderedResults[index].push({
+        hash,
+        result: resolved.result,
+      });
       continue;
     }
 
@@ -141,7 +169,7 @@ export async function executeToolBatch(
 
   const executableOutcomes = await Promise.all(
     executable.map((toolCall) =>
-      executeSingleTool(toolCall.executable, environment)
+      executeSingleTool(toolCall.executable, toolCall.index, environment)
     )
   );
 
@@ -155,23 +183,33 @@ export async function executeToolBatch(
 
     if (outcome.approval !== undefined) {
       pendingToolCalls.push(...outcome.approval.toolCalls);
-      orderedResults[resultIndex].push(...outcome.approval.completedResults);
+      orderedResults[resultIndex].push(
+        ...zipStagedToolResults(
+          outcome.approval.completedResults,
+          outcome.completedResultHashes
+        )
+      );
       continue;
     }
 
-    orderedResults[resultIndex].push(outcome.result);
+    orderedResults[resultIndex].push({
+      hash: outcome.resultHash,
+      result: outcome.result,
+    });
   }
 
-  const results = orderedResults.flat();
-  await stageResultsInOrder(environment, results);
+  const stagedResults = orderedResults.flat();
+  const results = stagedResults.map((entry) => entry.result);
+  const resultHashes = stagedResults.map((entry) => entry.hash);
 
   return pendingToolCalls.length === 0
-    ? { results, updates }
+    ? { resultHashes, results, updates }
     : {
         approval: {
           completedResults: results,
           toolCalls: pendingToolCalls,
         },
+        resultHashes,
         results,
         updates,
       };
@@ -182,7 +220,7 @@ export async function resumeToolBatch(
   response: ApprovalResponse,
   environment: ToolBatchEnvironment
 ): Promise<ToolBatchOutcome> {
-  const orderedResults = request.toolCalls.map((): ToolResultPart[] => []);
+  const orderedResults = request.toolCalls.map((): StagedToolResult[] => []);
   const updates: ExtensionStateUpdate[] = [];
   const executable: OrderedExecutableToolCall[] = [];
   const responseMap = new Map<string, ApprovalDecision>();
@@ -205,8 +243,15 @@ export async function resumeToolBatch(
     );
 
     if ("result" in resumePlan) {
-      emitToolResultEvent(environment, resumePlan.result);
-      orderedResults[index].push(resumePlan.result);
+      const hash = await stageAndEmitResult(
+        environment,
+        resumePlan.result,
+        index
+      );
+      orderedResults[index].push({
+        hash,
+        result: resumePlan.result,
+      });
       continue;
     }
 
@@ -218,7 +263,7 @@ export async function resumeToolBatch(
 
   const executedOutcomes = await Promise.all(
     executable.map((toolCall) =>
-      executeSingleTool(toolCall.executable, environment)
+      executeSingleTool(toolCall.executable, toolCall.index, environment)
     )
   );
   const pendingToolCalls: PendingToolCall[] = [];
@@ -232,16 +277,25 @@ export async function resumeToolBatch(
     }
 
     if (outcome.approval !== undefined) {
-      orderedResults[resultIndex].push(...outcome.approval.completedResults);
+      orderedResults[resultIndex].push(
+        ...zipStagedToolResults(
+          outcome.approval.completedResults,
+          outcome.completedResultHashes
+        )
+      );
       pendingToolCalls.push(...outcome.approval.toolCalls);
       continue;
     }
 
-    orderedResults[resultIndex].push(outcome.result);
+    orderedResults[resultIndex].push({
+      hash: outcome.resultHash,
+      result: outcome.result,
+    });
   }
 
-  const results = orderedResults.flat();
-  await stageResultsInOrder(environment, results);
+  const stagedResults = orderedResults.flat();
+  const results = stagedResults.map((entry) => entry.result);
+  const resultHashes = stagedResults.map((entry) => entry.hash);
 
   return {
     approval:
@@ -251,6 +305,7 @@ export async function resumeToolBatch(
             completedResults: results,
             toolCalls: pendingToolCalls,
           },
+    resultHashes,
     results,
     updates,
   };
@@ -399,6 +454,7 @@ function resolveResumeDecision(
 
 async function executeSingleTool(
   toolCall: ExecutableToolCall,
+  orderIndex: number,
   environment: ToolBatchEnvironment
 ): Promise<SingleToolOutcome> {
   const toolStartState: ToolStartState = {
@@ -420,23 +476,43 @@ async function executeSingleTool(
     );
 
     if (outcome.approval !== undefined) {
-      return outcome;
+      const completedResultHashes = await stageAndEmitResults(
+        environment,
+        outcome.approval.completedResults,
+        orderIndex
+      );
+      return {
+        approval: outcome.approval,
+        completedResultHashes,
+        updates: outcome.updates,
+      };
     }
 
     const result = applyApprovalDecisionMetadata(
       outcome.result,
       toolCall.approvalDecision
     );
-    emitToolResultEvent(environment, result);
+    const resultHash = await stageAndEmitResult(
+      environment,
+      result,
+      orderIndex
+    );
 
     return {
+      resultHash,
       result,
       updates: outcome.updates,
     };
   } catch (error: unknown) {
     if (error instanceof ToolPauseSignal) {
+      const completedResultHashes = await stageAndEmitResults(
+        environment,
+        error.approval.completedResults,
+        orderIndex
+      );
       return {
         approval: error.approval,
+        completedResultHashes,
         updates: error.updates,
       };
     }
@@ -446,9 +522,14 @@ async function executeSingleTool(
       error,
       toolCall.approvalDecision
     );
-    emitToolResultEvent(environment, result);
+    const resultHash = await stageAndEmitResult(
+      environment,
+      result,
+      orderIndex
+    );
 
     return {
+      resultHash,
       result,
       updates: [],
     };
@@ -466,7 +547,7 @@ async function runAroundToolHandlers(
   environment: ToolBatchEnvironment,
   sharedExports: Record<string, Record<string, unknown>>,
   toolStartState: ToolStartState
-): Promise<SingleToolOutcome> {
+): Promise<RawSingleToolOutcome> {
   if (index >= handlers.length) {
     emitToolStartIfNeeded(toolCall, environment, toolStartState);
     const output = await runWithTimeout(
@@ -579,7 +660,7 @@ function normalizeAroundToolResult(
   context: AroundToolContext,
   environment: ToolBatchEnvironment,
   toolStartState: ToolStartState
-): SingleToolOutcome {
+): RawSingleToolOutcome {
   if (isPauseResult(result)) {
     if (nestedResult !== undefined) {
       return {
@@ -846,7 +927,19 @@ function validateToolInput(
     "validate" in schema &&
     typeof schema.validate === "function"
   ) {
-    const result = schema.validate(input);
+    let result: ReturnType<typeof schema.validate>;
+
+    try {
+      result = schema.validate(input);
+    } catch (error: unknown) {
+      return {
+        details: {
+          error: normalizeError(error).message,
+        },
+        valid: false,
+      };
+    }
+
     return result.valid
       ? { valid: true, value: result.value }
       : { details: result.error, valid: false };
@@ -985,6 +1078,30 @@ function createErrorToolResult(
   };
 }
 
+async function stageAndEmitResult(
+  environment: ToolBatchEnvironment,
+  result: ToolResultPart,
+  orderIndex: number
+): Promise<HashString> {
+  const hash = await environment.stageResult(result, orderIndex);
+  emitToolResultEvent(environment, result);
+  return hash;
+}
+
+async function stageAndEmitResults(
+  environment: ToolBatchEnvironment,
+  results: ToolResultPart[],
+  orderIndex: number
+): Promise<HashString[]> {
+  const hashes: HashString[] = [];
+
+  for (const result of results) {
+    hashes.push(await stageAndEmitResult(environment, result, orderIndex));
+  }
+
+  return hashes;
+}
+
 function emitToolResultEvent(
   environment: ToolBatchEnvironment,
   result: ToolResultPart
@@ -999,17 +1116,6 @@ function emitToolResultEvent(
   });
 }
 
-async function stageResultsInOrder(
-  environment: ToolBatchEnvironment,
-  results: ToolResultPart[]
-): Promise<void> {
-  if (results.length === 0) {
-    return;
-  }
-
-  await environment.stageResults(results);
-}
-
 function asRecord(value: unknown): Record<string, unknown> {
   if (value !== null && typeof value === "object" && !Array.isArray(value)) {
     return value as Record<string, unknown>;
@@ -1020,6 +1126,20 @@ function asRecord(value: unknown): Record<string, unknown> {
 
 function normalizeError(error: unknown): Error {
   return error instanceof Error ? error : new Error(String(error));
+}
+
+function zipStagedToolResults(
+  results: ToolResultPart[],
+  hashes: HashString[]
+): StagedToolResult[] {
+  if (results.length !== hashes.length) {
+    throw new Error("tool result hashes must align with tool results");
+  }
+
+  return results.map((result, index) => ({
+    hash: hashes[index],
+    result,
+  }));
 }
 
 function isExecutableApprovalDecision(

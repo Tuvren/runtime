@@ -1102,15 +1102,18 @@ class RuntimeCore implements KrakenRuntime {
       let resolution = driverResult.resolution;
       const driverMessages = driverResult.messages ?? [];
       const stagedMessages = [...driverMessages];
+      const stagedMessageHashes: HashString[] = [];
       const driverResponse = synthesizeResponse(driverMessages, resolution);
       const requestedToolCalls = extractToolCallsFromMessages(driverMessages);
       const toolResults: ToolResultPart[] = [];
 
       for (let index = 0; index < stagedMessages.length; index += 1) {
-        await this.stageMessage(
-          iterationRunId,
-          stagedMessages[index],
-          `message_${nextIteration}_${index}`
+        stagedMessageHashes.push(
+          await this.stageMessage(
+            iterationRunId,
+            stagedMessages[index],
+            `message_${nextIteration}_${index}`
+          )
         );
       }
 
@@ -1147,6 +1150,7 @@ class RuntimeCore implements KrakenRuntime {
           )
         );
         toolResults.push(...toolBatch.results);
+        stagedMessageHashes.push(...toolBatch.resultHashes);
         loopState.carriedStateUpdates.push(...toolBatch.updates);
 
         for (const result of toolBatch.results) {
@@ -1171,21 +1175,32 @@ class RuntimeCore implements KrakenRuntime {
         loopState.carriedStateUpdates
       );
       loopState.carriedStateUpdates = [];
-      await this.stageManifest(iterationRunId, manifest);
-
-      if (resolution.type === "pause") {
-        await this.stageRuntimeStatus(
-          iterationRunId,
-          {
-            activeAgent: driverResult.activeAgent,
-            iterationCount: nextIteration,
-            pauseReason: resolution.reason,
-            state: "paused",
-            turnId: handle.turnId,
-          },
-          "runtime_status"
-        );
-      }
+      const manifestHash = await this.stageManifest(iterationRunId, manifest);
+      const runtimeStatusHash =
+        resolution.type === "pause"
+          ? await this.stageRuntimeStatus(
+              iterationRunId,
+              {
+                activeAgent: driverResult.activeAgent,
+                iterationCount: nextIteration,
+                pauseReason: resolution.reason,
+                state: "paused",
+                turnId: handle.turnId,
+              },
+              "runtime_status"
+            )
+          : undefined;
+      const nextTreeHash =
+        resolution.type === "fail" && resolution.fatality === "hard"
+          ? undefined
+          : await this.createIterationTree(
+              schemaId,
+              headState.turnNode.turnTreeHash,
+              headState.messageHashes,
+              stagedMessageHashes,
+              manifestHash,
+              runtimeStatusHash
+            );
 
       const turnNodeHash = await this.completeIterationRun(
         handle,
@@ -1193,7 +1208,8 @@ class RuntimeCore implements KrakenRuntime {
         resolution,
         manifest,
         nextIteration,
-        loopState
+        loopState,
+        nextTreeHash
       );
 
       handle.updateStatus({
@@ -1381,7 +1397,7 @@ class RuntimeCore implements KrakenRuntime {
       ]
     );
     await this.options.kernel.run.beginStep(runId, "iterate");
-    await this.stageRuntimeStatus(
+    const runningRuntimeStatusHash = await this.stageRuntimeStatus(
       runId,
       {
         activeAgent: loopState.activeConfig.name,
@@ -1412,7 +1428,7 @@ class RuntimeCore implements KrakenRuntime {
       resumedMessages,
       toolBatch.updates
     );
-    await this.stageManifest(runId, manifest);
+    const manifestHash = await this.stageManifest(runId, manifest);
 
     let resolution: RuntimeResolution =
       toolBatch.approval === undefined
@@ -1423,19 +1439,28 @@ class RuntimeCore implements KrakenRuntime {
             type: "pause",
           };
 
-    if (resolution.type === "pause") {
-      await this.stageRuntimeStatus(
-        runId,
-        {
-          activeAgent: loopState.activeConfig.name,
-          iterationCount: pausedIteration.iterationCount,
-          pauseReason: resolution.reason,
-          state: "paused",
-          turnId: handle.turnId,
-        },
-        "runtime_status_paused"
-      );
-    }
+    const runtimeStatusHash =
+      resolution.type === "pause"
+        ? await this.stageRuntimeStatus(
+            runId,
+            {
+              activeAgent: loopState.activeConfig.name,
+              iterationCount: pausedIteration.iterationCount,
+              pauseReason: resolution.reason,
+              state: "paused",
+              turnId: handle.turnId,
+            },
+            "runtime_status_paused"
+          )
+        : runningRuntimeStatusHash;
+    const nextTreeHash = await this.createIterationTree(
+      schemaId,
+      headState.turnNode.turnTreeHash,
+      headState.messageHashes,
+      toolBatch.resultHashes,
+      manifestHash,
+      runtimeStatusHash
+    );
 
     const turnNodeHash = await this.completeIterationRun(
       handle,
@@ -1443,7 +1468,8 @@ class RuntimeCore implements KrakenRuntime {
       resolution,
       manifest,
       pausedIteration.iterationCount,
-      loopState
+      loopState,
+      nextTreeHash
     );
 
     handle.updateStatus({
@@ -1532,17 +1558,15 @@ class RuntimeCore implements KrakenRuntime {
       },
       runId,
       signal: handle.abortSignal,
-      stageResults: async (results) => {
-        for (const result of results) {
-          await this.stageMessage(
-            runId,
-            {
-              parts: [result],
-              role: "tool",
-            },
-            `tool_message_${result.callId}`
-          );
-        }
+      stageResult: async (result, orderIndex) => {
+        return await this.stageMessage(
+          runId,
+          {
+            parts: [result],
+            role: "tool",
+          },
+          formatToolResultTaskId(orderIndex, result.callId)
+        );
       },
       threadId: handle.request.threadId,
       toolRegistry: loopState.activeToolRegistry,
@@ -1581,7 +1605,8 @@ class RuntimeCore implements KrakenRuntime {
     resolution: RuntimeResolution,
     manifest: ContextManifest,
     iterationCount: number,
-    loopState: LoopState
+    loopState: LoopState,
+    treeHash?: HashString
   ): Promise<HashString | undefined> {
     let turnNodeHash: HashString | undefined;
 
@@ -1594,7 +1619,10 @@ class RuntimeCore implements KrakenRuntime {
     } else {
       const stepResult = await this.options.kernel.run.completeStep(
         runId,
-        "iterate"
+        "iterate",
+        undefined,
+        undefined,
+        treeHash
       );
       const completion = await this.options.kernel.run.complete(
         runId,
@@ -1615,6 +1643,30 @@ class RuntimeCore implements KrakenRuntime {
     }
 
     return turnNodeHash;
+  }
+
+  private async createIterationTree(
+    schemaId: string,
+    baseTurnTreeHash: HashString,
+    baseMessageHashes: HashString[],
+    appendedMessageHashes: HashString[],
+    manifestHash: HashString,
+    runtimeStatusHash?: HashString
+  ): Promise<HashString> {
+    const changes: Record<string, PathValue> = {
+      "context.manifest": manifestHash,
+      messages: [...baseMessageHashes, ...appendedMessageHashes],
+    };
+
+    if (runtimeStatusHash !== undefined) {
+      changes["runtime.status"] = runtimeStatusHash;
+    }
+
+    return await this.options.kernel.tree.create(
+      schemaId,
+      changes,
+      baseTurnTreeHash
+    );
   }
 
   private createSequenceHandoffPlan(
@@ -2372,14 +2424,16 @@ class RuntimeCore implements KrakenRuntime {
   private async stageManifest(
     runId: string,
     manifest: ContextManifest
-  ): Promise<void> {
-    await this.options.kernel.staging.stage(
+  ): Promise<HashString> {
+    const staged = await this.options.kernel.staging.stage(
       runId,
       encodeKernelRecord(manifest, "manifest"),
       "manifest",
       "context_manifest",
       "completed"
     );
+
+    return staged.objectHash;
   }
 
   private async stageMessage(
@@ -2402,14 +2456,16 @@ class RuntimeCore implements KrakenRuntime {
     runId: string,
     status: Record<string, unknown>,
     taskId: string
-  ): Promise<void> {
-    await this.options.kernel.staging.stage(
+  ): Promise<HashString> {
+    const staged = await this.options.kernel.staging.stage(
       runId,
       encodeKernelRecord(status, "runtime status"),
       taskId,
       "runtime_status",
       "completed"
     );
+
+    return staged.objectHash;
   }
 
   private async storeKernelRecord(
@@ -3002,7 +3058,7 @@ class OrchestrationRuntimeImpl implements OrchestrationRuntime {
       type: "custom",
     });
 
-    if (worker.status === "completed") {
+    if (worker.status === "completed" || worker.status === "failed") {
       const signal = createWorkerResultSignal(worker, worker.result);
 
       if (sessionHandle?.status().phase === "running") {
@@ -3489,8 +3545,8 @@ function createWorkerResultSignal(
       {
         data: {
           agent: worker.agent,
-          output,
-          status: "completed",
+          output: sanitizeSignalValue(output),
+          status: worker.status,
           workerId: worker.workerId,
         },
         name: "worker_result",
@@ -3498,6 +3554,44 @@ function createWorkerResultSignal(
       },
     ],
   };
+}
+
+function sanitizeSignalValue(value: unknown): unknown {
+  if (value === undefined) {
+    return null;
+  }
+
+  if (
+    value === null ||
+    typeof value === "string" ||
+    typeof value === "number" ||
+    typeof value === "boolean" ||
+    value instanceof Uint8Array
+  ) {
+    return value;
+  }
+
+  if (Array.isArray(value)) {
+    return value.map((entry) => sanitizeSignalValue(entry));
+  }
+
+  if (isRecord(value)) {
+    const sanitized: Record<string, unknown> = {};
+
+    for (const [key, entry] of Object.entries(value)) {
+      if (entry !== undefined) {
+        sanitized[key] = sanitizeSignalValue(entry);
+      }
+    }
+
+    return sanitized;
+  }
+
+  return String(value);
+}
+
+function formatToolResultTaskId(orderIndex: number, callId: string): string {
+  return `tool_message_${orderIndex.toString().padStart(6, "0")}_${callId}`;
 }
 
 function resolutionPriority(resolution: RuntimeResolution): number {

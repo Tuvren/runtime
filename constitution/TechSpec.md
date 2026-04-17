@@ -1,6 +1,7 @@
 # Technical Specification
 
 ## 0. Version History & Changelog
+- v0.3.2 - Synced the published orchestration contract to the runtime-core reality by adding session-local worker state, worker approval resolution, parent-qualified worker launch, and narrowed orchestration resume typing.
 - v0.3.1 - Corrected the brownfield framework baseline to include the implemented contract packages, added the shared orchestration runtime contract surface, and expanded the driver seam so runtime-core can execute against explicit shared-runtime state.
 - v0.3.0 - Reframed the framework implementation as driver-oriented, added the initial ReAct-driver posture, and updated package structure and build sequence to separate shared framework services from driver implementations.
 - v0.2.3 - Defined the backend adapter repository interfaces and the `createMemoryBackend` factory surface so backend implementations no longer depend on implied persistence contracts.
@@ -450,11 +451,13 @@ export interface WorkerStatus {
   workerId: string;
   agent: string;
   threadId: string;
-  status: "running" | "completed" | "failed";
+  status: "running" | "paused" | "completed" | "failed";
+  approval?: ApprovalRequest;
   result?: unknown;
 }
 
 export interface OrchestrationHandle extends ExecutionHandle {
+  resolveApproval(response: ApprovalResponse): OrchestrationHandle;
   parentEvents(): AsyncIterable<KrakenStreamEvent>;
   workerEvents(workerId: string): AsyncIterable<KrakenStreamEvent>;
   allEvents(): AsyncIterable<KrakenStreamEvent>;
@@ -471,8 +474,13 @@ export interface OrchestrationRuntime {
     tools?: KrakenToolDefinition[];
     parentTurnId?: string | null;
   }): OrchestrationHandle;
-  launchWorker(agent: string, task: unknown): Promise<string>;
+  launchWorker(
+    agent: string,
+    task: unknown,
+    options?: { parent: OrchestrationHandle }
+  ): Promise<string>;
   awaitWorker(workerId: string): Promise<unknown>;
+  resolveWorkerApproval(workerId: string, response: ApprovalResponse): void;
   cancel(): void;
 }
 

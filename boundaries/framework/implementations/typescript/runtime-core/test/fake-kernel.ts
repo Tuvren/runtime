@@ -73,6 +73,7 @@ export interface FakeKernelHarness {
   readBranchManifest(branchId: string): Promise<TurnTreeManifest>;
   readBranchMessages(branchId: string): Promise<unknown[]>;
   readBranchRuntimeStatus(branchId: string): Promise<unknown | null>;
+  readRunningStagedMessages(branchId: string): Promise<unknown[]>;
 }
 
 export function createFakeKernelHarness(): FakeKernelHarness {
@@ -484,6 +485,32 @@ export function createFakeKernelHarness(): FakeKernelHarness {
       return payload === undefined
         ? null
         : decodeDeterministicKernelRecord(payload);
+    },
+    async readRunningStagedMessages(branchId) {
+      const run = [...state.runs.values()].find(
+        (candidate) =>
+          candidate.branchId === branchId && candidate.status === "running"
+      );
+
+      if (run === undefined) {
+        return [];
+      }
+
+      const messages: unknown[] = [];
+
+      for (const stagedResult of run.stagedResults) {
+        if (stagedResult.objectType !== "message") {
+          continue;
+        }
+
+        const payload = state.objects.get(stagedResult.objectHash);
+
+        if (payload !== undefined) {
+          messages.push(decodeDeterministicKernelRecord(payload));
+        }
+      }
+
+      return messages;
     },
   };
 }

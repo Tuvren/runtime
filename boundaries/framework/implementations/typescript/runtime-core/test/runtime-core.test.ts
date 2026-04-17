@@ -1421,6 +1421,129 @@ describe("framework-runtime-core", () => {
     ]);
   });
 
+  test("incrementally stages completed tool results before slower siblings finish", async () => {
+    const harness = createFakeKernelHarness();
+    let releaseSlowTool: (() => void) | undefined;
+    const slowTool = new Promise<void>((resolve) => {
+      releaseSlowTool = resolve;
+    });
+    const driver = {
+      async execute(context) {
+        const toolMessages = context.messages.filter(
+          (message) => message.role === "tool"
+        );
+
+        if (toolMessages.length === 0) {
+          return {
+            activeAgent: "primary",
+            messages: [
+              assistantToolCalls([
+                {
+                  callId: "call-fast",
+                  input: { query: "fast" },
+                  name: "fast",
+                },
+                {
+                  callId: "call-slow",
+                  input: { query: "slow" },
+                  name: "slow",
+                },
+              ]),
+            ],
+            resolution: {
+              type: "continue_iteration",
+            },
+          };
+        }
+
+        return {
+          activeAgent: "primary",
+          messages: [assistantText("Tools finished.")],
+          resolution: {
+            reason: "done",
+            type: "end_turn",
+          },
+        };
+      },
+      id: "fake",
+      async resume() {
+        throw new Error("resume was not expected");
+      },
+    } satisfies KrakenDriver;
+    const runtime = createKrakenRuntimeCore({
+      defaultDriverId: "fake",
+      driverRegistry: createDriverRegistry([driver]),
+      kernel: harness.kernel,
+    });
+    const thread = await runtime.createThread({});
+    const handle = runtime.executeTurn({
+      branchId: thread.branchId,
+      config: {
+        name: "primary",
+        tools: [
+          {
+            description: "Finish immediately",
+            execute() {
+              return {
+                status: "fast",
+              };
+            },
+            inputSchema: {
+              properties: {
+                query: { type: "string" },
+              },
+              required: ["query"],
+              type: "object",
+            },
+            name: "fast",
+          },
+          {
+            description: "Wait for release",
+            async execute() {
+              await slowTool;
+              return {
+                status: "slow",
+              };
+            },
+            inputSchema: {
+              properties: {
+                query: { type: "string" },
+              },
+              required: ["query"],
+              type: "object",
+            },
+            name: "slow",
+          },
+        ],
+      },
+      signal: textSignal("Run staged tools"),
+      threadId: thread.threadId,
+    });
+    const eventsPromise = collectEvents(handle.events());
+
+    await waitForAsync(async () => {
+      const stagedMessages = await harness.readRunningStagedMessages(
+        thread.branchId
+      );
+      return stagedMessages.some(
+        (message) =>
+          message !== null &&
+          typeof message === "object" &&
+          "role" in message &&
+          message.role === "tool"
+      );
+    });
+
+    const stagedMessages = await harness.readRunningStagedMessages(
+      thread.branchId
+    );
+
+    expect(extractToolMessages(stagedMessages)).toHaveLength(1);
+
+    releaseSlowTool?.();
+    await eventsPromise;
+  });
+
   test("persists tool messages in call order even when parallel completion order differs", async () => {
     const harness = createFakeKernelHarness();
     const driver = {
@@ -1617,6 +1740,107 @@ describe("framework-runtime-core", () => {
       name: "slow",
       output: {
         error: 'tool "slow" timed out after 5ms',
+      },
+      type: "tool_result",
+    });
+  });
+
+  test("treats thrown CustomSchema validators as tool input validation errors", async () => {
+    const harness = createFakeKernelHarness();
+    const driver = {
+      async execute(context) {
+        const toolMessages = context.messages.filter(
+          (message) => message.role === "tool"
+        );
+
+        if (toolMessages.length === 0) {
+          return {
+            activeAgent: "primary",
+            messages: [
+              assistantToolCalls([
+                {
+                  callId: "call-custom",
+                  input: { query: "boom" },
+                  name: "custom",
+                },
+              ]),
+            ],
+            resolution: {
+              type: "continue_iteration",
+            },
+          };
+        }
+
+        return {
+          activeAgent: "primary",
+          messages: [assistantText("Recovered from validator error.")],
+          resolution: {
+            reason: "done",
+            type: "end_turn",
+          },
+        };
+      },
+      id: "fake",
+      async resume() {
+        throw new Error("resume was not expected");
+      },
+    } satisfies KrakenDriver;
+    const runtime = createKrakenRuntimeCore({
+      defaultDriverId: "fake",
+      driverRegistry: createDriverRegistry([driver]),
+      kernel: harness.kernel,
+    });
+    const thread = await runtime.createThread({});
+    const handle = runtime.executeTurn({
+      branchId: thread.branchId,
+      config: {
+        name: "primary",
+        tools: [
+          {
+            description: "Throwing schema",
+            execute() {
+              return {
+                ok: true,
+              };
+            },
+            inputSchema: {
+              toJSONSchema() {
+                return {
+                  properties: {
+                    query: { type: "string" },
+                  },
+                  required: ["query"],
+                  type: "object",
+                };
+              },
+              validate() {
+                throw new Error("validator exploded");
+              },
+            },
+            name: "custom",
+          },
+        ],
+      },
+      signal: textSignal("Throw in validator"),
+      threadId: thread.threadId,
+    });
+
+    await collectEvents(handle.events());
+    const toolMessages = extractToolMessages(
+      await harness.readBranchMessages(thread.branchId)
+    );
+
+    expect(handle.status().phase).toBe("completed");
+    expect(toolMessages).toHaveLength(1);
+    expect(toolMessages[0]?.parts[0]).toEqual({
+      callId: "call-custom",
+      isError: true,
+      name: "custom",
+      output: {
+        details: {
+          error: "validator exploded",
+        },
+        error: "Tool input failed validation.",
       },
       type: "tool_result",
     });
@@ -3660,6 +3884,93 @@ describe("framework-runtime-core", () => {
     });
   });
 
+  test("steers failed worker payloads back into a running parent turn", async () => {
+    const harness = createFakeKernelHarness();
+    const driver = {
+      async execute(context) {
+        const workerResult = extractLastWorkerResult(context.messages);
+
+        if (context.config.name === "worker") {
+          throw new Error("worker exploded");
+        }
+
+        if (
+          workerResult?.status === "failed" &&
+          workerResult.output !== null &&
+          typeof workerResult.output === "object" &&
+          "message" in workerResult.output &&
+          workerResult.output.message === "worker exploded"
+        ) {
+          return {
+            activeAgent: "primary",
+            messages: [assistantText("Parent observed worker failure.")],
+            resolution: {
+              reason: "done",
+              type: "end_turn",
+            },
+          };
+        }
+
+        await delay(10);
+        return {
+          activeAgent: "primary",
+          messages: [assistantText("Still waiting on worker outcome.")],
+          resolution: {
+            type: "continue_iteration",
+          },
+        };
+      },
+      id: "fake",
+      async resume() {
+        throw new Error("resume was not expected");
+      },
+    } satisfies KrakenDriver;
+    const framework = createKrakenRuntimeCore({
+      defaultDriverId: "fake",
+      driverRegistry: createDriverRegistry([driver]),
+      kernel: harness.kernel,
+    });
+    const orchestration = createOrchestrationRuntime({
+      agents: {
+        primary: { name: "primary" },
+        worker: { name: "worker" },
+      },
+      defaultDriverId: "fake",
+      driverRegistry: createDriverRegistry([driver]),
+      entrypoint: "primary",
+      framework,
+      kernel: harness.kernel,
+    });
+    const thread = await framework.createThread({});
+    const handle = orchestration.executeTurn({
+      branchId: thread.branchId,
+      signal: textSignal("Observe failed worker"),
+      threadId: thread.threadId,
+    });
+    const allEventsPromise = collectEvents(handle.allEvents());
+
+    const workerId = await orchestration.launchWorker(
+      "worker",
+      {
+        task: "failure",
+      },
+      {
+        parent: handle,
+      }
+    );
+
+    await orchestration.awaitWorker(workerId);
+    await allEventsPromise;
+
+    expect(handle.status().phase).toBe("completed");
+    expect(
+      hasAssistantText(
+        await harness.readBranchMessages(thread.branchId),
+        "Parent observed worker failure."
+      )
+    ).toBe(true);
+  });
+
   test("cancels only the current session workers when a parent handle is cancelled", async () => {
     const harness = createFakeKernelHarness();
     let activeWorkers = 0;
@@ -4020,6 +4331,21 @@ async function waitFor(
   const startedAt = Date.now();
 
   while (!condition()) {
+    if (Date.now() - startedAt >= timeoutMilliseconds) {
+      throw new Error("timed out waiting for condition");
+    }
+
+    await delay(5);
+  }
+}
+
+async function waitForAsync(
+  condition: () => Promise<boolean>,
+  timeoutMilliseconds = 1000
+): Promise<void> {
+  const startedAt = Date.now();
+
+  while (!(await condition())) {
     if (Date.now() - startedAt >= timeoutMilliseconds) {
       throw new Error("timed out waiting for condition");
     }

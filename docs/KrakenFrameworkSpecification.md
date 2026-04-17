@@ -1,6 +1,6 @@
 # Kraken Framework Specification
 
-**Version**: v0.15
+**Version**: v0.16
 **Status**: Authoritative
 **Basis**: Kernel Specification v0.9 (frozen)
 
@@ -1168,16 +1168,19 @@ for each toolCall in executingTools:
 
 **Parallel execution:**
 
-All `tool.start` events for executing tools are yielded before any `tool.result`. This allows protocol adapters to show multiple tools executing concurrently.
+All `tool.start` events for executing tools are yielded before any `tool.result`. Each completed tool then emits `tool.result` at the moment that specific tool finishes; the runtime does not wait for the slowest sibling before surfacing already-completed results.
 
 ```
 for each toolCall in executingTools:
   yield { type: "tool.start", callId, name, input, timestamp: now() }
 
-results = await Promise.all(executingTools.map(executeSingleTool))
-
-for each result in results:
+for each toolCall in executingTools run concurrently:
+  result = await executeSingleTool(toolCall)
+  stage completed tool_result durably for recovery
   yield { type: "tool.result", callId, name, output, isError, timestamp: now() }
+
+// At checkpoint time the framework materializes the final messages path in the
+// original tool-call order so durable conversation order remains deterministic.
 ```
 
 **Mixed-approval batch ordering**: When a parallel batch contains both auto-approved and approval-gated tools, only auto-approved tools emit `tool.start`/`tool.result` events before the pause. Approval-gated tools do not emit `tool.start` until after approval, during the resume. The model’s request for the tool is already visible in `tool_call.done` events from the streaming phase.
@@ -1835,15 +1838,15 @@ tools: [{
 ```
 [Worker Result: {workerId}]
 Agent: {agentName}
-Status: completed
-Output: {structured result}
+Status: {completed | failed}
+Output: {structured result or failure payload}
 ```
 
 When such a payload is delivered while the parent Turn is running, the parent sees it as a user message at the next iteration boundary. The model can reason about worker status (“I got vendor A’s results, still waiting on B and C”).
 
 **wait_for_worker**: Converts an async worker to sync mid-flight. The tool blocks until the specified worker completes and returns the result as a tool result. The developer chooses when to synchronize, not the framework.
 
-Async worker outputs enter parent context through exactly two mechanisms: explicit synchronization (`wait_for_worker`, or equivalent host-defined sync tooling) or steering during a running parent Turn. Worker completion alone does not mutate the parent’s context.
+Async worker outputs enter parent context through exactly two mechanisms: explicit synchronization (`wait_for_worker`, or equivalent host-defined sync tooling) or steering during a running parent Turn. Worker terminal completion alone does not mutate the parent’s context.
 
 **Edge case — parent Turn is paused when workers complete**: Steering is only valid while `status().phase === "running"`. If the parent Turn is paused awaiting approval, completed worker results are recorded in worker state but are not injected into the paused Turn. They may be delivered by steering only after the parent resumes running.
 
@@ -2010,13 +2013,15 @@ The framework-provided runtime for multi-agent coordination. Owns worker lifecyc
 ```
 OrchestrationRuntime
 ├─ executeTurn(input: { signal, threadId, branchId, schemaId?, driverId? }) → OrchestrationHandle
-├─ launchWorker(agent: string, task: unknown) → string (workerId)
+├─ launchWorker(agent: string, task: unknown, options?: { parent: OrchestrationHandle }) → string (workerId)
 ├─ awaitWorker(workerId: string) → Promise<unknown>
+├─ resolveWorkerApproval(workerId: string, response: ApprovalResponse) → void
 └─ cancel(): void
 ```
 
 ```
 OrchestrationHandle extends ExecutionHandle
+├─ resolveApproval(response: ApprovalResponse) → OrchestrationHandle
 ├─ parentEvents(): AsyncIterable<KrakenStreamEvent>
 ├─ workerEvents(workerId: string): AsyncIterable<KrakenStreamEvent>
 ├─ allEvents(): AsyncIterable<KrakenStreamEvent>
@@ -2028,7 +2033,8 @@ WorkerStatus
 ├─ workerId: string
 ├─ agent: string
 ├─ threadId: string
-├─ status: "running" | "completed" | "failed"
+├─ status: "running" | "paused" | "completed" | "failed"
+├─ approval?: ApprovalRequest
 └─ result?: unknown
 ```
 
@@ -2054,6 +2060,8 @@ const orchestration = createOrchestrationRuntime({
 
 No new kernel concepts. The runtime is a composition layer.
 
+When one `OrchestrationRuntime` hosts multiple active parent sessions at once, `launchWorker(..., { parent })` is the required disambiguation mechanism. When only one parent session is active, the runtime may resolve the parent implicitly.
+
 **Event stream demuxing**: The runtime provides three consumption patterns:
 
 - `parentEvents()`: Only events from the parent agent’s execution. No `source` field.
@@ -2062,13 +2070,20 @@ No new kernel concepts. The runtime is a composition layer.
 
 The frontend developer subscribes to the streams they need. Separate UI panels get separate streams. A unified view gets the merged stream. The contract is the same regardless of host implementation.
 
-**Cascading cancellation**: `cancel()` cancels the parent handle and all running worker handles.
+**Cascading cancellation**:
 
-**Worker completion watching**: The runtime internally iterates each worker handle’s events. When a worker’s `turn.end` event arrives, the runtime extracts the final output and updates `WorkerStatus`.
+- `OrchestrationHandle.cancel()` cancels only that parent Turn plus workers owned by the same orchestration session.
+- `OrchestrationRuntime.cancel()` cancels every active parent session plus every running or paused worker owned by those sessions.
 
-- If the parent Turn is `running`, the runtime calls `parentHandle.steer()` with a structured worker result message.
-- If the parent Turn is `paused`, the runtime queues the worker result for delivery at the next valid steering injection point after approval resume.
+**Worker completion watching**: The runtime internally iterates each worker handle’s events. When a worker reaches a terminal `turn.end`, the runtime extracts the final output and updates `WorkerStatus`.
+
+- If the worker completed successfully and the parent Turn is `running`, the runtime calls `parentHandle.steer()` with a structured worker result message.
+- If the worker failed and the parent Turn is `running`, the runtime still calls `parentHandle.steer()` with the structured failure payload so the parent can react without polling.
+- If the parent Turn is `paused`, the runtime queues terminal worker results for delivery at the next valid steering injection point after approval resume.
+- If the worker itself pauses for approval, the runtime records `WorkerStatus.status = "paused"` plus the worker approval payload and waits for the host to call `resolveWorkerApproval(workerId, response)`.
 - If the parent Turn has already ended, the runtime stores the result for host-level retrieval so the host can deliver it through a new Turn or alongside the next human-initiated Turn.
+
+**Worker visibility**: `OrchestrationHandle.workers()` is session-local. Each parent handle sees only the workers launched for that orchestration session, even when multiple parent sessions share one `OrchestrationRuntime`.
 
 ### 10.7 Extension Scoping
 
@@ -2109,4 +2124,4 @@ This specification does not define:
 
 ---
 
-_v0.14. This is the single authoritative framework specification. All framework behavior — execution model, extension system, multi-agent orchestration, streaming, host contract, and tool dispatch — is defined here. Companion rationale is explanatory only and non-contract._
+_v0.16. This is the single authoritative framework specification. All framework behavior — execution model, extension system, multi-agent orchestration, streaming, host contract, and tool dispatch — is defined here. Companion rationale is explanatory only and non-contract._
