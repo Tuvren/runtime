@@ -51,7 +51,10 @@ import type {
   TurnEndEvent,
   WorkerStatus,
 } from "@kraken/framework-runtime-api";
-import { assertApprovalResponseForRequest } from "@kraken/framework-runtime-api";
+import {
+  assertApprovalResponseForRequest,
+  assertKrakenMessage,
+} from "@kraken/framework-runtime-api";
 import {
   decodeDeterministicKernelRecord,
   encodeDeterministicKernelRecord,
@@ -374,6 +377,7 @@ class RuntimeExecutionHandle implements ExecutionHandle {
 
   cancel(): void {
     this.abortController.abort();
+    this.runtime.cancelPausedExecution(this);
   }
 
   consumeSteeringSignal(): InputSignal | undefined {
@@ -403,6 +407,10 @@ class RuntimeExecutionHandle implements ExecutionHandle {
     return this.schemaIdValue;
   }
 
+  hasStartedExecution(): boolean {
+    return this.started;
+  }
+
   publish(event: KrakenStreamEvent): void {
     this.eventsFanout.emit(event);
   }
@@ -429,6 +437,24 @@ class RuntimeExecutionHandle implements ExecutionHandle {
 
   setSchemaId(schemaId: string): void {
     this.schemaIdValue = schemaId;
+  }
+
+  takePauseContextForCancellation(): PauseContext | undefined {
+    if (
+      this.statusSnapshot.phase !== "paused" ||
+      this.pauseContext === undefined
+    ) {
+      return undefined;
+    }
+
+    const pauseContext = this.pauseContext;
+    this.pauseContext = undefined;
+    this.replaceStatus({
+      ...this.statusSnapshot,
+      approval: undefined,
+      pauseReason: undefined,
+    });
+    return pauseContext;
   }
 
   resolveApproval(response: ApprovalResponse): ExecutionHandle {
@@ -624,6 +650,22 @@ class RuntimeCore implements KrakenRuntime {
       phase: "running",
     });
     return handle;
+  }
+
+  cancelPausedExecution(handle: RuntimeExecutionHandle): void {
+    const pauseContext = handle.takePauseContextForCancellation();
+
+    if (pauseContext === undefined) {
+      return;
+    }
+
+    detachPromise(
+      this.finalizePausedCancellation(
+        handle,
+        pauseContext,
+        new Error("execution cancelled")
+      )
+    );
   }
 
   // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: This is the runtime's top-level turn lifecycle coordinator.
@@ -1136,6 +1178,10 @@ class RuntimeCore implements KrakenRuntime {
       const driverResponse = synthesizeResponse(driverMessages, resolution);
       const requestedToolCalls = extractToolCallsFromMessages(driverMessages);
       const toolResults: ToolResultPart[] = [];
+
+      for (const [index, driverMessage] of driverMessages.entries()) {
+        assertKrakenMessage(driverMessage, `driverResult.messages[${index}]`);
+      }
 
       for (let index = 0; index < stagedMessages.length; index += 1) {
         stagedMessageHashes.push(
@@ -2296,6 +2342,35 @@ class RuntimeCore implements KrakenRuntime {
     }
   }
 
+  private async finalizePausedCancellation(
+    handle: RuntimeExecutionHandle,
+    pauseContext: PauseContext,
+    error: Error
+  ): Promise<void> {
+    const loopState: LoopState = {
+      activeConfig: pauseContext.activeConfig,
+      activeDriverId: pauseContext.activeDriverId,
+      activeToolRegistry: pauseContext.activeToolRegistry,
+      carriedStateUpdates: [],
+      enteredIterationLoop: true,
+    };
+    const failureResolution: RuntimeResolution = {
+      error,
+      fatality: "hard",
+      type: "fail",
+    };
+
+    handle.rememberError(projectError(error));
+    await this.options.kernel.run.complete(pauseContext.pausedRunId, "failed");
+    await this.finalizeTurnStatus(handle, failureResolution, loopState);
+    handle.replaceStatus({
+      activeAgent: pauseContext.activeConfig.name,
+      iterationCount: handle.status().iterationCount,
+      manifest: handle.status().manifest,
+      phase: "failed",
+    });
+  }
+
   private async loadHeadState(branchId: string): Promise<HeadState> {
     const branch = await this.options.kernel.branch.get(branchId);
 
@@ -2691,6 +2766,10 @@ class OrchestrationHandleImpl implements OrchestrationHandle {
 
   getParentThreadId(): string {
     return this.threadId;
+  }
+
+  hasStartedExecution(): boolean {
+    return this.started;
   }
 
   resolveApproval(response: ApprovalResponse): OrchestrationHandle {
@@ -3260,7 +3339,7 @@ class OrchestrationRuntimeImpl implements OrchestrationRuntime {
       return worker;
     }
 
-    if (this.countKnownOrchestrationSessions() > 1) {
+    if (this.countActiveOrchestrationSessions() > 1) {
       throw new KrakenRuntimeError(
         `${methodName}() requires { parent } when multiple orchestration sessions exist`,
         {
@@ -3276,11 +3355,8 @@ class OrchestrationRuntimeImpl implements OrchestrationRuntime {
     return worker;
   }
 
-  private countKnownOrchestrationSessions(): number {
-    return new Set([
-      ...this.sessionHandles.keys(),
-      ...[...this.workers.values()].map((worker) => worker.sessionId),
-    ]).size;
+  private countActiveOrchestrationSessions(): number {
+    return this.sessionHandles.size;
   }
 
   private requireRuntimeParentHandle(
@@ -3320,21 +3396,7 @@ class OrchestrationRuntimeImpl implements OrchestrationRuntime {
           }
         );
       }
-
-      const phase = parent.status().phase;
-
-      if (phase !== "running" && phase !== "paused") {
-        throw new KrakenRuntimeError(
-          "launchWorker() requires a running or paused parent handle",
-          {
-            code: "orchestration_parent_inactive",
-            details: {
-              phase,
-            },
-          }
-        );
-      }
-
+      this.assertLaunchableParentHandle(parent);
       return parent;
     }
 
@@ -3351,21 +3413,8 @@ class OrchestrationRuntimeImpl implements OrchestrationRuntime {
       const iterator = this.sessionHandles.values().next();
 
       if (!iterator.done) {
-        const phase = iterator.value.status().phase;
-
-        if (phase === "running" || phase === "paused") {
-          return iterator.value;
-        }
-
-        throw new KrakenRuntimeError(
-          "launchWorker() requires a running or paused parent handle",
-          {
-            code: "orchestration_parent_inactive",
-            details: {
-              phase,
-            },
-          }
-        );
+        this.assertLaunchableParentHandle(iterator.value);
+        return iterator.value;
       }
     }
 
@@ -3380,6 +3429,33 @@ class OrchestrationRuntimeImpl implements OrchestrationRuntime {
             : "orchestration_parent_ambiguous",
       }
     );
+  }
+
+  private assertLaunchableParentHandle(
+    parentHandle: OrchestrationHandleImpl
+  ): void {
+    if (!parentHandle.hasStartedExecution()) {
+      throw new KrakenRuntimeError(
+        "launchWorker() requires the parent handle to start execution first",
+        {
+          code: "orchestration_parent_not_started",
+        }
+      );
+    }
+
+    const phase = parentHandle.status().phase;
+
+    if (phase !== "running" && phase !== "paused") {
+      throw new KrakenRuntimeError(
+        "launchWorker() requires a running or paused parent handle",
+        {
+          code: "orchestration_parent_inactive",
+          details: {
+            phase,
+          },
+        }
+      );
+    }
   }
 }
 
@@ -3745,9 +3821,26 @@ function normalizeWorkerTask(task: unknown): InputSignal {
     task !== null &&
     typeof task === "object" &&
     "parts" in task &&
-    Array.isArray((task as { parts?: unknown }).parts)
+    Array.isArray(task.parts)
   ) {
-    return task as InputSignal;
+    const candidateMessage: unknown = {
+      parts: task.parts,
+      role: "user",
+    };
+    assertKrakenMessage(candidateMessage, "worker task");
+
+    if (candidateMessage.role !== "user") {
+      throw new KrakenRuntimeError(
+        "worker tasks must normalize to a user message",
+        {
+          code: "invalid_worker_task",
+        }
+      );
+    }
+
+    return {
+      parts: candidateMessage.parts,
+    };
   }
 
   return {

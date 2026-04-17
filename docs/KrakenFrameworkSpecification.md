@@ -1239,6 +1239,8 @@ Package topology: `@kraken/stream-agui`, `@kraken/stream-acp`, `@kraken/stream-s
 
 **User-initiated cancellation**: Host signals via `AbortSignal` through `handle.cancel()`. The driver aborts the provider stream, emits an `error` event with `fatal: true`, stages accumulated content as a partial assistant message (with `partial: true` on RuntimeStatus), completes the Run as `failed`, and yields `turn.end` with `"failed"`. The partial content is durable — on the next Turn, the model sees its own interrupted output.
 
+If `cancel()` is called after the Turn has already paused for approval, the framework MUST fail the paused Run, durably finalize `runtime.status` as `"failed"`, and transition the paused handle to failed state. Cancellation never leaves a paused Turn durably stranded as `"paused"`.
+
 **Provider stream interruption**: The driver emits an `error` event, stages an error message, and yields `turn.end` with `"failed"`.
 
 ### 6.11 Durability Boundary
@@ -1280,7 +1282,7 @@ ExecutionHandle
 
 **`events()`** — the primary output. The host iterates this to receive all execution events. Iteration drives execution — the driver advances as the consumer pulls events.
 
-**`cancel()`** — triggers the AbortSignal. The driver handles staging partial content and failing the Run.
+**`cancel()`** — triggers the AbortSignal. The driver handles staging partial content and failing the Run. If the Turn is already paused for approval, the framework fails the paused Run and durably finalizes the Turn as failed.
 
 **`steer(signal)`** — pushes a signal into the steering channel. The driver consumes it at the next iteration boundary. Only valid when `status().phase === "running"`. Rejected if the Turn is paused or completed.
 

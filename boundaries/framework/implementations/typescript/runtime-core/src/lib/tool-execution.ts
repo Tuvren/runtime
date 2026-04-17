@@ -33,6 +33,7 @@ import type {
   ToolRegistry,
   ToolResultPart,
 } from "@kraken/framework-runtime-api";
+import { assertApprovalRequest } from "@kraken/framework-runtime-api";
 import type { HashString } from "@kraken/shared-core-types";
 import Ajv, { type ErrorObject, type ValidateFunction } from "ajv";
 import { runWithTimeout } from "./execution-timeouts.js";
@@ -517,6 +518,10 @@ async function executeSingleTool(
       };
     }
 
+    if (isApprovalRequestValidationError(error)) {
+      throw error;
+    }
+
     const result = createExecutionFailureResult(
       toolCall.toolCall,
       error,
@@ -633,6 +638,10 @@ async function runAroundToolHandlers(
       ]);
     }
 
+    if (isApprovalRequestValidationError(error)) {
+      throw error;
+    }
+
     if (nestedResult !== undefined) {
       environment.reportSoftError(normalizeError(error));
       return {
@@ -673,8 +682,17 @@ function normalizeAroundToolResult(
       };
     }
 
+    const approval = normalizeApprovalRequest(
+      context.toolCall,
+      result.approval
+    );
+    assertApprovalRequest(
+      approval,
+      `aroundTool approval from extension "${extensionName}"`
+    );
+
     return {
-      approval: normalizeApprovalRequest(context.toolCall, result.approval),
+      approval,
       updates: collectExtensionStateUpdate(
         extensionName,
         result.state,
@@ -903,6 +921,14 @@ function normalizeApprovalRequest(
       },
     ],
   };
+}
+
+function isApprovalRequestValidationError(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    "code" in error &&
+    error.code === "invalid_approval_request"
+  );
 }
 
 async function evaluateApprovalPolicy(
