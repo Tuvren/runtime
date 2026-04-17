@@ -31,6 +31,10 @@ export interface ExtensionStateUpdate {
   state: Record<string, unknown>;
 }
 
+export interface CollectSystemPromptsOptions {
+  onError?(input: { error: Error; extensionName: string }): void;
+}
+
 interface HookRunResult {
   cePlan?: ContextEngineeringPlan;
   resolution?: RuntimeResolution;
@@ -84,7 +88,8 @@ export function buildSharedExports(
 export function collectSystemPrompts(
   extensions: KrakenExtension[],
   manifest: ContextManifest,
-  iterationCount: number
+  iterationCount: number,
+  options?: CollectSystemPromptsOptions
 ): string[] {
   const sharedExports = buildSharedExports(extensions, manifest);
   const prompts: string[] = [];
@@ -110,8 +115,11 @@ export function collectSystemPrompts(
       if (prompt !== undefined) {
         prompts.push(prompt);
       }
-    } catch {
-      // Ignore prompt contribution failures so one extension does not break the turn shell.
+    } catch (error: unknown) {
+      options?.onError?.({
+        error: normalizeError(error),
+        extensionName: extension.name,
+      });
     }
   }
 

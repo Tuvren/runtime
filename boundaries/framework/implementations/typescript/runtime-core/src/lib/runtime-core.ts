@@ -211,6 +211,7 @@ interface WorkerRecord {
   resolveResult(value: unknown): void;
   result?: unknown;
   resultPromise: Promise<unknown>;
+  sessionId: string;
   status: "running" | "completed" | "failed";
   threadId: string;
   workerId: string;
@@ -219,7 +220,12 @@ interface WorkerRecord {
 class AsyncEventQueue<T> implements AsyncIterable<T> {
   private closed = false;
   private readonly items: T[] = [];
+  private onClose?: () => void;
   private readonly waiters: Array<(value: IteratorResult<T>) => void> = [];
+
+  constructor(onClose?: () => void) {
+    this.onClose = onClose;
+  }
 
   close(): void {
     if (this.closed) {
@@ -231,6 +237,9 @@ class AsyncEventQueue<T> implements AsyncIterable<T> {
     while (this.waiters.length > 0) {
       this.waiters.shift()?.({ done: true, value: undefined });
     }
+
+    this.onClose?.();
+    this.onClose = undefined;
   }
 
   push(item: T): void {
@@ -269,6 +278,13 @@ class AsyncEventQueue<T> implements AsyncIterable<T> {
           this.waiters.push(resolve);
         });
       },
+      return: (): Promise<IteratorResult<T>> => {
+        this.close();
+        return Promise.resolve({
+          done: true,
+          value: undefined,
+        });
+      },
     };
   }
 }
@@ -302,7 +318,10 @@ class EventFanout<T> {
   }
 
   subscribe(): AsyncIterable<T> {
-    const queue = new AsyncEventQueue<T>();
+    let queue: AsyncEventQueue<T>;
+    queue = new AsyncEventQueue<T>(() => {
+      this.subscribers.delete(queue);
+    });
 
     if (this.closed) {
       queue.close();
@@ -1009,6 +1028,7 @@ class RuntimeCore implements KrakenRuntime {
           handle,
           schemaId,
           beforeIteration.cePlan,
+          loopState,
           loopState.carriedStateUpdates
         );
         loopState.carriedStateUpdates = [];
@@ -1025,6 +1045,7 @@ class RuntimeCore implements KrakenRuntime {
           handle,
           schemaId,
           policyPlan,
+          loopState,
           loopState.carriedStateUpdates
         );
         loopState.carriedStateUpdates = [];
@@ -1818,6 +1839,7 @@ class RuntimeCore implements KrakenRuntime {
     handle: RuntimeExecutionHandle,
     schemaId: string,
     plan: ContextEngineeringPlan,
+    loopState: LoopState,
     updates: ExtensionStateUpdate[]
   ): Promise<void> {
     const runId = this.createId();
@@ -1834,10 +1856,10 @@ class RuntimeCore implements KrakenRuntime {
     };
     const nextMessageHashes = plan.execute(context);
     await helperBundle.flush();
-
-    const nextMessages = nextMessageHashes
-      .map((hash) => helperBundle.helpers.loadMessage(hash))
-      .filter((message): message is KrakenMessage => message !== null);
+    const nextMessages = this.materializeContextMessages(
+      nextMessageHashes,
+      helperBundle.helpers
+    );
     const nextManifest = updateContextManifest(
       createContextManifest(nextMessages, headState.manifest.extensions),
       [],
@@ -1883,6 +1905,13 @@ class RuntimeCore implements KrakenRuntime {
       await this.options.kernel.turn.updateHead(
         handle.turnId,
         stepResult.turnNodeHash
+      );
+      await this.emitStateObservability(
+        handle,
+        loopState,
+        stepResult.turnNodeHash,
+        nextManifest,
+        handle.status().iterationCount
       );
     }
     handle.updateStatus({
@@ -1949,9 +1978,10 @@ class RuntimeCore implements KrakenRuntime {
       normalizedPlan.sourceContext
     );
     await helperBundle.flush();
-    const nextMessages = nextMessageHashes
-      .map((hash) => helperBundle.helpers.loadMessage(hash))
-      .filter((message): message is KrakenMessage => message !== null);
+    const nextMessages = this.materializeContextMessages(
+      nextMessageHashes,
+      helperBundle.helpers
+    );
     const nextManifest = updateContextManifest(
       createContextManifest(nextMessages, headState.manifest.extensions),
       [],
@@ -2090,6 +2120,30 @@ class RuntimeCore implements KrakenRuntime {
         },
       },
     };
+  }
+
+  private materializeContextMessages(
+    hashes: HashString[],
+    helpers: ContextEngineeringHelpers
+  ): KrakenMessage[] {
+    const messages: KrakenMessage[] = [];
+
+    for (const hash of hashes) {
+      const message = helpers.loadMessage(hash);
+
+      if (message === null) {
+        throw new KrakenLineageError(`message "${hash}" does not exist`, {
+          code: "missing_message",
+          details: {
+            hash,
+          },
+        });
+      }
+
+      messages.push(message);
+    }
+
+    return messages;
   }
 
   private async finalizeTurnStatus(
@@ -2462,14 +2516,17 @@ class OrchestrationHandleImpl implements OrchestrationHandle {
   private readonly openWorkers = new Set<string>();
   private readonly runtime: OrchestrationRuntimeImpl;
   private readonly parentHandle: ExecutionHandle;
+  private started = false;
   private readonly workerEventFanouts = new Map<
     string,
     EventFanout<KrakenStreamEvent>
   >();
+  readonly sessionId: string;
 
   constructor(
     runtime: OrchestrationRuntimeImpl,
     parentHandle: ExecutionHandle,
+    sessionId: string,
     options?: {
       openWorkers?: string[];
       pendingWorkerSignals?: InputSignal[];
@@ -2477,17 +2534,19 @@ class OrchestrationHandleImpl implements OrchestrationHandle {
   ) {
     this.runtime = runtime;
     this.parentHandle = parentHandle;
+    this.sessionId = sessionId;
     for (const workerId of options?.openWorkers ?? []) {
       this.openWorkers.add(workerId);
     }
     for (const signal of options?.pendingWorkerSignals ?? []) {
       this.pendingWorkerSignals.push(signal);
     }
-    detachPromise(this.watchParent());
   }
 
   allEvents(): AsyncIterable<KrakenStreamEvent> {
-    return this.allEventsFanout.subscribe();
+    const events = this.allEventsFanout.subscribe();
+    this.ensureStarted();
+    return events;
   }
 
   cancel(): void {
@@ -2513,7 +2572,9 @@ class OrchestrationHandleImpl implements OrchestrationHandle {
   }
 
   parentEvents(): AsyncIterable<KrakenStreamEvent> {
-    return this.parentEventsFanout.subscribe();
+    const events = this.parentEventsFanout.subscribe();
+    this.ensureStarted();
+    return events;
   }
 
   queueWorkerSignal(signal: InputSignal): void {
@@ -2525,6 +2586,7 @@ class OrchestrationHandleImpl implements OrchestrationHandle {
     const resumedHandle = new OrchestrationHandleImpl(
       this.runtime,
       resumedParentHandle,
+      this.sessionId,
       {
         openWorkers: [...this.openWorkers],
         pendingWorkerSignals: [...this.pendingWorkerSignals],
@@ -2562,7 +2624,9 @@ class OrchestrationHandleImpl implements OrchestrationHandle {
       this.workerEventFanouts.get(workerId) ??
       new EventFanout<KrakenStreamEvent>();
     this.workerEventFanouts.set(workerId, fanout);
-    return fanout.subscribe();
+    const events = fanout.subscribe();
+    this.ensureStarted();
+    return events;
   }
 
   workers(): ReadonlyMap<
@@ -2617,6 +2681,7 @@ class OrchestrationHandleImpl implements OrchestrationHandle {
 
     this.allEventsClosed = true;
     this.allEventsFanout.close();
+    this.runtime.releaseHandle(this);
   }
 
   private closeForResume(): void {
@@ -2630,6 +2695,16 @@ class OrchestrationHandleImpl implements OrchestrationHandle {
     }
 
     this.workerEventFanouts.clear();
+    this.runtime.releaseHandle(this);
+  }
+
+  private ensureStarted(): void {
+    if (this.started) {
+      return;
+    }
+
+    this.started = true;
+    detachPromise(this.watchParent());
   }
 }
 
@@ -2641,6 +2716,7 @@ class OrchestrationRuntimeImpl implements OrchestrationRuntime {
   private readonly framework: KrakenRuntime;
   private readonly kernel: KrakenKernel;
   private readonly now: () => EpochMs;
+  private readonly sessionHandles = new Map<string, OrchestrationHandleImpl>();
   private readonly workers = new Map<string, WorkerRecord>();
 
   constructor(
@@ -2712,13 +2788,28 @@ class OrchestrationRuntimeImpl implements OrchestrationRuntime {
       config,
       driverId: input.driverId ?? this.defaultDriverId,
     });
-    const orchestrationHandle = new OrchestrationHandleImpl(this, parentHandle);
-    this.currentHandle = orchestrationHandle;
+    const orchestrationHandle = new OrchestrationHandleImpl(
+      this,
+      parentHandle,
+      this.createId()
+    );
+    this.setCurrentHandle(orchestrationHandle);
     return orchestrationHandle;
   }
 
   setCurrentHandle(handle: OrchestrationHandleImpl): void {
     this.currentHandle = handle;
+    this.sessionHandles.set(handle.sessionId, handle);
+  }
+
+  releaseHandle(handle: OrchestrationHandleImpl): void {
+    if (this.currentHandle === handle) {
+      this.currentHandle = undefined;
+    }
+
+    if (this.sessionHandles.get(handle.sessionId) === handle) {
+      this.sessionHandles.delete(handle.sessionId);
+    }
   }
 
   getWorkerStatuses(): ReadonlyMap<
@@ -2793,6 +2884,7 @@ class OrchestrationRuntimeImpl implements OrchestrationRuntime {
       handle,
       resolveResult: deferred.resolve,
       resultPromise: deferred.promise,
+      sessionId: currentHandle.sessionId,
       status: "running",
       threadId: thread.threadId,
       workerId,
@@ -2815,14 +2907,11 @@ class OrchestrationRuntimeImpl implements OrchestrationRuntime {
       timestamp: this.now(),
       type: "custom",
     });
-    detachPromise(this.watchWorker(record, currentHandle));
+    detachPromise(this.watchWorker(record));
     return workerId;
   }
 
-  private async watchWorker(
-    worker: WorkerRecord,
-    parentHandle: OrchestrationHandleImpl
-  ): Promise<void> {
+  private async watchWorker(worker: WorkerRecord): Promise<void> {
     let lastError: KrakenErrorProjection | undefined;
 
     for await (const event of worker.handle.events()) {
@@ -2830,22 +2919,27 @@ class OrchestrationRuntimeImpl implements OrchestrationRuntime {
         lastError = event.error;
       }
 
-      parentHandle.emitWorkerEvent(worker.workerId, {
-        ...event,
-        source: {
-          ...(event.source ?? {}),
-          agent: worker.agent,
-          threadId: worker.threadId,
-          workerId: worker.workerId,
-        },
-      });
+      this.resolveSessionHandle(worker.sessionId)?.emitWorkerEvent(
+        worker.workerId,
+        {
+          ...event,
+          source: {
+            ...(event.source ?? {}),
+            agent: worker.agent,
+            threadId: worker.threadId,
+            workerId: worker.workerId,
+          },
+        }
+      );
     }
 
     worker.status =
       worker.handle.status().phase === "failed" ? "failed" : "completed";
     worker.result = await this.resolveWorkerResult(worker, lastError);
     worker.resolveResult(worker.result);
-    parentHandle.emitWorkerEvent(worker.workerId, {
+    const sessionHandle = this.resolveSessionHandle(worker.sessionId);
+
+    sessionHandle?.emitWorkerEvent(worker.workerId, {
       data: {
         agent: worker.agent,
         result: worker.result,
@@ -2866,14 +2960,14 @@ class OrchestrationRuntimeImpl implements OrchestrationRuntime {
     if (worker.status === "completed") {
       const signal = createWorkerResultSignal(worker, worker.result);
 
-      if (parentHandle.status().phase === "running") {
-        parentHandle.steer(signal);
-      } else if (parentHandle.status().phase === "paused") {
-        parentHandle.queueWorkerSignal(signal);
+      if (sessionHandle?.status().phase === "running") {
+        sessionHandle.steer(signal);
+      } else if (sessionHandle?.status().phase === "paused") {
+        sessionHandle.queueWorkerSignal(signal);
       }
     }
 
-    parentHandle.workerFinished(worker.workerId);
+    sessionHandle?.workerFinished(worker.workerId);
   }
 
   private async resolveWorkerResult(
@@ -2899,6 +2993,19 @@ class OrchestrationRuntimeImpl implements OrchestrationRuntime {
     }
 
     return projectedOutput;
+  }
+
+  private createId(): string {
+    return (
+      globalThis.crypto?.randomUUID?.() ??
+      `${Date.now()}_${Math.random().toString(16).slice(2)}`
+    );
+  }
+
+  private resolveSessionHandle(
+    sessionId: string
+  ): OrchestrationHandleImpl | undefined {
+    return this.sessionHandles.get(sessionId);
   }
 }
 
