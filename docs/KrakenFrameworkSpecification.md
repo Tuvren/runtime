@@ -2058,6 +2058,8 @@ const orchestration = createOrchestrationRuntime({
 })
 ```
 
+If `framework` is omitted, `createOrchestrationRuntime(...)` constructs a framework runtime with the supplied `agents`, `sequence`, and `handoffContextBuilder` behavior wired in. If `framework` is provided, the orchestration layer delegates parent and worker Turn execution directly to that runtime; any custom `executeTurn(...)` behavior on the supplied framework therefore applies normally. Because execution is delegated, sequence and handoff behavior in that mode comes from the supplied framework's own runtime configuration. Hosts that want the orchestration-managed defaults can omit `framework`, or supply a framework that was itself constructed with matching `resolveAgentConfig`, `resolveNextAgent`, and sequence handoff settings.
+
 **Internal mechanics**: The runtime composes existing primitives:
 
 - `executeTurn` for both parent and worker Turns

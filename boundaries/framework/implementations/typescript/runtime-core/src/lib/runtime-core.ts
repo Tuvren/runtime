@@ -450,11 +450,6 @@ class RuntimeExecutionHandle implements ExecutionHandle {
 
     const pauseContext = this.pauseContext;
     this.pauseContext = undefined;
-    this.replaceStatus({
-      ...this.statusSnapshot,
-      approval: undefined,
-      pauseReason: undefined,
-    });
     return pauseContext;
   }
 
@@ -484,11 +479,6 @@ class RuntimeExecutionHandle implements ExecutionHandle {
       response
     );
     this.pauseContext = undefined;
-    this.replaceStatus({
-      ...this.statusSnapshot,
-      approval: undefined,
-      pauseReason: undefined,
-    });
     return resumedHandle;
   }
 
@@ -860,7 +850,15 @@ class RuntimeCore implements KrakenRuntime {
               false,
               loopState
             );
-          } else if (resumedOutcome.resolution.type !== "continue_iteration") {
+          } else if (
+            resumedOutcome.resolution.type !== "continue_iteration" &&
+            !(await this.applyTerminalAgentTransitionIfNeeded(
+              handle,
+              schemaId,
+              resumedOutcome.resolution,
+              loopState
+            ))
+          ) {
             await this.completeExecution(
               handle,
               resumedOutcome.resolution,
@@ -1391,52 +1389,15 @@ class RuntimeCore implements KrakenRuntime {
         };
       }
 
-      if (resolution.type === "handoff") {
-        const handoff = await this.applyHandoff(
+      if (
+        await this.applyTerminalAgentTransitionIfNeeded(
           handle,
           schemaId,
-          resolution.contextPlan,
-          loopState,
-          loopState.carriedStateUpdates
-        );
-        loopState.activeConfig = handoff.activeConfig;
-        loopState.activeToolRegistry = handoff.activeToolRegistry;
-        loopState.carriedStateUpdates = [];
-        continue;
-      }
-
-      const sequenceTarget = this.options.resolveNextAgent?.(
-        loopState.activeConfig.name
-      );
-
-      if (
-        resolution.type === "end_turn" &&
-        sequenceTarget !== undefined &&
-        this.options.resolveAgentConfig !== undefined
+          resolution,
+          loopState
+        )
       ) {
-        const targetConfig = this.options.resolveAgentConfig(sequenceTarget);
-
-        if (targetConfig !== undefined) {
-          const latestHeadState = await this.loadHeadState(
-            handle.request.branchId
-          );
-          const sequencePlan = this.createSequenceHandoffPlan(
-            latestHeadState,
-            loopState.activeConfig,
-            targetConfig
-          );
-          const handoff = await this.applyHandoff(
-            handle,
-            schemaId,
-            sequencePlan,
-            loopState,
-            loopState.carriedStateUpdates
-          );
-          loopState.activeConfig = handoff.activeConfig;
-          loopState.activeToolRegistry = handoff.activeToolRegistry;
-          loopState.carriedStateUpdates = [];
-          continue;
-        }
+        continue;
       }
 
       return {
@@ -2493,26 +2454,137 @@ class RuntimeCore implements KrakenRuntime {
     branchId: string,
     explicitParentTurnId?: string | null
   ): Promise<string | null> {
-    if (explicitParentTurnId !== undefined) {
-      return explicitParentTurnId;
-    }
+    const resolvedParentTurnId =
+      explicitParentTurnId === undefined
+        ? await this.options.resolveParentTurnId?.(threadId, branchId)
+        : explicitParentTurnId;
 
-    const resolved = await this.options.resolveParentTurnId?.(
-      threadId,
-      branchId
+    const parentTurnId =
+      resolvedParentTurnId === undefined
+        ? readRuntimeStatusTurnId(
+            await readBranchRuntimeStatus(this.options.kernel, branchId)
+          )
+        : resolvedParentTurnId;
+    await this.assertValidParentTurnId(threadId, branchId, parentTurnId);
+    return parentTurnId;
+  }
+
+  private async assertValidParentTurnId(
+    threadId: string,
+    branchId: string,
+    parentTurnId: string | null
+  ): Promise<void> {
+    const expectedParentTurnId = readRuntimeStatusTurnId(
+      await readBranchRuntimeStatus(this.options.kernel, branchId)
     );
 
-    if (resolved !== undefined) {
-      return resolved;
+    if (parentTurnId !== expectedParentTurnId) {
+      throw new KrakenLineageError(
+        `parent turn "${parentTurnId}" is not the active branch parent for branch "${branchId}"`,
+        {
+          code: "invalid_parent_turn",
+          details: {
+            branchId,
+            expectedParentTurnId,
+            parentTurnId,
+            threadId,
+          },
+        }
+      );
     }
 
-    const runtimeStatus = await readBranchRuntimeStatus(
-      this.options.kernel,
-      branchId
+    if (parentTurnId === null) {
+      return;
+    }
+
+    const parentTurn = await this.options.kernel.turn.get(parentTurnId);
+
+    if (parentTurn === null) {
+      throw new KrakenLineageError(
+        `parent turn "${parentTurnId}" does not exist`,
+        {
+          code: "invalid_parent_turn",
+          details: {
+            branchId,
+            parentTurnId,
+            threadId,
+          },
+        }
+      );
+    }
+
+    if (parentTurn.threadId !== threadId || parentTurn.branchId !== branchId) {
+      throw new KrakenLineageError(
+        `parent turn "${parentTurnId}" must stay on thread "${threadId}" and branch "${branchId}"`,
+        {
+          code: "invalid_parent_turn",
+          details: {
+            branchId,
+            parentBranchId: parentTurn.branchId,
+            parentThreadId: parentTurn.threadId,
+            parentTurnId,
+            threadId,
+          },
+        }
+      );
+    }
+  }
+
+  private async applyTerminalAgentTransitionIfNeeded(
+    handle: RuntimeExecutionHandle,
+    schemaId: string,
+    resolution: RuntimeResolution,
+    loopState: LoopState
+  ): Promise<boolean> {
+    if (resolution.type === "handoff") {
+      const handoff = await this.applyHandoff(
+        handle,
+        schemaId,
+        resolution.contextPlan,
+        loopState,
+        loopState.carriedStateUpdates
+      );
+      loopState.activeConfig = handoff.activeConfig;
+      loopState.activeToolRegistry = handoff.activeToolRegistry;
+      loopState.carriedStateUpdates = [];
+      return true;
+    }
+
+    const sequenceTarget =
+      resolution.type === "end_turn"
+        ? this.options.resolveNextAgent?.(loopState.activeConfig.name)
+        : undefined;
+
+    if (
+      sequenceTarget === undefined ||
+      this.options.resolveAgentConfig === undefined
+    ) {
+      return false;
+    }
+
+    const targetConfig = this.options.resolveAgentConfig(sequenceTarget);
+
+    if (targetConfig === undefined) {
+      return false;
+    }
+
+    const latestHeadState = await this.loadHeadState(handle.request.branchId);
+    const sequencePlan = this.createSequenceHandoffPlan(
+      latestHeadState,
+      loopState.activeConfig,
+      targetConfig
     );
-    return runtimeStatus !== null && typeof runtimeStatus.turnId === "string"
-      ? runtimeStatus.turnId
-      : null;
+    const handoff = await this.applyHandoff(
+      handle,
+      schemaId,
+      sequencePlan,
+      loopState,
+      loopState.carriedStateUpdates
+    );
+    loopState.activeConfig = handoff.activeConfig;
+    loopState.activeToolRegistry = handoff.activeToolRegistry;
+    loopState.carriedStateUpdates = [];
+    return true;
   }
 
   private resolveDriver(driverId: string): KrakenDriver {
@@ -3502,30 +3574,20 @@ export function createKrakenRuntimeCore(
 export function createOrchestrationRuntime(
   options: OrchestrationRuntimeOptions
 ): OrchestrationRuntime {
-  const sequenceResolver = buildSequenceResolver(options.sequence);
-  const orchestrationFrameworkCore = createKrakenRuntimeCore({
-    createId: options.createId,
-    defaultDriverId: options.defaultDriverId,
-    driverRegistry: options.driverRegistry,
-    enableStateObservability: options.enableStateObservability,
-    kernel: options.kernel,
-    now: options.now,
-    resolveAgentConfig: (agentName) => options.agents[agentName],
-    resolveNextAgent: sequenceResolver,
-    sequenceHandoffContextBuilder: options.handoffContextBuilder,
-    resolveParentTurnId: options.resolveParentTurnId,
-  });
-  const baseFramework = options.framework ?? orchestrationFrameworkCore;
-  const framework: KrakenRuntime =
-    options.framework === undefined
-      ? orchestrationFrameworkCore
-      : {
-          createBranch: (input) => baseFramework.createBranch(input),
-          createThread: (input) => baseFramework.createThread(input),
-          executeTurn: (input) => orchestrationFrameworkCore.executeTurn(input),
-          getThread: (threadId) => baseFramework.getThread(threadId),
-          setBranchHead: (input) => baseFramework.setBranchHead(input),
-        };
+  const framework =
+    options.framework ??
+    createKrakenRuntimeCore({
+      createId: options.createId,
+      defaultDriverId: options.defaultDriverId,
+      driverRegistry: options.driverRegistry,
+      enableStateObservability: options.enableStateObservability,
+      kernel: options.kernel,
+      now: options.now,
+      resolveAgentConfig: (agentName) => options.agents[agentName],
+      resolveNextAgent: buildSequenceResolver(options.sequence),
+      sequenceHandoffContextBuilder: options.handoffContextBuilder,
+      resolveParentTurnId: options.resolveParentTurnId,
+    });
 
   return new OrchestrationRuntimeImpl(
     framework,
@@ -3839,6 +3901,14 @@ function isContextEngineeringPlan(
   value: ContextEngineeringPlan | { action: "none" }
 ): value is ContextEngineeringPlan {
   return value.action !== "none";
+}
+
+function readRuntimeStatusTurnId(
+  runtimeStatus: Record<string, unknown> | null
+): string | null {
+  return runtimeStatus !== null && typeof runtimeStatus.turnId === "string"
+    ? runtimeStatus.turnId
+    : null;
 }
 
 function normalizeError(error: unknown): Error {
