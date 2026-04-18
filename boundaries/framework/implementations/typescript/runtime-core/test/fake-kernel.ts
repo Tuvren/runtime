@@ -222,6 +222,14 @@ export function createFakeKernelHarness(): FakeKernelHarness {
         startTurnNodeHash,
         steps
       ) {
+        const activeRun = findActiveRunForBranch(state, branchId);
+
+        if (activeRun !== undefined) {
+          throw new Error(
+            `branch "${branchId}" already has an active run "${activeRun.runId}"`
+          );
+        }
+
         const run: FakeRunState = {
           branchId,
           createdTurnNodes: [],
@@ -705,6 +713,17 @@ function requireRun(state: FakeKernelState, runId: string): FakeRunState {
   }
 
   return run;
+}
+
+function findActiveRunForBranch(
+  state: FakeKernelState,
+  branchId: string
+): FakeRunState | undefined {
+  return [...state.runs.values()].find(
+    (run) =>
+      run.branchId === branchId &&
+      (run.status === "running" || run.status === "paused")
+  );
 }
 
 function requireSchema(

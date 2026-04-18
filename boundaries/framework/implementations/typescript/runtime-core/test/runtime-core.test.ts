@@ -391,20 +391,85 @@ describe("framework-runtime-core", () => {
     ]);
   });
 
-  test("merges per-turn tools with agent-configured tools at turn start", async () => {
+  test("fails the active iteration run before finalizing post-start runtime errors", async () => {
+    const harness = createFakeKernelHarness();
+    const driver = {
+      async execute() {
+        return JSON.parse(
+          '{"activeAgent":"primary","messages":[{"role":"assistant","parts":[123]}],"resolution":{"reason":"done","type":"end_turn"}}'
+        );
+      },
+      id: "fake",
+      async resume() {
+        throw new Error("resume was not expected");
+      },
+    } satisfies KrakenDriver;
+    const runtime = createKrakenRuntimeCore({
+      defaultDriverId: "fake",
+      driverRegistry: createDriverRegistry([driver]),
+      kernel: harness.kernel,
+    });
+    const thread = await runtime.createThread({});
+    const handle = runtime.executeTurn({
+      branchId: thread.branchId,
+      config: { name: "primary" },
+      signal: textSignal("Trigger tracked-run failure handling"),
+      threadId: thread.threadId,
+    });
+
+    const events = await collectEvents(handle.events());
+    const errorEvent = events.find(
+      (event): event is Extract<(typeof events)[number], { type: "error" }> =>
+        event.type === "error"
+    );
+
+    expect(handle.status().phase).toBe("failed");
+    expect(errorEvent?.error.code).toBe("invalid_kraken_message");
+    expect(events.some((event) => event.type === "turn.end")).toBe(true);
+    expect(await harness.readBranchRuntimeStatus(thread.branchId)).toEqual({
+      activeAgent: "primary",
+      state: "failed",
+      turnId: extractTurnId(events),
+    });
+  });
+
+  test("uses per-turn tools instead of agent-configured tools at turn start", async () => {
     const harness = createFakeKernelHarness();
     const driver = {
       async execute(context) {
+        const toolMessages = extractToolMessages(context.messages);
+
+        if (toolMessages.length === 0) {
+          return {
+            activeAgent: context.config.name,
+            messages: [
+              assistantToolCalls([
+                {
+                  callId: "call-search",
+                  input: { query: "override" },
+                  name: "search",
+                },
+              ]),
+            ],
+            resolution: {
+              type: "continue_iteration",
+            },
+          };
+        }
+
+        const resultPart = toolMessages[0]?.parts[0];
+        const source =
+          resultPart?.type === "tool_result" &&
+          resultPart.output !== null &&
+          typeof resultPart.output === "object" &&
+          "source" in resultPart.output &&
+          typeof resultPart.output.source === "string"
+            ? resultPart.output.source
+            : "missing";
+
         return {
           activeAgent: context.config.name,
-          messages: [
-            assistantText(
-              [
-                `configured:${String(context.toolRegistry.has("configured"))}`,
-                `adhoc:${String(context.toolRegistry.has("adhoc"))}`,
-              ].join("|")
-            ),
-          ],
+          messages: [assistantText(`source:${source}`)],
           resolution: {
             reason: "done",
             type: "end_turn",
@@ -428,33 +493,41 @@ describe("framework-runtime-core", () => {
         name: "primary",
         tools: [
           {
-            description: "Configured tool",
+            description: "Configured search",
             execute() {
               return {
-                configured: true,
+                source: "configured",
               };
             },
             inputSchema: {
+              properties: {
+                query: { type: "string" },
+              },
+              required: ["query"],
               type: "object",
             },
-            name: "configured",
+            name: "search",
           },
         ],
       },
-      signal: textSignal("Merge tools"),
+      signal: textSignal("Override tools"),
       threadId: thread.threadId,
       tools: [
         {
-          description: "Ad-hoc tool",
+          description: "Per-turn search override",
           execute() {
             return {
-              adhoc: true,
+              source: "request",
             };
           },
           inputSchema: {
+            properties: {
+              query: { type: "string" },
+            },
+            required: ["query"],
             type: "object",
           },
-          name: "adhoc",
+          name: "search",
         },
       ],
     });
@@ -464,7 +537,7 @@ describe("framework-runtime-core", () => {
     expect(
       hasAssistantText(
         await harness.readBranchMessages(thread.branchId),
-        "configured:true|adhoc:true"
+        "source:request"
       )
     ).toBe(true);
   });
@@ -1024,6 +1097,64 @@ describe("framework-runtime-core", () => {
     expect(driverExecutedIndex).toBeGreaterThan(rewrittenSnapshotIndex);
   });
 
+  test("surfaces afterTurn cleanup failures as non-fatal error events", async () => {
+    const harness = createFakeKernelHarness();
+    const driver = {
+      async execute(context) {
+        return {
+          activeAgent: context.config.name,
+          messages: [assistantText("Finished main execution.")],
+          resolution: {
+            reason: "done",
+            type: "end_turn",
+          },
+        };
+      },
+      id: "fake",
+      async resume() {
+        throw new Error("resume was not expected");
+      },
+    } satisfies KrakenDriver;
+    const runtime = createKrakenRuntimeCore({
+      defaultDriverId: "fake",
+      driverRegistry: createDriverRegistry([driver]),
+      kernel: harness.kernel,
+    });
+    const thread = await runtime.createThread({});
+    const handle = runtime.executeTurn({
+      branchId: thread.branchId,
+      config: {
+        extensions: [
+          {
+            afterTurn() {
+              throw new Error("cleanup failed");
+            },
+            name: "cleanup-observer",
+          },
+        ],
+        name: "primary",
+      },
+      signal: textSignal("Run afterTurn cleanup"),
+      threadId: thread.threadId,
+    });
+
+    const events = await collectEvents(handle.events());
+    const errorEvent = events.find(
+      (event): event is Extract<(typeof events)[number], { type: "error" }> =>
+        event.type === "error"
+    );
+
+    expect(handle.status().phase).toBe("completed");
+    expect(errorEvent?.fatal).toBe(false);
+    expect(errorEvent?.error.message).toBe("cleanup failed");
+    expect(
+      hasAssistantText(
+        await harness.readBranchMessages(thread.branchId),
+        "Finished main execution."
+      )
+    ).toBe(true);
+  });
+
   test("rejects invalid context-engineering helper messages with a validation error", async () => {
     const harness = createFakeKernelHarness();
     const driver = {
@@ -1469,6 +1600,98 @@ describe("framework-runtime-core", () => {
       state: "paused",
       turnId,
     });
+  });
+
+  test("durably restages running status before driver pause resumes continue", async () => {
+    const harness = createFakeKernelHarness();
+    let resumed = false;
+    const driver = {
+      async execute(context) {
+        return {
+          activeAgent: context.config.name,
+          messages: [assistantText("Pause for driver approval.")],
+          resolution: {
+            approval: {
+              completedResults: [],
+              toolCalls: [
+                {
+                  callId: "driver-pause",
+                  decisions: ["approve", "reject"],
+                  input: { step: "resume" },
+                  message: "Resume the paused driver.",
+                  name: "driver_pause",
+                },
+              ],
+            },
+            reason: "approval_required",
+            type: "pause",
+          },
+        };
+      },
+      id: "fake",
+      async resume(context) {
+        resumed = true;
+        await delay(40);
+        return {
+          activeAgent: context.config.name,
+          messages: [assistantText("Driver resumed after approval.")],
+          resolution: {
+            reason: "done",
+            type: "end_turn",
+          },
+        };
+      },
+    } satisfies KrakenDriver;
+    const runtime = createKrakenRuntimeCore({
+      defaultDriverId: "fake",
+      driverRegistry: createDriverRegistry([driver]),
+      kernel: harness.kernel,
+    });
+    const thread = await runtime.createThread({});
+    const pausedHandle = runtime.executeTurn({
+      branchId: thread.branchId,
+      config: { name: "primary" },
+      signal: textSignal("Pause the driver"),
+      threadId: thread.threadId,
+    });
+
+    const pausedEvents = await collectEvents(pausedHandle.events());
+    const pausedTurnId = extractTurnId(pausedEvents);
+    const resumedHandle = pausedHandle.resolveApproval({
+      decisions: [{ callId: "driver-pause", type: "approve" }],
+    });
+    const resumedEventsPromise = collectEvents(resumedHandle.events());
+
+    await waitForAsync(async () => {
+      const runtimeStatus = await harness.readBranchRuntimeStatus(
+        thread.branchId
+      );
+
+      return (
+        resumed &&
+        runtimeStatus !== null &&
+        typeof runtimeStatus === "object" &&
+        "state" in runtimeStatus &&
+        runtimeStatus.state === "running"
+      );
+    });
+
+    expect(await harness.readBranchRuntimeStatus(thread.branchId)).toEqual({
+      activeAgent: "primary",
+      iterationCount: 1,
+      state: "running",
+      turnId: pausedTurnId,
+    });
+
+    await resumedEventsPromise;
+
+    expect(resumedHandle.status().phase).toBe("completed");
+    expect(
+      hasAssistantText(
+        await harness.readBranchMessages(thread.branchId),
+        "Driver resumed after approval."
+      )
+    ).toBe(true);
   });
 
   test("durably fails paused turns when the host cancels after approval pause", async () => {
@@ -3477,7 +3700,7 @@ describe("framework-runtime-core", () => {
     expect(handoffText).not.toContain('"secret":true');
   });
 
-  test("preserves per-turn tools across handoff transitions", async () => {
+  test("does not leak per-turn tools across handoff transitions", async () => {
     const harness = createFakeKernelHarness();
     const agents: Record<string, AgentConfig> = {
       primary: { name: "primary" },
@@ -3551,7 +3774,7 @@ describe("framework-runtime-core", () => {
     expect(
       hasAssistantText(
         await harness.readBranchMessages(thread.branchId),
-        "adhoc:true"
+        "adhoc:false"
       )
     ).toBe(true);
   });

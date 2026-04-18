@@ -61,6 +61,7 @@ import {
   encodeDeterministicKernelRecord,
   type KrakenKernel,
   type PathValue,
+  type RunCompletionStatus,
   type TurnNode,
   type TurnTreeSchema,
 } from "@kraken/kernel-contract-protocol";
@@ -344,6 +345,7 @@ function detachPromise(task: Promise<unknown>): void {
 }
 
 class RuntimeExecutionHandle implements ExecutionHandle {
+  private activeRunId?: string;
   private readonly abortController = new AbortController();
   private readonly eventsFanout = new EventFanout<KrakenStreamEvent>();
   private lastErrorProjection?: KrakenErrorProjection;
@@ -404,6 +406,10 @@ class RuntimeExecutionHandle implements ExecutionHandle {
     return this.abortController.signal;
   }
 
+  getActiveRunId(): string | undefined {
+    return this.activeRunId;
+  }
+
   get schemaId(): string {
     return this.schemaIdValue;
   }
@@ -436,8 +442,18 @@ class RuntimeExecutionHandle implements ExecutionHandle {
     this.statusSnapshot = cloneExecutionStatus(status);
   }
 
+  setActiveRunId(runId: string): void {
+    this.activeRunId = runId;
+  }
+
   setSchemaId(schemaId: string): void {
     this.schemaIdValue = schemaId;
+  }
+
+  takeActiveRunId(): string | undefined {
+    const activeRunId = this.activeRunId;
+    this.activeRunId = undefined;
+    return activeRunId;
   }
 
   takePauseContextForCancellation(): PauseContext | undefined {
@@ -803,6 +819,13 @@ class RuntimeCore implements KrakenRuntime {
           },
           loopState
         );
+        await this.checkpointResumeRunningStatus(
+          handle,
+          schemaId,
+          loopState,
+          handle.resumedFrom.pauseContext.pausedIteration?.iterationCount ??
+            handle.status().iterationCount
+        );
 
         if (handle.resumedFrom.pauseContext.kind === "tool_approval") {
           const resumedOutcome = await this.resumePausedToolExecution(
@@ -925,6 +948,8 @@ class RuntimeCore implements KrakenRuntime {
         type: "fail",
       };
 
+      await this.failActiveRunIfNeeded(handle);
+
       if ((await this.options.kernel.turn.get(handle.turnId)) !== null) {
         await this.finalizeTurnStatus(handle, failureResolution, loopState);
       }
@@ -959,7 +984,7 @@ class RuntimeCore implements KrakenRuntime {
   ): Promise<void> {
     if (enteredIterationLoop) {
       const headState = await this.loadHeadState(handle.request.branchId);
-      await runAfterTurnHooks({
+      const afterTurn = await runAfterTurnHooks({
         emit: (event) => {
           this.publishCustomEvent(handle, event, loopState);
         },
@@ -970,6 +995,15 @@ class RuntimeCore implements KrakenRuntime {
         runId: this.createId(),
         turnId: handle.turnId,
       });
+
+      if (afterTurn.resolution?.type === "fail") {
+        this.publishProjectedError(
+          handle,
+          afterTurn.resolution.error,
+          false,
+          loopState
+        );
+      }
     }
 
     if (resolution.type === "fail" && resolution.fatality === "hard") {
@@ -1135,7 +1169,8 @@ class RuntimeCore implements KrakenRuntime {
       const driver = this.resolveDriver(loopState.activeDriverId);
       const iterationRunId = this.createId();
 
-      await this.options.kernel.run.create(
+      await this.createTrackedRun(
+        handle,
         iterationRunId,
         handle.turnId,
         handle.request.branchId,
@@ -1427,7 +1462,8 @@ class RuntimeCore implements KrakenRuntime {
     const headState = await this.loadHeadState(handle.request.branchId);
     const runId = this.createId();
 
-    await this.options.kernel.run.create(
+    await this.createTrackedRun(
+      handle,
       runId,
       handle.turnId,
       handle.request.branchId,
@@ -1442,16 +1478,6 @@ class RuntimeCore implements KrakenRuntime {
       ]
     );
     await this.options.kernel.run.beginStep(runId, "iterate");
-    const runningRuntimeStatusHash = await this.stageRuntimeStatus(
-      runId,
-      {
-        activeAgent: loopState.activeConfig.name,
-        iterationCount: pausedIteration.iterationCount,
-        state: "running",
-        turnId: handle.turnId,
-      },
-      "runtime_status_running"
-    );
 
     const toolBatch = await resumeToolBatch(
       resumeContext.pauseContext.approval,
@@ -1497,7 +1523,7 @@ class RuntimeCore implements KrakenRuntime {
             },
             "runtime_status_paused"
           )
-        : runningRuntimeStatusHash;
+        : undefined;
     const nextTreeHash = await this.createIterationTree(
       schemaId,
       headState.turnNode.turnTreeHash,
@@ -1659,10 +1685,7 @@ class RuntimeCore implements KrakenRuntime {
     let turnNodeHash: HashString | undefined;
 
     if (resolution.type === "fail" && resolution.fatality === "hard") {
-      const completion = await this.options.kernel.run.complete(
-        runId,
-        "failed"
-      );
+      const completion = await this.completeTrackedRun(handle, runId, "failed");
       turnNodeHash = completion.turnNodeHash;
     } else {
       const stepResult = await this.options.kernel.run.completeStep(
@@ -1672,7 +1695,8 @@ class RuntimeCore implements KrakenRuntime {
         undefined,
         treeHash
       );
-      const completion = await this.options.kernel.run.complete(
+      const completion = await this.completeTrackedRun(
+        handle,
         runId,
         resolution.type === "pause" ? "paused" : "completed"
       );
@@ -1768,7 +1792,8 @@ class RuntimeCore implements KrakenRuntime {
       )
     );
 
-    await this.options.kernel.run.create(
+    await this.createTrackedRun(
+      handle,
       runId,
       handle.turnId,
       handle.request.branchId,
@@ -1798,7 +1823,7 @@ class RuntimeCore implements KrakenRuntime {
       runId,
       "incorporate_input"
     );
-    await this.options.kernel.run.complete(runId, "completed");
+    await this.completeTrackedRun(handle, runId, "completed");
 
     if (stepResult.turnNodeHash !== undefined) {
       await this.options.kernel.turn.updateHead(
@@ -1831,7 +1856,8 @@ class RuntimeCore implements KrakenRuntime {
       steeringMessage,
     ]);
 
-    await this.options.kernel.run.create(
+    await this.createTrackedRun(
+      handle,
       runId,
       handle.turnId,
       handle.request.branchId,
@@ -1856,7 +1882,7 @@ class RuntimeCore implements KrakenRuntime {
       runId,
       "incorporate_steering"
     );
-    await this.options.kernel.run.complete(runId, "completed");
+    await this.completeTrackedRun(handle, runId, "completed");
 
     if (stepResult.turnNodeHash !== undefined) {
       await this.options.kernel.turn.updateHead(
@@ -1901,7 +1927,8 @@ class RuntimeCore implements KrakenRuntime {
     const manifest = updateContextManifest(headState.manifest, [], updates);
     const runId = this.createId();
 
-    await this.options.kernel.run.create(
+    await this.createTrackedRun(
+      handle,
       runId,
       handle.turnId,
       handle.request.branchId,
@@ -1921,7 +1948,7 @@ class RuntimeCore implements KrakenRuntime {
       runId,
       "commit_extension_state"
     );
-    await this.options.kernel.run.complete(runId, "completed");
+    await this.completeTrackedRun(handle, runId, "completed");
 
     if (stepResult.turnNodeHash !== undefined) {
       await this.options.kernel.turn.updateHead(
@@ -1985,7 +2012,8 @@ class RuntimeCore implements KrakenRuntime {
       headState.turnNode.turnTreeHash
     );
 
-    await this.options.kernel.run.create(
+    await this.createTrackedRun(
+      handle,
       runId,
       handle.turnId,
       handle.request.branchId,
@@ -2007,7 +2035,7 @@ class RuntimeCore implements KrakenRuntime {
       undefined,
       nextTreeHash
     );
-    await this.options.kernel.run.complete(runId, "completed");
+    await this.completeTrackedRun(handle, runId, "completed");
     if (stepResult.turnNodeHash !== undefined) {
       await this.options.kernel.turn.updateHead(
         handle.turnId,
@@ -2124,7 +2152,8 @@ class RuntimeCore implements KrakenRuntime {
       headState.turnNode.turnTreeHash
     );
     const runId = this.createId();
-    await this.options.kernel.run.create(
+    await this.createTrackedRun(
+      handle,
       runId,
       handle.turnId,
       handle.request.branchId,
@@ -2146,7 +2175,7 @@ class RuntimeCore implements KrakenRuntime {
       undefined,
       nextTreeHash
     );
-    await this.options.kernel.run.complete(runId, "completed");
+    await this.completeTrackedRun(handle, runId, "completed");
 
     if (stepResult.turnNodeHash !== undefined) {
       await this.options.kernel.turn.updateHead(
@@ -2185,10 +2214,7 @@ class RuntimeCore implements KrakenRuntime {
 
     return {
       activeConfig: targetConfig,
-      activeToolRegistry: createActiveToolRegistry(
-        handle.request.tools,
-        targetConfig
-      ),
+      activeToolRegistry: createActiveToolRegistry(undefined, targetConfig),
     };
   }
 
@@ -2277,7 +2303,8 @@ class RuntimeCore implements KrakenRuntime {
     const phase = resolutionToPhase(resolution);
     const headState = await this.loadHeadState(handle.request.branchId);
     const runId = this.createId();
-    await this.options.kernel.run.create(
+    await this.createTrackedRun(
+      handle,
       runId,
       handle.turnId,
       handle.request.branchId,
@@ -2305,7 +2332,7 @@ class RuntimeCore implements KrakenRuntime {
       runId,
       "finalize_turn_status"
     );
-    await this.options.kernel.run.complete(runId, "completed");
+    await this.completeTrackedRun(handle, runId, "completed");
 
     if (stepResult.turnNodeHash !== undefined) {
       await this.options.kernel.turn.updateHead(
@@ -2585,6 +2612,128 @@ class RuntimeCore implements KrakenRuntime {
     loopState.activeToolRegistry = handoff.activeToolRegistry;
     loopState.carriedStateUpdates = [];
     return true;
+  }
+
+  private async failActiveRunIfNeeded(
+    handle: RuntimeExecutionHandle
+  ): Promise<void> {
+    const activeRunId = handle.takeActiveRunId();
+
+    if (activeRunId === undefined) {
+      return;
+    }
+
+    await this.options.kernel.run.complete(activeRunId, "failed");
+  }
+
+  private async checkpointResumeRunningStatus(
+    handle: RuntimeExecutionHandle,
+    schemaId: string,
+    loopState: LoopState,
+    iterationCount: number
+  ): Promise<void> {
+    const headState = await this.loadHeadState(handle.request.branchId);
+    const runId = this.createId();
+    await this.createTrackedRun(
+      handle,
+      runId,
+      handle.turnId,
+      handle.request.branchId,
+      schemaId,
+      headState.branchHeadHash,
+      [
+        {
+          deterministic: false,
+          id: "resume_running_status",
+          sideEffects: false,
+        },
+      ]
+    );
+    await this.options.kernel.run.beginStep(runId, "resume_running_status");
+    const runtimeStatusHash = await this.stageRuntimeStatus(
+      runId,
+      {
+        activeAgent: loopState.activeConfig.name,
+        iterationCount,
+        state: "running",
+        turnId: handle.turnId,
+      },
+      "runtime_status_running"
+    );
+    const nextTreeHash = await this.options.kernel.tree.create(
+      schemaId,
+      {
+        "runtime.status": runtimeStatusHash,
+      },
+      headState.turnNode.turnTreeHash
+    );
+    const stepResult = await this.options.kernel.run.completeStep(
+      runId,
+      "resume_running_status",
+      undefined,
+      undefined,
+      nextTreeHash
+    );
+    await this.completeTrackedRun(handle, runId, "completed");
+
+    if (stepResult.turnNodeHash !== undefined) {
+      await this.options.kernel.turn.updateHead(
+        handle.turnId,
+        stepResult.turnNodeHash
+      );
+      await this.emitStateObservability(
+        handle,
+        loopState,
+        stepResult.turnNodeHash,
+        headState.manifest,
+        iterationCount
+      );
+    }
+
+    handle.updateStatus({
+      activeAgent: loopState.activeConfig.name,
+      iterationCount,
+      manifest: headState.manifest,
+      phase: "running",
+    });
+  }
+
+  private async createTrackedRun(
+    handle: RuntimeExecutionHandle,
+    runId: string,
+    turnId: string,
+    branchId: string,
+    schemaId: string,
+    startTurnNodeHash: HashString,
+    steps: Array<{
+      deterministic: boolean;
+      id: string;
+      sideEffects: boolean;
+    }>
+  ): Promise<void> {
+    await this.options.kernel.run.create(
+      runId,
+      turnId,
+      branchId,
+      schemaId,
+      startTurnNodeHash,
+      steps
+    );
+    handle.setActiveRunId(runId);
+  }
+
+  private async completeTrackedRun(
+    handle: RuntimeExecutionHandle,
+    runId: string,
+    status: RunCompletionStatus
+  ): Promise<{ turnNodeHash?: HashString }> {
+    const completion = await this.options.kernel.run.complete(runId, status);
+
+    if (handle.getActiveRunId() === runId) {
+      handle.takeActiveRunId();
+    }
+
+    return completion;
   }
 
   private resolveDriver(driverId: string): KrakenDriver {
@@ -3663,9 +3812,9 @@ function createActiveToolRegistry(
   requestTools: KrakenToolDefinition[] | undefined,
   config: AgentConfig
 ): ToolRegistry {
-  const mergedTools = [...(config.tools ?? []), ...(requestTools ?? [])];
+  const activeTools = requestTools ?? config.tools ?? [];
 
-  return createToolRegistry(mergedTools, config.extensions ?? []);
+  return createToolRegistry(activeTools, config.extensions ?? []);
 }
 
 function cloneValue<T>(value: T): T {
