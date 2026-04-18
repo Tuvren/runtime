@@ -1855,6 +1855,18 @@ function isContextManifest(value: unknown): value is ContextManifest {
   return true;
 }
 
+export function assertContextManifest(
+  value: unknown,
+  label = "value"
+): asserts value is ContextManifest {
+  if (!isContextManifest(value)) {
+    throw new KrakenValidationError(
+      `${label} must be a valid ContextManifest`,
+      { code: "invalid_context_manifest", details: value }
+    );
+  }
+}
+
 function isContextManifestCounters(
   value: unknown
 ): value is ContextManifestCounters {

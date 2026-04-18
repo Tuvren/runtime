@@ -54,7 +54,9 @@ import type {
 import {
   assertApprovalRequest,
   assertApprovalResponseForRequest,
+  assertContextManifest,
   assertKrakenMessage,
+  assertKrakenStreamEvent,
 } from "@kraken/framework-runtime-api";
 import {
   decodeDeterministicKernelRecord,
@@ -730,13 +732,17 @@ class RuntimeCore implements KrakenRuntime {
         );
       }
 
+      const resumedPauseContext = handle.resumedFrom?.pauseContext;
       const loopState: LoopState = {
-        activeConfig: handle.request.config,
-        activeDriverId: handle.request.driverId ?? this.options.defaultDriverId,
-        activeToolRegistry: createActiveToolRegistry(
-          handle.request.tools,
-          handle.request.config
-        ),
+        activeConfig:
+          resumedPauseContext?.activeConfig ?? handle.request.config,
+        activeDriverId:
+          resumedPauseContext?.activeDriverId ??
+          handle.request.driverId ??
+          this.options.defaultDriverId,
+        activeToolRegistry:
+          resumedPauseContext?.activeToolRegistry ??
+          createActiveToolRegistry(handle.request.tools, handle.request.config),
         carriedStateUpdates: [],
         enteredIterationLoop: false,
       };
@@ -951,7 +957,16 @@ class RuntimeCore implements KrakenRuntime {
       await this.failActiveRunIfNeeded(handle);
 
       if ((await this.options.kernel.turn.get(handle.turnId)) !== null) {
-        await this.finalizeTurnStatus(handle, failureResolution, loopState);
+        try {
+          await this.finalizeTurnStatus(handle, failureResolution, loopState);
+        } catch (finalizeError: unknown) {
+          this.publishProjectedError(
+            handle,
+            normalizeError(finalizeError),
+            false,
+            loopState
+          );
+        }
       }
 
       this.publishProjectedError(handle, runtimeError, true, loopState);
@@ -2435,9 +2450,9 @@ class RuntimeCore implements KrakenRuntime {
       });
     }
 
-    return decodeDeterministicKernelRecord(
-      payload
-    ) as unknown as ContextManifest;
+    const manifest = decodeDeterministicKernelRecord(payload);
+    assertContextManifest(manifest, `manifest "${hash}"`);
+    return manifest;
   }
 
   private async readMessages(hashes: HashString[]): Promise<KrakenMessage[]> {
@@ -2489,7 +2504,8 @@ class RuntimeCore implements KrakenRuntime {
     const parentTurnId =
       resolvedParentTurnId === undefined
         ? readRuntimeStatusTurnId(
-            await readBranchRuntimeStatus(this.options.kernel, branchId)
+            await readBranchRuntimeStatus(this.options.kernel, branchId),
+            branchId
           )
         : resolvedParentTurnId;
     await this.assertValidParentTurnId(threadId, branchId, parentTurnId);
@@ -2502,7 +2518,8 @@ class RuntimeCore implements KrakenRuntime {
     parentTurnId: string | null
   ): Promise<void> {
     const expectedParentTurnId = readRuntimeStatusTurnId(
-      await readBranchRuntimeStatus(this.options.kernel, branchId)
+      await readBranchRuntimeStatus(this.options.kernel, branchId),
+      branchId
     );
 
     if (parentTurnId !== expectedParentTurnId) {
@@ -2852,14 +2869,16 @@ class RuntimeCore implements KrakenRuntime {
     event: KrakenStreamEvent,
     loopState: LoopState
   ): void {
-    handle.publish({
+    const publishedEvent = {
       ...event,
       source: event.source ?? {
         agent: loopState.activeConfig.name,
         driver: loopState.activeDriverId,
         threadId: handle.request.threadId,
       },
-    });
+    };
+    assertKrakenStreamEvent(publishedEvent, "stream event");
+    handle.publish(publishedEvent);
   }
 
   private publishProjectedError(
@@ -3149,6 +3168,7 @@ class OrchestrationHandleImpl implements OrchestrationHandle {
 class OrchestrationRuntimeImpl implements OrchestrationRuntime {
   private currentHandle?: OrchestrationHandleImpl;
   private readonly agents: Record<string, AgentConfig>;
+  private readonly delegateDriverSelectionToFramework: boolean;
   private readonly defaultDriverId?: string;
   private readonly entrypoint: string;
   private readonly framework: KrakenRuntime;
@@ -3163,6 +3183,7 @@ class OrchestrationRuntimeImpl implements OrchestrationRuntime {
     agents: Record<string, AgentConfig>,
     entrypoint: string,
     now: () => EpochMs,
+    delegateDriverSelectionToFramework: boolean,
     defaultDriverId?: string
   ) {
     this.framework = framework;
@@ -3170,6 +3191,8 @@ class OrchestrationRuntimeImpl implements OrchestrationRuntime {
     this.agents = agents;
     this.entrypoint = entrypoint;
     this.now = now;
+    this.delegateDriverSelectionToFramework =
+      delegateDriverSelectionToFramework;
     this.defaultDriverId = defaultDriverId;
   }
 
@@ -3247,10 +3270,15 @@ class OrchestrationRuntimeImpl implements OrchestrationRuntime {
       );
     }
 
+    const parentDriverId =
+      input.driverId ??
+      (this.delegateDriverSelectionToFramework
+        ? undefined
+        : this.defaultDriverId);
     const parentHandle = this.framework.executeTurn({
       ...input,
       config,
-      driverId: input.driverId ?? this.defaultDriverId,
+      ...(parentDriverId === undefined ? {} : { driverId: parentDriverId }),
     });
     const orchestrationHandle = new OrchestrationHandleImpl(
       this,
@@ -3393,12 +3421,15 @@ class OrchestrationRuntimeImpl implements OrchestrationRuntime {
     });
     const workerId = thread.threadId;
     const deferred = createDeferred<unknown>();
+    const workerDriverId = this.delegateDriverSelectionToFramework
+      ? undefined
+      : this.defaultDriverId;
     const handle = this.framework.executeTurn({
       branchId: thread.branchId,
       config,
-      driverId: this.defaultDriverId,
       signal: normalizeWorkerTask(task),
       threadId: thread.threadId,
+      ...(workerDriverId === undefined ? {} : { driverId: workerDriverId }),
     });
     const record: WorkerRecord = {
       agent,
@@ -3744,6 +3775,7 @@ export function createOrchestrationRuntime(
     options.agents,
     options.entrypoint,
     options.now ?? Date.now,
+    options.framework !== undefined,
     options.defaultDriverId
   );
 }
@@ -4053,11 +4085,27 @@ function isContextEngineeringPlan(
 }
 
 function readRuntimeStatusTurnId(
-  runtimeStatus: Record<string, unknown> | null
+  runtimeStatus: Record<string, unknown> | null,
+  branchId: string
 ): string | null {
-  return runtimeStatus !== null && typeof runtimeStatus.turnId === "string"
-    ? runtimeStatus.turnId
-    : null;
+  if (runtimeStatus === null) {
+    return null;
+  }
+
+  if (typeof runtimeStatus.turnId === "string") {
+    return runtimeStatus.turnId;
+  }
+
+  throw new KrakenLineageError(
+    `runtime status for branch "${branchId}" must carry a turnId`,
+    {
+      code: "invalid_runtime_status",
+      details: {
+        branchId,
+        runtimeStatus,
+      },
+    }
+  );
 }
 
 function normalizeError(error: unknown): Error {
@@ -4069,13 +4117,32 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function projectError(error: Error): KrakenErrorProjection {
+  const errorRecord = isRecord(error) ? error : undefined;
+
   return {
     code:
-      "code" in error ? String((error as { code: unknown }).code) : undefined,
+      errorRecord !== undefined && typeof errorRecord.code === "string"
+        ? errorRecord.code
+        : undefined,
     details:
-      "details" in error ? (error as { details: unknown }).details : undefined,
+      errorRecord === undefined
+        ? undefined
+        : sanitizeErrorDetails(errorRecord.details),
     message: error.message,
   };
+}
+
+function sanitizeErrorDetails(details: unknown): unknown {
+  if (details === undefined) {
+    return undefined;
+  }
+
+  try {
+    assertKernelRecord(details, "error details");
+    return cloneValue(details);
+  } catch {
+    return undefined;
+  }
 }
 
 function normalizeWorkerTask(task: unknown): InputSignal {

@@ -130,6 +130,7 @@ export {
   assertApprovalRequest,
   assertApprovalResponse,
   assertApprovalResponseForRequest,
+  assertContextManifest,
   assertExecutionStatus,
   assertKrakenMessage,
   assertKrakenStreamEvent,
