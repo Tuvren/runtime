@@ -92,6 +92,7 @@ import {
   executeToolBatch,
   resumeToolBatch,
   type ToolBatchEnvironment,
+  type ToolBatchOutcome,
 } from "./tool-execution.js";
 import { createToolRegistry } from "./tool-registry.js";
 
@@ -224,6 +225,18 @@ interface WorkerRecord {
   status: WorkerStatus["status"];
   threadId: string;
   workerId: string;
+}
+
+class FinalizationFailure extends Error {
+  readonly finalizationError: Error;
+  readonly rootCause?: Error;
+
+  constructor(finalizationError: Error, rootCause?: Error) {
+    super(finalizationError.message, { cause: finalizationError });
+    this.name = "FinalizationFailure";
+    this.finalizationError = finalizationError;
+    this.rootCause = rootCause;
+  }
 }
 
 class AsyncEventQueue<T> implements AsyncIterable<T> {
@@ -936,8 +949,14 @@ class RuntimeCore implements KrakenRuntime {
         loopState.enteredIterationLoop
       );
     } catch (error: unknown) {
+      const finalizationFailure =
+        error instanceof FinalizationFailure ? error : undefined;
       const runtimeError = normalizeError(error);
-      handle.rememberError(projectError(runtimeError));
+      const rootError =
+        finalizationFailure?.rootCause ??
+        finalizationFailure?.finalizationError;
+
+      handle.rememberError(projectError(rootError ?? runtimeError));
       const loopState: LoopState = {
         activeConfig: {
           ...handle.request.config,
@@ -949,12 +968,38 @@ class RuntimeCore implements KrakenRuntime {
         enteredIterationLoop: false,
       };
       const failureResolution: RuntimeResolution = {
-        error: runtimeError,
+        error: rootError ?? runtimeError,
         fatality: "hard",
         type: "fail",
       };
 
       await this.failActiveRunIfNeeded(handle);
+
+      if (finalizationFailure !== undefined) {
+        if (finalizationFailure.rootCause === undefined) {
+          this.publishProjectedError(
+            handle,
+            finalizationFailure.finalizationError,
+            true,
+            loopState
+          );
+        } else {
+          this.publishProjectedError(
+            handle,
+            finalizationFailure.rootCause,
+            true,
+            loopState
+          );
+          this.publishProjectedError(
+            handle,
+            finalizationFailure.finalizationError,
+            false,
+            loopState
+          );
+        }
+
+        return;
+      }
 
       if ((await this.options.kernel.turn.get(handle.turnId)) !== null) {
         try {
@@ -962,10 +1007,17 @@ class RuntimeCore implements KrakenRuntime {
         } catch (finalizeError: unknown) {
           this.publishProjectedError(
             handle,
+            failureResolution.error,
+            true,
+            loopState
+          );
+          this.publishProjectedError(
+            handle,
             normalizeError(finalizeError),
             false,
             loopState
           );
+          return;
         }
       }
 
@@ -1021,11 +1073,21 @@ class RuntimeCore implements KrakenRuntime {
       }
     }
 
+    try {
+      await this.finalizeTurnStatus(handle, resolution, loopState);
+    } catch (error: unknown) {
+      throw new FinalizationFailure(
+        normalizeError(error),
+        resolution.type === "fail" && resolution.fatality === "hard"
+          ? resolution.error
+          : undefined
+      );
+    }
+
     if (resolution.type === "fail" && resolution.fatality === "hard") {
       this.publishProjectedError(handle, resolution.error, true, loopState);
     }
 
-    await this.finalizeTurnStatus(handle, resolution, loopState);
     handle.replaceStatus({
       activeAgent: loopState.activeConfig.name,
       iterationCount: handle.status().iterationCount,
@@ -1229,10 +1291,36 @@ class RuntimeCore implements KrakenRuntime {
 
       let resolution = driverResult.resolution;
       const driverMessages = driverResult.messages ?? [];
-      const stagedMessages = [...driverMessages];
       const stagedMessageHashes: HashString[] = [];
-      const driverResponse = synthesizeResponse(driverMessages, resolution);
       const requestedToolCalls = extractToolCallsFromMessages(driverMessages);
+      const invalidDriverResolutionError =
+        requestedToolCalls.length > 0 &&
+        resolution.type !== "continue_iteration"
+          ? new KrakenRuntimeError(
+              "drivers must not return executable tool calls with a terminal resolution",
+              {
+                code: "invalid_driver_resolution",
+                details: {
+                  resolutionType: resolution.type,
+                  toolCallCount: requestedToolCalls.length,
+                },
+              }
+            )
+          : undefined;
+
+      if (invalidDriverResolutionError !== undefined) {
+        await this.completeTrackedRun(handle, iterationRunId, "completed");
+        return {
+          resolution: {
+            error: invalidDriverResolutionError,
+            fatality: "hard",
+            type: "fail",
+          },
+        };
+      }
+
+      const stagedMessages = [...driverMessages];
+      const driverResponse = synthesizeResponse(driverMessages, resolution);
       const toolResults: ToolResultPart[] = [];
 
       for (const [index, driverMessage] of driverMessages.entries()) {
@@ -1250,37 +1338,33 @@ class RuntimeCore implements KrakenRuntime {
       }
 
       if (
-        requestedToolCalls.length > 0 &&
-        resolution.type !== "continue_iteration"
-      ) {
-        resolution = {
-          error: new KrakenRuntimeError(
-            "drivers must not return executable tool calls with a terminal resolution",
-            {
-              code: "invalid_driver_resolution",
-              details: {
-                resolutionType: resolution.type,
-                toolCallCount: requestedToolCalls.length,
-              },
-            }
-          ),
-          fatality: "hard",
-          type: "fail",
-        };
-      } else if (
         resolution.type === "continue_iteration" &&
         requestedToolCalls.length > 0
       ) {
-        const toolBatch = await executeToolBatch(
-          requestedToolCalls,
-          this.createToolBatchEnvironment(
-            handle,
-            loopState,
-            headState.manifest,
-            nextIteration,
-            iterationRunId
-          )
-        );
+        let toolBatch: ToolBatchOutcome;
+
+        try {
+          toolBatch = await executeToolBatch(
+            requestedToolCalls,
+            this.createToolBatchEnvironment(
+              handle,
+              loopState,
+              headState.manifest,
+              nextIteration,
+              iterationRunId
+            )
+          );
+        } catch (error: unknown) {
+          await this.completeTrackedRun(handle, iterationRunId, "completed");
+          return {
+            resolution: {
+              error: normalizeError(error),
+              fatality: "hard",
+              type: "fail",
+            },
+          };
+        }
+
         toolResults.push(...toolBatch.results);
         stagedMessageHashes.push(...toolBatch.resultHashes);
         loopState.carriedStateUpdates.push(...toolBatch.updates);
@@ -1494,17 +1578,30 @@ class RuntimeCore implements KrakenRuntime {
     );
     await this.options.kernel.run.beginStep(runId, "iterate");
 
-    const toolBatch = await resumeToolBatch(
-      resumeContext.pauseContext.approval,
-      resumeContext.approval,
-      this.createToolBatchEnvironment(
-        handle,
-        loopState,
-        headState.manifest,
-        pausedIteration.iterationCount,
-        runId
-      )
-    );
+    let toolBatch: ToolBatchOutcome;
+
+    try {
+      toolBatch = await resumeToolBatch(
+        resumeContext.pauseContext.approval,
+        resumeContext.approval,
+        this.createToolBatchEnvironment(
+          handle,
+          loopState,
+          headState.manifest,
+          pausedIteration.iterationCount,
+          runId
+        )
+      );
+    } catch (error: unknown) {
+      await this.completeTrackedRun(handle, runId, "completed");
+      return {
+        resolution: {
+          error: normalizeError(error),
+          fatality: "hard",
+          type: "fail",
+        },
+      };
+    }
     const resumedMessages = toolBatch.results.map((result) => ({
       parts: [result],
       role: "tool",
@@ -3787,6 +3884,25 @@ function buildSequenceResolver(
     return undefined;
   }
 
+  const seenAgents = new Set<string>();
+
+  for (const agentName of sequence) {
+    if (seenAgents.has(agentName)) {
+      throw new KrakenRuntimeError(
+        `orchestration sequences must not repeat agent "${agentName}"`,
+        {
+          code: "invalid_orchestration_sequence",
+          details: {
+            agentName,
+            sequence,
+          },
+        }
+      );
+    }
+
+    seenAgents.add(agentName);
+  }
+
   return (agentName: string) => {
     const index = sequence.indexOf(agentName);
 
@@ -4251,10 +4367,11 @@ function assertRuntimeResolution(
       }
       break;
     case "handoff":
-      if (
-        typeof resolution.targetAgent === "string" &&
-        isRecord(resolution.contextPlan)
-      ) {
+      if (typeof resolution.targetAgent === "string") {
+        assertDriverHandoffContextPlan(
+          resolution.contextPlan,
+          "driverResult.resolution.contextPlan"
+        );
         return;
       }
       break;
@@ -4274,6 +4391,73 @@ function assertRuntimeResolution(
     code: "invalid_driver_result",
     details: resolution,
   });
+}
+
+function assertDriverHandoffContextPlan(
+  plan: unknown,
+  label: string
+): asserts plan is HandoffContextPlan {
+  if (
+    !isRecord(plan) ||
+    typeof plan.targetAgent !== "string" ||
+    typeof plan.reason !== "string" ||
+    typeof plan.mode !== "string" ||
+    typeof plan.builder !== "function" ||
+    !isRecord(plan.sourceContext)
+  ) {
+    throw new KrakenRuntimeError(`${label} must be a valid handoff plan`, {
+      code: "invalid_driver_result",
+      details: plan,
+    });
+  }
+
+  assertDriverHandoffSourceContext(
+    plan.sourceContext,
+    `${label}.sourceContext`
+  );
+}
+
+function assertDriverHandoffSourceContext(
+  sourceContext: unknown,
+  label: string
+): asserts sourceContext is HandoffSourceContext {
+  if (!isRecord(sourceContext)) {
+    throw new KrakenRuntimeError(`${label} must be a valid handoff source`, {
+      code: "invalid_driver_result",
+      details: sourceContext,
+    });
+  }
+
+  if (!Array.isArray(sourceContext.messages)) {
+    throw new KrakenRuntimeError(`${label}.messages must be an array`, {
+      code: "invalid_driver_result",
+      details: sourceContext,
+    });
+  }
+
+  for (const [index, message] of sourceContext.messages.entries()) {
+    assertKrakenMessage(message, `${label}.messages[${index}]`);
+  }
+
+  assertContextManifest(sourceContext.manifest, `${label}.manifest`);
+
+  if (
+    !isRecord(sourceContext.handoffIntent) ||
+    typeof sourceContext.handoffIntent.targetAgent !== "string" ||
+    !isRecord(sourceContext.sourceAgent) ||
+    typeof sourceContext.sourceAgent.name !== "string" ||
+    !isRecord(sourceContext.targetAgent) ||
+    typeof sourceContext.targetAgent.name !== "string" ||
+    !isRecord(sourceContext.helpers) ||
+    typeof sourceContext.helpers.loadMessage !== "function" ||
+    typeof sourceContext.helpers.storeMessage !== "function" ||
+    typeof sourceContext.helpers.storeMessages !== "function"
+  ) {
+    throw new KrakenRuntimeError(`${label} must be a valid handoff source`, {
+      code: "invalid_driver_result",
+      details: sourceContext,
+    });
+  }
 }
 
 function decodeKrakenMessageRecord(

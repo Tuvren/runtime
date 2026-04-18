@@ -456,6 +456,103 @@ describe("framework-runtime-core", () => {
     ]);
   });
 
+  test("rejects malformed driver handoff plans at the execution boundary", async () => {
+    const harness = createFakeKernelHarness();
+    const driver = {
+      async execute() {
+        return JSON.parse(
+          '{"activeAgent":"primary","messages":[{"role":"assistant","parts":[{"type":"text","text":"Bad handoff"}]}],"resolution":{"type":"handoff","targetAgent":"reviewer","contextPlan":{"targetAgent":"reviewer"}}}'
+        );
+      },
+      id: "fake",
+      async resume() {
+        throw new Error("resume was not expected");
+      },
+    } satisfies KrakenDriver;
+    const runtime = createKrakenRuntimeCore({
+      defaultDriverId: "fake",
+      driverRegistry: createDriverRegistry([driver]),
+      kernel: harness.kernel,
+    });
+    const thread = await runtime.createThread({});
+    const handle = runtime.executeTurn({
+      branchId: thread.branchId,
+      config: { name: "primary" },
+      signal: textSignal("Reject malformed handoff"),
+      threadId: thread.threadId,
+    });
+
+    const events = await collectEvents(handle.events());
+    const errorEvent = events.find(
+      (event): event is Extract<(typeof events)[number], { type: "error" }> =>
+        event.type === "error"
+    );
+
+    expect(handle.status().phase).toBe("failed");
+    expect(errorEvent?.error.code).toBe("invalid_driver_result");
+    expect(await harness.readBranchMessages(thread.branchId)).toEqual([
+      {
+        parts: [{ text: "Reject malformed handoff", type: "text" }],
+        role: "user",
+      },
+    ]);
+  });
+
+  test("rejects terminal driver resolutions that still contain executable tool calls before persistence", async () => {
+    const harness = createFakeKernelHarness();
+    const driver = {
+      async execute() {
+        return {
+          activeAgent: "primary",
+          messages: [
+            assistantToolCalls([
+              {
+                callId: "call-search",
+                input: { query: "invalid" },
+                name: "search",
+              },
+            ]),
+          ],
+          resolution: {
+            reason: "done",
+            type: "end_turn",
+          },
+        };
+      },
+      id: "fake",
+      async resume() {
+        throw new Error("resume was not expected");
+      },
+    } satisfies KrakenDriver;
+    const runtime = createKrakenRuntimeCore({
+      defaultDriverId: "fake",
+      driverRegistry: createDriverRegistry([driver]),
+      kernel: harness.kernel,
+    });
+    const thread = await runtime.createThread({});
+    const handle = runtime.executeTurn({
+      branchId: thread.branchId,
+      config: { name: "primary" },
+      signal: textSignal("Reject terminal tool call"),
+      threadId: thread.threadId,
+    });
+
+    const events = await collectEvents(handle.events());
+    const errorEvent = events.find(
+      (event): event is Extract<(typeof events)[number], { type: "error" }> =>
+        event.type === "error"
+    );
+
+    expect(handle.status().phase).toBe("failed");
+    expect(errorEvent?.error.code).toBe("invalid_driver_resolution");
+    expect(await harness.readBranchMessages(thread.branchId)).toEqual([
+      {
+        parts: [{ text: "Reject terminal tool call", type: "text" }],
+        role: "user",
+      },
+    ]);
+  });
+
   test("fails the active iteration run before finalizing post-start runtime errors", async () => {
     const harness = createFakeKernelHarness();
     const driver = {
@@ -818,8 +915,9 @@ describe("framework-runtime-core", () => {
         event.type === "error"
     );
 
-    expect(handle.status().phase).toBe("failed");
+    expect(handle.status().phase).toBe("running");
     expect(errorEvent?.error.code).toBe("invalid_context_manifest");
+    expect(events.some((event) => event.type === "turn.end")).toBe(false);
   });
 
   test("preserves custom thread schemas through final turn-status checkpoints", async () => {
@@ -910,6 +1008,65 @@ describe("framework-runtime-core", () => {
       activeAgent: "primary",
       state: "failed",
       turnId: failedTurnId,
+    });
+  });
+
+  test("does not emit turn.end when final turn-status checkpointing fails and preserves the root cause", async () => {
+    const harness = createFakeKernelHarness();
+    const kernel = {
+      ...harness.kernel,
+      staging: {
+        ...harness.kernel.staging,
+        async stage(runId, blob, taskId, objectType, status, interruptPayload) {
+          if (taskId === "runtime_status_final") {
+            throw new Error("final runtime status staging failed");
+          }
+
+          return await harness.kernel.staging.stage(
+            runId,
+            blob,
+            taskId,
+            objectType,
+            status,
+            interruptPayload
+          );
+        },
+      },
+    } satisfies KrakenKernel;
+    const runtime = createKrakenRuntimeCore({
+      defaultDriverId: "fake",
+      driverRegistry: createDriverRegistry(),
+      kernel,
+    });
+    const thread = await runtime.createThread({});
+    const handle = runtime.executeTurn({
+      branchId: thread.branchId,
+      config: { name: "primary" },
+      driverId: "missing-driver",
+      signal: textSignal("Trigger finalize failure"),
+      threadId: thread.threadId,
+    });
+
+    const events = await collectEvents(handle.events());
+    const errorEvents = events.filter(
+      (event): event is Extract<(typeof events)[number], { type: "error" }> =>
+        event.type === "error"
+    );
+
+    expect(handle.status().phase).toBe("running");
+    expect(events.some((event) => event.type === "turn.end")).toBe(false);
+    expect(
+      errorEvents.some((event) => event.error.code === "unknown_driver")
+    ).toBe(true);
+    expect(
+      errorEvents.some(
+        (event) => event.error.message === "final runtime status staging failed"
+      )
+    ).toBe(true);
+    expect(await harness.readBranchRuntimeStatus(thread.branchId)).toEqual({
+      activeAgent: "primary",
+      state: "running",
+      turnId: extractTurnId(events),
     });
   });
 
@@ -2373,6 +2530,313 @@ describe("framework-runtime-core", () => {
     expect(events.some((event) => event.type === "approval.requested")).toBe(
       false
     );
+  });
+
+  test("does not checkpoint resumed sibling tool progress when resume approval is malformed", async () => {
+    const harness = createFakeKernelHarness();
+    let searchCalls = 0;
+    const driver = {
+      async execute(context) {
+        const toolMessages = extractToolMessages(context.messages);
+
+        if (toolMessages.length === 0) {
+          return {
+            activeAgent: "primary",
+            messages: [
+              assistantToolCalls([
+                {
+                  callId: "call-search",
+                  input: { query: "resume batch" },
+                  name: "search",
+                },
+                {
+                  callId: "call-review",
+                  input: { item: "resume batch" },
+                  name: "review",
+                },
+              ]),
+            ],
+            resolution: {
+              type: "continue_iteration",
+            },
+          };
+        }
+
+        return {
+          activeAgent: "primary",
+          messages: [assistantText("This should not be reached.")],
+          resolution: {
+            reason: "done",
+            type: "end_turn",
+          },
+        };
+      },
+      id: "fake",
+      async resume() {
+        throw new Error("resume was not expected");
+      },
+    } satisfies KrakenDriver;
+    const runtime = createKrakenRuntimeCore({
+      defaultDriverId: "fake",
+      driverRegistry: createDriverRegistry([driver]),
+      kernel: harness.kernel,
+    });
+    const thread = await runtime.createThread({});
+    const pausedHandle = runtime.executeTurn({
+      branchId: thread.branchId,
+      config: {
+        extensions: [
+          {
+            aroundTool(context, next) {
+              if (
+                context.tool.name === "review" &&
+                context.approvalDecision?.type === "approve"
+              ) {
+                return {
+                  approval: {
+                    completedResults: [
+                      {
+                        callId: context.callId,
+                        name: context.tool.name,
+                        output: { duplicate: true },
+                        type: "tool_result",
+                      },
+                    ],
+                    toolCalls: [
+                      {
+                        callId: context.callId,
+                        decisions: ["approve", "reject"],
+                        input: context.input,
+                        message: "broken resume approval",
+                        name: context.tool.name,
+                      },
+                    ],
+                  },
+                  verdict: "pause",
+                };
+              }
+
+              return next();
+            },
+            name: "broken-resume-review-gate",
+          },
+        ],
+        name: "primary",
+        tools: [
+          {
+            approval: true,
+            description: "Search docs",
+            execute(input: unknown) {
+              searchCalls += 1;
+              return {
+                query: readQueryInput(input),
+                result: "ok",
+              };
+            },
+            inputSchema: {
+              properties: {
+                query: { type: "string" },
+              },
+              required: ["query"],
+              type: "object",
+            },
+            name: "search",
+          },
+          {
+            approval: true,
+            description: "Review docs",
+            execute() {
+              return {
+                reviewed: true,
+              };
+            },
+            inputSchema: {
+              properties: {
+                item: { type: "string" },
+              },
+              required: ["item"],
+              type: "object",
+            },
+            name: "review",
+          },
+        ],
+      },
+      signal: textSignal("Break the resumed approval batch"),
+      threadId: thread.threadId,
+    });
+
+    await collectEvents(pausedHandle.events());
+
+    const resumedHandle = pausedHandle.resolveApproval({
+      decisions: [
+        { callId: "call-search", type: "approve" },
+        { callId: "call-review", type: "approve" },
+      ],
+    });
+    const events = await collectEvents(resumedHandle.events());
+    const errorEvent = events.find(
+      (event): event is Extract<(typeof events)[number], { type: "error" }> =>
+        event.type === "error"
+    );
+
+    expect(searchCalls).toBe(1);
+    expect(resumedHandle.status().phase).toBe("failed");
+    expect(errorEvent?.error.code).toBe("invalid_approval_request");
+    expect(await harness.readBranchMessages(thread.branchId)).toEqual([
+      {
+        parts: [{ text: "Break the resumed approval batch", type: "text" }],
+        role: "user",
+      },
+      {
+        parts: [
+          {
+            callId: "call-search",
+            input: { query: "resume batch" },
+            name: "search",
+            type: "tool_call",
+          },
+          {
+            callId: "call-review",
+            input: { item: "resume batch" },
+            name: "review",
+            type: "tool_call",
+          },
+        ],
+        role: "assistant",
+      },
+    ]);
+  });
+
+  test("does not checkpoint sibling tool progress when a parallel batch fails on invalid approval", async () => {
+    const harness = createFakeKernelHarness();
+    let searchCalls = 0;
+    const driver = {
+      async execute(context) {
+        return {
+          activeAgent: context.config.name,
+          messages: [
+            assistantToolCalls([
+              {
+                callId: "call-search",
+                input: { query: "parallel batch" },
+                name: "search",
+              },
+              {
+                callId: "call-review",
+                input: { item: "proposal" },
+                name: "review",
+              },
+            ]),
+          ],
+          resolution: {
+            type: "continue_iteration",
+          },
+        };
+      },
+      id: "fake",
+      async resume() {
+        throw new Error("resume was not expected");
+      },
+    } satisfies KrakenDriver;
+    const runtime = createKrakenRuntimeCore({
+      defaultDriverId: "fake",
+      driverRegistry: createDriverRegistry([driver]),
+      kernel: harness.kernel,
+    });
+    const thread = await runtime.createThread({});
+    const handle = runtime.executeTurn({
+      branchId: thread.branchId,
+      config: {
+        extensions: [
+          {
+            aroundTool(context, next) {
+              if (context.tool.name === "review") {
+                return {
+                  approval: {
+                    completedResults: [
+                      {
+                        callId: context.callId,
+                        name: context.tool.name,
+                        output: { duplicate: true },
+                        type: "tool_result",
+                      },
+                    ],
+                    toolCalls: [
+                      {
+                        callId: context.callId,
+                        decisions: ["approve", "reject"],
+                        input: context.input,
+                        message: "broken approval",
+                        name: context.tool.name,
+                      },
+                    ],
+                  },
+                  verdict: "pause",
+                };
+              }
+
+              return next();
+            },
+            name: "broken-review-gate",
+          },
+        ],
+        name: "primary",
+        tools: [
+          {
+            description: "Search docs",
+            execute(input: unknown) {
+              searchCalls += 1;
+              return {
+                query: readQueryInput(input),
+                result: "ok",
+              };
+            },
+            inputSchema: {
+              properties: {
+                query: { type: "string" },
+              },
+              required: ["query"],
+              type: "object",
+            },
+            name: "search",
+          },
+          {
+            description: "Review docs",
+            execute() {
+              return {
+                reviewed: true,
+              };
+            },
+            inputSchema: {
+              properties: {
+                item: { type: "string" },
+              },
+              required: ["item"],
+              type: "object",
+            },
+            name: "review",
+          },
+        ],
+      },
+      signal: textSignal("Break the parallel approval batch"),
+      threadId: thread.threadId,
+    });
+
+    const events = await collectEvents(handle.events());
+    const errorEvent = events.find(
+      (event): event is Extract<(typeof events)[number], { type: "error" }> =>
+        event.type === "error"
+    );
+
+    expect(searchCalls).toBe(1);
+    expect(handle.status().phase).toBe("failed");
+    expect(errorEvent?.error.code).toBe("invalid_approval_request");
+    expect(await harness.readBranchMessages(thread.branchId)).toEqual([
+      {
+        parts: [{ text: "Break the parallel approval batch", type: "text" }],
+        role: "user",
+      },
+    ]);
   });
 
   test("returns the executed result when aroundTool pauses after next()", async () => {
@@ -4368,6 +4832,23 @@ describe("framework-runtime-core", () => {
     );
 
     expect(capturedDriverIds).toEqual([undefined, undefined]);
+  });
+
+  test("rejects orchestration sequences that repeat agent names", async () => {
+    const harness = createFakeKernelHarness();
+
+    expect(() =>
+      createOrchestrationRuntime({
+        agents: {
+          planner: { name: "planner" },
+          reviewer: { name: "reviewer" },
+        },
+        defaultDriverId: "fake",
+        entrypoint: "planner",
+        kernel: harness.kernel,
+        sequence: ["planner", "reviewer", "planner"],
+      })
+    ).toThrow('orchestration sequences must not repeat agent "planner"');
   });
 
   test("does not start orchestration parent execution before an event stream is consumed", async () => {
