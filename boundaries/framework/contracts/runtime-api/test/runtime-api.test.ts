@@ -24,6 +24,7 @@ import {
   assertApprovalRequest,
   assertApprovalResponse,
   assertApprovalResponseForRequest,
+  assertContextManifest,
   assertExecutionStatus,
   assertKrakenMessage,
   assertKrakenStreamEvent,
@@ -59,6 +60,9 @@ describe("runtime-api contracts", () => {
     expect(isExecutionStatus(frameworkContractFixtures.executionStatus)).toBe(
       true
     );
+    expect(() =>
+      assertContextManifest(frameworkContractFixtures.contextManifest)
+    ).not.toThrow();
 
     expect(() =>
       assertKrakenMessage(frameworkContractFixtures.assistantMessage)
@@ -78,6 +82,35 @@ describe("runtime-api contracts", () => {
     expect(() =>
       assertExecutionStatus(frameworkContractFixtures.executionStatus)
     ).not.toThrow();
+  });
+
+  test("exposes the orchestration contract surface through canonical fixtures", async () => {
+    const handle = frameworkContractFixtures.orchestrationRuntime.executeTurn({
+      branchId: "branch_main",
+      signal: {
+        parts: [{ text: "Start orchestration", type: "text" }],
+      },
+      threadId: "thread_main",
+    });
+    const workerStatuses = handle.workers();
+
+    expect(handle.resolveApproval({ decisions: [] })).toBe(handle);
+    expect(
+      await frameworkContractFixtures.orchestrationRuntime.launchWorker(
+        "worker",
+        {
+          task: "summarize",
+        }
+      )
+    ).toBe(frameworkContractFixtures.workerStatus.workerId);
+    expect(
+      await frameworkContractFixtures.orchestrationRuntime.awaitWorker(
+        frameworkContractFixtures.workerStatus.workerId
+      )
+    ).toEqual(frameworkContractFixtures.workerStatus.result);
+    expect(
+      workerStatuses.get(frameworkContractFixtures.workerStatus.workerId)
+    ).toEqual(frameworkContractFixtures.workerStatus);
   });
 
   test("rejects malformed contract values", () => {
@@ -107,6 +140,11 @@ describe("runtime-api contracts", () => {
         invalidFrameworkContractFixtures.malformedExecutionStatus
       )
     ).toBe(false);
+    expect(() =>
+      assertContextManifest(
+        invalidFrameworkContractFixtures.malformedContextManifest
+      )
+    ).toThrow("must be a valid ContextManifest");
   });
 
   test("rejects provider chunks that omit required fields", () => {

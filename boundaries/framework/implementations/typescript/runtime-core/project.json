@@ -26,7 +26,7 @@
       "dependsOn": ["^build"],
       "options": {
         "cwd": "boundaries/framework/implementations/typescript/runtime-core",
-        "command": "bunx --bun tsc --project tsconfig.lib.json --noEmit --pretty false && bunx --bun tsc --project tsconfig.typecheck.json --noEmit --pretty false"
+        "command": "bunx --bun tsc --project tsconfig.lib.json --noEmit --pretty false && bunx --bun tsc --project tsconfig.typecheck.json --noEmit --pretty false && bunx --bun tsc --project tsconfig.dts.json --noEmit --pretty false"
       }
     }
   }

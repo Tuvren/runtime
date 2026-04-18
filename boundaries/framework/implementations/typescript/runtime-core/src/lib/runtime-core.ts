@@ -229,6 +229,16 @@ interface WorkerRecord {
   workerId: string;
 }
 
+type WorkerAccess =
+  | {
+      kind: "live";
+      worker: WorkerRecord;
+    }
+  | {
+      kind: "retained";
+      worker: WorkerStatus;
+    };
+
 class FinalizationFailure extends Error {
   readonly finalizationError: Error;
   readonly rootCause?: Error;
@@ -3141,6 +3151,7 @@ class OrchestrationHandleImpl implements OrchestrationHandle {
   private readonly parentEventsFanout = new EventFanout<KrakenStreamEvent>();
   private readonly pendingWorkerSignals: InputSignal[] = [];
   private readonly openWorkers = new Set<string>();
+  private readonly retainedWorkers = new Map<string, WorkerStatus>();
   private readonly runtime: OrchestrationRuntimeImpl;
   private readonly parentHandle: ExecutionHandle;
   private started = false;
@@ -3281,7 +3292,22 @@ class OrchestrationHandleImpl implements OrchestrationHandle {
   }
 
   workers(): ReadonlyMap<string, WorkerStatus> {
-    return this.runtime.getWorkerStatuses(this.sessionId);
+    const snapshot = new Map(this.runtime.getWorkerStatuses(this.sessionId));
+
+    for (const [workerId, status] of this.retainedWorkers) {
+      snapshot.set(workerId, cloneWorkerStatus(status));
+    }
+
+    return snapshot;
+  }
+
+  getRetainedWorkerStatus(workerId: string): WorkerStatus | undefined {
+    const status = this.retainedWorkers.get(workerId);
+    return status === undefined ? undefined : cloneWorkerStatus(status);
+  }
+
+  retainWorkerStatus(status: WorkerStatus): void {
+    this.retainedWorkers.set(status.workerId, cloneWorkerStatus(status));
   }
 
   private async watchParent(): Promise<void> {
@@ -3412,12 +3438,14 @@ class OrchestrationRuntimeImpl implements OrchestrationRuntime {
     workerId: string,
     options?: { parent: OrchestrationHandle }
   ): Promise<unknown> {
-    const worker = this.requireWorkerAccess(
+    const workerAccess = this.requireWorkerAccess(
       workerId,
       options?.parent,
       "awaitWorker"
     );
-    return await worker.resultPromise;
+    return workerAccess.kind === "live"
+      ? await workerAccess.worker.resultPromise
+      : workerAccess.worker.result;
   }
 
   cancel(): void {
@@ -3522,11 +3550,26 @@ class OrchestrationRuntimeImpl implements OrchestrationRuntime {
     response: ApprovalResponse,
     options?: { parent: OrchestrationHandle }
   ): void {
-    const worker = this.requireWorkerAccess(
+    const workerAccess = this.requireWorkerAccess(
       workerId,
       options?.parent,
       "resolveWorkerApproval"
     );
+
+    if (workerAccess.kind !== "live") {
+      throw new KrakenRuntimeError(
+        `worker "${workerId}" is not awaiting approval`,
+        {
+          code: "invalid_approval_resolution",
+          details: {
+            status: workerAccess.worker.status,
+            workerId,
+          },
+        }
+      );
+    }
+
+    const { worker } = workerAccess;
 
     if (worker.status !== "paused" || worker.approval === undefined) {
       throw new KrakenRuntimeError(
@@ -3698,69 +3741,99 @@ class OrchestrationRuntimeImpl implements OrchestrationRuntime {
 
   private async watchWorker(worker: WorkerRecord): Promise<void> {
     let lastError: KrakenErrorProjection | undefined;
+    let completedTerminalWatch = false;
+    let sessionHandle: OrchestrationHandleImpl | undefined;
 
-    for await (const event of worker.handle.events()) {
-      if (event.type === "error") {
-        lastError = event.error;
+    try {
+      for await (const event of worker.handle.events()) {
+        if (event.type === "error") {
+          lastError = event.error;
+        }
+
+        this.resolveSessionHandle(worker.sessionId)?.emitWorkerEvent(
+          worker.workerId,
+          {
+            ...event,
+            source: {
+              ...(event.source ?? {}),
+              agent: worker.agent,
+              threadId: worker.threadId,
+              workerId: worker.workerId,
+            },
+          }
+        );
       }
 
-      this.resolveSessionHandle(worker.sessionId)?.emitWorkerEvent(
-        worker.workerId,
-        {
-          ...event,
+      const phase = worker.handle.status().phase;
+
+      if (phase === "paused") {
+        worker.approval = worker.handle.status().approval;
+        worker.status = "paused";
+        return;
+      }
+
+      completedTerminalWatch = true;
+      sessionHandle = this.resolveSessionHandle(worker.sessionId);
+      worker.approval = undefined;
+      worker.status = phase === "failed" ? "failed" : "completed";
+
+      try {
+        worker.result = await this.resolveWorkerResult(worker, lastError);
+      } catch (error: unknown) {
+        worker.status = "failed";
+        worker.result = projectError(normalizeError(error));
+        this.emitWorkerLifecycleError(sessionHandle, worker, error);
+      }
+
+      worker.resolveResult(worker.result);
+      sessionHandle?.retainWorkerStatus(createWorkerStatusSnapshot(worker));
+
+      try {
+        sessionHandle?.emitWorkerEvent(worker.workerId, {
+          data: {
+            agent: worker.agent,
+            result: worker.result,
+            status: worker.status,
+            threadId: worker.threadId,
+            workerId: worker.workerId,
+          },
+          name: "worker.completed",
           source: {
-            ...(event.source ?? {}),
             agent: worker.agent,
             threadId: worker.threadId,
             workerId: worker.workerId,
           },
+          timestamp: this.now(),
+          type: "custom",
+        });
+
+        if (worker.status === "completed" || worker.status === "failed") {
+          const signal = createWorkerResultSignal(worker, worker.result);
+
+          if (sessionHandle?.status().phase === "running") {
+            sessionHandle.steer(signal);
+          } else if (sessionHandle?.status().phase === "paused") {
+            sessionHandle.queueWorkerSignal(signal);
+          }
         }
-      );
-    }
-
-    const phase = worker.handle.status().phase;
-
-    if (phase === "paused") {
-      worker.approval = worker.handle.status().approval;
-      worker.status = "paused";
-      return;
-    }
-
-    worker.approval = undefined;
-    worker.status = phase === "failed" ? "failed" : "completed";
-    worker.result = await this.resolveWorkerResult(worker, lastError);
-    worker.resolveResult(worker.result);
-    const sessionHandle = this.resolveSessionHandle(worker.sessionId);
-
-    sessionHandle?.emitWorkerEvent(worker.workerId, {
-      data: {
-        agent: worker.agent,
-        result: worker.result,
-        status: worker.status,
-        threadId: worker.threadId,
-        workerId: worker.workerId,
-      },
-      name: "worker.completed",
-      source: {
-        agent: worker.agent,
-        threadId: worker.threadId,
-        workerId: worker.workerId,
-      },
-      timestamp: this.now(),
-      type: "custom",
-    });
-
-    if (worker.status === "completed" || worker.status === "failed") {
-      const signal = createWorkerResultSignal(worker, worker.result);
-
-      if (sessionHandle?.status().phase === "running") {
-        sessionHandle.steer(signal);
-      } else if (sessionHandle?.status().phase === "paused") {
-        sessionHandle.queueWorkerSignal(signal);
+      } catch (error: unknown) {
+        this.emitWorkerLifecycleError(sessionHandle, worker, error);
+      }
+    } catch (error: unknown) {
+      completedTerminalWatch = true;
+      sessionHandle = this.resolveSessionHandle(worker.sessionId);
+      worker.approval = undefined;
+      worker.status = "failed";
+      worker.result = projectError(normalizeError(error));
+      worker.resolveResult(worker.result);
+      sessionHandle?.retainWorkerStatus(createWorkerStatusSnapshot(worker));
+      this.emitWorkerLifecycleError(sessionHandle, worker, error);
+    } finally {
+      if (completedTerminalWatch) {
+        this.workers.delete(worker.workerId);
+        sessionHandle?.workerFinished(worker.workerId);
       }
     }
-
-    sessionHandle?.workerFinished(worker.workerId);
   }
 
   private async resolveWorkerResult(
@@ -3814,28 +3887,62 @@ class OrchestrationRuntimeImpl implements OrchestrationRuntime {
     workerId: string,
     parent: OrchestrationHandle | undefined,
     methodName: "awaitWorker" | "resolveWorkerApproval"
-  ): WorkerRecord {
-    const worker = this.requireWorker(workerId);
+  ): WorkerAccess {
+    const liveWorker = this.workers.get(workerId);
 
     if (parent !== undefined) {
       const parentHandle = this.requireRuntimeParentHandle(parent, methodName);
 
-      if (parentHandle.sessionId !== worker.sessionId) {
-        throw new KrakenRuntimeError(
-          `${methodName}() requires the worker's owning parent handle`,
-          {
-            code: "orchestration_worker_parent_mismatch",
-            details: {
-              methodName,
-              parentSessionId: parentHandle.sessionId,
-              workerId,
-              workerSessionId: worker.sessionId,
-            },
-          }
-        );
+      if (liveWorker !== undefined) {
+        if (parentHandle.sessionId !== liveWorker.sessionId) {
+          throw new KrakenRuntimeError(
+            `${methodName}() requires the worker's owning parent handle`,
+            {
+              code: "orchestration_worker_parent_mismatch",
+              details: {
+                methodName,
+                parentSessionId: parentHandle.sessionId,
+                workerId,
+                workerSessionId: liveWorker.sessionId,
+              },
+            }
+          );
+        }
+
+        return {
+          kind: "live",
+          worker: liveWorker,
+        };
       }
 
-      return worker;
+      const retainedWorker = parentHandle.getRetainedWorkerStatus(workerId);
+
+      if (retainedWorker !== undefined) {
+        return {
+          kind: "retained",
+          worker: retainedWorker,
+        };
+      }
+
+      throw new KrakenRuntimeError(`worker "${workerId}" is not known`, {
+        code: "unknown_worker",
+        details: {
+          workerId,
+        },
+      });
+    }
+
+    if (liveWorker === undefined) {
+      throw new KrakenRuntimeError(
+        `${methodName}() requires { parent } for workers from closed orchestration sessions`,
+        {
+          code: "orchestration_worker_parent_required",
+          details: {
+            methodName,
+            workerId,
+          },
+        }
+      );
     }
 
     if (this.countActiveOrchestrationSessions() > 1) {
@@ -3851,7 +3958,49 @@ class OrchestrationRuntimeImpl implements OrchestrationRuntime {
       );
     }
 
-    return worker;
+    if (!this.sessionHandles.has(liveWorker.sessionId)) {
+      throw new KrakenRuntimeError(
+        `${methodName}() requires { parent } for workers from closed orchestration sessions`,
+        {
+          code: "orchestration_worker_parent_required",
+          details: {
+            methodName,
+            workerId,
+          },
+        }
+      );
+    }
+
+    return {
+      kind: "live",
+      worker: liveWorker,
+    };
+  }
+
+  private emitWorkerLifecycleError(
+    sessionHandle: OrchestrationHandleImpl | undefined,
+    worker: WorkerRecord,
+    error: unknown
+  ): void {
+    if (sessionHandle === undefined) {
+      return;
+    }
+
+    try {
+      sessionHandle.emitWorkerEvent(worker.workerId, {
+        error: projectError(normalizeError(error)),
+        fatal: false,
+        source: {
+          agent: worker.agent,
+          threadId: worker.threadId,
+          workerId: worker.workerId,
+        },
+        timestamp: this.now(),
+        type: "error",
+      });
+    } catch {
+      return;
+    }
   }
 
   private countActiveOrchestrationSessions(): number {
@@ -4041,6 +4190,17 @@ function cloneExecutionStatus(status: ExecutionStatus): ExecutionStatus {
   };
 }
 
+function cloneWorkerStatus(status: WorkerStatus): WorkerStatus {
+  return {
+    agent: status.agent,
+    approval: cloneValue(status.approval),
+    result: cloneValue(status.result),
+    status: status.status,
+    threadId: status.threadId,
+    workerId: status.workerId,
+  };
+}
+
 function composeResolutions(
   baseResolution: RuntimeResolution,
   overrideResolution: RuntimeResolution | undefined
@@ -4069,6 +4229,17 @@ function createDeferred<T>(): {
     resolve(value: T) {
       resolveValue?.(value);
     },
+  };
+}
+
+function createWorkerStatusSnapshot(worker: WorkerRecord): WorkerStatus {
+  return {
+    agent: worker.agent,
+    approval: cloneValue(worker.approval),
+    result: cloneValue(worker.result),
+    status: worker.status,
+    threadId: worker.threadId,
+    workerId: worker.workerId,
   };
 }
 

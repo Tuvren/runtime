@@ -6098,7 +6098,7 @@ describe("framework-runtime-core", () => {
     handleB.cancel();
   });
 
-  test("does not keep historical worker sessions ambiguous once only one session is active", async () => {
+  test("requires { parent } for retained workers from closed sessions while keeping the sole live session implicit", async () => {
     const harness = createFakeKernelHarness();
     const driver = {
       async execute(context) {
@@ -6208,6 +6208,15 @@ describe("framework-runtime-core", () => {
       threadId: threadC.threadId,
     });
     const eventsCPromise = collectEvents(handleC.events());
+
+    await expect(orchestration.awaitWorker(workerA)).rejects.toThrow(
+      "awaitWorker() requires { parent } for workers from closed orchestration sessions"
+    );
+    expect(
+      await orchestration.awaitWorker(workerA, {
+        parent: handleA,
+      })
+    ).toBe(`Worker for ${workerA}.`);
 
     const workerC = await orchestration.launchWorker("worker", {
       task: "C",
@@ -6721,7 +6730,7 @@ describe("framework-runtime-core", () => {
     ).toBe(true);
   });
 
-  test("closes paused parent streams and releases the cancelled session", async () => {
+  test("exhausts paused parent streams immediately after pause", async () => {
     const harness = createFakeKernelHarness();
     const driver = {
       async execute(context) {
@@ -8098,6 +8107,105 @@ describe("framework-runtime-core", () => {
     });
   });
 
+  test("settles worker bookkeeping when terminal worker result projection fails", async () => {
+    const harness = createFakeKernelHarness();
+    const baseRuntime = createKrakenRuntimeCore({
+      defaultDriverId: "unused",
+      kernel: harness.kernel,
+    });
+    const parentThread = await baseRuntime.createThread({});
+    const parentExecutionHandle = createStubExecutionHandle("running");
+    let workerSequence = 0;
+    const framework: KrakenRuntime = {
+      async createBranch() {
+        return {
+          branchId: "unused_branch",
+          headTurnNodeHash: "1".repeat(64),
+          threadId: parentThread.threadId,
+        };
+      },
+      async createThread() {
+        workerSequence += 1;
+        return {
+          branchId: `missing_worker_branch_${workerSequence}`,
+          rootTurnNodeHash: "2".repeat(64),
+          rootTurnTreeHash: "3".repeat(64),
+          threadId: `missing_worker_thread_${workerSequence}`,
+        };
+      },
+      executeTurn(input) {
+        return input.threadId === parentThread.threadId
+          ? parentExecutionHandle
+          : createStubExecutionHandle("completed");
+      },
+      async getThread(threadId) {
+        return threadId === parentThread.threadId
+          ? {
+              rootTurnNodeHash: parentThread.rootTurnNodeHash,
+              schemaId: "kraken.agent.v1",
+              threadId,
+            }
+          : null;
+      },
+      async setBranchHead() {
+        return {
+          branchId: "unused_branch",
+          headTurnNodeHash: "4".repeat(64),
+        };
+      },
+    };
+    const orchestration = createOrchestrationRuntime({
+      agents: {
+        primary: { name: "primary" },
+        worker: { name: "worker" },
+      },
+      defaultDriverId: "unused",
+      entrypoint: "primary",
+      framework,
+      kernel: harness.kernel,
+    });
+    const handle = orchestration.executeTurn({
+      branchId: parentThread.branchId,
+      signal: textSignal("Start parent"),
+      threadId: parentThread.threadId,
+    });
+
+    detachTestPromise(collectEventsForDuration(handle.events(), 20));
+
+    const workerId = await orchestration.launchWorker(
+      "worker",
+      {
+        task: "broken projection",
+      },
+      {
+        parent: handle,
+      }
+    );
+    const workerResult = await settleWithin(
+      orchestration.awaitWorker(workerId, {
+        parent: handle,
+      }),
+      100
+    );
+
+    expect(workerResult).not.toBe(TIMEOUT_TOKEN);
+    expect(workerResult).toEqual(
+      expect.objectContaining({
+        code: "missing_branch",
+      })
+    );
+    expect(handle.workers().get(workerId)?.status).toBe("failed");
+
+    handle.cancel();
+
+    const allEventsAfterCancel = await settleWithin(
+      collectEvents(handle.allEvents()),
+      100
+    );
+
+    expect(allEventsAfterCancel).not.toBe(TIMEOUT_TOKEN);
+  });
+
   test("steers failed worker payloads back into a running parent turn", async () => {
     const harness = createFakeKernelHarness();
     const driver = {
@@ -8693,6 +8801,51 @@ async function waitForAsync(
 
     await delay(5);
   }
+}
+
+function createStubExecutionHandle(
+  initialPhase: ExecutionStatus["phase"]
+): ExecutionHandle {
+  let phase = initialPhase;
+  let closed = initialPhase !== "running";
+  let resolveClosed: (() => void) | undefined;
+  const closedPromise = new Promise<void>((resolve) => {
+    resolveClosed = resolve;
+
+    if (closed) {
+      resolve();
+    }
+  });
+  const handle: ExecutionHandle = {
+    cancel() {
+      phase = "failed";
+
+      if (!closed) {
+        closed = true;
+        resolveClosed?.();
+      }
+    },
+    events() {
+      return (async function* () {
+        await closedPromise;
+        yield* [];
+      })();
+    },
+    resolveApproval() {
+      return handle;
+    },
+    status() {
+      return {
+        iterationCount: 0,
+        phase,
+      };
+    },
+    steer() {
+      return;
+    },
+  };
+
+  return handle;
 }
 
 function assistantText(text: string): KrakenMessage {

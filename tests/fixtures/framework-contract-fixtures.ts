@@ -18,23 +18,31 @@
 import type {
   AgentConfig,
   ApprovalRequest,
+  ContextManifest,
   ExecutionHandle,
   ExecutionStatus,
   KrakenMessage,
   KrakenRuntime,
   KrakenStreamEvent,
   KrakenToolDefinition,
+  OrchestrationHandle,
+  OrchestrationRuntime,
   ProviderStreamChunk,
+  WorkerStatus,
 } from "../../boundaries/framework/contracts/runtime-api/src/index.ts";
+
+function emptyEvents<T>(): AsyncIterable<T> {
+  return (async function* () {
+    yield* [];
+  })();
+}
 
 const noopExecutionHandle: ExecutionHandle = {
   cancel() {
     return;
   },
   events() {
-    return (async function* () {
-      yield* [];
-    })();
+    return emptyEvents();
   },
   resolveApproval() {
     return this;
@@ -43,6 +51,82 @@ const noopExecutionHandle: ExecutionHandle = {
     return frameworkContractFixtures.executionStatus;
   },
   steer() {
+    return;
+  },
+};
+
+const contextManifestFixture = {
+  byRole: {
+    assistant: 1,
+    system: 0,
+    tool: 1,
+    user: 1,
+  },
+  extensions: {
+    budget: {
+      remaining: 3,
+    },
+  },
+  lastAssistantMessageIndex: 1,
+  lastUserMessageIndex: 0,
+  messageCount: 3,
+  tokenEstimate: 42,
+  toolCalls: {
+    byName: {
+      search: 1,
+    },
+    total: 1,
+  },
+  toolResults: {
+    byName: {
+      search: 1,
+    },
+    total: 1,
+  },
+  turnBoundaries: [0],
+} satisfies ContextManifest;
+
+const workerStatusFixture = {
+  agent: "worker",
+  result: { ok: true },
+  status: "completed",
+  threadId: "thread_worker",
+  workerId: "worker_1",
+} satisfies WorkerStatus;
+
+const noopOrchestrationHandle: OrchestrationHandle = {
+  ...noopExecutionHandle,
+  allEvents() {
+    return emptyEvents();
+  },
+  parentEvents() {
+    return emptyEvents();
+  },
+  resolveApproval() {
+    return this;
+  },
+  workerEvents() {
+    return emptyEvents();
+  },
+  workers() {
+    return new Map([[workerStatusFixture.workerId, workerStatusFixture]]);
+  },
+};
+
+const noopOrchestrationRuntime: OrchestrationRuntime = {
+  awaitWorker() {
+    return Promise.resolve(workerStatusFixture.result);
+  },
+  cancel() {
+    return;
+  },
+  executeTurn() {
+    return noopOrchestrationHandle;
+  },
+  launchWorker() {
+    return Promise.resolve(workerStatusFixture.workerId);
+  },
+  resolveWorkerApproval() {
     return;
   },
 };
@@ -104,6 +188,7 @@ export const frameworkContractFixtures = {
     ],
     role: "assistant",
   } satisfies KrakenMessage,
+  contextManifest: contextManifestFixture,
   executionStatus: {
     activeAgent: "primary",
     approval: {
@@ -119,9 +204,12 @@ export const frameworkContractFixtures = {
       ],
     },
     iterationCount: 2,
+    manifest: contextManifestFixture,
     pauseReason: "approval_required",
     phase: "paused",
   } satisfies ExecutionStatus,
+  orchestrationHandle: noopOrchestrationHandle,
+  orchestrationRuntime: noopOrchestrationRuntime,
   providerStreamChunk: {
     delta: '{"status":"pending"}',
     type: "structured_delta",
@@ -185,6 +273,7 @@ export const frameworkContractFixtures = {
     },
     name: "search",
   } satisfies KrakenToolDefinition,
+  workerStatus: workerStatusFixture,
 };
 
 export const invalidFrameworkContractFixtures = {
@@ -195,6 +284,28 @@ export const invalidFrameworkContractFixtures = {
   malformedExecutionStatus: {
     iterationCount: 1.5,
     phase: "waiting",
+  },
+  malformedContextManifest: {
+    byRole: {
+      assistant: 0,
+      system: 0,
+      tool: 0,
+      user: 0,
+    },
+    extensions: {},
+    lastAssistantMessageIndex: -1,
+    lastUserMessageIndex: -1,
+    messageCount: 0,
+    tokenEstimate: 0,
+    toolCalls: {
+      byName: {},
+      total: -1,
+    },
+    toolResults: {
+      byName: {},
+      total: 0,
+    },
+    turnBoundaries: [],
   },
   malformedMessage: {
     parts: "not-an-array",
