@@ -640,6 +640,180 @@ describe("framework-runtime-core", () => {
     ]);
   });
 
+  test("rejects driver messages that bypass the shared tool-result path", async () => {
+    const harness = createFakeKernelHarness();
+    const driver = {
+      async execute() {
+        return {
+          activeAgent: "primary",
+          messages: [
+            {
+              parts: [
+                {
+                  callId: "call-search",
+                  name: "search",
+                  output: { hits: 1 },
+                  type: "tool_result",
+                },
+              ],
+              role: "assistant",
+            },
+          ],
+          resolution: {
+            reason: "done",
+            type: "end_turn",
+          },
+        };
+      },
+      id: "fake",
+      async resume() {
+        throw new Error("resume was not expected");
+      },
+    } satisfies KrakenDriver;
+    const runtime = createKrakenRuntimeCore({
+      defaultDriverId: "fake",
+      driverRegistry: createDriverRegistry([driver]),
+      kernel: harness.kernel,
+    });
+    const thread = await runtime.createThread({});
+    const handle = runtime.executeTurn({
+      branchId: thread.branchId,
+      config: { name: "primary" },
+      signal: textSignal("Reject driver tool result"),
+      threadId: thread.threadId,
+    });
+
+    const events = await collectEvents(handle.events());
+    const errorEvent = events.find(
+      (event): event is Extract<(typeof events)[number], { type: "error" }> =>
+        event.type === "error"
+    );
+
+    expect(handle.status().phase).toBe("failed");
+    expect(errorEvent?.error.code).toBe("invalid_driver_result");
+    expect(await harness.readBranchMessages(thread.branchId)).toEqual([
+      {
+        parts: [{ text: "Reject driver tool result", type: "text" }],
+        role: "user",
+      },
+    ]);
+  });
+
+  test("rejects driver responses that contradict staged assistant messages", async () => {
+    const harness = createFakeKernelHarness();
+    const driver = {
+      async execute() {
+        return {
+          activeAgent: "primary",
+          messages: [assistantText("Plain assistant output.")],
+          response: {
+            finishReason: "tool_call",
+            parts: [
+              {
+                callId: "call-search",
+                input: { query: "mismatch" },
+                name: "search",
+                type: "tool_call",
+              },
+            ],
+          },
+          resolution: {
+            reason: "done",
+            type: "end_turn",
+          },
+        };
+      },
+      id: "fake",
+      async resume() {
+        throw new Error("resume was not expected");
+      },
+    } satisfies KrakenDriver;
+    const runtime = createKrakenRuntimeCore({
+      defaultDriverId: "fake",
+      driverRegistry: createDriverRegistry([driver]),
+      kernel: harness.kernel,
+    });
+    const thread = await runtime.createThread({});
+    const handle = runtime.executeTurn({
+      branchId: thread.branchId,
+      config: { name: "primary" },
+      signal: textSignal("Reject contradictory driver response"),
+      threadId: thread.threadId,
+    });
+
+    const events = await collectEvents(handle.events());
+    const errorEvent = events.find(
+      (event): event is Extract<(typeof events)[number], { type: "error" }> =>
+        event.type === "error"
+    );
+
+    expect(handle.status().phase).toBe("failed");
+    expect(errorEvent?.error.code).toBe("invalid_driver_result");
+    expect(await harness.readBranchMessages(thread.branchId)).toEqual([
+      {
+        parts: [{ text: "Reject contradictory driver response", type: "text" }],
+        role: "user",
+      },
+    ]);
+  });
+
+  test("rejects driver handoff resolutions whose target disagrees with the context plan", async () => {
+    const harness = createFakeKernelHarness();
+    const driver = {
+      async execute(context) {
+        return {
+          activeAgent: "primary",
+          messages: [assistantText("Mismatched handoff target.")],
+          resolution: {
+            contextPlan: context.handoff.createContextPlan({
+              reason: "handoff",
+              targetAgent: "worker",
+            }),
+            targetAgent: "reviewer",
+            type: "handoff",
+          },
+        };
+      },
+      id: "fake",
+      async resume() {
+        throw new Error("resume was not expected");
+      },
+    } satisfies KrakenDriver;
+    const runtime = createKrakenRuntimeCore({
+      defaultDriverId: "fake",
+      driverRegistry: createDriverRegistry([driver]),
+      kernel: harness.kernel,
+      resolveAgentConfig: (agentName) =>
+        ({
+          primary: { name: "primary" },
+          reviewer: { name: "reviewer" },
+          worker: { name: "worker" },
+        })[agentName],
+    });
+    const thread = await runtime.createThread({});
+    const handle = runtime.executeTurn({
+      branchId: thread.branchId,
+      config: { name: "primary" },
+      signal: textSignal("Reject handoff target mismatch"),
+      threadId: thread.threadId,
+    });
+
+    const events = await collectEvents(handle.events());
+    const errorEvent = events.find(
+      (event): event is Extract<(typeof events)[number], { type: "error" }> =>
+        event.type === "error"
+    );
+
+    expect(handle.status().phase).toBe("failed");
+    expect(errorEvent?.error.code).toBe("invalid_driver_result");
+    expect(await harness.readBranchMessages(thread.branchId)).toEqual([
+      {
+        parts: [{ text: "Reject handoff target mismatch", type: "text" }],
+        role: "user",
+      },
+    ]);
+  });
+
   test("rejects terminal driver resolutions that still contain executable tool calls before persistence", async () => {
     const harness = createFakeKernelHarness();
     const driver = {
@@ -4860,6 +5034,22 @@ describe("framework-runtime-core", () => {
 
     releaseSlowTool?.();
     await capture.done;
+
+    expect(
+      capture.events.filter(
+        (event) =>
+          event.type === "tool.result" && event.callId === "call-missing"
+      )
+    ).toHaveLength(1);
+    expect(
+      extractToolMessages(
+        await harness.readBranchMessages(thread.branchId)
+      ).filter(
+        (message) =>
+          message.parts[0]?.type === "tool_result" &&
+          message.parts[0].callId === "call-missing"
+      )
+    ).toHaveLength(1);
   });
 
   test("persists tool messages in call order even when parallel completion order differs", async () => {
@@ -5494,6 +5684,22 @@ describe("framework-runtime-core", () => {
 
     releaseSlowTool?.();
     await capture.done;
+
+    expect(
+      capture.events.filter(
+        (event) =>
+          event.type === "tool.result" && event.callId === "call-reject"
+      )
+    ).toHaveLength(1);
+    expect(
+      extractToolMessages(
+        await harness.readBranchMessages(thread.branchId)
+      ).filter(
+        (message) =>
+          message.parts[0]?.type === "tool_result" &&
+          message.parts[0].callId === "call-reject"
+      )
+    ).toHaveLength(1);
   });
 
   test("resumes aroundTool approval gates through the shared executor", async () => {

@@ -215,15 +215,6 @@ export async function executeToolBatch(
     });
   }
 
-  if (executable.length > 0) {
-    await stageImmediateResults(
-      environment,
-      immediateResults,
-      orderedResults,
-      createToolStartBarrier(0)
-    );
-  }
-
   const stagedResults = orderedResults.flat();
   const results = stagedResults.map((entry) => entry.result);
   const resultHashes = stagedResults.map((entry) => entry.hash);

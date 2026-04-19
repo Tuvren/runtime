@@ -4955,6 +4955,7 @@ function normalizeInputSignal(signal: InputSignal, label: string): InputSignal {
 function assertDriverExecutionResult(result: unknown): asserts result is {
   activeAgent: string;
   messages?: KrakenMessage[];
+  response?: KrakenModelResponse;
   resolution: RuntimeResolution;
 } {
   if (!isRecord(result) || typeof result.activeAgent !== "string") {
@@ -4974,11 +4975,17 @@ function assertDriverExecutionResult(result: unknown): asserts result is {
 
     for (const [index, message] of result.messages.entries()) {
       assertKrakenMessage(message, `driverResult.messages[${index}]`);
+      assertDriverMessage(message, `driverResult.messages[${index}]`);
     }
   }
 
   if ("response" in result && result.response !== undefined) {
     assertKrakenModelResponse(result.response, "driverResult.response");
+    assertDriverResponseMatchesMessages(
+      Array.isArray(result.messages) ? result.messages : undefined,
+      result.response,
+      "driverResult.response"
+    );
   }
 
   assertRuntimeResolution(result.resolution);
@@ -5020,6 +5027,20 @@ function assertRuntimeResolution(
           resolution.contextPlan,
           "driverResult.resolution.contextPlan"
         );
+
+        if (resolution.contextPlan.targetAgent !== resolution.targetAgent) {
+          throw new KrakenRuntimeError(
+            "driver handoff target must match handoff context target",
+            {
+              code: "invalid_driver_result",
+              details: {
+                contextPlanTargetAgent: resolution.contextPlan.targetAgent,
+                resolutionTargetAgent: resolution.targetAgent,
+              },
+            }
+          );
+        }
+
         return;
       }
       break;
@@ -5039,6 +5060,187 @@ function assertRuntimeResolution(
     code: "invalid_driver_result",
     details: resolution,
   });
+}
+
+function assertDriverMessage(message: KrakenMessage, label: string): void {
+  if (message.role !== "assistant") {
+    throw new KrakenRuntimeError(`${label} must be an assistant message`, {
+      code: "invalid_driver_result",
+      details: message,
+    });
+  }
+
+  for (const [index, part] of message.parts.entries()) {
+    if (part.type === "tool_result") {
+      throw new KrakenRuntimeError(
+        `${label}.parts[${index}] must not be a tool_result`,
+        {
+          code: "invalid_driver_result",
+          details: part,
+        }
+      );
+    }
+  }
+}
+
+function assertDriverResponseMatchesMessages(
+  messages: KrakenMessage[] | undefined,
+  response: KrakenModelResponse,
+  label: string
+): void {
+  const responseToolCalls = response.parts.filter(
+    (
+      part
+    ): part is Extract<
+      (typeof response.parts)[number],
+      { type: "tool_call" }
+    > => part.type === "tool_call"
+  );
+
+  if (response.parts.some((part) => part.type === "tool_result")) {
+    throw new KrakenRuntimeError(
+      `${label} must not contain tool_result parts`,
+      {
+        code: "invalid_driver_result",
+        details: response,
+      }
+    );
+  }
+
+  if (messages === undefined || messages.length === 0) {
+    if (response.finishReason === "tool_call" || responseToolCalls.length > 0) {
+      throw new KrakenRuntimeError(
+        `${label} must not advertise tool calls when driverResult.messages contains none`,
+        {
+          code: "invalid_driver_result",
+          details: response,
+        }
+      );
+    }
+
+    return;
+  }
+
+  const lastMessage = messages.at(-1);
+
+  if (lastMessage?.role !== "assistant") {
+    throw new KrakenRuntimeError(
+      `${label} requires the last driver message to be an assistant message`,
+      {
+        code: "invalid_driver_result",
+        details: {
+          lastMessage,
+          response,
+        },
+      }
+    );
+  }
+
+  const messageToolCalls = lastMessage.parts.filter(
+    (
+      part
+    ): part is Extract<
+      (typeof lastMessage.parts)[number],
+      { type: "tool_call" }
+    > => part.type === "tool_call"
+  );
+  const messageHasToolCalls = messageToolCalls.length > 0;
+  const responseHasToolCalls =
+    response.finishReason === "tool_call" || responseToolCalls.length > 0;
+
+  if (messageHasToolCalls !== responseHasToolCalls) {
+    throw new KrakenRuntimeError(
+      `${label} must agree with the staged assistant message about tool-call semantics`,
+      {
+        code: "invalid_driver_result",
+        details: {
+          messageParts: lastMessage.parts,
+          response,
+        },
+      }
+    );
+  }
+
+  if (!messageHasToolCalls) {
+    return;
+  }
+
+  if (
+    !equalKernelRecords(
+      encodeDeterministicKernelRecord(toKernelToolCalls(messageToolCalls)),
+      encodeDeterministicKernelRecord(toKernelToolCalls(responseToolCalls))
+    )
+  ) {
+    throw new KrakenRuntimeError(
+      `${label}.parts must preserve the staged assistant tool calls`,
+      {
+        code: "invalid_driver_result",
+        details: {
+          messageToolCalls,
+          responseToolCalls,
+        },
+      }
+    );
+  }
+}
+
+function toKernelToolCalls(toolCalls: ToolCallPart[]): KernelRecord {
+  return toolCalls.map((toolCall) => ({
+    callId: toolCall.callId,
+    input: toComparableKernelRecord(toolCall.input),
+    name: toolCall.name,
+    type: toolCall.type,
+  }));
+}
+
+function toComparableKernelRecord(value: unknown): KernelRecord {
+  if (
+    value === null ||
+    typeof value === "boolean" ||
+    typeof value === "string"
+  ) {
+    return value;
+  }
+
+  if (typeof value === "number") {
+    return Number.isSafeInteger(value) ? value : String(value);
+  }
+
+  if (value instanceof Uint8Array) {
+    return value;
+  }
+
+  if (Array.isArray(value)) {
+    return value.map((entry) => toComparableKernelRecord(entry));
+  }
+
+  if (isRecord(value)) {
+    const normalized: Record<string, KernelRecord> = {};
+
+    for (const [key, entry] of Object.entries(value)) {
+      if (entry !== undefined) {
+        normalized[key] = toComparableKernelRecord(entry);
+      }
+    }
+
+    return normalized;
+  }
+
+  return String(value);
+}
+
+function equalKernelRecords(left: Uint8Array, right: Uint8Array): boolean {
+  if (left.length !== right.length) {
+    return false;
+  }
+
+  for (let index = 0; index < left.length; index += 1) {
+    if (left[index] !== right[index]) {
+      return false;
+    }
+  }
+
+  return true;
 }
 
 function assertDriverHandoffContextPlan(
