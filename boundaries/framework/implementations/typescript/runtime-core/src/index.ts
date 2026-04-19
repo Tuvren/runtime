@@ -34,14 +34,14 @@ export {
   createLastOutputOnlyHandoffContextBuilder,
   createPreserveTraceHandoffContextBuilder,
 } from "./lib/handoff-builders.js";
+export type { OrchestrationRuntimeOptions } from "./lib/orchestration-runtime.js";
+export { createOrchestrationRuntime } from "./lib/orchestration-runtime.js";
 export type {
   ExecutionSessionRequest,
-  OrchestrationRuntimeOptions,
   RuntimeCoreOptions,
 } from "./lib/runtime-core.js";
 export {
   createKrakenRuntimeCore,
-  createOrchestrationRuntime,
   DEFAULT_AGENT_SCHEMA,
   DEFAULT_AGENT_SCHEMA_ID,
 } from "./lib/runtime-core.js";

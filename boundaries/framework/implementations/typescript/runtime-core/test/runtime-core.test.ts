@@ -10159,6 +10159,54 @@ describe("framework-runtime-core", () => {
     ).toBe(true);
   });
 
+  test("rejects unknown worker event streams instead of leaving them hanging", async () => {
+    const harness = createFakeKernelHarness();
+    const driver = {
+      async execute(context) {
+        await delay(10);
+        return {
+          activeAgent: context.config.name,
+          messages: [assistantText("Waiting.")],
+          resolution: {
+            type: "continue_iteration",
+          },
+        };
+      },
+      id: "fake",
+      async resume() {
+        throw new Error("resume was not expected");
+      },
+    } satisfies KrakenDriver;
+    const framework = createKrakenRuntimeCore({
+      defaultDriverId: "fake",
+      driverRegistry: createDriverRegistry([driver]),
+      kernel: harness.kernel,
+    });
+    const orchestration = createOrchestrationRuntime({
+      agents: {
+        primary: { name: "primary" },
+      },
+      defaultDriverId: "fake",
+      driverRegistry: createDriverRegistry([driver]),
+      entrypoint: "primary",
+      framework,
+      kernel: harness.kernel,
+    });
+    const thread = await framework.createThread({});
+    const handle = orchestration.executeTurn({
+      branchId: thread.branchId,
+      signal: textSignal("Observe worker event validation"),
+      threadId: thread.threadId,
+    });
+
+    expect(() => handle.workerEvents("missing-worker")).toThrow(
+      'worker "missing-worker" is not known'
+    );
+
+    handle.cancel();
+    await collectEvents(handle.events());
+  });
+
   test("returns structured worker outputs through awaitWorker", async () => {
     const harness = createFakeKernelHarness();
     const report = {
