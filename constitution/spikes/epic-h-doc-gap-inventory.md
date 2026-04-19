@@ -130,7 +130,25 @@ Current non-goals for shared `runtime.status`:
 - Which paused-handle responsibilities remain valid after replacement.
 - What durable state must exist before resumed work begins.
 
-<!-- Let's do the same that I asked for the previous one, see exactly what real use cases would require -->
+**Working direction so far:**
+
+- The only shared-core pause semantics in Epic H are HITL approval pauses.
+- A pause is scoped to the specific Run that requested approval. It does not implicitly pause sibling workers, the parent Run, or the rest of the orchestration runtime.
+- If the main Run pauses, workers may continue.
+- If a worker pauses, the main Run and other workers may continue.
+- Steering queue management around a pause is host policy, not shared-core policy.
+- Approval resolution must not implicitly clear or reinterpret steering that was already accepted before the pause.
+
+**Explicit correction against the branch drift:**
+
+- The framework core should not auto-convert a paused Turn into `failed` by its own pause-time criteria.
+- A paused Turn may remain paused until an explicit approval decision is executed.
+
+The remaining design questions inside this topic are therefore narrower:
+
+- whether `resolveApproval(...)` returns a replacement handle
+- what parts of the old paused handle become invalid after approval handoff
+- whether paused-handle `cancel()` should be rejected, ignored, or modeled as some future explicit abandonment action rather than as implicit failure
 
 ### 4. Parallel tool execution semantics
 
