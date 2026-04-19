@@ -67,7 +67,7 @@ export interface DriverResumeContext extends DriverExecutionContext {
 }
 
 export interface DriverExecutionResult {
-  activeAgent: string;
+  activeAgent?: string;
   messages?: KrakenMessage[];
   resolution: RuntimeResolution;
   response?: KrakenModelResponse;

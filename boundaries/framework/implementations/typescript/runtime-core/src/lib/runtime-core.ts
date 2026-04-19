@@ -145,14 +145,32 @@ export interface RuntimeCoreOptions {
   sequenceHandoffContextBuilder?: HandoffContextBuilder;
 }
 
-export interface OrchestrationRuntimeOptions
-  extends Omit<RuntimeCoreOptions, "resolveAgentConfig" | "resolveNextAgent"> {
+interface OrchestrationRuntimeBaseOptions {
   agents: Record<string, AgentConfig>;
   entrypoint: string;
-  framework?: KrakenRuntime;
   handoffContextBuilder?: HandoffContextBuilder;
   sequence?: string[];
 }
+
+type InternalOrchestrationRuntimeOptions = OrchestrationRuntimeBaseOptions &
+  Omit<RuntimeCoreOptions, "resolveAgentConfig" | "resolveNextAgent"> & {
+    framework?: undefined;
+  };
+
+type DelegatedOrchestrationRuntimeOptions = OrchestrationRuntimeBaseOptions & {
+  createId?: RuntimeCoreOptions["createId"];
+  defaultDriverId?: string;
+  driverRegistry?: RuntimeCoreOptions["driverRegistry"];
+  enableStateObservability?: RuntimeCoreOptions["enableStateObservability"];
+  framework: KrakenRuntime;
+  kernel: KrakenKernel;
+  now?: () => EpochMs;
+  resolveParentTurnId?: RuntimeCoreOptions["resolveParentTurnId"];
+};
+
+export type OrchestrationRuntimeOptions =
+  | InternalOrchestrationRuntimeOptions
+  | DelegatedOrchestrationRuntimeOptions;
 
 interface ResolvedRuntimeCoreOptions {
   createId: () => string;
@@ -727,6 +745,8 @@ class RuntimeCore implements KrakenRuntime {
       this,
       {
         ...request,
+        config: cloneAgentConfigForRequest(request.config),
+        tools: request.tools === undefined ? undefined : [...request.tools],
         signal: normalizedSignal,
       },
       this.createId(),
@@ -743,7 +763,7 @@ class RuntimeCore implements KrakenRuntime {
       this,
       {
         ...previousHandle.request,
-        config: pauseContext.activeConfig,
+        config: cloneAgentConfigForRequest(pauseContext.activeConfig),
         driverId: pauseContext.activeDriverId,
       },
       previousHandle.turnId,
@@ -4444,21 +4464,22 @@ export function createOrchestrationRuntime(
     options.sequence
   );
   const framework =
-    options.framework ??
-    createKrakenRuntimeCore({
-      createId: options.createId,
-      defaultDriverId: options.defaultDriverId,
-      driverRegistry: options.driverRegistry,
-      enableStateObservability: options.enableStateObservability,
-      handoffContextBuilder: options.handoffContextBuilder,
-      kernel: options.kernel,
-      now: options.now,
-      resolveAgentConfig: (agentName) => options.agents[agentName],
-      resolveNextAgent: buildSequenceResolver(options.sequence),
-      resolveSequenceStep: buildSequenceStepResolver(options.sequence),
-      sequenceHandoffContextBuilder: options.handoffContextBuilder,
-      resolveParentTurnId: options.resolveParentTurnId,
-    });
+    options.framework === undefined
+      ? createKrakenRuntimeCore({
+          createId: options.createId,
+          defaultDriverId: options.defaultDriverId,
+          driverRegistry: options.driverRegistry,
+          enableStateObservability: options.enableStateObservability,
+          handoffContextBuilder: options.handoffContextBuilder,
+          kernel: options.kernel,
+          now: options.now,
+          resolveAgentConfig: (agentName) => options.agents[agentName],
+          resolveNextAgent: buildSequenceResolver(options.sequence),
+          resolveSequenceStep: buildSequenceStepResolver(options.sequence),
+          sequenceHandoffContextBuilder: options.handoffContextBuilder,
+          resolveParentTurnId: options.resolveParentTurnId,
+        })
+      : options.framework;
 
   return new OrchestrationRuntimeImpl(
     framework,
@@ -4646,6 +4667,22 @@ function createActiveToolRegistry(
   return createToolRegistry(activeTools, config.extensions ?? []);
 }
 
+function cloneAgentConfigForRequest(config: AgentConfig): AgentConfig {
+  return {
+    ...config,
+    extensions:
+      config.extensions?.map((extension) => ({
+        ...extension,
+        state:
+          extension.state === undefined
+            ? undefined
+            : cloneValue(extension.state),
+        tools: extension.tools?.map((tool) => tool),
+      })) ?? undefined,
+    tools: config.tools?.map((tool) => tool) ?? undefined,
+  };
+}
+
 function cloneValue<T>(value: T): T {
   return globalThis.structuredClone(value);
 }
@@ -4671,7 +4708,7 @@ function collectInitialExtensionStateUpdates(
 
     updates.push({
       extensionName: extension.name,
-      state: { ...extension.state },
+      state: cloneValue(extension.state),
     });
   }
 
@@ -4817,7 +4854,11 @@ function extractWorkerOutput(messages: KrakenMessage[]): unknown {
     const message = messages[index];
 
     if (message.role === "assistant" || message.role === "tool") {
-      return projectMessageOutput(message);
+      const projectedOutput = projectMessageOutput(message);
+
+      if (projectedOutput !== undefined) {
+        return projectedOutput;
+      }
     }
   }
 
@@ -4827,16 +4868,28 @@ function extractWorkerOutput(messages: KrakenMessage[]): unknown {
 function projectMessageOutput(
   message: Extract<KrakenMessage, { role: "assistant" | "tool" }>
 ): unknown {
-  if (message.parts.length === 1) {
-    return projectContentPart(message.parts[0]);
+  const projectedParts: unknown[] = [];
+
+  for (const part of message.parts) {
+    const projectedPart = projectContentPart(part);
+
+    if (projectedPart !== OMITTED_WORKER_OUTPUT_PART) {
+      projectedParts.push(projectedPart);
+    }
   }
 
-  return message.parts.map((part) => projectContentPart(part));
+  if (projectedParts.length === 0) {
+    return undefined;
+  }
+
+  return projectedParts.length === 1 ? projectedParts[0] : projectedParts;
 }
+
+const OMITTED_WORKER_OUTPUT_PART = Symbol("omitted_worker_output_part");
 
 function projectContentPart(
   part: Extract<KrakenMessage, { role: "assistant" | "tool" }>["parts"][number]
-): unknown {
+): unknown | typeof OMITTED_WORKER_OUTPUT_PART {
   switch (part.type) {
     case "file":
       return {
@@ -4846,11 +4899,7 @@ function projectContentPart(
         type: part.type,
       };
     case "reasoning":
-      return {
-        redacted: part.redacted,
-        text: part.text,
-        type: part.type,
-      };
+      return OMITTED_WORKER_OUTPUT_PART;
     case "structured":
       return part.data;
     case "text":
@@ -5001,16 +5050,22 @@ function normalizeInputSignal(signal: InputSignal, label: string): InputSignal {
 }
 
 function assertDriverExecutionResult(result: unknown): asserts result is {
-  activeAgent: string;
+  activeAgent?: string;
   messages?: KrakenMessage[];
   response?: KrakenModelResponse;
   resolution: RuntimeResolution;
 } {
-  if (!isRecord(result) || typeof result.activeAgent !== "string") {
-    throw new KrakenRuntimeError("driver result must include activeAgent", {
-      code: "invalid_driver_result",
-      details: result,
-    });
+  if (
+    !isRecord(result) ||
+    ("activeAgent" in result && typeof result.activeAgent !== "string")
+  ) {
+    throw new KrakenRuntimeError(
+      "driver result must include a string activeAgent when provided",
+      {
+        code: "invalid_driver_result",
+        details: result,
+      }
+    );
   }
 
   if ("messages" in result && result.messages !== undefined) {

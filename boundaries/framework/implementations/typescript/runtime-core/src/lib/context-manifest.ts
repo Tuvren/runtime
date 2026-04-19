@@ -206,8 +206,8 @@ function applyExtensionStateUpdates(
   for (const update of updates) {
     const currentExtensionState = asRecord(nextState[update.extensionName]);
     nextState[update.extensionName] = {
-      ...currentExtensionState,
-      ...update.state,
+      ...cloneRecord(currentExtensionState),
+      ...cloneRecord(update.state),
     };
   }
 
@@ -215,7 +215,7 @@ function applyExtensionStateUpdates(
 }
 
 function cloneRecord(record: Record<string, unknown>): Record<string, unknown> {
-  return { ...record };
+  return globalThis.structuredClone(record);
 }
 
 function cloneCountRecord(

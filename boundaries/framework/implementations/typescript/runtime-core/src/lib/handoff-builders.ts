@@ -126,7 +126,6 @@ function cloneVisibleAssistantParts(
     switch (part.type) {
       case "file": {
         visibleParts.push({
-          ...cloneProviderMetadata(part.providerMetadata),
           data:
             typeof part.data === "string"
               ? part.data
@@ -139,7 +138,6 @@ function cloneVisibleAssistantParts(
       }
       case "structured": {
         visibleParts.push({
-          ...cloneProviderMetadata(part.providerMetadata),
           data: structuredClone(part.data),
           name: part.name,
           type: "structured",
@@ -148,7 +146,6 @@ function cloneVisibleAssistantParts(
       }
       case "text": {
         visibleParts.push({
-          ...cloneProviderMetadata(part.providerMetadata),
           text: part.text,
           type: "text",
         });
@@ -161,16 +158,6 @@ function cloneVisibleAssistantParts(
   }
 
   return visibleParts;
-}
-
-function cloneProviderMetadata(
-  providerMetadata: Record<string, unknown> | undefined
-): { providerMetadata?: Record<string, unknown> } {
-  return providerMetadata === undefined
-    ? {}
-    : {
-        providerMetadata: structuredClone(providerMetadata),
-      };
 }
 
 function renderMessageText(message: KrakenMessage): string {

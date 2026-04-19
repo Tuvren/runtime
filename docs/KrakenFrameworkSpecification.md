@@ -1852,6 +1852,8 @@ tools: [{
 
 When such a payload is delivered while the parent Turn is running, the parent sees it as a user message at the next iteration boundary. The model can reason about worker status (“I got vendor A’s results, still waiting on B and C”), and drivers or extensions can also consume the payload programmatically without string parsing.
 
+Worker output is projected from the worker's visible assistant/tool result surface. Reasoning parts are not forwarded into `worker_result`.
+
 **wait_for_worker**: Converts an async worker to sync mid-flight. The tool blocks until the specified worker completes and returns the result as a tool result. The developer chooses when to synchronize, not the framework.
 
 Async worker outputs enter parent context through exactly two mechanisms: explicit synchronization (`wait_for_worker`, or equivalent host-defined sync tooling) or steering during a running parent Turn. Worker terminal completion alone does not mutate the parent’s context.
@@ -1864,6 +1866,8 @@ Async worker outputs enter parent context through exactly two mechanisms: explic
 - **Option 2**: Queue for next user message — the host stores results and injects them via steering immediately after the next user-initiated Turn starts.
 
 The framework provides primitives for both options. The policy choice is the developer’s.
+
+**Launch precondition**: A parent handle must have actually started execution before it can launch new workers. In the default lazy execution model that means at least one parent-facing event stream (`events()`, `parentEvents()`, or `allEvents()`) has started consumption.
 
 ### 10.4 Handoffs
 
@@ -1893,7 +1897,7 @@ Every handoff replaces the entire active `messages` collection. Handoffs stay on
 The framework provides two standard handoff modes:
 
 - **`preserve_trace`** — expected for agent-signaled handoffs. The receiving agent gets a rewritten request that preserves the prior agent trace as a chronological summarized trace without exposing raw history, raw tool-call inputs, or incompatible tool surfaces.
-- **`last_output_only`** — expected for pipeline/orchestrated handoffs. The receiving agent gets a clean-slate request containing only the previous agent’s final visible output parts (text / structured / file) plus any developer-configured scaffolding.
+- **`last_output_only`** — expected for pipeline/orchestrated handoffs. The receiving agent gets a clean-slate request containing only the previous agent’s final visible output parts (text / structured / file) plus any developer-configured scaffolding. Provider continuity metadata is not carried across the role transition into the new user-authored handoff message.
 
 The handoff context builder (§1.5 `HandoffContextBuilder`) produces new message hashes. The framework executes it as a context engineering Run:
 
@@ -2067,12 +2071,16 @@ WorkerStatus
 ```
 const orchestration = createOrchestrationRuntime({
   framework,
+  kernel,
   agents: { primary, research, billing },
   entrypoint: "primary",
+  defaultDriverId?: string,
   handoffContextBuilder?: HandoffContextBuilder,
   sequence?: string[]
 })
 ```
+
+`kernel` remains required even when `framework` is supplied because orchestration still needs canonical thread/result access outside the delegated `executeTurn(...)` surface. `defaultDriverId` is required only when `framework` is omitted and orchestration must construct its own framework runtime.
 
 If `framework` is omitted, `createOrchestrationRuntime(...)` constructs a framework runtime with the supplied `agents`, `sequence`, and `handoffContextBuilder` behavior wired in. If `framework` is provided, the orchestration layer delegates parent and worker Turn execution directly to that runtime; any custom `executeTurn(...)` behavior on the supplied framework therefore applies normally. Because execution is delegated, sequence and handoff behavior in that mode comes from the supplied framework's own runtime configuration. Hosts that want the orchestration-managed defaults can omit `framework`, or supply a framework that was itself constructed with matching `resolveAgentConfig`, `resolveNextAgent`, and sequence handoff settings. Static orchestration configuration is still validated eagerly: entrypoint, declared agents, and any provided `sequence` must remain internally consistent even when execution is delegated.
 

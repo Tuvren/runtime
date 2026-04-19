@@ -54,6 +54,7 @@ import {
   createPreserveTraceHandoffContextBuilder,
   createToolRegistry,
   runBeforeTurnHooks,
+  updateContextManifest,
 } from "../src/index.ts";
 import { createFakeKernelHarness } from "./fake-kernel.ts";
 
@@ -352,6 +353,33 @@ describe("framework-runtime-core", () => {
           4
       )
     );
+  });
+
+  test("deep-clones nested extension state when manifest snapshots are updated", () => {
+    const originalManifest = createContextManifest([], {
+      budget: {
+        limits: {
+          tokens: 10,
+        },
+      },
+    });
+    const nextManifest = updateContextManifest(originalManifest, []);
+    const originalBudget = toOptionalRecord(originalManifest.extensions.budget);
+    const originalLimits = toOptionalRecord(originalBudget?.limits);
+
+    if (originalLimits === undefined) {
+      throw new Error("expected nested extension state in the source manifest");
+    }
+
+    originalLimits.tokens = 99;
+
+    expect(nextManifest.extensions).toEqual({
+      budget: {
+        limits: {
+          tokens: 10,
+        },
+      },
+    });
   });
 
   test("executes a driver-neutral turn and persists the input plus assistant output", async () => {
@@ -1611,6 +1639,63 @@ describe("framework-runtime-core", () => {
     });
     expect(handle.status().manifest?.extensions.seeded).toEqual({
       seeded: true,
+    });
+  });
+
+  test("deep-clones nested initial extension state before first-turn seeding", async () => {
+    const harness = createFakeKernelHarness();
+    const runtime = createKrakenRuntimeCore({
+      defaultDriverId: "fake",
+      driverRegistry: createDriverRegistry([
+        {
+          async execute(context) {
+            return {
+              activeAgent: context.config.name,
+              messages: [assistantText("Seeded state captured.")],
+              resolution: {
+                reason: "done",
+                type: "end_turn",
+              },
+            };
+          },
+          id: "fake",
+          async resume() {
+            throw new Error("resume was not expected");
+          },
+        } satisfies KrakenDriver,
+      ]),
+      kernel: harness.kernel,
+    });
+    const nestedState = {
+      limits: {
+        remaining: 3,
+      },
+    };
+    const config: AgentConfig = {
+      extensions: [
+        {
+          name: "seeded",
+          state: nestedState,
+        },
+      ],
+      name: "primary",
+    };
+    const thread = await runtime.createThread({});
+    const handle = runtime.executeTurn({
+      branchId: thread.branchId,
+      config,
+      signal: textSignal("Seed initial state"),
+      threadId: thread.threadId,
+    });
+
+    nestedState.limits.remaining = 0;
+
+    await collectEvents(handle.events());
+
+    expect(handle.status().manifest?.extensions.seeded).toEqual({
+      limits: {
+        remaining: 3,
+      },
     });
   });
 
@@ -6553,16 +6638,28 @@ describe("framework-runtime-core", () => {
         {
           parts: [
             { redacted: false, text: "private reasoning", type: "reasoning" },
-            { text: "Visible final output", type: "text" },
+            {
+              providerMetadata: {
+                opaque: "token",
+              },
+              text: "Visible final output",
+              type: "text",
+            },
             {
               data: { score: 42 },
               name: "scorecard",
+              providerMetadata: {
+                opaque: "schema-token",
+              },
               type: "structured",
             },
             {
               data: fileData,
               filename: "report.csv",
               mediaType: "text/csv",
+              providerMetadata: {
+                opaque: "file-token",
+              },
               type: "file",
             },
           ],
@@ -6597,6 +6694,12 @@ describe("framework-runtime-core", () => {
         type: "file",
       },
     ]);
+    expect(
+      capturedMessage.parts.some(
+        (part) =>
+          "providerMetadata" in part && part.providerMetadata !== undefined
+      )
+    ).toBe(false);
   });
 
   test("does not leak per-turn tools across handoff transitions", async () => {
@@ -7495,6 +7598,111 @@ describe("framework-runtime-core", () => {
       true
     );
     expect(handle.status().phase).toBe("completed");
+  });
+
+  test("bridges worker results without leaking reasoning parts into the parent", async () => {
+    const harness = createFakeKernelHarness();
+    const driver = {
+      async execute(context) {
+        const workerResult = extractLastWorkerResult(context.messages);
+
+        if (context.config.name === "worker") {
+          return {
+            activeAgent: "worker",
+            messages: [
+              {
+                parts: [
+                  {
+                    redacted: false,
+                    text: "private worker reasoning",
+                    type: "reasoning",
+                  },
+                  {
+                    text: "Worker visible output.",
+                    type: "text",
+                  },
+                ],
+                role: "assistant",
+              },
+            ],
+            resolution: {
+              reason: "done",
+              type: "end_turn",
+            },
+          };
+        }
+
+        if (
+          workerResult?.status === "completed" &&
+          workerResult.output === "Worker visible output."
+        ) {
+          return {
+            activeAgent: "primary",
+            messages: [assistantText("Parent saw sanitized worker output.")],
+            resolution: {
+              reason: "done",
+              type: "end_turn",
+            },
+          };
+        }
+
+        await delay(20);
+        return {
+          activeAgent: "primary",
+          messages: [assistantText("Waiting for worker.")],
+          resolution: {
+            type: "continue_iteration",
+          },
+        };
+      },
+      id: "fake",
+      async resume() {
+        throw new Error("resume was not expected");
+      },
+    } satisfies KrakenDriver;
+    const framework = createKrakenRuntimeCore({
+      defaultDriverId: "fake",
+      driverRegistry: createDriverRegistry([driver]),
+      kernel: harness.kernel,
+    });
+    const orchestration = createOrchestrationRuntime({
+      agents: {
+        primary: { name: "primary" },
+        worker: { name: "worker" },
+      },
+      defaultDriverId: "fake",
+      driverRegistry: createDriverRegistry([driver]),
+      entrypoint: "primary",
+      framework,
+      kernel: harness.kernel,
+    });
+    const thread = await framework.createThread({});
+    const handle = orchestration.executeTurn({
+      branchId: thread.branchId,
+      signal: textSignal("Start worker"),
+      threadId: thread.threadId,
+    });
+
+    const eventsPromise = collectEvents(handle.events());
+    await delay(0);
+    const workerId = await orchestration.launchWorker("worker", {
+      task: "research",
+    });
+    const workerResult = await orchestration.awaitWorker(workerId);
+
+    await eventsPromise;
+
+    expect(workerResult).toBe("Worker visible output.");
+    expect(
+      extractLastWorkerResult(
+        toKrakenMessages(await harness.readBranchMessages(thread.branchId))
+      )
+    ).toEqual({
+      agent: "worker",
+      output: "Worker visible output.",
+      status: "completed",
+      workerId,
+    });
   });
 
   test("launches workers against the explicit parent handle when multiple sessions coexist", async () => {

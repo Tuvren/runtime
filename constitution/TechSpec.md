@@ -890,7 +890,7 @@ export interface DriverResumeContext extends DriverExecutionContext {
 
 export interface DriverExecutionResult {
   resolution: RuntimeResolution;
-  activeAgent: string;
+  activeAgent?: string;
   messages?: KrakenMessage[];
   response?: KrakenModelResponse;
 }
