@@ -224,6 +224,20 @@ This keeps the boundary clean:
 
 This keeps the core focused on durable semantics and leaves batch-level recovery or continuation strategy to the concrete execution model above it.
 
+**Working decision (sub-aspect 4):**
+
+- Timeout ownership belongs to the framework or host layer, not to the shared core as a forced-termination guarantee.
+- The shared core provides the reliable semantics that occur after timeout is triggered.
+
+Current preferred shared-core guarantees after timeout:
+
+- abort runtime-owned signals where available
+- fence runtime-owned callbacks and event injection surfaces
+- ignore late results that arrive after the timeout boundary
+- prevent late timeout-losing work from re-entering durable framework state
+
+The shared core does **not** guarantee forced termination of arbitrary user code or tool logic. Stronger timeout enforcement may exist in specific hosts, sandboxes, or concrete driver deployments above the core.
+
 ### 5. Driver/runtime contract ownership
 
 **Original gap in `docs/`:**
