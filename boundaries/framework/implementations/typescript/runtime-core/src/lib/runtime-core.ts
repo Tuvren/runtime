@@ -925,6 +925,12 @@ class RuntimeCore implements KrakenRuntime {
       }
 
       this.publishIterationEnd(handle, loopState, nextIteration);
+      const cancelledAfterIteration = createCancelledLoopOutcome(handle);
+
+      if (cancelledAfterIteration !== undefined) {
+        return cancelledAfterIteration;
+      }
+
       const nextOutcome = await this.resolveIterationOutcome(
         handle,
         schemaId,
@@ -934,10 +940,16 @@ class RuntimeCore implements KrakenRuntime {
       );
 
       if (nextOutcome === "continue") {
+        const cancelledBeforeContinue = createCancelledLoopOutcome(handle);
+
+        if (cancelledBeforeContinue !== undefined) {
+          return cancelledBeforeContinue;
+        }
+
         continue;
       }
 
-      return nextOutcome;
+      return createCancelledLoopOutcome(handle) ?? nextOutcome;
     }
   }
 
@@ -1137,8 +1149,11 @@ class RuntimeCore implements KrakenRuntime {
     let resolution = driverResult.resolution;
     const driverMessages = driverResult.messages ?? [];
     const requestedToolCalls = extractToolCallsFromMessages(driverMessages);
+    const cancellationResolution = createCancelledResolution(handle);
     const invalidDriverResolutionError =
-      requestedToolCalls.length > 0 && resolution.type !== "continue_iteration"
+      cancellationResolution === undefined &&
+      requestedToolCalls.length > 0 &&
+      resolution.type !== "continue_iteration"
         ? new KrakenRuntimeError(
             "drivers must not return executable tool calls with a terminal resolution",
             {
@@ -1174,6 +1189,10 @@ class RuntimeCore implements KrakenRuntime {
     const driverResponse =
       driverResult.response ?? synthesizeResponse(driverMessages, resolution);
     const toolResults: ToolResultPart[] = [];
+
+    if (cancellationResolution !== undefined) {
+      resolution = cancellationResolution;
+    }
 
     if (
       resolution.type === "continue_iteration" &&
@@ -1215,6 +1234,8 @@ class RuntimeCore implements KrakenRuntime {
       }
     }
 
+    resolution = createCancelledResolution(handle) ?? resolution;
+
     const manifest = updateContextManifest(
       headState.manifest,
       stagedMessages,
@@ -1249,6 +1270,7 @@ class RuntimeCore implements KrakenRuntime {
       stagedMessages,
       manifest
     );
+    resolution = createCancelledResolution(handle) ?? resolution;
 
     return {
       kind: "executed",
@@ -1373,7 +1395,6 @@ class RuntimeCore implements KrakenRuntime {
               iterationCount,
               pauseReason: resolution.reason,
               state: "paused",
-              turnId: handle.turnId,
             },
             "runtime_status"
           )
@@ -1623,7 +1644,6 @@ class RuntimeCore implements KrakenRuntime {
               iterationCount: pausedIteration.iterationCount,
               pauseReason: resolution.reason,
               state: "paused",
-              turnId: handle.turnId,
             },
             "runtime_status_paused"
           )
@@ -1882,6 +1902,7 @@ class RuntimeCore implements KrakenRuntime {
         {
           fatality: resolution.fatality,
           message: resolution.error.message,
+          turnId: handle.turnId,
           type: "iteration_failed",
         }
       );
@@ -1889,6 +1910,7 @@ class RuntimeCore implements KrakenRuntime {
     } else {
       const stepEventHash = await this.storeEventRecord({
         iteration: iterationCount,
+        turnId: handle.turnId,
         type: "iteration_step_completed",
       });
       const stepResult = await this.options.kernel.run.completeStep(
@@ -1905,10 +1927,12 @@ class RuntimeCore implements KrakenRuntime {
         resolution.type === "pause"
           ? {
               reason: resolution.reason,
+              turnId: handle.turnId,
               type: "paused",
             }
           : {
               iteration: iterationCount,
+              turnId: handle.turnId,
               type: "iteration_completed",
             }
       );
@@ -2053,7 +2077,6 @@ class RuntimeCore implements KrakenRuntime {
       {
         activeAgent: loopState.activeConfig.name,
         state: "running",
-        turnId: handle.turnId,
       },
       "runtime_status"
     );
@@ -2061,6 +2084,7 @@ class RuntimeCore implements KrakenRuntime {
       runId,
       "incorporate_input",
       await this.storeEventRecord({
+        turnId: handle.turnId,
         type: "input_received",
       })
     );
@@ -2129,6 +2153,7 @@ class RuntimeCore implements KrakenRuntime {
       "incorporate_steering",
       await this.storeEventRecord({
         messageId: steeringMessageHash,
+        turnId: handle.turnId,
         type: "steering_incorporated",
       })
     );
@@ -2196,7 +2221,11 @@ class RuntimeCore implements KrakenRuntime {
     await this.stageManifest(runId, manifest);
     const stepResult = await this.options.kernel.run.completeStep(
       runId,
-      "commit_extension_state"
+      "commit_extension_state",
+      await this.storeEventRecord({
+        turnId: handle.turnId,
+        type: "extension_state_committed",
+      })
     );
     await this.completeTrackedRun(handle, runId, "completed");
 
@@ -2287,6 +2316,7 @@ class RuntimeCore implements KrakenRuntime {
       "context_engineering",
       await this.storeEventRecord({
         action: plan.action,
+        turnId: handle.turnId,
         type: "context_engineering_applied",
       }),
       undefined,
@@ -2400,7 +2430,6 @@ class RuntimeCore implements KrakenRuntime {
       {
         activeAgent: targetConfig.name,
         state: "running",
-        turnId: handle.turnId,
       },
       "handoff_runtime_status"
     );
@@ -2435,6 +2464,7 @@ class RuntimeCore implements KrakenRuntime {
       "handoff_context",
       await this.storeEventRecord({
         targetAgent: targetConfig.name,
+        turnId: handle.turnId,
         type: "handoff_applied",
       }),
       undefined,
@@ -2611,7 +2641,6 @@ class RuntimeCore implements KrakenRuntime {
       {
         activeAgent: loopState.activeConfig.name,
         state: phase,
-        turnId: handle.turnId,
       },
       "runtime_status_final"
     );
@@ -2620,6 +2649,7 @@ class RuntimeCore implements KrakenRuntime {
       "finalize_turn_status",
       await this.storeEventRecord({
         status: phase,
+        turnId: handle.turnId,
         type: "turn_status_finalized",
       })
     );
@@ -2790,10 +2820,7 @@ class RuntimeCore implements KrakenRuntime {
 
     const parentTurnId =
       resolvedParentTurnId === undefined
-        ? readRuntimeStatusTurnId(
-            await readBranchRuntimeStatus(this.options.kernel, branchId),
-            branchId
-          )
+        ? await readBranchActiveTurnId(this.options.kernel, branchId)
         : resolvedParentTurnId;
     await this.assertValidParentTurnId(threadId, branchId, parentTurnId);
     return parentTurnId;
@@ -2804,8 +2831,8 @@ class RuntimeCore implements KrakenRuntime {
     branchId: string,
     parentTurnId: string | null
   ): Promise<void> {
-    const expectedParentTurnId = readRuntimeStatusTurnId(
-      await readBranchRuntimeStatus(this.options.kernel, branchId),
+    const expectedParentTurnId = await readBranchActiveTurnId(
+      this.options.kernel,
       branchId
     );
 
@@ -3001,7 +3028,6 @@ class RuntimeCore implements KrakenRuntime {
         activeAgent: loopState.activeConfig.name,
         iterationCount,
         state: "running",
-        turnId: handle.turnId,
       },
       "runtime_status_running"
     );
@@ -3024,7 +3050,11 @@ class RuntimeCore implements KrakenRuntime {
     const stepResult = await this.options.kernel.run.completeStep(
       runId,
       "resume_running_status",
-      undefined,
+      await this.storeEventRecord({
+        iteration: iterationCount,
+        turnId: handle.turnId,
+        type: "runtime_status_resumed",
+      }),
       undefined,
       nextTreeHash
     );
@@ -3415,10 +3445,13 @@ function createPendingKernelHash(value: Uint8Array): HashString {
     .digest("hex");
 }
 
-async function readBranchRuntimeStatus(
+async function readBranchHeadState(
   kernel: KrakenKernel,
   branchId: string
-): Promise<Record<string, unknown> | null> {
+): Promise<{
+  branchHeadHash: HashString;
+  turnNode: TurnNode;
+}> {
   const branch = await kernel.branch.get(branchId);
 
   if (branch === null) {
@@ -3438,30 +3471,71 @@ async function readBranchRuntimeStatus(
     );
   }
 
-  const runtimeStatusHash = toOptionalHash(
-    await kernel.tree.resolve(turnNode.turnTreeHash, "runtime.status")
-  );
+  return {
+    branchHeadHash: branch.headTurnNodeHash,
+    turnNode,
+  };
+}
 
-  if (runtimeStatusHash === null) {
-    return null;
-  }
+async function readBranchActiveTurnId(
+  kernel: KrakenKernel,
+  branchId: string
+): Promise<string | null> {
+  const { turnNode } = await readBranchHeadState(kernel, branchId);
 
-  const payload = await kernel.store.get(runtimeStatusHash);
+  if (turnNode.eventHash === null) {
+    if (turnNode.previousTurnNodeHash === null) {
+      return null;
+    }
 
-  if (payload === null) {
     throw new KrakenLineageError(
-      `runtime status "${runtimeStatusHash}" does not exist`,
+      `branch "${branchId}" head turn node must reference a checkpoint event`,
       {
-        code: "missing_runtime_status",
+        code: "invalid_branch_head_event",
         details: {
-          hash: runtimeStatusHash,
+          branchId,
+          turnNode,
         },
       }
     );
   }
 
-  const status = decodeDeterministicKernelRecord(payload);
-  return isRecord(status) ? status : null;
+  const payload = await kernel.store.get(turnNode.eventHash);
+
+  if (payload === null) {
+    throw new KrakenLineageError(
+      `event object "${turnNode.eventHash}" does not exist`,
+      {
+        code: "missing_event_object",
+        details: {
+          branchId,
+          hash: turnNode.eventHash,
+        },
+      }
+    );
+  }
+
+  const eventRecord = decodeDeterministicKernelRecord(payload);
+
+  if (isRecord(eventRecord) && typeof eventRecord.turnId === "string") {
+    return eventRecord.turnId;
+  }
+
+  if (turnNode.previousTurnNodeHash === null) {
+    return null;
+  }
+
+  throw new KrakenLineageError(
+    `branch "${branchId}" head event must carry a turnId`,
+    {
+      code: "invalid_branch_head_event",
+      details: {
+        branchId,
+        eventHash: turnNode.eventHash,
+        eventRecord,
+      },
+    }
+  );
 }
 
 function inferFinishReason(
@@ -3478,30 +3552,6 @@ function isContextEngineeringPlan(
   return value.action !== "none";
 }
 
-function readRuntimeStatusTurnId(
-  runtimeStatus: Record<string, unknown> | null,
-  branchId: string
-): string | null {
-  if (runtimeStatus === null) {
-    return null;
-  }
-
-  if (typeof runtimeStatus.turnId === "string") {
-    return runtimeStatus.turnId;
-  }
-
-  throw new KrakenLineageError(
-    `runtime status for branch "${branchId}" must carry a turnId`,
-    {
-      code: "invalid_runtime_status",
-      details: {
-        branchId,
-        runtimeStatus,
-      },
-    }
-  );
-}
-
 function decodeKrakenMessageRecord(
   payload: Uint8Array,
   label: string
@@ -3514,16 +3564,28 @@ function decodeKrakenMessageRecord(
 function createCancelledLoopOutcome(
   handle: RuntimeExecutionHandle
 ): LoopOutcome | undefined {
+  const cancelledResolution = createCancelledResolution(handle);
+
+  if (cancelledResolution === undefined) {
+    return undefined;
+  }
+
+  return {
+    resolution: cancelledResolution,
+  };
+}
+
+function createCancelledResolution(
+  handle: RuntimeExecutionHandle
+): RuntimeResolution | undefined {
   if (!handle.abortSignal.aborted) {
     return undefined;
   }
 
   return {
-    resolution: {
-      error: new Error("execution cancelled"),
-      fatality: "hard",
-      type: "fail",
-    },
+    error: new Error("execution cancelled"),
+    fatality: "hard",
+    type: "fail",
   };
 }
 

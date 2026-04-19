@@ -1185,7 +1185,6 @@ export function createOrchestrationRuntime(
           resolveAgentConfig: (agentName) => options.agents[agentName],
           resolveNextAgent: buildSequenceResolver(options.sequence),
           resolveSequenceStep: buildSequenceStepResolver(options.sequence),
-          sequenceHandoffContextBuilder: options.handoffContextBuilder,
           resolveParentTurnId: options.resolveParentTurnId,
         })
       : options.framework;

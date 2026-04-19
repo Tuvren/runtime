@@ -81,11 +81,11 @@ function summarizeChronologicalMessage(message: KrakenMessage): string[] {
     }
     case "tool": {
       return message.parts.map((part) =>
-        formatTraceLine(`Tool:${part.name}`, renderToolResult(part))
+        formatTraceLine(`Tool:${part.name}`, summarizeToolResult(part))
       );
     }
     case "user": {
-      return [formatTraceLine("User", renderMessageText(message))];
+      return [formatTraceLine("User", summarizeUserMessage(message))];
     }
     default: {
       return [];
@@ -160,45 +160,63 @@ function cloneVisibleAssistantParts(
   return visibleParts;
 }
 
-function renderMessageText(message: KrakenMessage): string {
-  if (message.role === "system") {
-    return message.content;
-  }
-
-  const fragments: string[] = [];
+function summarizeUserMessage(
+  message: Extract<KrakenMessage, { role: "user" }>
+): string {
+  const summaryParts: string[] = [];
+  let textCount = 0;
+  let structuredCount = 0;
+  let fileCount = 0;
 
   for (const part of message.parts) {
     switch (part.type) {
-      case "reasoning":
       case "text":
-        fragments.push(part.text);
+        textCount += 1;
         break;
       case "structured":
-        fragments.push(JSON.stringify(part.data));
-        break;
-      case "tool_call":
-        fragments.push(`[tool:${part.name}] ${JSON.stringify(part.input)}`);
-        break;
-      case "tool_result":
-        fragments.push(`${part.name}: ${renderToolResult(part)}`);
+        structuredCount += 1;
         break;
       case "file":
-        fragments.push(
-          `[file:${part.filename ?? "unnamed"}:${part.mediaType}]`
-        );
+        fileCount += 1;
         break;
       default:
         break;
     }
   }
 
-  return fragments.join("\n");
+  if (textCount > 0) {
+    summaryParts.push(
+      textCount === 1
+        ? "Text request provided"
+        : `${textCount} text parts provided`
+    );
+  }
+
+  if (structuredCount > 0) {
+    summaryParts.push(
+      structuredCount === 1
+        ? "Structured input provided"
+        : `${structuredCount} structured inputs provided`
+    );
+  }
+
+  if (fileCount > 0) {
+    summaryParts.push(
+      fileCount === 1
+        ? "File attachment provided"
+        : `${fileCount} file attachments provided`
+    );
+  }
+
+  return summaryParts.length > 0
+    ? summaryParts.join("; ")
+    : "Non-text user content provided";
 }
 
-function renderToolResult(part: ToolResultPart): string {
-  return typeof part.output === "string"
-    ? part.output
-    : JSON.stringify(part.output);
+function summarizeToolResult(part: ToolResultPart): string {
+  return part.isError === true
+    ? "Reported an error result"
+    : "Returned a result";
 }
 
 function summarizeAssistantMessage(

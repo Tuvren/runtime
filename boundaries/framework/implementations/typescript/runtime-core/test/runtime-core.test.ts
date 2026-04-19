@@ -991,7 +991,6 @@ describe("framework-runtime-core", () => {
     expect(await harness.readBranchRuntimeStatus(thread.branchId)).toEqual({
       activeAgent: "primary",
       state: "failed",
-      turnId: extractTurnId(events),
     });
   });
 
@@ -1265,7 +1264,7 @@ describe("framework-runtime-core", () => {
     expect(callSequence).toEqual(["instance-1-call-1", "instance-1-call-2"]);
   });
 
-  test("fails loudly when branch runtime status is malformed during parent inference", async () => {
+  test("does not require runtime status turnId for implicit parent inference", async () => {
     const harness = createFakeKernelHarness();
     const driver = {
       async execute(context) {
@@ -1315,13 +1314,16 @@ describe("framework-runtime-core", () => {
       threadId: thread.threadId,
     });
     const events = await collectEvents(handle.events());
-    const errorEvent = events.find(
-      (event): event is Extract<(typeof events)[number], { type: "error" }> =>
-        event.type === "error"
-    );
+    const secondTurnId = extractTurnId(events);
 
-    expect(handle.status().phase).toBe("failed");
-    expect(errorEvent?.error.code).toBe("invalid_runtime_status");
+    if (secondTurnId === null) {
+      throw new Error("expected a second turn id");
+    }
+
+    const secondTurn = await harness.kernel.turn.get(secondTurnId);
+
+    expect(handle.status().phase).toBe("completed");
+    expect(secondTurn?.parentTurnId).toBe(extractTurnId(firstEvents));
   });
 
   test("rejects explicit parent turns that do not match the active branch parent", async () => {
@@ -1515,14 +1517,12 @@ describe("framework-runtime-core", () => {
       threadId: thread.threadId,
     });
 
-    const events = await collectEvents(handle.events());
-    const failedTurnId = extractTurnId(events);
+    await collectEvents(handle.events());
 
     expect(handle.status().phase).toBe("failed");
     expect(await harness.readBranchRuntimeStatus(thread.branchId)).toEqual({
       activeAgent: "primary",
       state: "failed",
-      turnId: failedTurnId,
     });
   });
 
@@ -1581,7 +1581,6 @@ describe("framework-runtime-core", () => {
     expect(await harness.readBranchRuntimeStatus(thread.branchId)).toEqual({
       activeAgent: "primary",
       state: "running",
-      turnId: extractTurnId(events),
     });
   });
 
@@ -2868,8 +2867,7 @@ describe("framework-runtime-core", () => {
       threadId: thread.threadId,
     });
 
-    const events = await collectEvents(handle.events());
-    const turnId = extractTurnId(events);
+    await collectEvents(handle.events());
 
     expect(handle.status().phase).toBe("paused");
     expect(handle.status().activeAgent).toBe("primary");
@@ -2878,7 +2876,6 @@ describe("framework-runtime-core", () => {
       iterationCount: 1,
       pauseReason: "approval_required",
       state: "paused",
-      turnId,
     });
   });
 
@@ -3002,8 +2999,7 @@ describe("framework-runtime-core", () => {
       threadId: thread.threadId,
     });
 
-    const pausedEvents = await collectEvents(pausedHandle.events());
-    const pausedTurnId = extractTurnId(pausedEvents);
+    await collectEvents(pausedHandle.events());
     const resumedHandle = pausedHandle.resolveApproval({
       decisions: [{ callId: "driver-pause", type: "approve" }],
     });
@@ -3027,7 +3023,6 @@ describe("framework-runtime-core", () => {
       activeAgent: "primary",
       iterationCount: 1,
       state: "running",
-      turnId: pausedTurnId,
     });
 
     await resumedEventsPromise;
@@ -3083,8 +3078,7 @@ describe("framework-runtime-core", () => {
       signal: textSignal("Pause for driver review"),
       threadId: thread.threadId,
     });
-    const events = await collectEvents(pausedHandle.events());
-    const turnId = extractTurnId(events);
+    await collectEvents(pausedHandle.events());
 
     expect(pausedHandle.status().phase).toBe("paused");
     expect(pausedHandle.status().pauseReason).toBe("driver_review_required");
@@ -3093,7 +3087,6 @@ describe("framework-runtime-core", () => {
       iterationCount: 1,
       pauseReason: "driver_review_required",
       state: "paused",
-      turnId,
     });
   });
 
@@ -3172,8 +3165,7 @@ describe("framework-runtime-core", () => {
       threadId: thread.threadId,
     });
 
-    const pausedEvents = await collectEvents(pausedHandle.events());
-    const pausedTurnId = extractTurnId(pausedEvents);
+    await collectEvents(pausedHandle.events());
     pausedHandle.cancel();
 
     expect(pausedHandle.status().phase).toBe("paused");
@@ -3199,7 +3191,6 @@ describe("framework-runtime-core", () => {
     expect(await harness.readBranchRuntimeStatus(thread.branchId)).toEqual({
       activeAgent: "primary",
       state: "failed",
-      turnId: pausedTurnId,
     });
   });
 
@@ -3277,8 +3268,7 @@ describe("framework-runtime-core", () => {
       signal: textSignal("Pause then cancel after approval"),
       threadId: thread.threadId,
     });
-    const pausedEvents = await collectEvents(pausedHandle.events());
-    const pausedTurnId = extractTurnId(pausedEvents);
+    await collectEvents(pausedHandle.events());
 
     const resumedHandle = pausedHandle.resolveApproval({
       decisions: [{ callId: "call-email", type: "approve" }],
@@ -3290,7 +3280,6 @@ describe("framework-runtime-core", () => {
     expect(await harness.readBranchRuntimeStatus(thread.branchId)).toEqual({
       activeAgent: "primary",
       state: "failed",
-      turnId: pausedTurnId,
     });
     expect(
       hasAssistantText(
@@ -6731,27 +6720,31 @@ describe("framework-runtime-core", () => {
     } satisfies HandoffSourceContext);
 
     const handoffText = extractSingleUserText(storedMessage);
-    const firstUserIndex = handoffText.indexOf("[User] Please investigate.");
+    const firstUserIndex = handoffText.indexOf("[User] Text request provided");
     const firstAssistantIndex = handoffText.indexOf(
       "[Assistant] Visible summary"
     );
     const secondUserIndex = handoffText.indexOf(
-      "[User] Please continue carefully."
+      "[User] Text request provided",
+      firstUserIndex + 1
     );
     const secondAssistantIndex = handoffText.indexOf(
       "[Assistant] Second visible summary"
     );
-    const toolIndex = handoffText.indexOf('[Tool:search] {"result":"okay"}');
+    const toolIndex = handoffText.indexOf("[Tool:search] Returned a result");
 
     expect(handoffText).toContain("Visible summary");
     expect(handoffText).toContain("[Structured output produced]");
     expect(firstUserIndex).toBeGreaterThanOrEqual(0);
     expect(firstAssistantIndex).toBeGreaterThan(firstUserIndex);
-    expect(secondUserIndex).toBeGreaterThan(firstAssistantIndex);
+    expect(secondUserIndex).toBeGreaterThanOrEqual(firstAssistantIndex);
     expect(secondAssistantIndex).toBeGreaterThan(secondUserIndex);
     expect(toolIndex).toBeGreaterThan(secondAssistantIndex);
     expect(handoffText).not.toContain("private reasoning");
+    expect(handoffText).not.toContain("Please investigate.");
+    expect(handoffText).not.toContain("Please continue carefully.");
     expect(handoffText).not.toContain("leak me");
+    expect(handoffText).not.toContain("okay");
     expect(handoffText).not.toContain('"secret":true');
   });
 
@@ -7248,6 +7241,106 @@ describe("framework-runtime-core", () => {
         "Reviewer saw: Custom handoff for reviewer"
       )
     ).toBe(true);
+  });
+
+  test("keeps sequence transitions on last_output_only even when orchestration has a custom handoff builder", async () => {
+    const harness = createFakeKernelHarness();
+    const customBuilder = (context: HandoffSourceContext) => [
+      context.helpers.storeMessage({
+        parts: [
+          {
+            text: `Custom builder for ${context.targetAgent.name}`,
+            type: "text",
+          },
+        ],
+        role: "user",
+      }),
+    ];
+    const driver = {
+      async execute(context) {
+        if (context.config.name === "primary") {
+          return {
+            activeAgent: "primary",
+            messages: [
+              {
+                parts: [
+                  { text: "Sequence visible output", type: "text" },
+                  {
+                    data: { score: 42 },
+                    name: "score",
+                    type: "structured",
+                  },
+                ],
+                role: "assistant",
+              },
+            ],
+            resolution: {
+              reason: "handoff",
+              type: "end_turn",
+            },
+          };
+        }
+
+        return {
+          activeAgent: "reviewer",
+          messages: [
+            assistantText(
+              `Reviewer saw: ${JSON.stringify(
+                context.messages[0]?.role === "user"
+                  ? context.messages[0].parts
+                  : null
+              )}`
+            ),
+          ],
+          resolution: {
+            reason: "done",
+            type: "end_turn",
+          },
+        };
+      },
+      id: "fake",
+      async resume() {
+        throw new Error("resume was not expected");
+      },
+    } satisfies KrakenDriver;
+    const orchestration = createOrchestrationRuntime({
+      agents: {
+        primary: { name: "primary" },
+        reviewer: { name: "reviewer" },
+      },
+      defaultDriverId: "fake",
+      driverRegistry: createDriverRegistry([driver]),
+      entrypoint: "primary",
+      handoffContextBuilder: customBuilder,
+      kernel: harness.kernel,
+      sequence: ["primary", "reviewer"],
+    });
+    const threadRuntime = createKrakenRuntimeCore({
+      defaultDriverId: "fake",
+      driverRegistry: createDriverRegistry([driver]),
+      kernel: harness.kernel,
+    });
+    const thread = await threadRuntime.createThread({});
+    const handle = orchestration.executeTurn({
+      branchId: thread.branchId,
+      signal: textSignal("Start custom sequence"),
+      threadId: thread.threadId,
+    });
+
+    await collectEvents(handle.events());
+
+    expect(
+      hasAssistantText(
+        await harness.readBranchMessages(thread.branchId),
+        'Reviewer saw: [{"text":"Sequence visible output","type":"text"},{"data":{"score":42},"name":"score","type":"structured"}]'
+      )
+    ).toBe(true);
+    expect(
+      hasAssistantText(
+        await harness.readBranchMessages(thread.branchId),
+        "Custom builder for reviewer"
+      )
+    ).toBe(false);
   });
 
   test("supports sequences when orchestration receives an external framework", async () => {
@@ -11163,7 +11256,7 @@ describe("framework-runtime-core", () => {
     expect(workerAResult).toEqual({
       code: undefined,
       details: undefined,
-      message: "worker cancel-me cancelled",
+      message: "execution cancelled",
     });
     expect(workerBResult).toBe("Worker stay-alive completed.");
   });
@@ -11261,6 +11354,54 @@ describe("framework-runtime-core", () => {
       details: undefined,
       message: "execution cancelled",
     });
+  });
+
+  test("fails the turn when cancellation races with a driver that ignores abort", async () => {
+    const harness = createFakeKernelHarness();
+    const driver = {
+      async execute(context) {
+        await delay(25);
+
+        return {
+          activeAgent: context.config.name,
+          messages: [assistantText("Too late.")],
+          resolution: {
+            reason: "done",
+            type: "end_turn",
+          },
+        };
+      },
+      id: "fake",
+      async resume() {
+        throw new Error("resume was not expected");
+      },
+    } satisfies KrakenDriver;
+    const runtime = createKrakenRuntimeCore({
+      defaultDriverId: "fake",
+      driverRegistry: createDriverRegistry([driver]),
+      kernel: harness.kernel,
+    });
+    const thread = await runtime.createThread({});
+    const handle = runtime.executeTurn({
+      branchId: thread.branchId,
+      config: { name: "primary" },
+      signal: textSignal("Cancel this turn"),
+      threadId: thread.threadId,
+    });
+
+    const eventsPromise = collectEvents(handle.events());
+    await delay(5);
+    handle.cancel();
+    const events = await eventsPromise;
+    const turnEndEvent = events.find(
+      (
+        event
+      ): event is Extract<(typeof events)[number], { type: "turn.end" }> =>
+        event.type === "turn.end"
+    );
+
+    expect(handle.status().phase).toBe("failed");
+    expect(turnEndEvent?.status).toBe("failed");
   });
 
   test("fails workers whose streams exhaust without a terminal turn status", async () => {

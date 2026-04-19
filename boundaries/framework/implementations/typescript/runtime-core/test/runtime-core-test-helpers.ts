@@ -402,7 +402,12 @@ export async function overwriteBranchSinglePath(
   const stepResult = await kernel.run.completeStep(
     runId,
     stepId,
-    undefined,
+    await kernel.store.put(
+      encodeDeterministicKernelRecord({
+        turnId,
+        type: `overwrite_${path.replace(".", "_")}`,
+      })
+    ),
     undefined,
     nextTreeHash
   );
