@@ -79,8 +79,6 @@ import {
 import {
   createContextManifest,
   createEmptyContextManifest,
-  createLastOutputOnlyHandoffContextBuilder,
-  createPreserveTraceHandoffContextBuilder,
   updateContextManifest,
 } from "./context-manifest.js";
 import { createDriverRegistry, materializeDriver } from "./driver-registry.js";
@@ -91,6 +89,10 @@ import {
   runBeforeIterationHooks,
   runBeforeTurnHooks,
 } from "./extension-runtime.js";
+import {
+  createLastOutputOnlyHandoffContextBuilder,
+  createPreserveTraceHandoffContextBuilder,
+} from "./handoff-builders.js";
 import {
   executeToolBatch,
   resumeToolBatch,
@@ -1528,7 +1530,11 @@ class RuntimeCore implements KrakenRuntime {
       );
 
       handle.updateStatus({
-        activeAgent: driverResult.activeAgent,
+        // `activeAgent` is framework-owned lifecycle state. The driver may report
+        // its own view for compatibility, but live handle status must stay aligned
+        // with the currently active AgentConfig until a framework-applied handoff
+        // actually changes that agent segment.
+        activeAgent: loopState.activeConfig.name,
         manifest,
       });
 

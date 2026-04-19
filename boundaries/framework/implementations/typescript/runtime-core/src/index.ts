@@ -18,8 +18,6 @@
 export {
   createContextManifest,
   createEmptyContextManifest,
-  createLastOutputOnlyHandoffContextBuilder,
-  createPreserveTraceHandoffContextBuilder,
   updateContextManifest,
 } from "./lib/context-manifest.js";
 export { createDriverRegistry } from "./lib/driver-registry.js";
@@ -32,6 +30,10 @@ export {
   runBeforeIterationHooks,
   runBeforeTurnHooks,
 } from "./lib/extension-runtime.js";
+export {
+  createLastOutputOnlyHandoffContextBuilder,
+  createPreserveTraceHandoffContextBuilder,
+} from "./lib/handoff-builders.js";
 export type {
   ExecutionSessionRequest,
   OrchestrationRuntimeOptions,

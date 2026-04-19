@@ -2741,6 +2741,73 @@ describe("framework-runtime-core", () => {
     });
   });
 
+  test("keeps live handle activeAgent framework-owned while a turn is still running", async () => {
+    const harness = createFakeKernelHarness();
+    let executeCount = 0;
+    let releaseSecondIteration: (() => void) | undefined;
+    const secondIterationGate = new Promise<void>((resolve) => {
+      releaseSecondIteration = resolve;
+    });
+    const driver = {
+      async execute(_context) {
+        executeCount += 1;
+
+        if (executeCount === 1) {
+          return {
+            activeAgent: "other-agent",
+            messages: [assistantText("First pass complete.")],
+            resolution: {
+              type: "continue_iteration",
+            },
+          };
+        }
+
+        await secondIterationGate;
+        return {
+          activeAgent: "other-agent",
+          messages: [assistantText("Second pass complete.")],
+          resolution: {
+            reason: "done",
+            type: "end_turn",
+          },
+        };
+      },
+      id: "fake",
+      async resume() {
+        throw new Error("resume was not expected");
+      },
+    } satisfies KrakenDriver;
+    const runtime = createKrakenRuntimeCore({
+      defaultDriverId: "fake",
+      driverRegistry: createDriverRegistry([driver]),
+      kernel: harness.kernel,
+    });
+    const thread = await runtime.createThread({});
+    const handle = runtime.executeTurn({
+      branchId: thread.branchId,
+      config: { name: "primary" },
+      signal: textSignal("Keep the turn running"),
+      threadId: thread.threadId,
+    });
+    const capture = startEventCapture(handle.events());
+
+    await waitFor(() => {
+      const status = handle.status();
+      return status.phase === "running" && status.manifest?.messageCount === 2;
+    });
+
+    expect(handle.status().activeAgent).toBe("primary");
+
+    if (releaseSecondIteration === undefined) {
+      throw new Error("second iteration gate was not initialized");
+    }
+
+    releaseSecondIteration();
+    await capture.done;
+
+    expect(handle.status().phase).toBe("completed");
+  });
+
   test("durably restages running status before driver pause resumes continue", async () => {
     const harness = createFakeKernelHarness();
     let resumed = false;
@@ -6315,7 +6382,7 @@ describe("framework-runtime-core", () => {
     ]);
   });
 
-  test("preserve_trace handoff summarizes assistant work without raw tool traces", () => {
+  test("preserve_trace handoff preserves chronological summarized trace without raw tool traces", () => {
     let storedMessage: KrakenMessage | null = null;
     const builder = createPreserveTraceHandoffContextBuilder();
 
@@ -6386,6 +6453,14 @@ describe("framework-runtime-core", () => {
           role: "assistant",
         },
         {
+          parts: [{ text: "Please continue carefully.", type: "text" }],
+          role: "user",
+        },
+        {
+          parts: [{ text: "Second visible summary", type: "text" }],
+          role: "assistant",
+        },
+        {
           parts: [
             {
               callId: "call-search",
@@ -6402,12 +6477,126 @@ describe("framework-runtime-core", () => {
     } satisfies HandoffSourceContext);
 
     const handoffText = extractSingleUserText(storedMessage);
+    const firstUserIndex = handoffText.indexOf("[User] Please investigate.");
+    const firstAssistantIndex = handoffText.indexOf(
+      "[Assistant] Visible summary"
+    );
+    const secondUserIndex = handoffText.indexOf(
+      "[User] Please continue carefully."
+    );
+    const secondAssistantIndex = handoffText.indexOf(
+      "[Assistant] Second visible summary"
+    );
+    const toolIndex = handoffText.indexOf('[Tool:search] {"result":"okay"}');
 
     expect(handoffText).toContain("Visible summary");
     expect(handoffText).toContain("[Structured output produced]");
+    expect(firstUserIndex).toBeGreaterThanOrEqual(0);
+    expect(firstAssistantIndex).toBeGreaterThan(firstUserIndex);
+    expect(secondUserIndex).toBeGreaterThan(firstAssistantIndex);
+    expect(secondAssistantIndex).toBeGreaterThan(secondUserIndex);
+    expect(toolIndex).toBeGreaterThan(secondAssistantIndex);
     expect(handoffText).not.toContain("private reasoning");
     expect(handoffText).not.toContain("leak me");
     expect(handoffText).not.toContain('"secret":true');
+  });
+
+  test("last_output_only handoff forwards the final visible assistant parts", () => {
+    let storedMessage: KrakenMessage | null = null;
+    const builder = createLastOutputOnlyHandoffContextBuilder();
+    const fileData = new Uint8Array([1, 2, 3]);
+
+    builder({
+      handoffIntent: {
+        reason: "delegate",
+        targetAgent: "reviewer",
+      },
+      helpers: {
+        loadMessage() {
+          return null;
+        },
+        storeMessage(message) {
+          storedMessage = message;
+          return "0".repeat(64);
+        },
+        storeMessages() {
+          return [];
+        },
+      },
+      manifest: {
+        byRole: {
+          assistant: 1,
+          system: 0,
+          tool: 0,
+          user: 1,
+        },
+        extensions: {},
+        lastAssistantMessageIndex: 1,
+        lastUserMessageIndex: 0,
+        messageCount: 2,
+        tokenEstimate: 0,
+        toolCalls: {
+          byName: {},
+          total: 0,
+        },
+        toolResults: {
+          byName: {},
+          total: 0,
+        },
+        turnBoundaries: [0],
+      },
+      messages: [
+        {
+          parts: [{ text: "Please investigate.", type: "text" }],
+          role: "user",
+        },
+        {
+          parts: [
+            { redacted: false, text: "private reasoning", type: "reasoning" },
+            { text: "Visible final output", type: "text" },
+            {
+              data: { score: 42 },
+              name: "scorecard",
+              type: "structured",
+            },
+            {
+              data: fileData,
+              filename: "report.csv",
+              mediaType: "text/csv",
+              type: "file",
+            },
+          ],
+          role: "assistant",
+        },
+      ],
+      sourceAgent: { name: "primary" },
+      targetAgent: { name: "reviewer" },
+    } satisfies HandoffSourceContext);
+
+    const capturedMessage = requireStoredHandoffMessage(storedMessage);
+
+    expect(capturedMessage.role).toBe("user");
+
+    if (capturedMessage.role !== "user") {
+      throw new Error(
+        "expected the stored handoff message to be user-authored"
+      );
+    }
+
+    expect(capturedMessage.parts).toEqual([
+      { text: "Visible final output", type: "text" },
+      {
+        data: { score: 42 },
+        name: "scorecard",
+        type: "structured",
+      },
+      {
+        data: fileData,
+        filename: "report.csv",
+        mediaType: "text/csv",
+        type: "file",
+      },
+    ]);
   });
 
   test("does not leak per-turn tools across handoff transitions", async () => {
@@ -11102,6 +11291,16 @@ function extractSingleUserText(message: KrakenMessage | null): string {
   }
 
   return firstPart.text;
+}
+
+function requireStoredHandoffMessage(
+  message: KrakenMessage | null
+): KrakenMessage {
+  if (message === null) {
+    throw new Error("expected the handoff builder to store a user message");
+  }
+
+  return message;
 }
 
 function extractLastMessageHash(manifest: {

@@ -1,0 +1,259 @@
+/**
+ * Copyright 2026 Oscar Yáñez Cisterna (@SkrOYC)
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+import type {
+  HandoffContextBuilder,
+  KrakenMessage,
+  ToolResultPart,
+} from "@kraken/framework-runtime-api";
+
+type UserMessageParts = Extract<KrakenMessage, { role: "user" }>["parts"];
+
+export function createPreserveTraceHandoffContextBuilder(): HandoffContextBuilder {
+  return (context) => {
+    // `preserve_trace` is a chronological summarized trace on purpose. The
+    // framework must preserve causal order across user, assistant, and tool
+    // outcomes without forwarding raw reasoning or raw tool-call inputs.
+    const handoffMessage = {
+      parts: [
+        {
+          text: [
+            `[Handoff from ${context.sourceAgent.name}]`,
+            `Reason: ${context.handoffIntent.reason ?? "unspecified"}`,
+            "--- Chronological Trace ---",
+            ...extractChronologicalTrace(context.messages),
+            "Continue from where the previous agent left off.",
+          ].join("\n"),
+          type: "text",
+        },
+      ],
+      role: "user",
+    } satisfies KrakenMessage;
+
+    return [context.helpers.storeMessage(handoffMessage)];
+  };
+}
+
+export function createLastOutputOnlyHandoffContextBuilder(): HandoffContextBuilder {
+  return (context) => {
+    // `last_output_only` forwards the prior agent's final visible output parts
+    // directly rather than textifying them, so structured data and files survive
+    // the handoff as canonical content parts.
+    const handoffMessage = {
+      parts: extractLastVisibleAssistantOutputParts(context.messages),
+      role: "user",
+    } satisfies KrakenMessage;
+
+    return [context.helpers.storeMessage(handoffMessage)];
+  };
+}
+
+function extractChronologicalTrace(messages: KrakenMessage[]): string[] {
+  const excerpts: string[] = [];
+
+  for (const message of messages) {
+    excerpts.push(...summarizeChronologicalMessage(message));
+  }
+
+  return excerpts;
+}
+
+function summarizeChronologicalMessage(message: KrakenMessage): string[] {
+  switch (message.role) {
+    case "assistant": {
+      return [formatTraceLine("Assistant", summarizeAssistantMessage(message))];
+    }
+    case "system": {
+      return [];
+    }
+    case "tool": {
+      return message.parts.map((part) =>
+        formatTraceLine(`Tool:${part.name}`, renderToolResult(part))
+      );
+    }
+    case "user": {
+      return [formatTraceLine("User", renderMessageText(message))];
+    }
+    default: {
+      return [];
+    }
+  }
+}
+
+function formatTraceLine(label: string, text: string): string {
+  return text.length === 0 ? `[${label}]` : `[${label}] ${text}`;
+}
+
+function extractLastVisibleAssistantOutputParts(
+  messages: KrakenMessage[]
+): UserMessageParts {
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index];
+
+    if (message === undefined || message.role !== "assistant") {
+      continue;
+    }
+
+    const visibleParts = cloneVisibleAssistantParts(message.parts);
+
+    return visibleParts.length > 0
+      ? visibleParts
+      : [{ text: "", type: "text" }];
+  }
+
+  return [{ text: "", type: "text" }];
+}
+
+function cloneVisibleAssistantParts(
+  parts: Extract<KrakenMessage, { role: "assistant" }>["parts"]
+): UserMessageParts {
+  const visibleParts: UserMessageParts = [];
+
+  for (const part of parts) {
+    switch (part.type) {
+      case "file": {
+        visibleParts.push({
+          ...cloneProviderMetadata(part.providerMetadata),
+          data:
+            typeof part.data === "string"
+              ? part.data
+              : new Uint8Array(part.data),
+          filename: part.filename,
+          mediaType: part.mediaType,
+          type: "file",
+        });
+        break;
+      }
+      case "structured": {
+        visibleParts.push({
+          ...cloneProviderMetadata(part.providerMetadata),
+          data: structuredClone(part.data),
+          name: part.name,
+          type: "structured",
+        });
+        break;
+      }
+      case "text": {
+        visibleParts.push({
+          ...cloneProviderMetadata(part.providerMetadata),
+          text: part.text,
+          type: "text",
+        });
+        break;
+      }
+      default: {
+        break;
+      }
+    }
+  }
+
+  return visibleParts;
+}
+
+function cloneProviderMetadata(
+  providerMetadata: Record<string, unknown> | undefined
+): { providerMetadata?: Record<string, unknown> } {
+  return providerMetadata === undefined
+    ? {}
+    : {
+        providerMetadata: structuredClone(providerMetadata),
+      };
+}
+
+function renderMessageText(message: KrakenMessage): string {
+  if (message.role === "system") {
+    return message.content;
+  }
+
+  const fragments: string[] = [];
+
+  for (const part of message.parts) {
+    switch (part.type) {
+      case "reasoning":
+      case "text":
+        fragments.push(part.text);
+        break;
+      case "structured":
+        fragments.push(JSON.stringify(part.data));
+        break;
+      case "tool_call":
+        fragments.push(`[tool:${part.name}] ${JSON.stringify(part.input)}`);
+        break;
+      case "tool_result":
+        fragments.push(`${part.name}: ${renderToolResult(part)}`);
+        break;
+      case "file":
+        fragments.push(
+          `[file:${part.filename ?? "unnamed"}:${part.mediaType}]`
+        );
+        break;
+      default:
+        break;
+    }
+  }
+
+  return fragments.join("\n");
+}
+
+function renderToolResult(part: ToolResultPart): string {
+  return typeof part.output === "string"
+    ? part.output
+    : JSON.stringify(part.output);
+}
+
+function summarizeAssistantMessage(
+  message: Extract<KrakenMessage, { role: "assistant" }>
+): string {
+  const summaryParts: string[] = [];
+  let structuredCount = 0;
+  let fileCount = 0;
+
+  for (const part of message.parts) {
+    switch (part.type) {
+      case "text":
+        summaryParts.push(part.text);
+        break;
+      case "structured":
+        structuredCount += 1;
+        break;
+      case "file":
+        fileCount += 1;
+        break;
+      default:
+        break;
+    }
+  }
+
+  if (structuredCount > 0) {
+    summaryParts.push(
+      structuredCount === 1
+        ? "[Structured output produced]"
+        : `[${structuredCount} structured outputs produced]`
+    );
+  }
+
+  if (fileCount > 0) {
+    summaryParts.push(
+      fileCount === 1
+        ? "[File attachment produced]"
+        : `[${fileCount} file attachments produced]`
+    );
+  }
+
+  return summaryParts.length > 0
+    ? summaryParts.join("\n")
+    : "[Previous agent work omitted for compatibility]";
+}

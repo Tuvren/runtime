@@ -1892,8 +1892,8 @@ Every handoff replaces the entire active `messages` collection. Handoffs stay on
 
 The framework provides two standard handoff modes:
 
-- **`preserve_trace`** — expected for agent-signaled handoffs. The receiving agent gets a rewritten request that preserves the prior agent trace in framework-defined form without exposing raw history or incompatible tool surfaces.
-- **`last_output_only`** — expected for pipeline/orchestrated handoffs. The receiving agent gets a clean-slate request containing only the previous agent’s final output (plus any developer-configured scaffolding).
+- **`preserve_trace`** — expected for agent-signaled handoffs. The receiving agent gets a rewritten request that preserves the prior agent trace as a chronological summarized trace without exposing raw history, raw tool-call inputs, or incompatible tool surfaces.
+- **`last_output_only`** — expected for pipeline/orchestrated handoffs. The receiving agent gets a clean-slate request containing only the previous agent’s final visible output parts (text / structured / file) plus any developer-configured scaffolding.
 
 The handoff context builder (§1.5 `HandoffContextBuilder`) produces new message hashes. The framework executes it as a context engineering Run:
 
@@ -1940,10 +1940,23 @@ function applyHandoff(plan: HandoffContextPlan, turnId, branchId, schemaId, pend
 
 #### Default Handoff Context Builder (`preserve_trace`)
 
-Deterministic, no model call:
+Deterministic, no model call. The semantic content below is normative; the exact wrapper text is implementation-defined.
 
 ```
 function defaultHandoffContextBuilder(ctx: HandoffSourceContext) → Hash[]:
+  trace = []
+  for message in ctx.messages:
+    switch message.role:
+      case "user":
+        trace.push(`[User] ${renderVisibleUserContent(message)}`)
+      case "assistant":
+        trace.push(`[Assistant] ${summarizeVisibleAssistantOutput(message)}`)
+      case "tool":
+        for result in message.parts:
+          trace.push(`[Tool:${result.name}] ${renderToolResult(result)}`)
+      case "system":
+        continue
+
   handoffMsg = {
     role: "user",
     parts: [{
@@ -1951,12 +1964,8 @@ function defaultHandoffContextBuilder(ctx: HandoffSourceContext) → Hash[]:
       text: [
         `[Handoff from ${ctx.sourceAgent.name}]`,
         `Reason: ${ctx.handoffIntent.reason ?? "unspecified"}`,
-        `--- User Messages ---`,
-        ...extractUserMessages(ctx.messages),
-        `--- Previous Agent's Work ---`,
-        ...extractAssistantSummary(ctx.messages),
-        `--- Key Outcomes ---`,
-        ...extractToolOutcomes(ctx.messages),
+        `--- Chronological Trace ---`,
+        ...trace,
         `Continue from where the previous agent left off.`
       ].join('\n')
     }]
@@ -1974,12 +1983,12 @@ Deterministic, no model call:
 
 ```
 function sequenceHandoffContextBuilder(ctx: HandoffSourceContext) → Hash[]:
+  lastParts = extractLastVisibleAssistantOutputParts(ctx.messages)
   handoffMsg = {
     role: "user",
-    parts: [{
-      type: "text",
-      text: extractLastAssistantOutput(ctx.messages)
-    }]
+    parts: lastParts.length > 0
+      ? lastParts
+      : [{ type: "text", text: "" }]
   }
   return [ctx.helpers.storeMessage(handoffMsg)]
 ```
