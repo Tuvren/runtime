@@ -236,6 +236,30 @@ interface LoopOutcome {
   resolution: RuntimeResolution;
 }
 
+interface IterationPreparationResult {
+  headState?: HeadState;
+  resolution?: RuntimeResolution;
+}
+
+interface ExecutedIterationResult {
+  driverResponse: KrakenModelResponse;
+  iterationRunId: string;
+  requestedToolCalls: ToolCallPart[];
+  resolution: RuntimeResolution;
+  toolResults: ToolResultPart[];
+  turnNodeHash: HashString | undefined;
+}
+
+type IterationPhaseResult =
+  | {
+      kind: "executed";
+      result: ExecutedIterationResult;
+    }
+  | {
+      kind: "outcome";
+      outcome: LoopOutcome;
+    };
+
 interface HelperBundle {
   flush(): Promise<void>;
   helpers: ContextEngineeringHelpers;
@@ -798,251 +822,22 @@ class RuntimeCore implements KrakenRuntime {
     );
   }
 
-  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: This is the runtime's top-level turn lifecycle coordinator.
   async startExecution(handle: RuntimeExecutionHandle): Promise<void> {
     try {
       const schemaId = await this.resolveExecutionSchemaId(handle.request);
       handle.setSchemaId(schemaId);
-      const branch = await this.options.kernel.branch.get(
-        handle.request.branchId
-      );
+      const branchHeadHash = await this.resolveExecutionBranchHead(handle);
+      await this.createExecutionTurnIfNeeded(handle, branchHeadHash);
+      const loopState = this.createExecutionLoopState(handle);
+      this.publishTurnStart(handle, loopState);
 
-      if (branch === null) {
-        throw new KrakenLineageError(
-          `branch "${handle.request.branchId}" does not exist`,
-          {
-            code: "missing_branch",
-          }
-        );
-      }
-
-      if (branch.threadId !== handle.request.threadId) {
-        throw new KrakenLineageError(
-          `branch "${handle.request.branchId}" belongs to thread "${branch.threadId}", not "${handle.request.threadId}"`,
-          {
-            code: "branch_thread_mismatch",
-            details: {
-              branchId: handle.request.branchId,
-              branchThreadId: branch.threadId,
-              requestThreadId: handle.request.threadId,
-            },
-          }
-        );
-      }
-
-      if (handle.resumedFrom === undefined) {
-        const parentTurnId = await this.resolveParentTurnId(
-          handle.request.threadId,
-          handle.request.branchId,
-          handle.request.parentTurnId
-        );
-
-        await this.options.kernel.turn.create(
-          handle.turnId,
-          handle.request.threadId,
-          handle.request.branchId,
-          parentTurnId,
-          branch.headTurnNodeHash
-        );
-      }
-
-      const resumedPauseContext = handle.resumedFrom?.pauseContext;
-      const loopState: LoopState = {
-        activeConfig:
-          resumedPauseContext?.activeConfig ?? handle.request.config,
-        activeDriverId:
-          resumedPauseContext?.activeDriverId ??
-          handle.request.driverId ??
-          this.options.defaultDriverId,
-        activeToolRegistry:
-          resumedPauseContext?.activeToolRegistry ??
-          createActiveToolRegistry(handle.request.tools, handle.request.config),
-        carriedStateUpdates: [
-          ...(resumedPauseContext?.carriedStateUpdates ?? []),
-        ],
-        enteredIterationLoop: false,
-      };
-
-      this.publishEvent(
-        handle,
-        {
-          resumedFrom: handle.resumedFrom?.pausedTurnNodeHash,
-          threadId: handle.request.threadId,
-          timestamp: this.now(),
-          turnId: handle.turnId,
-          type: "turn.start",
-        },
-        loopState
-      );
-
-      if (handle.resumedFrom === undefined) {
-        await this.incorporateInput(handle, schemaId, loopState);
-        const headState = await this.loadHeadState(handle.request.branchId);
-        handle.updateStatus({
-          activeAgent: loopState.activeConfig.name,
-          iterationCount: 0,
-          manifest: headState.manifest,
-          phase: "running",
-        });
-
-        const beforeTurn = await runBeforeTurnHooks({
-          emit: (event) => {
-            this.publishCustomEvent(handle, event, loopState);
-          },
-          extensions: loopState.activeConfig.extensions ?? [],
-          iterationCount: 0,
-          manifest: headState.manifest,
-          messages: headState.messages,
-          runId: this.createId(),
-          turnId: handle.turnId,
-        });
-        loopState.carriedStateUpdates.push(...beforeTurn.updates);
-
-        if (beforeTurn.resolution !== undefined) {
-          if (
-            beforeTurn.resolution.type === "fail" &&
-            beforeTurn.resolution.fatality === "soft"
-          ) {
-            this.publishProjectedError(
-              handle,
-              beforeTurn.resolution.error,
-              false,
-              loopState
-            );
-          } else {
-            await this.commitPendingExtensionStateUpdates(
-              handle,
-              schemaId,
-              loopState,
-              loopState.carriedStateUpdates,
-              0
-            );
-            loopState.carriedStateUpdates = [];
-            await this.completeExecution(
-              handle,
-              beforeTurn.resolution,
-              loopState,
-              false
-            );
-            return;
-          }
-        }
-      } else {
-        await this.options.kernel.run.complete(
-          handle.resumedFrom.pausedRunId,
-          "failed"
-        );
-        handle.clearPendingResumeCancellation();
-        this.publishEvent(
-          handle,
-          {
-            response: handle.resumedFrom.approval,
-            timestamp: this.now(),
-            type: "approval.resolved",
-          },
-          loopState
-        );
-        await this.checkpointResumeRunningStatus(
-          handle,
-          schemaId,
-          loopState,
-          handle.resumedFrom.pauseContext.pausedIteration?.iterationCount ??
-            handle.status().iterationCount
-        );
-
-        if (handle.resumedFrom.pauseContext.kind === "tool_approval") {
-          const resumedOutcome = await this.resumePausedToolExecution(
-            handle,
-            schemaId,
-            loopState,
-            handle.resumedFrom
-          );
-
-          if (resumedOutcome.pauseContext !== undefined) {
-            handle.rememberPauseContext(resumedOutcome.pauseContext);
-            this.publishEvent(
-              handle,
-              {
-                request: resumedOutcome.pauseContext.approval,
-                timestamp: this.now(),
-                type: "approval.requested",
-              },
-              {
-                ...loopState,
-                activeConfig: resumedOutcome.pauseContext.activeConfig,
-                activeDriverId: resumedOutcome.pauseContext.activeDriverId,
-              }
-            );
-            this.publishEvent(
-              handle,
-              {
-                status: "paused",
-                timestamp: this.now(),
-                turnId: handle.turnId,
-                type: "turn.end",
-              },
-              loopState
-            );
-            return;
-          }
-
-          if (
-            resumedOutcome.resolution.type === "fail" &&
-            resumedOutcome.resolution.fatality === "soft"
-          ) {
-            this.publishProjectedError(
-              handle,
-              resumedOutcome.resolution.error,
-              false,
-              loopState
-            );
-          } else if (
-            resumedOutcome.resolution.type !== "continue_iteration" &&
-            !(await this.applyTerminalAgentTransitionIfNeeded(
-              handle,
-              schemaId,
-              resumedOutcome.resolution,
-              loopState
-            ))
-          ) {
-            await this.completeExecution(
-              handle,
-              resumedOutcome.resolution,
-              loopState,
-              true
-            );
-            return;
-          }
-        }
+      if (await this.prepareExecutionStart(handle, schemaId, loopState)) {
+        return;
       }
 
       const outcome = await this.runExecutionLoop(handle, schemaId, loopState);
 
-      if (outcome.pauseContext !== undefined) {
-        handle.rememberPauseContext(outcome.pauseContext);
-        this.publishEvent(
-          handle,
-          {
-            request: outcome.pauseContext.approval,
-            timestamp: this.now(),
-            type: "approval.requested",
-          },
-          {
-            ...loopState,
-            activeConfig: outcome.pauseContext.activeConfig,
-            activeDriverId: outcome.pauseContext.activeDriverId,
-          }
-        );
-        this.publishEvent(
-          handle,
-          {
-            status: "paused",
-            timestamp: this.now(),
-            turnId: handle.turnId,
-            type: "turn.end",
-          },
-          loopState
-        );
+      if (this.publishPauseOutcome(handle, outcome.pauseContext, loopState)) {
         return;
       }
 
@@ -1053,111 +848,407 @@ class RuntimeCore implements KrakenRuntime {
         loopState.enteredIterationLoop
       );
     } catch (error: unknown) {
-      const finalizationFailure =
-        error instanceof FinalizationFailure ? error : undefined;
-      const runtimeError = normalizeError(error);
-      const rootError =
-        finalizationFailure?.rootCause ??
-        finalizationFailure?.finalizationError;
+      await this.handleExecutionFailure(handle, error);
+    } finally {
+      handle.finish();
+    }
+  }
 
-      handle.rememberError(projectError(rootError ?? runtimeError));
-      const loopState: LoopState = {
-        activeConfig: {
-          ...handle.request.config,
-          extensions: [],
-        },
-        activeDriverId: handle.request.driverId ?? this.options.defaultDriverId,
-        activeToolRegistry: createToolRegistry(),
-        carriedStateUpdates: [],
-        enteredIterationLoop: false,
-      };
-      const failureResolution: RuntimeResolution = {
-        error: rootError ?? runtimeError,
-        fatality: "hard",
-        type: "fail",
-      };
+  private async resolveExecutionBranchHead(
+    handle: RuntimeExecutionHandle
+  ): Promise<HashString> {
+    const branch = await this.options.kernel.branch.get(
+      handle.request.branchId
+    );
 
-      await this.failActiveRunIfNeeded(handle);
+    if (branch === null) {
+      throw new KrakenLineageError(
+        `branch "${handle.request.branchId}" does not exist`,
+        {
+          code: "missing_branch",
+        }
+      );
+    }
 
-      if (finalizationFailure !== undefined) {
+    if (branch.threadId !== handle.request.threadId) {
+      throw new KrakenLineageError(
+        `branch "${handle.request.branchId}" belongs to thread "${branch.threadId}", not "${handle.request.threadId}"`,
+        {
+          code: "branch_thread_mismatch",
+          details: {
+            branchId: handle.request.branchId,
+            branchThreadId: branch.threadId,
+            requestThreadId: handle.request.threadId,
+          },
+        }
+      );
+    }
+
+    return branch.headTurnNodeHash;
+  }
+
+  private async createExecutionTurnIfNeeded(
+    handle: RuntimeExecutionHandle,
+    branchHeadHash: HashString
+  ): Promise<void> {
+    if (handle.resumedFrom !== undefined) {
+      return;
+    }
+
+    const parentTurnId = await this.resolveParentTurnId(
+      handle.request.threadId,
+      handle.request.branchId,
+      handle.request.parentTurnId
+    );
+
+    await this.options.kernel.turn.create(
+      handle.turnId,
+      handle.request.threadId,
+      handle.request.branchId,
+      parentTurnId,
+      branchHeadHash
+    );
+  }
+
+  private createExecutionLoopState(handle: RuntimeExecutionHandle): LoopState {
+    const resumedPauseContext = handle.resumedFrom?.pauseContext;
+
+    return {
+      activeConfig: resumedPauseContext?.activeConfig ?? handle.request.config,
+      activeDriverId:
+        resumedPauseContext?.activeDriverId ??
+        handle.request.driverId ??
+        this.options.defaultDriverId,
+      activeToolRegistry:
+        resumedPauseContext?.activeToolRegistry ??
+        createActiveToolRegistry(handle.request.tools, handle.request.config),
+      carriedStateUpdates: [
+        ...(resumedPauseContext?.carriedStateUpdates ?? []),
+      ],
+      enteredIterationLoop: false,
+    };
+  }
+
+  private publishTurnStart(
+    handle: RuntimeExecutionHandle,
+    loopState: LoopState
+  ): void {
+    this.publishEvent(
+      handle,
+      {
+        resumedFrom: handle.resumedFrom?.pausedTurnNodeHash,
+        threadId: handle.request.threadId,
+        timestamp: this.now(),
+        turnId: handle.turnId,
+        type: "turn.start",
+      },
+      loopState
+    );
+  }
+
+  private async prepareExecutionStart(
+    handle: RuntimeExecutionHandle,
+    schemaId: string,
+    loopState: LoopState
+  ): Promise<boolean> {
+    if (handle.resumedFrom === undefined) {
+      return await this.prepareFreshExecutionStart(handle, schemaId, loopState);
+    }
+
+    return await this.prepareResumedExecutionStart(handle, schemaId, loopState);
+  }
+
+  private async prepareFreshExecutionStart(
+    handle: RuntimeExecutionHandle,
+    schemaId: string,
+    loopState: LoopState
+  ): Promise<boolean> {
+    await this.incorporateInput(handle, schemaId, loopState);
+    const headState = await this.loadHeadState(handle.request.branchId);
+    handle.updateStatus({
+      activeAgent: loopState.activeConfig.name,
+      iterationCount: 0,
+      manifest: headState.manifest,
+      phase: "running",
+    });
+
+    const beforeTurn = await runBeforeTurnHooks({
+      emit: (event) => {
+        this.publishCustomEvent(handle, event, loopState);
+      },
+      extensions: loopState.activeConfig.extensions ?? [],
+      iterationCount: 0,
+      manifest: headState.manifest,
+      messages: headState.messages,
+      runId: this.createId(),
+      turnId: handle.turnId,
+    });
+    loopState.carriedStateUpdates.push(...beforeTurn.updates);
+
+    if (beforeTurn.resolution === undefined) {
+      return false;
+    }
+
+    if (
+      beforeTurn.resolution.type === "fail" &&
+      beforeTurn.resolution.fatality === "soft"
+    ) {
+      this.publishProjectedError(
+        handle,
+        beforeTurn.resolution.error,
+        false,
+        loopState
+      );
+      return false;
+    }
+
+    await this.commitPendingExtensionStateUpdates(
+      handle,
+      schemaId,
+      loopState,
+      loopState.carriedStateUpdates,
+      0
+    );
+    loopState.carriedStateUpdates = [];
+    await this.completeExecution(
+      handle,
+      beforeTurn.resolution,
+      loopState,
+      false
+    );
+    return true;
+  }
+
+  private async prepareResumedExecutionStart(
+    handle: RuntimeExecutionHandle,
+    schemaId: string,
+    loopState: LoopState
+  ): Promise<boolean> {
+    const resumeContext = handle.resumedFrom;
+
+    if (resumeContext === undefined) {
+      return false;
+    }
+
+    await this.options.kernel.run.complete(resumeContext.pausedRunId, "failed");
+    handle.clearPendingResumeCancellation();
+    this.publishEvent(
+      handle,
+      {
+        response: resumeContext.approval,
+        timestamp: this.now(),
+        type: "approval.resolved",
+      },
+      loopState
+    );
+    await this.checkpointResumeRunningStatus(
+      handle,
+      schemaId,
+      loopState,
+      resumeContext.pauseContext.pausedIteration?.iterationCount ??
+        handle.status().iterationCount
+    );
+
+    if (resumeContext.pauseContext.kind !== "tool_approval") {
+      return false;
+    }
+
+    const resumedOutcome = await this.resumePausedToolExecution(
+      handle,
+      schemaId,
+      loopState,
+      resumeContext
+    );
+
+    if (
+      this.publishPauseOutcome(handle, resumedOutcome.pauseContext, loopState)
+    ) {
+      return true;
+    }
+
+    if (
+      resumedOutcome.resolution.type === "fail" &&
+      resumedOutcome.resolution.fatality === "soft"
+    ) {
+      this.publishProjectedError(
+        handle,
+        resumedOutcome.resolution.error,
+        false,
+        loopState
+      );
+      return false;
+    }
+
+    if (
+      resumedOutcome.resolution.type !== "continue_iteration" &&
+      !(await this.applyTerminalAgentTransitionIfNeeded(
+        handle,
+        schemaId,
+        resumedOutcome.resolution,
+        loopState
+      ))
+    ) {
+      await this.completeExecution(
+        handle,
+        resumedOutcome.resolution,
+        loopState,
+        true
+      );
+      return true;
+    }
+
+    return false;
+  }
+
+  private publishPauseOutcome(
+    handle: RuntimeExecutionHandle,
+    pauseContext: PauseContext | undefined,
+    loopState: LoopState
+  ): boolean {
+    if (pauseContext === undefined) {
+      return false;
+    }
+
+    handle.rememberPauseContext(pauseContext);
+    this.publishEvent(
+      handle,
+      {
+        request: pauseContext.approval,
+        timestamp: this.now(),
+        type: "approval.requested",
+      },
+      {
+        ...loopState,
+        activeConfig: pauseContext.activeConfig,
+        activeDriverId: pauseContext.activeDriverId,
+      }
+    );
+    this.publishEvent(
+      handle,
+      {
+        status: "paused",
+        timestamp: this.now(),
+        turnId: handle.turnId,
+        type: "turn.end",
+      },
+      loopState
+    );
+    return true;
+  }
+
+  private async handleExecutionFailure(
+    handle: RuntimeExecutionHandle,
+    error: unknown
+  ): Promise<void> {
+    const finalizationFailure =
+      error instanceof FinalizationFailure ? error : undefined;
+    const runtimeError = normalizeError(error);
+    const rootError =
+      finalizationFailure?.rootCause ?? finalizationFailure?.finalizationError;
+
+    handle.rememberError(projectError(rootError ?? runtimeError));
+    const loopState: LoopState = {
+      activeConfig: {
+        ...handle.request.config,
+        extensions: [],
+      },
+      activeDriverId: handle.request.driverId ?? this.options.defaultDriverId,
+      activeToolRegistry: createToolRegistry(),
+      carriedStateUpdates: [],
+      enteredIterationLoop: false,
+    };
+    const failureResolution: RuntimeResolution = {
+      error: rootError ?? runtimeError,
+      fatality: "hard",
+      type: "fail",
+    };
+
+    await this.failActiveRunIfNeeded(handle);
+
+    if (finalizationFailure !== undefined) {
+      this.projectFinalizationFailure(handle, loopState, finalizationFailure);
+      return;
+    }
+
+    if ((await this.options.kernel.turn.get(handle.turnId)) !== null) {
+      try {
+        await this.finalizeTurnStatus(handle, failureResolution, loopState);
+      } catch (finalizeError: unknown) {
         handle.replaceStatus({
           activeAgent: loopState.activeConfig.name,
           iterationCount: handle.status().iterationCount,
           manifest: handle.status().manifest,
           phase: "failed",
         });
-
-        if (finalizationFailure.rootCause === undefined) {
-          this.publishProjectedError(
-            handle,
-            finalizationFailure.finalizationError,
-            true,
-            loopState
-          );
-        } else {
-          this.publishProjectedError(
-            handle,
-            finalizationFailure.rootCause,
-            true,
-            loopState
-          );
-          this.publishProjectedError(
-            handle,
-            finalizationFailure.finalizationError,
-            false,
-            loopState
-          );
-        }
-
+        this.publishProjectedError(
+          handle,
+          failureResolution.error,
+          true,
+          loopState
+        );
+        this.publishProjectedError(
+          handle,
+          normalizeError(finalizeError),
+          false,
+          loopState
+        );
         return;
       }
+    }
 
-      if ((await this.options.kernel.turn.get(handle.turnId)) !== null) {
-        try {
-          await this.finalizeTurnStatus(handle, failureResolution, loopState);
-        } catch (finalizeError: unknown) {
-          handle.replaceStatus({
-            activeAgent: loopState.activeConfig.name,
-            iterationCount: handle.status().iterationCount,
-            manifest: handle.status().manifest,
-            phase: "failed",
-          });
-          this.publishProjectedError(
-            handle,
-            failureResolution.error,
-            true,
-            loopState
-          );
-          this.publishProjectedError(
-            handle,
-            normalizeError(finalizeError),
-            false,
-            loopState
-          );
-          return;
-        }
-      }
+    this.publishProjectedError(handle, runtimeError, true, loopState);
+    handle.replaceStatus({
+      activeAgent: handle.request.config.name,
+      iterationCount: handle.status().iterationCount,
+      manifest: handle.status().manifest,
+      phase: "failed",
+    });
+    this.publishEvent(
+      handle,
+      {
+        status: "failed",
+        timestamp: this.now(),
+        turnId: handle.turnId,
+        type: "turn.end",
+      },
+      loopState
+    );
+  }
 
-      this.publishProjectedError(handle, runtimeError, true, loopState);
-      handle.replaceStatus({
-        activeAgent: handle.request.config.name,
-        iterationCount: handle.status().iterationCount,
-        manifest: handle.status().manifest,
-        phase: "failed",
-      });
-      this.publishEvent(
+  private projectFinalizationFailure(
+    handle: RuntimeExecutionHandle,
+    loopState: LoopState,
+    finalizationFailure: FinalizationFailure
+  ): void {
+    handle.replaceStatus({
+      activeAgent: loopState.activeConfig.name,
+      iterationCount: handle.status().iterationCount,
+      manifest: handle.status().manifest,
+      phase: "failed",
+    });
+
+    if (finalizationFailure.rootCause === undefined) {
+      this.publishProjectedError(
         handle,
-        {
-          status: "failed",
-          timestamp: this.now(),
-          turnId: handle.turnId,
-          type: "turn.end",
-        },
+        finalizationFailure.finalizationError,
+        true,
         loopState
       );
-    } finally {
-      handle.finish();
+      return;
     }
+
+    this.publishProjectedError(
+      handle,
+      finalizationFailure.rootCause,
+      true,
+      loopState
+    );
+    this.publishProjectedError(
+      handle,
+      finalizationFailure.finalizationError,
+      false,
+      loopState
+    );
   }
 
   private async completeExecution(
@@ -1223,7 +1314,6 @@ class RuntimeCore implements KrakenRuntime {
     );
   }
 
-  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: This loop is the shared iteration state machine for driver-neutral execution.
   private async runExecutionLoop(
     handle: RuntimeExecutionHandle,
     schemaId: string,
@@ -1238,435 +1328,649 @@ class RuntimeCore implements KrakenRuntime {
       const nextIteration = handle.status().iterationCount + 1;
       loopState.enteredIterationLoop = true;
 
-      if (handle.abortSignal.aborted) {
-        return {
-          resolution: {
-            error: new Error("execution cancelled"),
-            fatality: "hard",
-            type: "fail",
-          },
-        };
+      const abortedOutcome = createCancelledLoopOutcome(handle);
+
+      if (abortedOutcome !== undefined) {
+        return abortedOutcome;
       }
 
-      handle.updateStatus({
-        activeAgent: loopState.activeConfig.name,
-        approval: undefined,
-        iterationCount: nextIteration,
-        pauseReason: undefined,
-        phase: "running",
-      });
-      this.publishEvent(
+      this.beginIteration(handle, loopState, nextIteration);
+      await this.incorporateQueuedSteeringIfNeeded(
         handle,
-        {
-          iterationCount: nextIteration,
-          timestamp: this.now(),
-          type: "iteration.start",
-        },
-        loopState
+        schemaId,
+        loopState,
+        pendingResume
       );
 
-      if (pendingResume === undefined) {
-        const steeringSignal = handle.consumeSteeringSignal();
-
-        if (steeringSignal !== undefined) {
-          await this.incorporateSteering(
-            handle,
-            schemaId,
-            steeringSignal,
-            loopState
-          );
-        }
-      }
-
-      let headState = await this.loadHeadState(handle.request.branchId);
-      handle.updateStatus({
-        manifest: headState.manifest,
-      });
-
-      const beforeIteration = await runBeforeIterationHooks({
-        emit: (event) => {
-          this.publishCustomEvent(handle, event, loopState);
-        },
-        extensions: loopState.activeConfig.extensions ?? [],
-        iterationCount: nextIteration,
-        manifest: headState.manifest,
-        messages: headState.messages,
-        runId: this.createId(),
-        turnId: handle.turnId,
-      });
-      loopState.carriedStateUpdates.push(...beforeIteration.updates);
-
-      if (beforeIteration.resolution !== undefined) {
-        if (
-          beforeIteration.resolution.type === "fail" &&
-          beforeIteration.resolution.fatality === "soft"
-        ) {
-          this.publishProjectedError(
-            handle,
-            beforeIteration.resolution.error,
-            false,
-            loopState
-          );
-        } else {
-          await this.commitPendingExtensionStateUpdates(
-            handle,
-            schemaId,
-            loopState,
-            loopState.carriedStateUpdates,
-            nextIteration
-          );
-          loopState.carriedStateUpdates = [];
-          this.publishEvent(
-            handle,
-            {
-              iterationCount: nextIteration,
-              timestamp: this.now(),
-              type: "iteration.end",
-            },
-            loopState
-          );
-          return {
-            resolution: beforeIteration.resolution,
-          };
-        }
-      }
-
-      if (beforeIteration.cePlan !== undefined) {
-        await this.applyContextEngineeringPlan(
-          handle,
-          schemaId,
-          beforeIteration.cePlan,
-          loopState,
-          loopState.carriedStateUpdates
-        );
-        loopState.carriedStateUpdates = [];
-        headState = await this.loadHeadState(handle.request.branchId);
-      }
-
-      const policyPlan = loopState.activeConfig.contextPolicy?.evaluate(
-        headState.manifest,
+      const preparation = await this.prepareIterationState(
+        handle,
+        schemaId,
+        loopState,
         nextIteration
       );
 
-      if (policyPlan !== undefined && isContextEngineeringPlan(policyPlan)) {
-        await this.applyContextEngineeringPlan(
-          handle,
-          schemaId,
-          policyPlan,
-          loopState,
-          loopState.carriedStateUpdates
-        );
-        loopState.carriedStateUpdates = [];
-        headState = await this.loadHeadState(handle.request.branchId);
+      if (preparation.resolution !== undefined) {
+        this.publishIterationEnd(handle, loopState, nextIteration);
+        return {
+          resolution: preparation.resolution,
+        };
       }
 
-      const driver = handle.getOrCreateDriver(
-        loopState.activeDriverId,
-        (driverId) => this.materializeDriver(driverId)
-      );
-      const iterationRunId = this.createId();
-
-      await this.createTrackedRun(
+      const phaseResult = await this.executeIterationPhase(
         handle,
-        iterationRunId,
-        handle.turnId,
-        handle.request.branchId,
         schemaId,
-        headState.branchHeadHash,
-        [
-          {
-            deterministic: false,
-            id: "iterate",
-            sideEffects: true,
-          },
-        ]
-      );
-      await this.options.kernel.run.beginStep(iterationRunId, "iterate");
-
-      const driverContext: DriverExecutionContext = {
-        branchId: handle.request.branchId,
-        config: loopState.activeConfig,
-        handoff: {
-          createContextPlan: (input) =>
-            this.createDriverHandoffContextPlan(input, headState, loopState),
-        },
-        iterationCount: nextIteration,
-        manifest: headState.manifest,
-        messages: headState.messages,
-        runtime: {
-          emit: (event) => {
-            this.publishEvent(handle, event, loopState);
-          },
-          now: () => this.now(),
-        },
-        schemaId,
-        signal: handle.abortSignal,
-        threadId: handle.request.threadId,
-        toolRegistry: loopState.activeToolRegistry,
-        turnId: handle.turnId,
-      };
-
-      const driverResult = await this.executeDriver(
-        driver,
-        driverContext,
+        loopState,
+        preparation.headState,
+        nextIteration,
         pendingResume
       );
       pendingResume = undefined;
 
-      let resolution = driverResult.resolution;
-      const driverMessages = driverResult.messages ?? [];
-      const stagedMessageHashes: HashString[] = [];
-      const requestedToolCalls = extractToolCallsFromMessages(driverMessages);
-      const invalidDriverResolutionError =
-        requestedToolCalls.length > 0 &&
-        resolution.type !== "continue_iteration"
-          ? new KrakenRuntimeError(
-              "drivers must not return executable tool calls with a terminal resolution",
-              {
-                code: "invalid_driver_resolution",
-                details: {
-                  resolutionType: resolution.type,
-                  toolCallCount: requestedToolCalls.length,
-                },
-              }
-            )
-          : undefined;
+      if (phaseResult.kind === "outcome") {
+        return phaseResult.outcome;
+      }
 
-      if (invalidDriverResolutionError !== undefined) {
-        await this.completeTrackedRun(handle, iterationRunId, "completed");
+      this.publishIterationEnd(handle, loopState, nextIteration);
+      const nextOutcome = await this.resolveIterationOutcome(
+        handle,
+        schemaId,
+        loopState,
+        nextIteration,
+        phaseResult.result
+      );
+
+      if (nextOutcome === "continue") {
+        continue;
+      }
+
+      return nextOutcome;
+    }
+  }
+
+  private beginIteration(
+    handle: RuntimeExecutionHandle,
+    loopState: LoopState,
+    iterationCount: number
+  ): void {
+    handle.updateStatus({
+      activeAgent: loopState.activeConfig.name,
+      approval: undefined,
+      iterationCount,
+      pauseReason: undefined,
+      phase: "running",
+    });
+    this.publishEvent(
+      handle,
+      {
+        iterationCount,
+        timestamp: this.now(),
+        type: "iteration.start",
+      },
+      loopState
+    );
+  }
+
+  private publishIterationEnd(
+    handle: RuntimeExecutionHandle,
+    loopState: LoopState,
+    iterationCount: number
+  ): void {
+    this.publishEvent(
+      handle,
+      {
+        iterationCount,
+        timestamp: this.now(),
+        type: "iteration.end",
+      },
+      loopState
+    );
+  }
+
+  private async incorporateQueuedSteeringIfNeeded(
+    handle: RuntimeExecutionHandle,
+    schemaId: string,
+    loopState: LoopState,
+    pendingResume: ResumeContext | undefined
+  ): Promise<void> {
+    if (pendingResume !== undefined) {
+      return;
+    }
+
+    const steeringSignal = handle.consumeSteeringSignal();
+
+    if (steeringSignal !== undefined) {
+      await this.incorporateSteering(
+        handle,
+        schemaId,
+        steeringSignal,
+        loopState
+      );
+    }
+  }
+
+  private async prepareIterationState(
+    handle: RuntimeExecutionHandle,
+    schemaId: string,
+    loopState: LoopState,
+    iterationCount: number
+  ): Promise<IterationPreparationResult> {
+    let headState = await this.loadHeadState(handle.request.branchId);
+    handle.updateStatus({
+      manifest: headState.manifest,
+    });
+
+    const beforeIteration = await runBeforeIterationHooks({
+      emit: (event) => {
+        this.publishCustomEvent(handle, event, loopState);
+      },
+      extensions: loopState.activeConfig.extensions ?? [],
+      iterationCount,
+      manifest: headState.manifest,
+      messages: headState.messages,
+      runId: this.createId(),
+      turnId: handle.turnId,
+    });
+    loopState.carriedStateUpdates.push(...beforeIteration.updates);
+
+    if (beforeIteration.resolution !== undefined) {
+      if (
+        beforeIteration.resolution.type === "fail" &&
+        beforeIteration.resolution.fatality === "soft"
+      ) {
+        this.publishProjectedError(
+          handle,
+          beforeIteration.resolution.error,
+          false,
+          loopState
+        );
+      } else {
+        await this.commitPendingExtensionStateUpdates(
+          handle,
+          schemaId,
+          loopState,
+          loopState.carriedStateUpdates,
+          iterationCount
+        );
+        loopState.carriedStateUpdates = [];
         return {
+          resolution: beforeIteration.resolution,
+        };
+      }
+    }
+
+    if (beforeIteration.cePlan !== undefined) {
+      await this.applyContextEngineeringPlan(
+        handle,
+        schemaId,
+        beforeIteration.cePlan,
+        loopState,
+        loopState.carriedStateUpdates
+      );
+      loopState.carriedStateUpdates = [];
+      headState = await this.loadHeadState(handle.request.branchId);
+    }
+
+    const policyPlan = loopState.activeConfig.contextPolicy?.evaluate(
+      headState.manifest,
+      iterationCount
+    );
+
+    if (policyPlan !== undefined && isContextEngineeringPlan(policyPlan)) {
+      await this.applyContextEngineeringPlan(
+        handle,
+        schemaId,
+        policyPlan,
+        loopState,
+        loopState.carriedStateUpdates
+      );
+      loopState.carriedStateUpdates = [];
+      headState = await this.loadHeadState(handle.request.branchId);
+    }
+
+    return {
+      headState,
+    };
+  }
+
+  private async executeIterationPhase(
+    handle: RuntimeExecutionHandle,
+    schemaId: string,
+    loopState: LoopState,
+    headState: HeadState | undefined,
+    iterationCount: number,
+    pendingResume: ResumeContext | undefined
+  ): Promise<IterationPhaseResult> {
+    if (headState === undefined) {
+      throw new KrakenRuntimeError("iteration execution requires head state", {
+        code: "missing_head_state",
+      });
+    }
+
+    const driver = handle.getOrCreateDriver(
+      loopState.activeDriverId,
+      (driverId) => this.materializeDriver(driverId)
+    );
+    const iterationRunId = this.createId();
+
+    await this.createTrackedRun(
+      handle,
+      iterationRunId,
+      handle.turnId,
+      handle.request.branchId,
+      schemaId,
+      headState.branchHeadHash,
+      [
+        {
+          deterministic: false,
+          id: "iterate",
+          sideEffects: true,
+        },
+      ]
+    );
+    await this.options.kernel.run.beginStep(iterationRunId, "iterate");
+
+    const driverResult = await this.executeDriver(
+      driver,
+      this.createDriverExecutionContext(
+        handle,
+        schemaId,
+        loopState,
+        headState,
+        iterationCount
+      ),
+      pendingResume
+    );
+    let resolution = driverResult.resolution;
+    const driverMessages = driverResult.messages ?? [];
+    const requestedToolCalls = extractToolCallsFromMessages(driverMessages);
+    const invalidDriverResolutionError =
+      requestedToolCalls.length > 0 && resolution.type !== "continue_iteration"
+        ? new KrakenRuntimeError(
+            "drivers must not return executable tool calls with a terminal resolution",
+            {
+              code: "invalid_driver_resolution",
+              details: {
+                resolutionType: resolution.type,
+                toolCallCount: requestedToolCalls.length,
+              },
+            }
+          )
+        : undefined;
+
+    if (invalidDriverResolutionError !== undefined) {
+      await this.completeTrackedRun(handle, iterationRunId, "completed");
+      return {
+        kind: "outcome",
+        outcome: {
           resolution: {
             error: invalidDriverResolutionError,
             fatality: "hard",
             type: "fail",
           },
+        },
+      };
+    }
+
+    const stagedMessages = [...driverMessages];
+    const stagedMessageHashes = await this.stageDriverMessages(
+      iterationRunId,
+      driverMessages,
+      iterationCount
+    );
+    const driverResponse =
+      driverResult.response ?? synthesizeResponse(driverMessages, resolution);
+    const toolResults: ToolResultPart[] = [];
+
+    if (
+      resolution.type === "continue_iteration" &&
+      requestedToolCalls.length > 0
+    ) {
+      const toolBatch = await this.executeRequestedToolBatch(
+        handle,
+        loopState,
+        headState,
+        iterationCount,
+        iterationRunId,
+        requestedToolCalls
+      );
+
+      if ("outcome" in toolBatch) {
+        return {
+          kind: "outcome",
+          outcome: toolBatch.outcome,
         };
       }
 
-      const stagedMessages = [...driverMessages];
-      const driverResponse =
-        driverResult.response ?? synthesizeResponse(driverMessages, resolution);
-      const toolResults: ToolResultPart[] = [];
+      toolResults.push(...toolBatch.results);
+      stagedMessageHashes.push(...toolBatch.resultHashes);
+      loopState.carriedStateUpdates.push(...toolBatch.updates);
 
-      for (const [index, driverMessage] of driverMessages.entries()) {
-        assertKrakenMessage(driverMessage, `driverResult.messages[${index}]`);
+      for (const result of toolBatch.results) {
+        stagedMessages.push({
+          parts: [result],
+          role: "tool",
+        });
       }
 
-      for (let index = 0; index < stagedMessages.length; index += 1) {
-        stagedMessageHashes.push(
-          await this.stageMessage(
-            iterationRunId,
-            stagedMessages[index],
-            `message_${nextIteration}_${index}`
+      if (toolBatch.approval !== undefined) {
+        resolution = {
+          approval: toolBatch.approval,
+          reason: "approval_required",
+          type: "pause",
+        };
+      }
+    }
+
+    const manifest = updateContextManifest(
+      headState.manifest,
+      stagedMessages,
+      [...loopState.carriedStateUpdates],
+      []
+    );
+    loopState.carriedStateUpdates = [];
+    const turnNodeHash = await this.completeIterationArtifacts(
+      handle,
+      schemaId,
+      loopState,
+      headState,
+      iterationCount,
+      iterationRunId,
+      resolution,
+      manifest,
+      stagedMessageHashes
+    );
+    handle.updateStatus({
+      activeAgent: loopState.activeConfig.name,
+      manifest,
+    });
+    resolution = await this.applyAfterIterationResolution(
+      handle,
+      loopState,
+      iterationCount,
+      iterationRunId,
+      resolution,
+      driverResponse,
+      toolResults,
+      headState.messages,
+      stagedMessages,
+      manifest
+    );
+
+    return {
+      kind: "executed",
+      result: {
+        driverResponse,
+        iterationRunId,
+        requestedToolCalls,
+        resolution,
+        toolResults,
+        turnNodeHash,
+      },
+    };
+  }
+
+  private createDriverExecutionContext(
+    handle: RuntimeExecutionHandle,
+    schemaId: string,
+    loopState: LoopState,
+    headState: HeadState,
+    iterationCount: number
+  ): DriverExecutionContext {
+    return {
+      branchId: handle.request.branchId,
+      config: loopState.activeConfig,
+      handoff: {
+        createContextPlan: (input) =>
+          this.createDriverHandoffContextPlan(input, headState, loopState),
+      },
+      iterationCount,
+      manifest: headState.manifest,
+      messages: headState.messages,
+      runtime: {
+        emit: (event) => {
+          this.publishEvent(handle, event, loopState);
+        },
+        now: () => this.now(),
+      },
+      schemaId,
+      signal: handle.abortSignal,
+      threadId: handle.request.threadId,
+      toolRegistry: loopState.activeToolRegistry,
+      turnId: handle.turnId,
+    };
+  }
+
+  private async stageDriverMessages(
+    runId: string,
+    messages: KrakenMessage[],
+    iterationCount: number
+  ): Promise<HashString[]> {
+    const stagedMessageHashes: HashString[] = [];
+
+    for (const [index, driverMessage] of messages.entries()) {
+      assertKrakenMessage(driverMessage, `driverResult.messages[${index}]`);
+      stagedMessageHashes.push(
+        await this.stageMessage(
+          runId,
+          driverMessage,
+          `message_${iterationCount}_${index}`
+        )
+      );
+    }
+
+    return stagedMessageHashes;
+  }
+
+  private async executeRequestedToolBatch(
+    handle: RuntimeExecutionHandle,
+    loopState: LoopState,
+    headState: HeadState,
+    iterationCount: number,
+    runId: string,
+    requestedToolCalls: ToolCallPart[]
+  ): Promise<ToolBatchOutcome | { outcome: LoopOutcome }> {
+    try {
+      return await executeToolBatch(
+        requestedToolCalls,
+        this.createToolBatchEnvironment(
+          handle,
+          loopState,
+          headState.manifest,
+          iterationCount,
+          runId
+        )
+      );
+    } catch (error: unknown) {
+      await this.failTrackedRunWithoutBranchAdvance(
+        handle,
+        runId,
+        headState.branchHeadHash
+      );
+      return {
+        outcome: {
+          resolution: {
+            error: normalizeError(error),
+            fatality: "hard",
+            type: "fail",
+          },
+        },
+      };
+    }
+  }
+
+  private async completeIterationArtifacts(
+    handle: RuntimeExecutionHandle,
+    schemaId: string,
+    loopState: LoopState,
+    headState: HeadState,
+    iterationCount: number,
+    runId: string,
+    resolution: RuntimeResolution,
+    manifest: ContextManifest,
+    appendedMessageHashes: HashString[]
+  ): Promise<HashString | undefined> {
+    const manifestHash = await this.stageManifest(runId, manifest);
+    const runtimeStatusHash =
+      resolution.type === "pause"
+        ? await this.stageRuntimeStatus(
+            runId,
+            {
+              activeAgent: loopState.activeConfig.name,
+              iterationCount,
+              pauseReason: resolution.reason,
+              state: "paused",
+              turnId: handle.turnId,
+            },
+            "runtime_status"
           )
+        : undefined;
+    const nextTreeHash =
+      resolution.type === "fail" && resolution.fatality === "hard"
+        ? undefined
+        : await this.createIterationTree(
+            schemaId,
+            headState.turnNode.turnTreeHash,
+            headState.messageHashes,
+            appendedMessageHashes,
+            manifestHash,
+            runtimeStatusHash
+          );
+
+    return await this.completeIterationRun(
+      handle,
+      runId,
+      resolution,
+      manifest,
+      iterationCount,
+      loopState,
+      nextTreeHash
+    );
+  }
+
+  private async applyAfterIterationResolution(
+    handle: RuntimeExecutionHandle,
+    loopState: LoopState,
+    iterationCount: number,
+    runId: string,
+    resolution: RuntimeResolution,
+    response: KrakenModelResponse,
+    toolResults: ToolResultPart[],
+    headMessages: KrakenMessage[],
+    stagedMessages: KrakenMessage[],
+    manifest: ContextManifest
+  ): Promise<RuntimeResolution> {
+    const afterIteration = await runAfterIterationHooks({
+      emit: (event) => {
+        this.publishCustomEvent(handle, event, loopState);
+      },
+      extensions: loopState.activeConfig.extensions ?? [],
+      iterationCount,
+      manifest,
+      messages: [...headMessages, ...stagedMessages],
+      resolution,
+      response,
+      runId,
+      toolResults,
+      turnId: handle.turnId,
+    });
+    let nextResolution = composeResolutions(
+      resolution,
+      afterIteration.resolution
+    );
+    loopState.carriedStateUpdates.push(...afterIteration.updates);
+
+    if (nextResolution.type === "fail" && nextResolution.fatality === "soft") {
+      this.publishProjectedError(
+        handle,
+        nextResolution.error,
+        false,
+        loopState
+      );
+    }
+
+    if (
+      loopState.activeConfig.maxIterations !== undefined &&
+      iterationCount >= loopState.activeConfig.maxIterations &&
+      nextResolution.type === "continue_iteration"
+    ) {
+      nextResolution = {
+        reason: "max_iterations",
+        type: "end_turn",
+      };
+    }
+
+    return nextResolution;
+  }
+
+  private async resolveIterationOutcome(
+    handle: RuntimeExecutionHandle,
+    schemaId: string,
+    loopState: LoopState,
+    iterationCount: number,
+    result: ExecutedIterationResult
+  ): Promise<LoopOutcome | "continue"> {
+    if (result.resolution.type === "continue_iteration") {
+      return "continue";
+    }
+
+    if (
+      result.resolution.type === "fail" &&
+      result.resolution.fatality === "soft"
+    ) {
+      return "continue";
+    }
+
+    if (result.resolution.type === "pause") {
+      if (result.turnNodeHash === undefined) {
+        throw new KrakenRuntimeError(
+          "paused iterations must commit a durable pause checkpoint",
+          {
+            code: "missing_pause_checkpoint",
+          }
         );
       }
 
-      if (
-        resolution.type === "continue_iteration" &&
-        requestedToolCalls.length > 0
-      ) {
-        let toolBatch: ToolBatchOutcome;
-
-        try {
-          toolBatch = await executeToolBatch(
-            requestedToolCalls,
-            this.createToolBatchEnvironment(
-              handle,
-              loopState,
-              headState.manifest,
-              nextIteration,
-              iterationRunId
-            )
-          );
-        } catch (error: unknown) {
-          await this.failTrackedRunWithoutBranchAdvance(
-            handle,
-            iterationRunId,
-            headState.branchHeadHash
-          );
-          return {
-            resolution: {
-              error: normalizeError(error),
-              fatality: "hard",
-              type: "fail",
-            },
-          };
-        }
-
-        toolResults.push(...toolBatch.results);
-        stagedMessageHashes.push(...toolBatch.resultHashes);
-        loopState.carriedStateUpdates.push(...toolBatch.updates);
-
-        for (const result of toolBatch.results) {
-          stagedMessages.push({
-            parts: [result],
-            role: "tool",
-          });
-        }
-
-        if (toolBatch.approval !== undefined) {
-          resolution = {
-            approval: toolBatch.approval,
-            reason: "approval_required",
-            type: "pause",
-          };
-        }
-      }
-
-      const manifest = updateContextManifest(
-        headState.manifest,
-        stagedMessages,
-        [...loopState.carriedStateUpdates],
-        []
-      );
-      loopState.carriedStateUpdates = [];
-      const manifestHash = await this.stageManifest(iterationRunId, manifest);
-      const runtimeStatusHash =
-        resolution.type === "pause"
-          ? await this.stageRuntimeStatus(
-              iterationRunId,
-              {
-                activeAgent: loopState.activeConfig.name,
-                iterationCount: nextIteration,
-                pauseReason: resolution.reason,
-                state: "paused",
-                turnId: handle.turnId,
-              },
-              "runtime_status"
-            )
-          : undefined;
-      const nextTreeHash =
-        resolution.type === "fail" && resolution.fatality === "hard"
-          ? undefined
-          : await this.createIterationTree(
-              schemaId,
-              headState.turnNode.turnTreeHash,
-              headState.messageHashes,
-              stagedMessageHashes,
-              manifestHash,
-              runtimeStatusHash
-            );
-
-      const turnNodeHash = await this.completeIterationRun(
-        handle,
-        iterationRunId,
-        resolution,
-        manifest,
-        nextIteration,
-        loopState,
-        nextTreeHash
-      );
-
-      handle.updateStatus({
-        // `activeAgent` is framework-owned lifecycle state. The driver may report
-        // its own view for compatibility, but live handle status must stay aligned
-        // with the currently active AgentConfig until a framework-applied handoff
-        // actually changes that agent segment.
-        activeAgent: loopState.activeConfig.name,
-        manifest,
-      });
-
-      const afterIteration = await runAfterIterationHooks({
-        emit: (event) => {
-          this.publishCustomEvent(handle, event, loopState);
-        },
-        extensions: loopState.activeConfig.extensions ?? [],
-        iterationCount: nextIteration,
-        manifest,
-        messages: [...headState.messages, ...stagedMessages],
-        resolution,
-        response: driverResponse,
-        runId: iterationRunId,
-        toolResults,
-        turnId: handle.turnId,
-      });
-      resolution = composeResolutions(resolution, afterIteration.resolution);
-      loopState.carriedStateUpdates.push(...afterIteration.updates);
-
-      if (resolution.type === "fail" && resolution.fatality === "soft") {
-        this.publishProjectedError(handle, resolution.error, false, loopState);
-      }
-
-      if (
-        loopState.activeConfig.maxIterations !== undefined &&
-        nextIteration >= loopState.activeConfig.maxIterations &&
-        resolution.type === "continue_iteration"
-      ) {
-        resolution = {
-          reason: "max_iterations",
-          type: "end_turn",
-        };
-      }
-
-      this.publishEvent(
-        handle,
-        {
-          iterationCount: nextIteration,
-          timestamp: this.now(),
-          type: "iteration.end",
-        },
-        loopState
-      );
-
-      if (resolution.type === "continue_iteration") {
-        continue;
-      }
-
-      if (resolution.type === "fail" && resolution.fatality === "soft") {
-        continue;
-      }
-
-      if (resolution.type === "pause") {
-        if (turnNodeHash === undefined) {
-          throw new KrakenRuntimeError(
-            "paused iterations must commit a durable pause checkpoint",
-            {
-              code: "missing_pause_checkpoint",
-            }
-          );
-        }
-
-        return {
-          pauseContext: {
-            activeConfig: loopState.activeConfig,
-            activeDriverId: loopState.activeDriverId,
-            activeToolRegistry: loopState.activeToolRegistry,
-            approval: resolution.approval,
-            carriedStateUpdates: [...loopState.carriedStateUpdates],
-            kind:
-              requestedToolCalls.length > 0 ? "tool_approval" : "driver_pause",
-            pauseReason: resolution.reason,
-            pausedIteration:
-              requestedToolCalls.length > 0
-                ? {
-                    iterationCount: nextIteration,
-                    response: driverResponse,
-                    toolResults,
-                  }
-                : undefined,
-            pausedRunId: iterationRunId,
-            pausedTurnNodeHash: turnNodeHash,
-          },
-          resolution,
-        };
-      }
-
-      if (
-        await this.applyTerminalAgentTransitionIfNeeded(
-          handle,
-          schemaId,
-          resolution,
-          loopState
-        )
-      ) {
-        continue;
-      }
-
       return {
-        resolution,
+        pauseContext: {
+          activeConfig: loopState.activeConfig,
+          activeDriverId: loopState.activeDriverId,
+          activeToolRegistry: loopState.activeToolRegistry,
+          approval: result.resolution.approval,
+          carriedStateUpdates: [...loopState.carriedStateUpdates],
+          kind:
+            result.requestedToolCalls.length > 0
+              ? "tool_approval"
+              : "driver_pause",
+          pauseReason: result.resolution.reason,
+          pausedIteration:
+            result.requestedToolCalls.length > 0
+              ? {
+                  iterationCount,
+                  response: result.driverResponse,
+                  toolResults: result.toolResults,
+                }
+              : undefined,
+          pausedRunId: result.iterationRunId,
+          pausedTurnNodeHash: result.turnNodeHash,
+        },
+        resolution: result.resolution,
       };
     }
+
+    if (
+      await this.applyTerminalAgentTransitionIfNeeded(
+        handle,
+        schemaId,
+        result.resolution,
+        loopState
+      )
+    ) {
+      return "continue";
+    }
+
+    return {
+      resolution: result.resolution,
+    };
   }
 
   private async resumePausedToolExecution(
@@ -5164,6 +5468,22 @@ function sanitizeSignalValue(value: unknown): unknown {
   }
 
   return String(value);
+}
+
+function createCancelledLoopOutcome(
+  handle: RuntimeExecutionHandle
+): LoopOutcome | undefined {
+  if (!handle.abortSignal.aborted) {
+    return undefined;
+  }
+
+  return {
+    resolution: {
+      error: new Error("execution cancelled"),
+      fatality: "hard",
+      type: "fail",
+    },
+  };
 }
 
 function formatToolResultTaskId(orderIndex: number, callId: string): string {

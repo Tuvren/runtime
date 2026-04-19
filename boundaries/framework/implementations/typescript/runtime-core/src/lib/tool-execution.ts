@@ -132,6 +132,14 @@ type RawSingleToolOutcome =
       updates: ExtensionStateUpdate[];
     };
 
+type ResolvedToolBatchStep =
+  | { executable: ExecutableToolCall }
+  | { pendingToolCall: PendingToolCall }
+  | { result: ToolResultPart };
+
+// This remains throw-based intentionally: aroundTool handlers receive
+// `next(): Promise<ToolResultPart>`, so a nested pause has no value-level way to
+// short-circuit that contract without widening the public handler surface.
 class ToolPauseSignal extends Error {
   readonly approval: ApprovalRequest;
   readonly updates: ExtensionStateUpdate[];
@@ -147,14 +155,63 @@ export async function executeToolBatch(
   toolCalls: ToolCallPart[],
   environment: ToolBatchEnvironment
 ): Promise<ToolBatchOutcome> {
-  const orderedResults = toolCalls.map((): StagedToolResult[] => []);
-  const immediateResults = toolCalls.map((): ToolResultPart[] => []);
+  return await runToolBatch(toolCalls.length, environment, async (index) => {
+    return await resolveExecutableToolCall(toolCalls[index], environment);
+  });
+}
+
+export async function resumeToolBatch(
+  request: ApprovalRequest,
+  response: ApprovalResponse,
+  environment: ToolBatchEnvironment
+): Promise<ToolBatchOutcome> {
+  const responseMap = new Map<string, ApprovalDecision>();
+  for (const decision of response.decisions) {
+    responseMap.set(decision.callId, decision);
+  }
+  return await runToolBatch(
+    request.toolCalls.length,
+    environment,
+    async (index) => {
+      const pendingToolCall = request.toolCalls[index];
+      const decision = responseMap.get(pendingToolCall.callId);
+
+      if (decision === undefined) {
+        return undefined;
+      }
+
+      return await resolveResumeDecision(
+        pendingToolCall,
+        decision,
+        environment
+      );
+    }
+  );
+}
+
+async function runToolBatch(
+  totalCalls: number,
+  environment: ToolBatchEnvironment,
+  resolveStep: (index: number) => Promise<ResolvedToolBatchStep | undefined>
+): Promise<ToolBatchOutcome> {
+  const orderedResults = Array.from(
+    { length: totalCalls },
+    (): StagedToolResult[] => []
+  );
+  const immediateResults = Array.from(
+    { length: totalCalls },
+    (): ToolResultPart[] => []
+  );
   const pendingToolCalls: PendingToolCall[] = [];
   const updates: ExtensionStateUpdate[] = [];
   const executable: OrderedExecutableToolCall[] = [];
 
-  for (const [index, toolCall] of toolCalls.entries()) {
-    const resolved = await resolveExecutableToolCall(toolCall, environment);
+  for (let index = 0; index < totalCalls; index += 1) {
+    const resolved = await resolveStep(index);
+
+    if (resolved === undefined) {
+      continue;
+    }
 
     if ("pendingToolCall" in resolved) {
       pendingToolCalls.push(resolved.pendingToolCall);
@@ -172,17 +229,34 @@ export async function executeToolBatch(
     });
   }
 
-  if (executable.length === 0) {
-    await stageImmediateResults(
-      environment,
-      immediateResults,
-      orderedResults,
-      createToolStartBarrier(0)
-    );
-  }
+  await executePlannedToolCalls(
+    environment,
+    immediateResults,
+    orderedResults,
+    executable,
+    pendingToolCalls,
+    updates
+  );
+
+  return buildToolBatchOutcome(orderedResults, pendingToolCalls, updates);
+}
+
+async function executePlannedToolCalls(
+  environment: ToolBatchEnvironment,
+  immediateResults: ToolResultPart[][],
+  orderedResults: StagedToolResult[][],
+  executable: OrderedExecutableToolCall[],
+  pendingToolCalls: PendingToolCall[],
+  updates: ExtensionStateUpdate[]
+): Promise<void> {
   const executableOutcomes =
     executable.length === 0
-      ? []
+      ? await stageImmediateResults(
+          environment,
+          immediateResults,
+          orderedResults,
+          createToolStartBarrier(0)
+        ).then(() => [] as SingleToolOutcome[])
       : await stageImmediateResultsWhileExecuting(
           environment,
           immediateResults,
@@ -214,7 +288,13 @@ export async function executeToolBatch(
       result: outcome.result,
     });
   }
+}
 
+function buildToolBatchOutcome(
+  orderedResults: StagedToolResult[][],
+  pendingToolCalls: PendingToolCall[],
+  updates: ExtensionStateUpdate[]
+): ToolBatchOutcome {
   const stagedResults = orderedResults.flat();
   const results = stagedResults.map((entry) => entry.result);
   const resultHashes = stagedResults.map((entry) => entry.hash);
@@ -230,107 +310,6 @@ export async function executeToolBatch(
         results,
         updates,
       };
-}
-
-export async function resumeToolBatch(
-  request: ApprovalRequest,
-  response: ApprovalResponse,
-  environment: ToolBatchEnvironment
-): Promise<ToolBatchOutcome> {
-  const orderedResults = request.toolCalls.map((): StagedToolResult[] => []);
-  const immediateResults = request.toolCalls.map((): ToolResultPart[] => []);
-  const updates: ExtensionStateUpdate[] = [];
-  const executable: OrderedExecutableToolCall[] = [];
-  const responseMap = new Map<string, ApprovalDecision>();
-
-  for (const decision of response.decisions) {
-    responseMap.set(decision.callId, decision);
-  }
-
-  for (const [index, pendingToolCall] of request.toolCalls.entries()) {
-    const decision = responseMap.get(pendingToolCall.callId);
-
-    if (decision === undefined) {
-      continue;
-    }
-
-    const resumePlan = await resolveResumeDecision(
-      pendingToolCall,
-      decision,
-      environment
-    );
-
-    if ("result" in resumePlan) {
-      immediateResults[index].push(resumePlan.result);
-      continue;
-    }
-
-    executable.push({
-      executable: resumePlan.executable,
-      index,
-    });
-  }
-
-  if (executable.length === 0) {
-    await stageImmediateResults(
-      environment,
-      immediateResults,
-      orderedResults,
-      createToolStartBarrier(0)
-    );
-  }
-  const executedOutcomes =
-    executable.length === 0
-      ? []
-      : await stageImmediateResultsWhileExecuting(
-          environment,
-          immediateResults,
-          orderedResults,
-          executable
-        );
-  const pendingToolCalls: PendingToolCall[] = [];
-
-  for (const [outcomeIndex, outcome] of executedOutcomes.entries()) {
-    updates.push(...outcome.updates);
-    const resultIndex = executable[outcomeIndex]?.index;
-
-    if (resultIndex === undefined) {
-      continue;
-    }
-
-    if (outcome.approval !== undefined) {
-      orderedResults[resultIndex].push(
-        ...zipStagedToolResults(
-          outcome.approval.completedResults,
-          outcome.completedResultHashes
-        )
-      );
-      pendingToolCalls.push(...outcome.approval.toolCalls);
-      continue;
-    }
-
-    orderedResults[resultIndex].push({
-      hash: outcome.resultHash,
-      result: outcome.result,
-    });
-  }
-
-  const stagedResults = orderedResults.flat();
-  const results = stagedResults.map((entry) => entry.result);
-  const resultHashes = stagedResults.map((entry) => entry.hash);
-
-  return {
-    approval:
-      pendingToolCalls.length === 0
-        ? undefined
-        : {
-            completedResults: results,
-            toolCalls: pendingToolCalls,
-          },
-    resultHashes,
-    results,
-    updates,
-  };
 }
 
 async function resolveExecutableToolCall(
