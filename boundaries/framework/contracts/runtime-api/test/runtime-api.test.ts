@@ -24,6 +24,10 @@ import {
   type KrakenStreamEvent as KrakenStreamEventFromSubpath,
 } from "../src/events.ts";
 import {
+  assertExecutionStatus as assertExecutionStatusFromSubpath,
+  type ExecutionStatus as ExecutionStatusFromSubpath,
+} from "../src/execution.ts";
+import {
   type AgentConfig,
   assertApprovalRequest,
   assertApprovalResponse,
@@ -44,6 +48,10 @@ import {
   isKrakenToolDefinition,
   isProviderStreamChunk,
 } from "../src/index.ts";
+import type {
+  OrchestrationHandle as OrchestrationHandleFromSubpath,
+  WorkerStatus as WorkerStatusFromSubpath,
+} from "../src/orchestration.ts";
 import {
   assertProviderStreamChunk as assertProviderStreamChunkFromSubpath,
   type ProviderStreamChunk as ProviderStreamChunkFromSubpath,
@@ -131,6 +139,21 @@ describe("runtime-api contracts", () => {
       finishReason: "stop",
       type: "finish",
     } satisfies ProviderStreamChunkFromSubpath;
+    const executionStatus = {
+      activeAgent: "primary",
+      iterationCount: 0,
+      phase: "running",
+    } satisfies ExecutionStatusFromSubpath;
+    const workerStatus =
+      frameworkContractFixtures.workerStatus satisfies WorkerStatusFromSubpath;
+    const orchestrationHandle =
+      frameworkContractFixtures.orchestrationRuntime.executeTurn({
+        branchId: "branch_subpath",
+        signal: {
+          parts: [{ text: "Subpath orchestration", type: "text" }],
+        },
+        threadId: "thread_subpath",
+      }) satisfies OrchestrationHandleFromSubpath;
 
     expect(() =>
       assertApprovalRequestFromSubpath(approvalRequest)
@@ -139,6 +162,11 @@ describe("runtime-api contracts", () => {
     expect(() =>
       assertProviderStreamChunkFromSubpath(providerChunk)
     ).not.toThrow();
+    expect(() =>
+      assertExecutionStatusFromSubpath(executionStatus)
+    ).not.toThrow();
+    expect(workerStatus.workerId).toBe("worker_1");
+    expect(typeof orchestrationHandle.workers).toBe("function");
   });
 
   test("exposes the orchestration contract surface through canonical fixtures", async () => {

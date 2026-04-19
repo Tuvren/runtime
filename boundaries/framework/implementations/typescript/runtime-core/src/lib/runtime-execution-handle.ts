@@ -1,0 +1,293 @@
+/**
+ * Copyright 2026 Oscar Yáñez Cisterna (@SkrOYC)
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+import type { KrakenDriver } from "@kraken/framework-driver-api";
+import type {
+  ApprovalResponse,
+  ExecutionHandle,
+  ExecutionStatus,
+  InputSignal,
+  KrakenErrorProjection,
+  KrakenStreamEvent,
+} from "@kraken/framework-runtime-api";
+import { assertApprovalResponseForRequest } from "@kraken/framework-runtime-api";
+import { KrakenRuntimeError } from "@kraken/shared-core-types";
+import {
+  cloneExecutionStatus,
+  detachPromise,
+  EventFanout,
+  normalizeInputSignal,
+} from "./runtime-core-shared.js";
+import type {
+  ExecutionSessionRequest,
+  PauseContext,
+  ResumeContext,
+} from "./runtime-execution-types.js";
+
+export interface RuntimeExecutionHandleRuntime {
+  cancelPausedExecution(handle: RuntimeExecutionHandle): void;
+  createResumedExecutionHandle(
+    previousHandle: RuntimeExecutionHandle,
+    pauseContext: PauseContext,
+    response: ApprovalResponse
+  ): RuntimeExecutionHandle;
+  startExecution(handle: RuntimeExecutionHandle): Promise<void>;
+}
+
+export class RuntimeExecutionHandle implements ExecutionHandle {
+  private activeRunId?: string;
+  private readonly abortController = new AbortController();
+  private readonly eventsFanout = new EventFanout<KrakenStreamEvent>();
+  private lastErrorProjection?: KrakenErrorProjection;
+  private materializedDriver?: KrakenDriver;
+  private materializedDriverId?: string;
+  private pauseContext?: PauseContext;
+  private replacementHandle?: RuntimeExecutionHandle;
+  private readonly runtime: RuntimeExecutionHandleRuntime;
+  private schemaIdValue: string;
+  private readonly steeringQueue: InputSignal[] = [];
+  private started = false;
+  private statusSnapshot: ExecutionStatus;
+  readonly request: ExecutionSessionRequest;
+  readonly resumedFrom?: ResumeContext;
+  readonly turnId: string;
+
+  constructor(
+    runtime: RuntimeExecutionHandleRuntime,
+    request: ExecutionSessionRequest,
+    turnId: string,
+    schemaId: string,
+    resumedFrom?: ResumeContext
+  ) {
+    this.runtime = runtime;
+    this.request = request;
+    this.turnId = turnId;
+    this.schemaIdValue = schemaId;
+    this.resumedFrom = resumedFrom;
+    this.statusSnapshot = {
+      activeAgent: request.config.name,
+      iterationCount: 0,
+      phase: "running",
+    };
+  }
+
+  cancel(): void {
+    if (this.replacementHandle !== undefined) {
+      this.replacementHandle.cancel();
+      return;
+    }
+
+    this.abortController.abort();
+    this.runtime.cancelPausedExecution(this);
+  }
+
+  consumeSteeringSignal(): InputSignal | undefined {
+    return this.steeringQueue.shift();
+  }
+
+  events(): AsyncIterable<KrakenStreamEvent> {
+    const events = this.eventsFanout.subscribe();
+
+    if (!this.started) {
+      this.started = true;
+      detachPromise(this.runtime.startExecution(this));
+    }
+
+    return events;
+  }
+
+  finish(): void {
+    this.eventsFanout.close();
+  }
+
+  get abortSignal(): AbortSignal {
+    return this.abortController.signal;
+  }
+
+  getActiveRunId(): string | undefined {
+    return this.activeRunId;
+  }
+
+  get schemaId(): string {
+    return this.schemaIdValue;
+  }
+
+  hasStartedExecution(): boolean {
+    return this.started;
+  }
+
+  publish(event: KrakenStreamEvent): void {
+    this.eventsFanout.emit(event);
+  }
+
+  rememberError(error: KrakenErrorProjection): void {
+    this.lastErrorProjection = error;
+  }
+
+  rememberPauseContext(context: PauseContext): void {
+    this.pauseContext = context;
+    this.replaceStatus({
+      activeAgent: context.activeConfig.name,
+      approval: context.approval,
+      iterationCount: this.statusSnapshot.iterationCount,
+      manifest: this.statusSnapshot.manifest,
+      pauseReason: context.pauseReason,
+      phase: "paused",
+    });
+  }
+
+  replaceStatus(status: ExecutionStatus): void {
+    this.statusSnapshot = cloneExecutionStatus(status);
+  }
+
+  setActiveRunId(runId: string): void {
+    this.activeRunId = runId;
+  }
+
+  setSchemaId(schemaId: string): void {
+    this.schemaIdValue = schemaId;
+  }
+
+  takeActiveRunId(): string | undefined {
+    const activeRunId = this.activeRunId;
+    this.activeRunId = undefined;
+    return activeRunId;
+  }
+
+  takePauseContextForCancellation(): PauseContext | undefined {
+    if (this.pauseContext === undefined) {
+      return undefined;
+    }
+
+    const canCancelPausedExecution =
+      this.statusSnapshot.phase === "paused" ||
+      (!this.started &&
+        this.resumedFrom !== undefined &&
+        this.statusSnapshot.phase === "running");
+
+    if (!canCancelPausedExecution) {
+      return undefined;
+    }
+
+    const pauseContext = this.pauseContext;
+    this.pauseContext = undefined;
+    return pauseContext;
+  }
+
+  resolveApproval(response: ApprovalResponse): ExecutionHandle {
+    if (
+      this.statusSnapshot.phase !== "paused" ||
+      this.pauseContext === undefined ||
+      this.statusSnapshot.approval === undefined ||
+      this.replacementHandle !== undefined
+    ) {
+      throw new KrakenRuntimeError(
+        "resolveApproval() is only valid while execution is paused",
+        {
+          code: "invalid_approval_resolution",
+        }
+      );
+    }
+
+    assertApprovalResponseForRequest(
+      response,
+      this.statusSnapshot.approval,
+      "response"
+    );
+
+    const resumedHandle = this.runtime.createResumedExecutionHandle(
+      this,
+      this.pauseContext,
+      response
+    );
+    this.replacementHandle = resumedHandle;
+    this.pauseContext = undefined;
+    return resumedHandle;
+  }
+
+  status(): ExecutionStatus {
+    return cloneExecutionStatus(this.statusSnapshot);
+  }
+
+  getLastErrorProjection(): KrakenErrorProjection | undefined {
+    return this.lastErrorProjection;
+  }
+
+  getOrCreateDriver(
+    driverId: string,
+    materialize: (driverId: string) => KrakenDriver
+  ): KrakenDriver {
+    if (
+      this.materializedDriver !== undefined &&
+      this.materializedDriverId === driverId
+    ) {
+      return this.materializedDriver;
+    }
+
+    const driver = materialize(driverId);
+    this.materializedDriver = driver;
+    this.materializedDriverId = driverId;
+    return driver;
+  }
+
+  steer(signal: InputSignal): void {
+    if (this.statusSnapshot.phase !== "running") {
+      throw new KrakenRuntimeError(
+        "steer() is only valid while execution is running",
+        {
+          code: "invalid_steering_state",
+          details: {
+            phase: this.statusSnapshot.phase,
+          },
+        }
+      );
+    }
+
+    this.steeringQueue.push(normalizeInputSignal(signal, "steering signal"));
+  }
+
+  updateStatus(patch: Partial<ExecutionStatus>): void {
+    this.statusSnapshot = cloneExecutionStatus({
+      ...this.statusSnapshot,
+      ...patch,
+    });
+  }
+
+  moveSteeringQueueTo(target: RuntimeExecutionHandle): void {
+    while (this.steeringQueue.length > 0) {
+      const signal = this.steeringQueue.shift();
+
+      if (signal !== undefined) {
+        target.steeringQueue.push(signal);
+      }
+    }
+  }
+
+  primeResumedCancellation(pauseContext: PauseContext): void {
+    this.pauseContext = pauseContext;
+  }
+
+  clearPendingResumeCancellation(): void {
+    if (this.statusSnapshot.phase === "running") {
+      this.pauseContext = undefined;
+    }
+  }
+
+  reuseDriverCache(previousHandle: RuntimeExecutionHandle): void {
+    this.materializedDriver = previousHandle.materializedDriver;
+    this.materializedDriverId = previousHandle.materializedDriverId;
+  }
+}

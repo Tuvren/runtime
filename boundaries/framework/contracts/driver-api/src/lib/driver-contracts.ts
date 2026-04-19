@@ -14,30 +14,31 @@
  * limitations under the License.
  */
 
+import type { KrakenStreamEvent } from "@kraken/framework-runtime-api/events";
 import type {
   AgentConfig,
-  ApprovalResponse,
   ContextManifest,
-  EpochMs,
   HandoffContextBuilder,
   HandoffContextMode,
   HandoffContextPlan,
   HandoffSourceContext,
-  HashString,
   KrakenMessage,
-  KrakenModelResponse,
-  KrakenStreamEvent,
   RuntimeResolution,
-  ToolCallPart,
-  ToolRegistry,
-} from "@kraken/framework-runtime-api";
+} from "@kraken/framework-runtime-api/execution";
 import {
-  assertApprovalRequest,
   assertContextManifest,
   assertKrakenMessage,
-  assertKrakenModelResponse,
-  KrakenValidationError,
-} from "@kraken/framework-runtime-api";
+} from "@kraken/framework-runtime-api/execution";
+import type { KrakenModelResponse } from "@kraken/framework-runtime-api/provider";
+import { assertKrakenModelResponse } from "@kraken/framework-runtime-api/provider";
+import type {
+  ApprovalResponse,
+  ToolCallPart,
+  ToolRegistry,
+} from "@kraken/framework-runtime-api/tools";
+import { assertApprovalRequest } from "@kraken/framework-runtime-api/tools";
+import type { EpochMs, HashString } from "@kraken/shared-core-types";
+import { KrakenValidationError } from "@kraken/shared-core-types";
 
 export interface DriverRuntimePort {
   emit(event: KrakenStreamEvent): Promise<void> | void;

@@ -36,13 +36,11 @@ export {
 } from "./lib/handoff-builders.js";
 export type { OrchestrationRuntimeOptions } from "./lib/orchestration-runtime.js";
 export { createOrchestrationRuntime } from "./lib/orchestration-runtime.js";
-export type {
-  ExecutionSessionRequest,
-  RuntimeCoreOptions,
-} from "./lib/runtime-core.js";
+export type { RuntimeCoreOptions } from "./lib/runtime-core.js";
 export {
   createKrakenRuntimeCore,
   DEFAULT_AGENT_SCHEMA,
   DEFAULT_AGENT_SCHEMA_ID,
 } from "./lib/runtime-core.js";
+export type { ExecutionSessionRequest } from "./lib/runtime-execution-types.js";
 export { createToolRegistry } from "./lib/tool-registry.js";

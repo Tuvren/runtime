@@ -16,6 +16,12 @@
       "@kraken/framework-runtime-api/events": [
         "./boundaries/framework/contracts/runtime-api/src/events.ts"
       ],
+      "@kraken/framework-runtime-api/execution": [
+        "./boundaries/framework/contracts/runtime-api/src/execution.ts"
+      ],
+      "@kraken/framework-runtime-api/orchestration": [
+        "./boundaries/framework/contracts/runtime-api/src/orchestration.ts"
+      ],
       "@kraken/framework-runtime-api/provider": [
         "./boundaries/framework/contracts/runtime-api/src/provider.ts"
       ],

@@ -14,6 +14,16 @@
       "import": "./dist/events.js",
       "default": "./dist/events.js"
     },
+    "./execution": {
+      "types": "./dist/execution.d.ts",
+      "import": "./dist/execution.js",
+      "default": "./dist/execution.js"
+    },
+    "./orchestration": {
+      "types": "./dist/orchestration.d.ts",
+      "import": "./dist/orchestration.js",
+      "default": "./dist/orchestration.js"
+    },
     "./provider": {
       "types": "./dist/provider.d.ts",
       "import": "./dist/provider.js",

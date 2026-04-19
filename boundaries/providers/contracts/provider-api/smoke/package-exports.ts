@@ -14,18 +14,19 @@
  * limitations under the License.
  */
 
-// biome-ignore-all lint/performance/noBarrelFile: This package subpath is the intentional focused contract surface.
-export type {
-  KrakenModelResponse,
-  KrakenPrompt,
-  KrakenProvider,
-  ProviderStreamChunk,
-  ProviderUsage,
-  StructuredOutputRequest,
-} from "./lib/runtime-contracts.js";
-export {
-  assertKrakenModelResponse,
+import { describe, expect, test } from "bun:test";
+import {
   assertProviderStreamChunk,
-  isKrakenModelResponse,
-  isProviderStreamChunk,
-} from "./lib/runtime-contracts.js";
+  type ProviderStreamChunk,
+} from "@kraken/provider-api";
+
+describe("provider-api package exports", () => {
+  test("resolve from the built package surface", () => {
+    const chunk = {
+      finishReason: "stop",
+      type: "finish",
+    } satisfies ProviderStreamChunk;
+
+    expect(() => assertProviderStreamChunk(chunk)).not.toThrow();
+  });
+});

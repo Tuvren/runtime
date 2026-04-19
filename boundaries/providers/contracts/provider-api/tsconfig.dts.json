@@ -7,9 +7,7 @@
     "moduleResolution": "bundler",
     "outDir": "./dist",
     "paths": {
-      "@kraken/shared-core-types": [
-        "../../../shared/contracts/core-types/dist/index.d.ts"
-      ],
+      "@kraken/shared-core-types": ["../../../shared/contracts/core-types"],
       "@kraken/framework-runtime-api": [
         "../../../framework/contracts/runtime-api/dist/index.d.ts"
       ],

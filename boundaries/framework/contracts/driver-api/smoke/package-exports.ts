@@ -14,18 +14,18 @@
  * limitations under the License.
  */
 
-// biome-ignore-all lint/performance/noBarrelFile: This package subpath is the intentional focused contract surface.
-export type {
-  KrakenModelResponse,
-  KrakenPrompt,
-  KrakenProvider,
-  ProviderStreamChunk,
-  ProviderUsage,
-  StructuredOutputRequest,
-} from "./lib/runtime-contracts.js";
-export {
-  assertKrakenModelResponse,
-  assertProviderStreamChunk,
-  isKrakenModelResponse,
-  isProviderStreamChunk,
-} from "./lib/runtime-contracts.js";
+import { describe, expect, test } from "bun:test";
+import {
+  assertDriverExecutionResult,
+  type DriverExecutionResult,
+} from "@kraken/framework-driver-api";
+
+describe("framework-driver-api package exports", () => {
+  test("resolve from the built package surface", () => {
+    const result = {
+      resolution: { reason: "done", type: "end_turn" },
+    } satisfies DriverExecutionResult;
+
+    expect(() => assertDriverExecutionResult(result)).not.toThrow();
+  });
+});
