@@ -311,6 +311,36 @@ describe("driver-api", () => {
     ).not.toThrow();
   });
 
+  test("permits failed partial execution results when assistant output is staged", () => {
+    expect(() =>
+      assertDriverExecutionResult({
+        activeAgent: "primary",
+        messages: [
+          {
+            parts: [{ text: "Interrupted output", type: "text" }],
+            role: "assistant",
+          },
+        ],
+        partial: true,
+        resolution: {
+          error: new Error("execution cancelled"),
+          fatality: "hard",
+          type: "fail",
+        },
+      })
+    ).not.toThrow();
+  });
+
+  test("rejects partial execution results that are not failed assistant output", () => {
+    expect(() =>
+      assertDriverExecutionResult({
+        activeAgent: "primary",
+        partial: true,
+        resolution: { reason: "done", type: "end_turn" },
+      })
+    ).toThrow("partial is only valid for failed execution results");
+  });
+
   test("rejects driver results that bypass framework-owned tool results", () => {
     expect(() =>
       assertDriverExecutionResult({

@@ -358,15 +358,17 @@ DefaultAgentSchema
 ├─ paths:
 │    messages              ordered     // conversation in natural order
 │    context.manifest      single      // structural index
+│    turn.lineage          single      // semantic-turn lineage metadata
 │    runtime.status        single      // execution state metadata
 │
 └─ incorporationRules:
      message               → messages
      context_manifest      → context.manifest
+     turn_lineage          → turn.lineage
      runtime_status        → runtime.status
 ```
 
-Three paths. Three objectTypes. Three incorporation rules.
+Four paths. Four objectTypes. Four incorporation rules.
 
 ### 2.2 Messages Path (ordered)
 
@@ -380,7 +382,16 @@ Staged as `objectType: "context_manifest"`. Each new manifest replaces the previ
 
 When context engineering restructures the messages path via `tree.create`, the manifest is rebuilt from the new hash array and included in the new TurnTree.
 
-### 2.4 Runtime Status Path (single)
+### 2.4 Turn Lineage Path (single)
+
+```
+TurnLineage
+└─ activeTurnId: string
+```
+
+`turn.lineage` is framework-owned semantic lineage metadata. It is initialized during input incorporation for a new Turn and then preserved across later checkpoints on the same Turn. When the caller omits `parentTurnId`, the framework infers the active semantic parent from the Branch Head's `turn.lineage.activeTurnId`. It is not used for context assembly or host status display.
+
+### 2.5 Runtime Status Path (single)
 
 ```
 RuntimeStatus
@@ -400,7 +411,7 @@ RuntimeStatus
 
 `partial`: Set to `true` when a cancellation or other recoverable interruption stages a partial assistant message before the Run fails. Hard process crashes during model streaming may still lose in-memory accumulator state and re-execute from scratch. Extensions and host code can use this flag to detect incomplete responses that were durably staged.
 
-### 2.5 Context Engineering Operations
+### 2.6 Context Engineering Operations
 
 All produce new TurnTrees via `tree.create`. Original messages are never mutated.
 
@@ -594,6 +605,9 @@ function incorporateInput(signal, turnId, branchId, schemaId, agentName?):
   manifest = readManifest(branch.headTurnNodeHash)
   manifest = updateManifest(manifest, [userMsg])
   kernel.staging.stage(inputRunId, serialize(manifest), "manifest", "context_manifest", completed)
+
+  lineage = { activeTurnId: turnId }
+  kernel.staging.stage(inputRunId, serialize(lineage), "turn_lineage", "turn_lineage", completed)
 
   status = { state: "running", activeAgent: agentName }
   kernel.staging.stage(inputRunId, serialize(status), "runtime_status", "runtime_status", completed)
@@ -2082,7 +2096,7 @@ const orchestration = createOrchestrationRuntime({
 
 `kernel` remains required even when `framework` is supplied because orchestration still needs canonical thread/result access outside the delegated `executeTurn(...)` surface. `defaultDriverId` is required only when `framework` is omitted and orchestration must construct its own framework runtime.
 
-If `framework` is omitted, `createOrchestrationRuntime(...)` constructs a framework runtime with the supplied `agents`, `sequence`, and `handoffContextBuilder` behavior wired in. If `framework` is provided, the orchestration layer delegates parent and worker Turn execution directly to that runtime; any custom `executeTurn(...)` behavior on the supplied framework therefore applies normally. Because execution is delegated, sequence and handoff behavior in that mode comes from the supplied framework's own runtime configuration. Hosts that want the orchestration-managed defaults can omit `framework`, or supply a framework that was itself constructed with matching `resolveAgentConfig`, `resolveNextAgent`, and sequence handoff settings. Static orchestration configuration is still validated eagerly: entrypoint, declared agents, and any provided `sequence` must remain internally consistent even when execution is delegated.
+If `framework` is omitted, `createOrchestrationRuntime(...)` constructs a framework runtime with the supplied `agents`, `sequence`, and agent-handoff `handoffContextBuilder` behavior wired in. Sequence transitions remain on the framework's standard `last_output_only` handoff semantics and are not custom-builder-configurable. If `framework` is provided, the orchestration layer delegates parent and worker Turn execution directly to that runtime; any custom `executeTurn(...)` behavior on the supplied framework therefore applies normally. Because execution is delegated, sequence and handoff behavior in that mode comes from the supplied framework's own runtime configuration. Hosts that want the orchestration-managed defaults can omit `framework`, or supply a framework that was itself constructed with matching `resolveAgentConfig` and `resolveNextAgent` behavior. Static orchestration configuration is still validated eagerly: entrypoint, declared agents, and any provided `sequence` must remain internally consistent even when execution is delegated.
 
 **Internal mechanics**: The runtime composes existing primitives:
 

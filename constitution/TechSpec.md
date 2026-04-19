@@ -892,6 +892,7 @@ export interface DriverExecutionResult {
   resolution: RuntimeResolution;
   activeAgent?: string;
   messages?: KrakenMessage[];
+  partial?: boolean;
   response?: KrakenModelResponse;
 }
 

@@ -329,6 +329,7 @@ export function createFakeKernelHarness(): FakeKernelHarness {
           {
             "context.manifest": manifestHash,
             "runtime.status": null,
+            "turn.lineage": null,
             messages: [],
           },
           schema

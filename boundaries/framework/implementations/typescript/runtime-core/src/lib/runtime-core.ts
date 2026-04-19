@@ -112,11 +112,13 @@ export const DEFAULT_AGENT_SCHEMA: TurnTreeSchema = {
   incorporationRules: [
     { objectType: "message", targetPath: "messages" },
     { objectType: "context_manifest", targetPath: "context.manifest" },
+    { objectType: "turn_lineage", targetPath: "turn.lineage" },
     { objectType: "runtime_status", targetPath: "runtime.status" },
   ],
   paths: [
     { collection: "ordered", path: "messages" },
     { collection: "single", path: "context.manifest" },
+    { collection: "single", path: "turn.lineage" },
     { collection: "single", path: "runtime.status" },
   ],
   schemaId: DEFAULT_AGENT_SCHEMA_ID,
@@ -137,7 +139,6 @@ export interface RuntimeCoreOptions {
     branchId: string
   ) => Promise<string | null> | string | null;
   resolveSequenceStep?: (agentName: string) => number | undefined;
-  sequenceHandoffContextBuilder?: HandoffContextBuilder;
 }
 
 interface ResolvedRuntimeCoreOptions {
@@ -155,7 +156,6 @@ interface ResolvedRuntimeCoreOptions {
     branchId: string
   ) => Promise<string | null> | string | null;
   resolveSequenceStep?: (agentName: string) => number | undefined;
-  sequenceHandoffContextBuilder?: HandoffContextBuilder;
 }
 
 interface HeadState {
@@ -175,6 +175,7 @@ interface LoopState {
 }
 
 interface LoopOutcome {
+  partial?: boolean;
   pauseContext?: PauseContext;
   resolution: RuntimeResolution;
 }
@@ -187,10 +188,23 @@ interface IterationPreparationResult {
 interface ExecutedIterationResult {
   driverResponse: KrakenModelResponse;
   iterationRunId: string;
+  partial: boolean;
   requestedToolCalls: ToolCallPart[];
   resolution: RuntimeResolution;
   toolResults: ToolResultPart[];
   turnNodeHash: HashString | undefined;
+}
+
+interface DurableRuntimeStatus {
+  activeAgent?: string;
+  iterationCount?: number;
+  partial?: boolean;
+  pauseReason?: string;
+  state: "completed" | "failed" | "paused" | "running";
+}
+
+interface TurnLineageRecord {
+  activeTurnId: string;
 }
 
 type IterationPhaseResult =
@@ -236,7 +250,6 @@ class RuntimeCore implements KrakenRuntime {
       resolveAgentConfig: options.resolveAgentConfig,
       resolveNextAgent: options.resolveNextAgent,
       resolveSequenceStep: options.resolveSequenceStep,
-      sequenceHandoffContextBuilder: options.sequenceHandoffContextBuilder,
       resolveParentTurnId: options.resolveParentTurnId,
     };
   }
@@ -398,6 +411,7 @@ class RuntimeCore implements KrakenRuntime {
       await this.completeExecution(
         handle,
         outcome.resolution,
+        outcome.partial ?? false,
         loopState,
         loopState.enteredIterationLoop
       );
@@ -567,6 +581,7 @@ class RuntimeCore implements KrakenRuntime {
     await this.completeExecution(
       handle,
       beforeTurn.resolution,
+      false,
       loopState,
       false
     );
@@ -645,6 +660,7 @@ class RuntimeCore implements KrakenRuntime {
       await this.completeExecution(
         handle,
         resumedOutcome.resolution,
+        resumedOutcome.partial ?? false,
         loopState,
         true
       );
@@ -726,7 +742,12 @@ class RuntimeCore implements KrakenRuntime {
 
     if ((await this.options.kernel.turn.get(handle.turnId)) !== null) {
       try {
-        await this.finalizeTurnStatus(handle, failureResolution, loopState);
+        await this.finalizeTurnStatus(
+          handle,
+          failureResolution,
+          false,
+          loopState
+        );
       } catch (finalizeError: unknown) {
         handle.replaceStatus({
           activeAgent: loopState.activeConfig.name,
@@ -808,6 +829,7 @@ class RuntimeCore implements KrakenRuntime {
   private async completeExecution(
     handle: RuntimeExecutionHandle,
     resolution: RuntimeResolution,
+    partial: boolean,
     loopState: LoopState,
     enteredIterationLoop: boolean
   ): Promise<void> {
@@ -836,7 +858,7 @@ class RuntimeCore implements KrakenRuntime {
     }
 
     try {
-      await this.finalizeTurnStatus(handle, resolution, loopState);
+      await this.finalizeTurnStatus(handle, resolution, partial, loopState);
     } catch (error: unknown) {
       throw new FinalizationFailure(
         normalizeError(error),
@@ -925,7 +947,10 @@ class RuntimeCore implements KrakenRuntime {
       }
 
       this.publishIterationEnd(handle, loopState, nextIteration);
-      const cancelledAfterIteration = createCancelledLoopOutcome(handle);
+      const cancelledAfterIteration = createCancelledLoopOutcome(
+        handle,
+        phaseResult.kind === "executed" ? phaseResult.result.partial : false
+      );
 
       if (cancelledAfterIteration !== undefined) {
         return cancelledAfterIteration;
@@ -949,7 +974,10 @@ class RuntimeCore implements KrakenRuntime {
         continue;
       }
 
-      return createCancelledLoopOutcome(handle) ?? nextOutcome;
+      return (
+        createCancelledLoopOutcome(handle, nextOutcome.partial ?? false) ??
+        nextOutcome
+      );
     }
   }
 
@@ -1150,6 +1178,10 @@ class RuntimeCore implements KrakenRuntime {
     const driverMessages = driverResult.messages ?? [];
     const requestedToolCalls = extractToolCallsFromMessages(driverMessages);
     const cancellationResolution = createCancelledResolution(handle);
+    const partial =
+      driverResult.partial === true ||
+      (cancellationResolution !== undefined &&
+        hasAssistantOutputMessages(driverMessages));
     const invalidDriverResolutionError =
       cancellationResolution === undefined &&
       requestedToolCalls.length > 0 &&
@@ -1277,6 +1309,7 @@ class RuntimeCore implements KrakenRuntime {
       result: {
         driverResponse,
         iterationRunId,
+        partial,
         requestedToolCalls,
         resolution,
         toolResults,
@@ -1544,6 +1577,7 @@ class RuntimeCore implements KrakenRuntime {
     }
 
     return {
+      partial: result.partial,
       resolution: result.resolution,
     };
   }
@@ -1988,9 +2022,7 @@ class RuntimeCore implements KrakenRuntime {
     );
 
     return {
-      builder:
-        this.options.sequenceHandoffContextBuilder ??
-        createLastOutputOnlyHandoffContextBuilder(),
+      builder: createLastOutputOnlyHandoffContextBuilder(),
       mode: "last_output_only",
       reason: "sequence_transition",
       sourceContext: {
@@ -2072,6 +2104,7 @@ class RuntimeCore implements KrakenRuntime {
     await this.options.kernel.run.beginStep(runId, "incorporate_input");
     await this.stageMessage(runId, userMessage, "input_message");
     await this.stageManifest(runId, manifest);
+    await this.stageTurnLineage(runId, handle.turnId, "turn_lineage");
     await this.stageRuntimeStatus(
       runId,
       {
@@ -2615,6 +2648,7 @@ class RuntimeCore implements KrakenRuntime {
   private async finalizeTurnStatus(
     handle: RuntimeExecutionHandle,
     resolution: RuntimeResolution,
+    partial: boolean,
     loopState: LoopState
   ): Promise<void> {
     const phase = resolutionToPhase(resolution);
@@ -2640,6 +2674,7 @@ class RuntimeCore implements KrakenRuntime {
       runId,
       {
         activeAgent: loopState.activeConfig.name,
+        partial: phase === "failed" && partial ? true : undefined,
         state: phase,
       },
       "runtime_status_final"
@@ -2701,7 +2736,7 @@ class RuntimeCore implements KrakenRuntime {
       loopState.carriedStateUpdates = [];
     }
 
-    await this.finalizeTurnStatus(handle, failureResolution, loopState);
+    await this.finalizeTurnStatus(handle, failureResolution, false, loopState);
     handle.replaceStatus({
       activeAgent: pauseContext.activeConfig.name,
       iterationCount: handle.status().iterationCount,
@@ -3165,6 +3200,7 @@ class RuntimeCore implements KrakenRuntime {
     const existing = await this.options.kernel.schema.get(resolvedSchemaId);
 
     if (existing !== null) {
+      assertFrameworkSchemaCompatibility(existing);
       return existing.schemaId;
     }
 
@@ -3214,14 +3250,38 @@ class RuntimeCore implements KrakenRuntime {
     return staged.objectHash;
   }
 
-  private async stageRuntimeStatus(
+  private async stageTurnLineage(
     runId: string,
-    status: Record<string, unknown>,
+    turnId: string,
     taskId: string
   ): Promise<HashString> {
     const staged = await this.options.kernel.staging.stage(
       runId,
-      encodeKernelRecord(status, "runtime status"),
+      encodeKernelRecord(
+        {
+          activeTurnId: turnId,
+        } satisfies TurnLineageRecord,
+        "turn lineage"
+      ),
+      taskId,
+      "turn_lineage",
+      "completed"
+    );
+
+    return staged.objectHash;
+  }
+
+  private async stageRuntimeStatus(
+    runId: string,
+    status: DurableRuntimeStatus,
+    taskId: string
+  ): Promise<HashString> {
+    const serializedStatus = Object.fromEntries(
+      Object.entries(status).filter(([, value]) => value !== undefined)
+    );
+    const staged = await this.options.kernel.staging.stage(
+      runId,
+      encodeKernelRecord(serializedStatus, "runtime status"),
       taskId,
       "runtime_status",
       "completed"
@@ -3482,57 +3542,43 @@ async function readBranchActiveTurnId(
   branchId: string
 ): Promise<string | null> {
   const { turnNode } = await readBranchHeadState(kernel, branchId);
+  const lineageHash = toOptionalHash(
+    await kernel.tree.resolve(turnNode.turnTreeHash, "turn.lineage")
+  );
 
-  if (turnNode.eventHash === null) {
-    if (turnNode.previousTurnNodeHash === null) {
-      return null;
-    }
-
-    throw new KrakenLineageError(
-      `branch "${branchId}" head turn node must reference a checkpoint event`,
-      {
-        code: "invalid_branch_head_event",
-        details: {
-          branchId,
-          turnNode,
-        },
-      }
-    );
-  }
-
-  const payload = await kernel.store.get(turnNode.eventHash);
-
-  if (payload === null) {
-    throw new KrakenLineageError(
-      `event object "${turnNode.eventHash}" does not exist`,
-      {
-        code: "missing_event_object",
-        details: {
-          branchId,
-          hash: turnNode.eventHash,
-        },
-      }
-    );
-  }
-
-  const eventRecord = decodeDeterministicKernelRecord(payload);
-
-  if (isRecord(eventRecord) && typeof eventRecord.turnId === "string") {
-    return eventRecord.turnId;
-  }
-
-  if (turnNode.previousTurnNodeHash === null) {
+  if (lineageHash === null) {
     return null;
   }
 
+  const payload = await kernel.store.get(lineageHash);
+
+  if (payload === null) {
+    throw new KrakenLineageError(
+      `turn lineage "${lineageHash}" does not exist`,
+      {
+        code: "missing_turn_lineage",
+        details: {
+          branchId,
+          hash: lineageHash,
+        },
+      }
+    );
+  }
+
+  const decoded = decodeDeterministicKernelRecord(payload);
+
+  if (isTurnLineageRecord(decoded)) {
+    return decoded.activeTurnId;
+  }
+
   throw new KrakenLineageError(
-    `branch "${branchId}" head event must carry a turnId`,
+    `branch "${branchId}" turn lineage must carry an activeTurnId`,
     {
-      code: "invalid_branch_head_event",
+      code: "invalid_turn_lineage",
       details: {
         branchId,
-        eventHash: turnNode.eventHash,
-        eventRecord,
+        lineageHash,
+        turnLineage: decoded,
       },
     }
   );
@@ -3562,7 +3608,8 @@ function decodeKrakenMessageRecord(
 }
 
 function createCancelledLoopOutcome(
-  handle: RuntimeExecutionHandle
+  handle: RuntimeExecutionHandle,
+  partial = false
 ): LoopOutcome | undefined {
   const cancelledResolution = createCancelledResolution(handle);
 
@@ -3571,6 +3618,7 @@ function createCancelledLoopOutcome(
   }
 
   return {
+    partial,
     resolution: cancelledResolution,
   };
 }
@@ -3676,4 +3724,66 @@ function toOrderedHashArray(value: PathValue): HashString[] {
       value,
     },
   });
+}
+
+function isTurnLineageRecord(value: unknown): value is TurnLineageRecord {
+  return isRecord(value) && typeof value.activeTurnId === "string";
+}
+
+function hasAssistantOutputMessages(messages: KrakenMessage[]): boolean {
+  return messages.some((message) => message.role === "assistant");
+}
+
+function assertFrameworkSchemaCompatibility(schema: TurnTreeSchema): void {
+  const requiredPathKinds = new Map<string, "ordered" | "single">([
+    ["messages", "ordered"],
+    ["context.manifest", "single"],
+    ["turn.lineage", "single"],
+    ["runtime.status", "single"],
+  ]);
+  const requiredIncorporationRules = new Map<string, string>([
+    ["message", "messages"],
+    ["context_manifest", "context.manifest"],
+    ["turn_lineage", "turn.lineage"],
+    ["runtime_status", "runtime.status"],
+  ]);
+
+  for (const [path, collection] of requiredPathKinds) {
+    const definition = schema.paths.find(
+      (candidate) => candidate.path === path
+    );
+
+    if (definition?.collection !== collection) {
+      throw new KrakenRuntimeError(
+        `schema "${schema.schemaId}" must define ${collection} path "${path}"`,
+        {
+          code: "invalid_framework_schema",
+          details: {
+            path,
+            schemaId: schema.schemaId,
+          },
+        }
+      );
+    }
+  }
+
+  for (const [objectType, targetPath] of requiredIncorporationRules) {
+    const rule = schema.incorporationRules.find(
+      (candidate) => candidate.objectType === objectType
+    );
+
+    if (rule?.targetPath !== targetPath) {
+      throw new KrakenRuntimeError(
+        `schema "${schema.schemaId}" must incorporate "${objectType}" into "${targetPath}"`,
+        {
+          code: "invalid_framework_schema",
+          details: {
+            objectType,
+            schemaId: schema.schemaId,
+            targetPath,
+          },
+        }
+      );
+    }
+  }
 }

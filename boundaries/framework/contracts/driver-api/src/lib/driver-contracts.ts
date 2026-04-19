@@ -78,6 +78,7 @@ export interface DriverResumeContext extends DriverExecutionContext {
 export interface DriverExecutionResult {
   activeAgent?: string;
   messages?: KrakenMessage[];
+  partial?: boolean;
   resolution: RuntimeResolution;
   response?: KrakenModelResponse;
 }
@@ -135,10 +136,11 @@ export function assertDriverExecutionResult(
 ): asserts value is DriverExecutionResult {
   if (
     !isRecord(value) ||
-    ("activeAgent" in value && typeof value.activeAgent !== "string")
+    ("activeAgent" in value && typeof value.activeAgent !== "string") ||
+    ("partial" in value && typeof value.partial !== "boolean")
   ) {
     throw new KrakenValidationError(
-      `${label} must include a string activeAgent when provided`,
+      `${label} must include only valid optional driver metadata fields`,
       {
         code: "invalid_driver_result",
         details: value,
@@ -170,6 +172,14 @@ export function assertDriverExecutionResult(
   }
 
   assertDriverRuntimeResolution(value.resolution, `${label}.resolution`);
+  assertDriverPartialResult(
+    {
+      messages: Array.isArray(value.messages) ? value.messages : undefined,
+      partial: value.partial === true,
+      resolution: value.resolution,
+    },
+    `${label}`
+  );
 }
 
 export function assertDriverRuntimeResolution(
@@ -425,6 +435,39 @@ function assertDriverResponseMatchesMessages(
           messageToolCalls,
           responseToolCalls,
         },
+      }
+    );
+  }
+}
+
+function assertDriverPartialResult(
+  value: {
+    messages?: KrakenMessage[];
+    partial: boolean;
+    resolution: RuntimeResolution;
+  },
+  label: string
+): void {
+  if (!value.partial) {
+    return;
+  }
+
+  if (value.resolution.type !== "fail") {
+    throw new KrakenValidationError(
+      `${label}.partial is only valid for failed execution results`,
+      {
+        code: "invalid_driver_result",
+        details: value,
+      }
+    );
+  }
+
+  if (!value.messages?.some((message) => message.role === "assistant")) {
+    throw new KrakenValidationError(
+      `${label}.partial requires a staged assistant message`,
+      {
+        code: "invalid_driver_result",
+        details: value,
       }
     );
   }

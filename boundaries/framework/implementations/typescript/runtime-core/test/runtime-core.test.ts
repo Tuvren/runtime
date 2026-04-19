@@ -1443,11 +1443,13 @@ describe("framework-runtime-core", () => {
       incorporationRules: [
         { objectType: "message", targetPath: "messages" },
         { objectType: "context_manifest", targetPath: "context.manifest" },
+        { objectType: "turn_lineage", targetPath: "turn.lineage" },
         { objectType: "runtime_status", targetPath: "runtime.status" },
       ],
       paths: [
         { collection: "ordered", path: "messages" },
         { collection: "single", path: "context.manifest" },
+        { collection: "single", path: "turn.lineage" },
         { collection: "single", path: "runtime.status" },
       ],
       schemaId: "custom.agent.v1",
@@ -1499,6 +1501,34 @@ describe("framework-runtime-core", () => {
     expect((await harness.kernel.thread.get(thread.threadId))?.schemaId).toBe(
       customSchema.schemaId
     );
+  });
+
+  test("rejects custom schemas that omit the framework turn lineage path", async () => {
+    const harness = createFakeKernelHarness();
+    await harness.kernel.schema.register({
+      incorporationRules: [
+        { objectType: "message", targetPath: "messages" },
+        { objectType: "context_manifest", targetPath: "context.manifest" },
+        { objectType: "runtime_status", targetPath: "runtime.status" },
+      ],
+      paths: [
+        { collection: "ordered", path: "messages" },
+        { collection: "single", path: "context.manifest" },
+        { collection: "single", path: "runtime.status" },
+      ],
+      schemaId: "invalid.custom.agent.v1",
+    } satisfies TurnTreeSchema);
+    const runtime = createKrakenRuntimeCore({
+      defaultDriverId: "fake",
+      driverRegistry: createDriverRegistry(),
+      kernel: harness.kernel,
+    });
+
+    await expect(
+      runtime.createThread({
+        schemaId: "invalid.custom.agent.v1",
+      })
+    ).rejects.toThrow('must define single path "turn.lineage"');
   });
 
   test("finalizes durable runtime status for post-start fatal failures", async () => {
@@ -3505,8 +3535,6 @@ describe("framework-runtime-core", () => {
         agentName === "primary" ? "reviewer" : undefined,
       resolveSequenceStep: (agentName) =>
         agentName === "primary" ? 2 : undefined,
-      sequenceHandoffContextBuilder:
-        createLastOutputOnlyHandoffContextBuilder(),
     });
     const thread = await runtime.createThread({});
     const pausedHandle = runtime.executeTurn({
@@ -7026,8 +7054,6 @@ describe("framework-runtime-core", () => {
         agentName === "primary" ? "reviewer" : undefined,
       resolveSequenceStep: (agentName) =>
         agentName === "primary" ? 2 : undefined,
-      sequenceHandoffContextBuilder:
-        createLastOutputOnlyHandoffContextBuilder(),
     });
     const thread = await runtime.createThread({});
     const pausedHandle = runtime.executeTurn({
@@ -7390,8 +7416,6 @@ describe("framework-runtime-core", () => {
         agentName === "primary" ? "reviewer" : undefined,
       resolveSequenceStep: (agentName) =>
         agentName === "primary" ? 2 : undefined,
-      sequenceHandoffContextBuilder:
-        createLastOutputOnlyHandoffContextBuilder(),
     });
     const framework = {
       createBranch: (input) => baseFramework.createBranch(input),
@@ -10405,11 +10429,13 @@ describe("framework-runtime-core", () => {
       incorporationRules: [
         { objectType: "message", targetPath: "messages" },
         { objectType: "context_manifest", targetPath: "context.manifest" },
+        { objectType: "turn_lineage", targetPath: "turn.lineage" },
         { objectType: "runtime_status", targetPath: "runtime.status" },
       ],
       paths: [
         { collection: "ordered", path: "messages" },
         { collection: "single", path: "context.manifest" },
+        { collection: "single", path: "turn.lineage" },
         { collection: "single", path: "runtime.status" },
       ],
       schemaId: "custom.worker.agent.v1",
@@ -11402,6 +11428,11 @@ describe("framework-runtime-core", () => {
 
     expect(handle.status().phase).toBe("failed");
     expect(turnEndEvent?.status).toBe("failed");
+    expect(await harness.readBranchRuntimeStatus(thread.branchId)).toEqual({
+      activeAgent: "primary",
+      partial: true,
+      state: "failed",
+    });
   });
 
   test("fails workers whose streams exhaust without a terminal turn status", async () => {
