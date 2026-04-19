@@ -49,6 +49,14 @@ The kernel spec did not materially change in this branch. The drift is concentra
 
 This is the cleanest example of a concept the branch should not have been forced to derive ad hoc.
 
+**Working decision:**
+
+- Treat semantic-turn lineage as a first-class framework-owned schema path.
+- Keep it out of `runtime.status` and out of checkpoint event payload conventions.
+- Keep it narrowly scoped to semantic parent-turn inference rather than prompt context, host status, or application-owned state.
+
+LangGraph was a useful comparison point here: its `thread_id` lives outside graph state as execution/checkpointer config, which reinforces the need to keep operational addressing and framework state distinct. The analogy is not exact, though: Kraken's semantic turn lineage is not session addressing, so the cleaner answer is an explicit framework-owned lineage path rather than hidden derivation from unrelated metadata.
+
 ### 2. Runtime status as execution state, not catch-all metadata
 
 **Original gap in `docs/`:**
@@ -77,6 +85,8 @@ This is the cleanest example of a concept the branch should not have been forced
 - Which fields are normative versus optional observability.
 - Whether partial-output durability is part of Epic H or deferred.
 
+<!-- I need further insights regarding the use cases that this apply to -->
+
 ### 3. Approval pause and resume semantics
 
 **Original gap in `docs/`:**
@@ -100,6 +110,8 @@ This is the cleanest example of a concept the branch should not have been forced
 - Whether handle replacement is normative.
 - Which paused-handle responsibilities remain valid after replacement.
 - What durable state must exist before resumed work begins.
+
+<!-- Let's do the same that I asked for the previous one, see exactly what real use cases would require -->
 
 ### 4. Parallel tool execution semantics
 
@@ -127,6 +139,8 @@ This is the cleanest example of a concept the branch should not have been forced
 
 - The full concurrency contract for tool execution and approval resume.
 - The durability boundary for per-tool completion versus whole-batch checkpointing.
+
+<!-- I think that we must handle the tool ordering for tool.start and tool.result events as part of the shared framework core to ensure that each driver doesn't have to reimplement it. When tools are executed, they must execute in parallel correctly and independently from each other *or* in a sequence, depending on the precise choise by the driver, which also could expose it to the host if the driver wants to -->
 
 ### 5. Driver/runtime contract ownership
 
@@ -157,6 +171,8 @@ This is the cleanest example of a concept the branch should not have been forced
 
 This is one of the highest-value doc areas to settle before any Epic I driver work.
 
+<!-- Show me the current shape and let's work through at least 3 example use cases where this could be stress tested for me to decide the final shape -->
+
 ### 6. Handoff semantics versus exact wording
 
 **Original gap in `docs/`:**
@@ -178,6 +194,8 @@ This is one of the highest-value doc areas to settle before any Epic I driver wo
 
 - Which handoff invariants are normative.
 - Which wording or formatting choices are intentionally implementation-defined.
+
+<!-- We must probably keep this as is for now -->
 
 ### 7. Sequence semantics as a strict orchestration mode
 
@@ -202,6 +220,8 @@ This is one of the highest-value doc areas to settle before any Epic I driver wo
 **Docs-first decision to make explicitly:**
 
 - Whether sequences are a best-effort convenience or a rigid orchestration mode.
+
+<!-- The goal of the framework core is to provide the primitives, the opinionated aspects will be inside the specific drivers and any shared logic can be added to the core afterworks when found to be necessary -->
 
 ### 8. Public orchestration runtime contract
 
@@ -229,6 +249,8 @@ This is one of the highest-value doc areas to settle before any Epic I driver wo
 - Which parts of worker/session behavior are core framework semantics and which are implementation details.
 - Whether the no-`parent` convenience path is normative or merely optional when ambiguity is low.
 
+<!-- We will need to handle this in detail for me to be able to decide for each one -->
+
 ### 9. Worker-result projection
 
 **Original gap in `docs/`:**
@@ -250,6 +272,8 @@ This is one of the highest-value doc areas to settle before any Epic I driver wo
 
 - Whether `worker_result` is purely structured.
 - Which part types are allowed or forbidden in projected worker output.
+
+<!-- Workers should only return the final response to the parent, nothing else. Any extra typed schema is for a driver-extra details such as adding a worker run id that could be used by the parent to, for example, transform an async run to sync by waiting for the worker. Same as I mentioned before, the core framework part must be providing the primitives that drivers use later -->
 
 ### 10. Observability versus correctness
 
@@ -274,6 +298,8 @@ This is one of the highest-value doc areas to settle before any Epic I driver wo
 - The exact boundary between observability and correctness.
 - Whether any checkpoint event object is ever allowed to carry semantic state.
 
+<!-- Let's check this specifically because my guess is that we may be trying to reinvent the wheel in the sense of doing too much for something that may not be load-bearing -->
+
 ### 11. External or delegated framework execution mode
 
 **Original gap in `docs/`:**
@@ -296,6 +322,8 @@ This is one of the highest-value doc areas to settle before any Epic I driver wo
 **Docs-first decision to make explicitly:**
 
 - Whether delegated orchestration is part of the normative framework contract or just a convenience composition mode.
+
+<!-- I think I still don't understand what "delegated orchestration" means so this needs to be talked more for me to be able to decide on specifics -->
 
 ## Recommended Docs-First Rewrite Order
 
