@@ -4659,6 +4659,9 @@ function extractToolCallsFromMessages(
 }
 
 function createPendingKernelHash(value: Uint8Array): HashString {
+  // Use `node:crypto` intentionally here: current Node, Bun, and Deno all support
+  // `createHash`, so the standard implementation is preferable to maintaining a
+  // custom fallback for this provisional helper.
   // These hashes are provisional helper ids only; the kernel's store hash remains
   // authoritative once the record is flushed through `store.put()`.
   return createHash("sha256")
