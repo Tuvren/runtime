@@ -37,7 +37,10 @@ import type {
   KrakenStreamEvent,
   KrakenToolDefinition,
 } from "@kraken/framework-runtime-api";
-import { assertKrakenMessage } from "@kraken/framework-runtime-api";
+import {
+  assertContextManifest,
+  assertKrakenMessage,
+} from "@kraken/framework-runtime-api";
 import {
   decodeDeterministicKernelRecord,
   encodeDeterministicKernelRecord,
@@ -147,6 +150,33 @@ describe("framework-runtime-core", () => {
         ]
       )
     ).toThrow('extension "shared" is already registered');
+  });
+
+  test("allows same-turn user messages without creating new turn boundaries", () => {
+    const manifest = createContextManifest([
+      {
+        parts: [{ text: "Turn start", type: "text" }],
+        role: "user",
+      },
+      {
+        parts: [{ text: "Assistant reply", type: "text" }],
+        role: "assistant",
+      },
+    ]);
+    const continuedManifest = updateContextManifest(
+      manifest,
+      [
+        {
+          parts: [{ text: "Injected same-turn user message", type: "text" }],
+          role: "user",
+        },
+      ],
+      [],
+      []
+    );
+
+    expect(manifest.turnBoundaries).toEqual([0]);
+    expect(continuedManifest.turnBoundaries).toEqual([0]);
   });
 
   test("collectSystemPrompts reports non-fatal prompt contribution failures", () => {
@@ -3752,6 +3782,119 @@ describe("framework-runtime-core", () => {
     expect(events.some((event) => event.type === "approval.requested")).toBe(
       false
     );
+  });
+
+  test("does not hang mixed batches when malformed approvals race immediate tool errors", async () => {
+    const harness = createFakeKernelHarness();
+    const driver = {
+      async execute(context) {
+        return {
+          activeAgent: context.config.name,
+          messages: [
+            assistantToolCalls([
+              {
+                callId: "call-missing",
+                input: { query: "missing" },
+                name: "missing",
+              },
+              {
+                callId: "call-review",
+                input: { item: "mixed" },
+                name: "review",
+              },
+            ]),
+          ],
+          resolution: {
+            type: "continue_iteration",
+          },
+        };
+      },
+      id: "fake",
+      async resume() {
+        throw new Error("resume was not expected");
+      },
+    } satisfies KrakenDriver;
+    const runtime = createKrakenRuntimeCore({
+      defaultDriverId: "fake",
+      driverRegistry: createDriverRegistry([driver]),
+      kernel: harness.kernel,
+    });
+    const thread = await runtime.createThread({});
+    const handle = runtime.executeTurn({
+      branchId: thread.branchId,
+      config: {
+        extensions: [
+          {
+            aroundTool(context) {
+              if (context.tool.name !== "review") {
+                throw new Error("unexpected tool");
+              }
+
+              return {
+                approval: {
+                  completedResults: [
+                    {
+                      callId: context.callId,
+                      name: context.tool.name,
+                      output: { duplicate: true },
+                      type: "tool_result",
+                    },
+                  ],
+                  toolCalls: [
+                    {
+                      callId: context.callId,
+                      decisions: ["approve"],
+                      input: context.input,
+                      message: "broken mixed approval",
+                      name: context.tool.name,
+                    },
+                  ],
+                },
+                verdict: "pause",
+              };
+            },
+            name: "broken-mixed-approval",
+          },
+        ],
+        name: "primary",
+        tools: [
+          {
+            description: "Review docs",
+            execute() {
+              return {
+                reviewed: true,
+              };
+            },
+            inputSchema: {
+              properties: {
+                item: { type: "string" },
+              },
+              required: ["item"],
+              type: "object",
+            },
+            name: "review",
+          },
+        ],
+      },
+      signal: textSignal("Break the mixed approval batch"),
+      threadId: thread.threadId,
+    });
+
+    const events = await settleWithin(collectEvents(handle.events()), 100);
+
+    expect(events).not.toBe(TIMEOUT_TOKEN);
+
+    if (events === TIMEOUT_TOKEN) {
+      throw new Error("expected malformed mixed approval batch to terminate");
+    }
+
+    const errorEvent = events.find(
+      (event): event is Extract<(typeof events)[number], { type: "error" }> =>
+        event.type === "error"
+    );
+
+    expect(handle.status().phase).toBe("failed");
+    expect(errorEvent?.error.code).toBe("invalid_approval_request");
   });
 
   test("aborts and joins sibling tool work before surfacing malformed initial approval failures", async () => {
@@ -8299,7 +8442,7 @@ describe("framework-runtime-core", () => {
         }
       )
     ).rejects.toThrow(
-      "launchWorker() requires a running or paused parent handle"
+      "launchWorker() requires an active current parent handle"
     );
   });
 
@@ -8742,6 +8885,236 @@ describe("framework-runtime-core", () => {
           event.type === "turn.start" &&
           "resumedFrom" in event &&
           typeof event.resumedFrom === "string"
+      )
+    ).toBe(true);
+  });
+
+  test("rejects stale orchestration parent handles after approval resume", async () => {
+    const harness = createFakeKernelHarness();
+    const driver = {
+      async execute(context) {
+        const workerResult = extractLastWorkerResult(context.messages);
+        const toolMessages = extractToolMessages(context.messages);
+
+        if (context.config.name === "worker") {
+          if (toolMessages.length === 0) {
+            return {
+              activeAgent: "worker",
+              messages: [
+                assistantToolCalls([
+                  {
+                    callId: "call-approve-worker",
+                    input: { hold: true },
+                    name: "hold",
+                  },
+                ]),
+              ],
+              resolution: {
+                type: "continue_iteration",
+              },
+            };
+          }
+
+          return {
+            activeAgent: "worker",
+            messages: [assistantText("Worker resumed with approval.")],
+            resolution: {
+              reason: "done",
+              type: "end_turn",
+            },
+          };
+        }
+
+        if (workerResult?.status === "completed") {
+          return {
+            activeAgent: "primary",
+            messages: [assistantText("Parent saw the resumed worker.")],
+            resolution: {
+              reason: "done",
+              type: "end_turn",
+            },
+          };
+        }
+
+        if (toolMessages.length === 0) {
+          return {
+            activeAgent: "primary",
+            messages: [
+              assistantToolCalls([
+                {
+                  callId: "call-parent-hold",
+                  input: { hold: true },
+                  name: "hold-parent",
+                },
+              ]),
+            ],
+            resolution: {
+              type: "continue_iteration",
+            },
+          };
+        }
+
+        await delay(10);
+        return {
+          activeAgent: "primary",
+          messages: [assistantText("Waiting for worker.")],
+          resolution: {
+            type: "continue_iteration",
+          },
+        };
+      },
+      id: "fake",
+      async resume() {
+        throw new Error("resume was not expected");
+      },
+    } satisfies KrakenDriver;
+    const framework = createKrakenRuntimeCore({
+      defaultDriverId: "fake",
+      driverRegistry: createDriverRegistry([driver]),
+      kernel: harness.kernel,
+    });
+    const orchestration = createOrchestrationRuntime({
+      agents: {
+        primary: {
+          name: "primary",
+          tools: [
+            {
+              approval: true,
+              description: "Pause parent until approval",
+              execute() {
+                return {
+                  approved: true,
+                };
+              },
+              inputSchema: {
+                properties: {
+                  hold: { type: "boolean" },
+                },
+                required: ["hold"],
+                type: "object",
+              },
+              name: "hold-parent",
+            },
+          ],
+        },
+        worker: {
+          name: "worker",
+          tools: [
+            {
+              approval: true,
+              description: "Pause worker until approval",
+              execute() {
+                return {
+                  approved: true,
+                };
+              },
+              inputSchema: {
+                properties: {
+                  hold: { type: "boolean" },
+                },
+                required: ["hold"],
+                type: "object",
+              },
+              name: "hold",
+            },
+          ],
+        },
+      },
+      defaultDriverId: "fake",
+      driverRegistry: createDriverRegistry([driver]),
+      entrypoint: "primary",
+      framework,
+      kernel: harness.kernel,
+    });
+    const thread = await framework.createThread({});
+    const handle = orchestration.executeTurn({
+      branchId: thread.branchId,
+      signal: textSignal("Pause parent before worker launch"),
+      threadId: thread.threadId,
+    });
+    const pausedEventsPromise = collectEvents(handle.allEvents());
+
+    await waitFor(() => handle.status().phase === "paused");
+    await pausedEventsPromise;
+
+    const resumedHandle = handle.resolveApproval({
+      decisions: [{ callId: "call-parent-hold", type: "approve" }],
+    });
+    const resumedEventsPromise = collectEvents(resumedHandle.allEvents());
+
+    await delay(0);
+    await expect(
+      orchestration.launchWorker(
+        "worker",
+        {
+          task: "stale",
+        },
+        {
+          parent: handle,
+        }
+      )
+    ).rejects.toThrow(
+      "launchWorker() requires the current parent handle for that orchestration session"
+    );
+
+    const workerId = await orchestration.launchWorker(
+      "worker",
+      {
+        task: "live",
+      },
+      {
+        parent: resumedHandle,
+      }
+    );
+
+    await waitFor(
+      () => resumedHandle.workers().get(workerId)?.status === "paused"
+    );
+
+    await expect(
+      orchestration.awaitWorker(workerId, {
+        parent: handle,
+      })
+    ).rejects.toThrow(
+      "awaitWorker() requires the current parent handle for that orchestration session"
+    );
+    expect(() =>
+      orchestration.resolveWorkerApproval(
+        workerId,
+        {
+          decisions: [{ callId: "call-approve-worker", type: "approve" }],
+        },
+        {
+          parent: handle,
+        }
+      )
+    ).toThrow(
+      "resolveWorkerApproval() requires the current parent handle for that orchestration session"
+    );
+
+    orchestration.resolveWorkerApproval(
+      workerId,
+      {
+        decisions: [{ callId: "call-approve-worker", type: "approve" }],
+      },
+      {
+        parent: resumedHandle,
+      }
+    );
+
+    const workerResult = await orchestration.awaitWorker(workerId, {
+      parent: resumedHandle,
+    });
+    const resumedEvents = await resumedEventsPromise;
+
+    expect(workerResult).toBe("Worker resumed with approval.");
+    expect(resumedHandle.status().phase).toBe("completed");
+    expect(
+      resumedEvents.some(
+        (event) =>
+          event.type === "custom" &&
+          event.name === "worker.completed" &&
+          event.source?.workerId === workerId
       )
     ).toBe(true);
   });
@@ -10963,9 +11336,14 @@ describe("framework-runtime-core", () => {
     );
     handle.steer(textSignal("Injected steering"));
     await eventsPromise;
+    const manifest = await readBranchContextManifest(
+      harness.kernel,
+      thread.branchId
+    );
     const messages = await harness.readBranchMessages(thread.branchId);
 
     expect(handle.status().phase).toBe("completed");
+    expect(manifest.turnBoundaries).toEqual([0]);
     expect(messages[0]).toEqual({
       parts: [{ text: "Start steering validation", type: "text" }],
       role: "user",
@@ -11603,6 +11981,46 @@ function extractLastMessageHash(manifest: {
         (hash): hash is string => typeof hash === "string"
       )
     : undefined;
+}
+
+async function readBranchContextManifest(
+  kernel: KrakenKernel,
+  branchId: string
+): Promise<ContextManifest> {
+  const branch = await kernel.branch.get(branchId);
+
+  if (branch === null) {
+    throw new Error(`expected branch "${branchId}" to exist`);
+  }
+
+  const turnNode = await kernel.node.get(branch.headTurnNodeHash);
+
+  if (turnNode === null) {
+    throw new Error(
+      `expected branch "${branchId}" head turn node "${branch.headTurnNodeHash}" to exist`
+    );
+  }
+
+  const manifestHash = await kernel.tree.resolve(
+    turnNode.turnTreeHash,
+    "context.manifest"
+  );
+
+  if (manifestHash === null || Array.isArray(manifestHash)) {
+    throw new Error(
+      `expected branch "${branchId}" to have a context manifest hash`
+    );
+  }
+
+  const manifestRecord = await kernel.store.get(manifestHash);
+
+  if (manifestRecord === null) {
+    throw new Error(`expected context manifest "${manifestHash}" to exist`);
+  }
+
+  const manifest = decodeDeterministicKernelRecord(manifestRecord);
+  assertContextManifest(manifest, `manifest "${manifestHash}"`);
+  return manifest;
 }
 
 function extractTurnId(

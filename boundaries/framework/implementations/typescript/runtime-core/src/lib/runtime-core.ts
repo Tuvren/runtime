@@ -1522,7 +1522,8 @@ class RuntimeCore implements KrakenRuntime {
       const manifest = updateContextManifest(
         headState.manifest,
         stagedMessages,
-        loopState.carriedStateUpdates
+        [...loopState.carriedStateUpdates],
+        []
       );
       loopState.carriedStateUpdates = [];
       const manifestHash = await this.stageManifest(iterationRunId, manifest);
@@ -1746,7 +1747,8 @@ class RuntimeCore implements KrakenRuntime {
     const manifest = updateContextManifest(
       headState.manifest,
       resumedMessages,
-      toolBatch.updates
+      toolBatch.updates,
+      []
     );
     const manifestHash = await this.stageManifest(runId, manifest);
 
@@ -2171,7 +2173,8 @@ class RuntimeCore implements KrakenRuntime {
       collectInitialExtensionStateUpdates(
         loopState.activeConfig.extensions ?? [],
         headState.manifest
-      )
+      ),
+      [0]
     );
 
     await this.createTrackedRun(
@@ -2237,9 +2240,14 @@ class RuntimeCore implements KrakenRuntime {
       parts: signal.parts,
       role: "user",
     };
-    const manifest = updateContextManifest(headState.manifest, [
-      steeringMessage,
-    ]);
+    // Steering appends user-role content inside the current semantic turn, so it
+    // must not mint a new turn boundary in the manifest.
+    const manifest = updateContextManifest(
+      headState.manifest,
+      [steeringMessage],
+      [],
+      []
+    );
 
     await this.createTrackedRun(
       handle,
@@ -2384,6 +2392,9 @@ class RuntimeCore implements KrakenRuntime {
       resolvedMessageHashes,
       helperBundle.helpers
     );
+    // Full CE rewrites rebuild a fresh visible history. Keep normal boundary
+    // inference here; forcing preserved-boundary-only remaps can make rewritten
+    // manifests structurally invalid when the plan materializes new user messages.
     const nextManifest = updateContextManifest(
       createContextManifest(nextMessages, headState.manifest.extensions),
       [],
@@ -2511,6 +2522,10 @@ class RuntimeCore implements KrakenRuntime {
       resolvedMessageHashes,
       helperBundle.helpers
     );
+    // Handoff rewrites also rebuild a fresh visible history for the receiving
+    // agent. Preserve the standard manifest boundary rules instead of carrying
+    // over only source-hash turn starts, which can invalidate single-message
+    // handoff contexts.
     const baseManifest = createContextManifest(
       nextMessages,
       headState.manifest.extensions
@@ -3452,6 +3467,7 @@ class OrchestrationHandleImpl implements OrchestrationHandle {
   private readonly retainedWorkers = new Map<string, WorkerStatus>();
   private readonly runtime: OrchestrationRuntimeImpl;
   private readonly parentHandle: ExecutionHandle;
+  private replacedByResume = false;
   private started = false;
   private readonly threadId: string;
   private readonly workerEventFanouts = new Map<
@@ -3542,6 +3558,10 @@ class OrchestrationHandleImpl implements OrchestrationHandle {
 
   hasStartedExecution(): boolean {
     return this.started;
+  }
+
+  wasReplacedByResume(): boolean {
+    return this.replacedByResume;
   }
 
   resolveApproval(response: ApprovalResponse): OrchestrationHandle {
@@ -3657,6 +3677,7 @@ class OrchestrationHandleImpl implements OrchestrationHandle {
   }
 
   private closeForResume(): void {
+    this.replacedByResume = true;
     this.parentCompleted = true;
     this.parentEventsFanout.close();
     this.allEventsClosed = true;
@@ -4354,18 +4375,72 @@ class OrchestrationRuntimeImpl implements OrchestrationRuntime {
     methodName: string
   ): OrchestrationHandleImpl {
     if (
-      parent instanceof OrchestrationHandleImpl &&
-      parent.belongsToRuntime(this)
+      !(
+        parent instanceof OrchestrationHandleImpl &&
+        parent.belongsToRuntime(this)
+      )
     ) {
-      return parent;
+      throw new KrakenRuntimeError(
+        `${methodName}() requires a parent handle created by this orchestration runtime`,
+        {
+          code: "invalid_orchestration_parent",
+        }
+      );
     }
 
-    throw new KrakenRuntimeError(
-      `${methodName}() requires a parent handle created by this orchestration runtime`,
-      {
-        code: "invalid_orchestration_parent",
-      }
-    );
+    if (parent.wasReplacedByResume()) {
+      throw new KrakenRuntimeError(
+        `${methodName}() requires the current parent handle for that orchestration session`,
+        {
+          code: "invalid_orchestration_parent",
+          details: {
+            methodName,
+            reason: "stale_replaced_handle",
+            sessionId: parent.sessionId,
+          },
+        }
+      );
+    }
+
+    const currentHandle = this.resolveSessionHandle(parent.sessionId);
+
+    if (currentHandle !== undefined && currentHandle !== parent) {
+      throw new KrakenRuntimeError(
+        `${methodName}() requires the current parent handle for that orchestration session`,
+        {
+          code: "invalid_orchestration_parent",
+          details: {
+            methodName,
+            reason: "superseded_session_handle",
+            sessionId: parent.sessionId,
+          },
+        }
+      );
+    }
+
+    return parent;
+  }
+
+  private requireCurrentParentHandle(
+    parent: OrchestrationHandle,
+    methodName: string
+  ): OrchestrationHandleImpl {
+    const parentHandle = this.requireRuntimeParentHandle(parent, methodName);
+
+    if (this.resolveSessionHandle(parentHandle.sessionId) !== parentHandle) {
+      throw new KrakenRuntimeError(
+        `${methodName}() requires an active current parent handle`,
+        {
+          code: "invalid_orchestration_parent",
+          details: {
+            methodName,
+            sessionId: parentHandle.sessionId,
+          },
+        }
+      );
+    }
+
+    return parentHandle;
   }
 
   private resolveSessionHandle(
@@ -4377,26 +4452,13 @@ class OrchestrationRuntimeImpl implements OrchestrationRuntime {
   private resolveLaunchParentHandle(
     parent: OrchestrationHandle | undefined
   ): OrchestrationHandleImpl {
-    if (parent instanceof OrchestrationHandleImpl) {
-      if (!parent.belongsToRuntime(this)) {
-        throw new KrakenRuntimeError(
-          "launchWorker() requires a parent handle created by this orchestration runtime",
-          {
-            code: "invalid_orchestration_parent",
-          }
-        );
-      }
-      this.assertLaunchableParentHandle(parent);
-      return parent;
-    }
-
     if (parent !== undefined) {
-      throw new KrakenRuntimeError(
-        "launchWorker() requires a parent handle created by this orchestration runtime",
-        {
-          code: "invalid_orchestration_parent",
-        }
+      const parentHandle = this.requireCurrentParentHandle(
+        parent,
+        "launchWorker"
       );
+      this.assertLaunchableParentHandle(parentHandle);
+      return parentHandle;
     }
 
     if (this.sessionHandles.size === 1) {

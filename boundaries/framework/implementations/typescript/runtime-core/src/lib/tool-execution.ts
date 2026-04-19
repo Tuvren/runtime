@@ -567,6 +567,7 @@ async function executeSingleTool(
     }
 
     if (isApprovalRequestValidationError(error)) {
+      settleToolStartIfNeeded(toolStartState, startBarrier);
       throw error;
     }
 

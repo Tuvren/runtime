@@ -49,22 +49,25 @@ export function createEmptyContextManifest(): ContextManifest {
 
 export function createContextManifest(
   messages: KrakenMessage[],
-  extensionState: Record<string, unknown> = {}
+  extensionState: Record<string, unknown> = {},
+  turnBoundaryOffsets: number[] = inferUserTurnBoundaryOffsets(messages)
 ): ContextManifest {
   const manifest = createEmptyContextManifest();
   manifest.extensions = cloneRecord(extensionState);
-  return updateContextManifest(manifest, messages);
+  return updateContextManifest(manifest, messages, [], turnBoundaryOffsets);
 }
 
 export function updateContextManifest(
   manifest: ContextManifest,
   messages: KrakenMessage[],
-  updates: ExtensionStateUpdate[] = []
+  updates: ExtensionStateUpdate[] = [],
+  turnBoundaryOffsets: number[] = inferUserTurnBoundaryOffsets(messages)
 ): ContextManifest {
   const nextManifest = cloneContextManifest(manifest);
+  const turnBoundaryOffsetSet = new Set(turnBoundaryOffsets);
 
-  for (const message of messages) {
-    appendMessage(nextManifest, message);
+  for (const [index, message] of messages.entries()) {
+    appendMessage(nextManifest, message, turnBoundaryOffsetSet.has(index));
   }
 
   nextManifest.extensions = applyExtensionStateUpdates(
@@ -104,7 +107,8 @@ export function cloneContextManifest(
 
 function appendMessage(
   manifest: ContextManifest,
-  message: KrakenMessage
+  message: KrakenMessage,
+  isTurnBoundary: boolean
 ): void {
   const messageIndex = manifest.messageCount;
   manifest.messageCount += 1;
@@ -139,7 +143,9 @@ function appendMessage(
     case "user":
       manifest.byRole.user += 1;
       manifest.lastUserMessageIndex = messageIndex;
-      manifest.turnBoundaries.push(messageIndex);
+      if (isTurnBoundary) {
+        manifest.turnBoundaries.push(messageIndex);
+      }
       return;
     default:
       return;
@@ -216,6 +222,18 @@ function applyExtensionStateUpdates(
 
 function cloneRecord(record: Record<string, unknown>): Record<string, unknown> {
   return globalThis.structuredClone(record);
+}
+
+function inferUserTurnBoundaryOffsets(messages: KrakenMessage[]): number[] {
+  const turnBoundaryOffsets: number[] = [];
+
+  for (const [index, message] of messages.entries()) {
+    if (message.role === "user") {
+      turnBoundaryOffsets.push(index);
+    }
+  }
+
+  return turnBoundaryOffsets;
 }
 
 function cloneCountRecord(
