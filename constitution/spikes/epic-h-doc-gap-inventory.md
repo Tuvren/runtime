@@ -85,7 +85,26 @@ LangGraph was a useful comparison point here: its `thread_id` lives outside grap
 - Which fields are normative versus optional observability.
 - Whether partial-output durability is part of Epic H or deferred.
 
-<!-- I need further insights regarding the use cases that this apply to -->
+**Working decision:**
+
+- Keep `runtime.status` as a minimal framework-owned lifecycle record.
+- Treat it as canonical execution-state metadata for recovery, host status, approval resume, and orchestration ownership only.
+- Leave richer observability to concrete drivers and extensions rather than standardizing it in the shared framework core.
+
+Current preferred minimal shape:
+
+- `state`
+- `activeAgent?`
+- `pauseReason?`
+- `partial?`
+
+Current non-goals for shared `runtime.status`:
+
+- provider/model telemetry
+- iteration counters as observability
+- catch-all execution diagnostics
+
+`resumptionSchema` should be treated as a separate question tied to whether Epic H wants general non-approval pause semantics in the shared core. It is not part of the current minimal lifecycle record by default.
 
 ### 3. Approval pause and resume semantics
 
