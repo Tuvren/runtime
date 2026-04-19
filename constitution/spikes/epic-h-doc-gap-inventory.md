@@ -238,6 +238,20 @@ Current preferred shared-core guarantees after timeout:
 
 The shared core does **not** guarantee forced termination of arbitrary user code or tool logic. Stronger timeout enforcement may exist in specific hosts, sandboxes, or concrete driver deployments above the core.
 
+**Working decision (sub-aspect 5):**
+
+- Approval-resume batches follow the same execution-mode, ordering, and durability semantics as initial tool batches.
+- Resume is not a separate tool execution model; it is a continuation of the same canonical tool execution semantics with only unfinished calls eligible to continue.
+
+That means:
+
+- the same driver-chosen sequential or parallel mode applies
+- the same shared-core `tool.start` / `tool.result` ordering guarantees apply
+- known non-executed outcomes may still surface as soon as they are known
+- durable final ordering remains original tool-call order
+
+The only resume-specific additions are decision context and the exclusion of already-resolved calls from re-execution.
+
 ### 5. Driver/runtime contract ownership
 
 **Original gap in `docs/`:**
