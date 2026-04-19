@@ -2971,17 +2971,36 @@ class RuntimeCore implements KrakenRuntime {
         ? this.options.resolveNextAgent?.(loopState.activeConfig.name)
         : undefined;
 
-    if (
-      sequenceTarget === undefined ||
-      this.options.resolveAgentConfig === undefined
-    ) {
+    if (sequenceTarget === undefined) {
       return false;
+    }
+
+    if (this.options.resolveAgentConfig === undefined) {
+      throw new KrakenRuntimeError(
+        `agent transition target "${sequenceTarget}" cannot be resolved because no agent resolver is configured`,
+        {
+          code: "invalid_agent_transition",
+          details: {
+            from: loopState.activeConfig.name,
+            to: sequenceTarget,
+          },
+        }
+      );
     }
 
     const targetConfig = this.options.resolveAgentConfig(sequenceTarget);
 
     if (targetConfig === undefined) {
-      return false;
+      throw new KrakenRuntimeError(
+        `agent transition target "${sequenceTarget}" is not defined`,
+        {
+          code: "invalid_agent_transition",
+          details: {
+            from: loopState.activeConfig.name,
+            to: sequenceTarget,
+          },
+        }
+      );
     }
 
     this.publishCustomEvent(
@@ -4354,6 +4373,11 @@ export function createKrakenRuntimeCore(
 export function createOrchestrationRuntime(
   options: OrchestrationRuntimeOptions
 ): OrchestrationRuntime {
+  validateOrchestrationConfiguration(
+    options.agents,
+    options.entrypoint,
+    options.sequence
+  );
   const framework =
     options.framework ??
     createKrakenRuntimeCore({
@@ -4381,16 +4405,41 @@ export function createOrchestrationRuntime(
   );
 }
 
-function buildSequenceResolver(
+function validateOrchestrationConfiguration(
+  agents: Record<string, AgentConfig>,
+  entrypoint: string,
   sequence: string[] | undefined
-): ((agentName: string) => string | undefined) | undefined {
-  if (sequence === undefined || sequence.length < 2) {
-    return undefined;
+): void {
+  if (!(entrypoint in agents)) {
+    throw new KrakenRuntimeError(
+      `entrypoint agent "${entrypoint}" is not defined`,
+      {
+        code: "unknown_orchestration_entrypoint",
+      }
+    );
+  }
+
+  if (sequence === undefined || sequence.length === 0) {
+    return;
   }
 
   const seenAgents = new Set<string>();
 
   for (const agentName of sequence) {
+    if (!(agentName in agents)) {
+      throw new KrakenRuntimeError(
+        `orchestration sequence agent "${agentName}" is not defined`,
+        {
+          code: "invalid_orchestration_sequence",
+          details: {
+            agentName,
+            entrypoint,
+            sequence,
+          },
+        }
+      );
+    }
+
     if (seenAgents.has(agentName)) {
       throw new KrakenRuntimeError(
         `orchestration sequences must not repeat agent "${agentName}"`,
@@ -4405,6 +4454,28 @@ function buildSequenceResolver(
     }
 
     seenAgents.add(agentName);
+  }
+
+  if (sequence[0] !== entrypoint) {
+    throw new KrakenRuntimeError(
+      `orchestration sequence must start with entrypoint agent "${entrypoint}"`,
+      {
+        code: "invalid_orchestration_sequence",
+        details: {
+          entrypoint,
+          firstSequenceAgent: sequence[0],
+          sequence,
+        },
+      }
+    );
+  }
+}
+
+function buildSequenceResolver(
+  sequence: string[] | undefined
+): ((agentName: string) => string | undefined) | undefined {
+  if (sequence === undefined || sequence.length < 2) {
+    return undefined;
   }
 
   return (agentName: string) => {

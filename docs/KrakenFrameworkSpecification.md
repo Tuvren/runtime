@@ -2014,6 +2014,13 @@ When the current agent reaches a non-paused, non-failed completion and a next ag
 
 Sequences are a specialized handoff with a simpler context builder. They reuse the same Turn, Branch, context-rewrite, and active-agent swap semantics as agent-signaled handoffs. Each agent sees only the previous agent’s output.
 
+**Validation**:
+
+- If `sequence` is provided, every entry MUST reference a defined agent.
+- `sequence[0]` MUST match `entrypoint`.
+- Sequence agent names MUST be unique.
+- If a next-step transition is configured but the target agent cannot be resolved at runtime, the Turn fails with an orchestration error rather than silently completing as a single-agent run.
+
 ### 10.6 OrchestrationRuntime
 
 The framework-provided runtime for multi-agent coordination. Owns worker lifecycle management, completion-to-steering bridging, cascading cancellation, and demuxed event streams.
@@ -2058,7 +2065,7 @@ const orchestration = createOrchestrationRuntime({
 })
 ```
 
-If `framework` is omitted, `createOrchestrationRuntime(...)` constructs a framework runtime with the supplied `agents`, `sequence`, and `handoffContextBuilder` behavior wired in. If `framework` is provided, the orchestration layer delegates parent and worker Turn execution directly to that runtime; any custom `executeTurn(...)` behavior on the supplied framework therefore applies normally. Because execution is delegated, sequence and handoff behavior in that mode comes from the supplied framework's own runtime configuration. Hosts that want the orchestration-managed defaults can omit `framework`, or supply a framework that was itself constructed with matching `resolveAgentConfig`, `resolveNextAgent`, and sequence handoff settings.
+If `framework` is omitted, `createOrchestrationRuntime(...)` constructs a framework runtime with the supplied `agents`, `sequence`, and `handoffContextBuilder` behavior wired in. If `framework` is provided, the orchestration layer delegates parent and worker Turn execution directly to that runtime; any custom `executeTurn(...)` behavior on the supplied framework therefore applies normally. Because execution is delegated, sequence and handoff behavior in that mode comes from the supplied framework's own runtime configuration. Hosts that want the orchestration-managed defaults can omit `framework`, or supply a framework that was itself constructed with matching `resolveAgentConfig`, `resolveNextAgent`, and sequence handoff settings. Static orchestration configuration is still validated eagerly: entrypoint, declared agents, and any provided `sequence` must remain internally consistent even when execution is delegated.
 
 **Internal mechanics**: The runtime composes existing primitives:
 

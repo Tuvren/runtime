@@ -6193,6 +6193,92 @@ describe("framework-runtime-core", () => {
     ).toThrow('orchestration sequences must not repeat agent "planner"');
   });
 
+  test("rejects orchestration sequences that reference unknown agents", async () => {
+    const harness = createFakeKernelHarness();
+
+    expect(() =>
+      createOrchestrationRuntime({
+        agents: {
+          planner: { name: "planner" },
+          reviewer: { name: "reviewer" },
+        },
+        defaultDriverId: "fake",
+        entrypoint: "planner",
+        kernel: harness.kernel,
+        sequence: ["planner", "writer", "reviewer"],
+      })
+    ).toThrow('orchestration sequence agent "writer" is not defined');
+  });
+
+  test("rejects orchestration sequences whose first step does not match the entrypoint", async () => {
+    const harness = createFakeKernelHarness();
+
+    expect(() =>
+      createOrchestrationRuntime({
+        agents: {
+          planner: { name: "planner" },
+          reviewer: { name: "reviewer" },
+        },
+        defaultDriverId: "fake",
+        entrypoint: "planner",
+        kernel: harness.kernel,
+        sequence: ["reviewer", "planner"],
+      })
+    ).toThrow(
+      'orchestration sequence must start with entrypoint agent "planner"'
+    );
+  });
+
+  test("fails turns when a configured next agent cannot be resolved", async () => {
+    const harness = createFakeKernelHarness();
+    const driver = {
+      async execute(context) {
+        return {
+          activeAgent: context.config.name,
+          messages: [assistantText("Primary completed.")],
+          resolution: {
+            reason: "done",
+            type: "end_turn",
+          },
+        };
+      },
+      id: "fake",
+      async resume() {
+        throw new Error("resume was not expected");
+      },
+    } satisfies KrakenDriver;
+    const runtime = createKrakenRuntimeCore({
+      defaultDriverId: "fake",
+      driverRegistry: createDriverRegistry([driver]),
+      kernel: harness.kernel,
+      resolveAgentConfig: (agentName) =>
+        ({
+          primary: { name: "primary" },
+        })[agentName],
+      resolveNextAgent: (agentName) =>
+        agentName === "primary" ? "reviewer" : undefined,
+    });
+    const thread = await runtime.createThread({});
+    const handle = runtime.executeTurn({
+      branchId: thread.branchId,
+      config: { name: "primary" },
+      signal: textSignal("Fail unresolved next agent"),
+      threadId: thread.threadId,
+    });
+
+    const events = await collectEvents(handle.events());
+    const errorEvent = events.find(
+      (event): event is Extract<(typeof events)[number], { type: "error" }> =>
+        event.type === "error"
+    );
+
+    expect(handle.status().phase).toBe("failed");
+    expect(errorEvent?.error.code).toBe("invalid_agent_transition");
+    expect(errorEvent?.error.message).toContain(
+      'agent transition target "reviewer" is not defined'
+    );
+  });
+
   test("does not start orchestration parent execution before an event stream is consumed", async () => {
     const harness = createFakeKernelHarness();
     let executeCount = 0;
