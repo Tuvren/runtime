@@ -91,6 +91,7 @@ This note exists to preserve the conclusions reached while unwinding the long-ru
 
 - The driver chooses whether a tool batch executes sequentially or in parallel.
 - The shared framework core owns the canonical ordering semantics once a mode is chosen.
+- The driver expresses that choice through the shared driver seam when it requests tool calls, not through runtime-core construction-time policy wiring.
 
 **Core Guarantees**
 
@@ -207,6 +208,7 @@ This note exists to preserve the conclusions reached while unwinding the long-ru
   - pure control outcomes with no durable assistant-history contribution
   - failures before any durable assistant output was staged
 - `partial` is valid only for failed execution results that stage an assistant message
+- `toolExecutionMode` is required when driver messages request tool calls and omitted otherwise, because the driver must choose sequential vs. parallel execution through the shared seam rather than through out-of-band runtime wiring
 
 **Clarification**
 

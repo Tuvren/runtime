@@ -62,6 +62,28 @@ describe("driver-api", () => {
     ).toBe("reviewer");
   });
 
+  test("accepts toolExecutionMode when assistant messages request tool calls", () => {
+    expect(() =>
+      assertDriverExecutionResult({
+        messages: [
+          {
+            parts: [
+              {
+                callId: "call-search",
+                input: { query: "kraken" },
+                name: "search",
+                type: "tool_call",
+              },
+            ],
+            role: "assistant",
+          },
+        ],
+        resolution: { type: "continue_iteration" },
+        toolExecutionMode: "sequential",
+      })
+    ).not.toThrow();
+  });
+
   test("permits failed partial execution results when assistant output is staged", () => {
     expect(() =>
       assertDriverExecutionResult({
@@ -141,7 +163,30 @@ describe("driver-api", () => {
         toolExecutionMode: "sequential",
       })
     ).toThrow(
-      'must not include unsupported driver result field "toolExecutionMode"'
+      "toolExecutionMode is only valid when driver messages request tool calls"
+    );
+  });
+
+  test("requires toolExecutionMode when assistant messages request tool calls", () => {
+    expect(() =>
+      assertDriverExecutionResult({
+        messages: [
+          {
+            parts: [
+              {
+                callId: "call-search",
+                input: { query: "kraken" },
+                name: "search",
+                type: "tool_call",
+              },
+            ],
+            role: "assistant",
+          },
+        ],
+        resolution: { type: "continue_iteration" },
+      })
+    ).toThrow(
+      "toolExecutionMode is required when driver messages request tool calls"
     );
   });
 

@@ -139,15 +139,6 @@ export interface RuntimeCoreOptions {
     threadId: string,
     branchId: string
   ) => Promise<string | null> | string | null;
-  // Runtime-core keeps the shared driver seam minimal, so concrete driver
-  // compositions select sequential vs. parallel batches through this
-  // implementation-local hook instead of expanding DriverExecutionResult.
-  selectToolExecutionMode?: (input: {
-    activeAgent: string;
-    driverId: string;
-    iterationCount: number;
-    requestedToolCalls: readonly ToolCallPart[];
-  }) => ToolExecutionMode;
 }
 
 interface ResolvedRuntimeCoreOptions {
@@ -163,12 +154,6 @@ interface ResolvedRuntimeCoreOptions {
     threadId: string,
     branchId: string
   ) => Promise<string | null> | string | null;
-  selectToolExecutionMode: (input: {
-    activeAgent: string;
-    driverId: string;
-    iterationCount: number;
-    requestedToolCalls: readonly ToolCallPart[];
-  }) => ToolExecutionMode;
 }
 
 interface HeadState {
@@ -260,8 +245,6 @@ class RuntimeCore implements KrakenRuntime {
       handoffContextBuilder: options.handoffContextBuilder,
       kernel: options.kernel,
       now: options.now ?? Date.now,
-      selectToolExecutionMode:
-        options.selectToolExecutionMode ?? (() => "parallel"),
       resolveAgentConfig: options.resolveAgentConfig,
       resolveParentTurnId: options.resolveParentTurnId,
     };
@@ -1182,14 +1165,7 @@ class RuntimeCore implements KrakenRuntime {
     let resolution = driverResult.resolution;
     const driverMessages = [...(driverResult.messages ?? [])];
     const requestedToolCalls = extractToolCallsFromMessages(driverMessages);
-    const toolExecutionMode = this.options.selectToolExecutionMode({
-      activeAgent: loopState.activeConfig.name,
-      driverId: loopState.activeDriverId,
-      iterationCount,
-      requestedToolCalls: createFrozenSnapshot(
-        requestedToolCalls.map((toolCall) => cloneValue(toolCall))
-      ),
-    });
+    const toolExecutionMode = driverResult.toolExecutionMode ?? "parallel";
     const cancellationResolution = createCancelledResolution(handle);
     const partial =
       driverResult.partial === true ||
@@ -2114,15 +2090,14 @@ class RuntimeCore implements KrakenRuntime {
   private resolveDefaultHandoffContextBuilder(
     mode: string
   ): HandoffContextBuilder {
-    if (this.options.handoffContextBuilder !== undefined) {
-      return this.options.handoffContextBuilder;
-    }
-
     switch (mode) {
       case "last_output_only":
         return createLastOutputOnlyHandoffContextBuilder();
       case "preserve_trace":
-        return createPreserveTraceHandoffContextBuilder();
+        return (
+          this.options.handoffContextBuilder ??
+          createPreserveTraceHandoffContextBuilder()
+        );
       default:
         throw new KrakenRuntimeError(
           `handoff mode "${mode}" requires an explicit builder`,

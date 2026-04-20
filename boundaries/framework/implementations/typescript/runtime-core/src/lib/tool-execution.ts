@@ -51,7 +51,6 @@ import {
   getAroundToolHandlers,
   isApprovalRequestValidationError,
   isExecutableApprovalDecision,
-  isRejectedPromiseResult,
   normalizeAroundToolResult,
   normalizeError,
   settleToolStartIfNeeded,
@@ -692,22 +691,7 @@ async function executeConcurrentToolCalls(
       throw error;
     })
   );
-  const settledOutcomes = await Promise.allSettled(outcomes);
-  const rejection = settledOutcomes.find(isRejectedPromiseResult);
-
-  if (rejection !== undefined) {
-    throw rejection.reason;
-  }
-
-  const successfulOutcomes: SingleToolOutcome[] = [];
-
-  for (const outcome of settledOutcomes) {
-    if (outcome.status === "fulfilled") {
-      successfulOutcomes.push(outcome.value);
-    }
-  }
-
-  return successfulOutcomes;
+  return await Promise.all(outcomes);
 }
 
 async function runAroundToolHandlers(

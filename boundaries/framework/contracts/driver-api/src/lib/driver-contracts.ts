@@ -72,10 +72,13 @@ export interface DriverResumeContext extends DriverExecutionContext {
   resumedFrom?: HashString;
 }
 
+export type DriverToolExecutionMode = "parallel" | "sequential";
+
 export interface DriverExecutionResult {
   messages?: KrakenMessage[];
   partial?: boolean;
   resolution: RuntimeResolution;
+  toolExecutionMode?: DriverToolExecutionMode;
 }
 
 export interface KrakenDriver {
@@ -142,6 +145,21 @@ export function assertDriverExecutionResult(
     );
   }
 
+  if (
+    "toolExecutionMode" in value &&
+    value.toolExecutionMode !== undefined &&
+    value.toolExecutionMode !== "parallel" &&
+    value.toolExecutionMode !== "sequential"
+  ) {
+    throw new KrakenValidationError(
+      `${label}.toolExecutionMode must be "parallel" or "sequential"`,
+      {
+        code: "invalid_driver_result",
+        details: value,
+      }
+    );
+  }
+
   if ("messages" in value && value.messages !== undefined) {
     if (!Array.isArray(value.messages)) {
       throw new KrakenValidationError(`${label}.messages must be an array`, {
@@ -157,7 +175,12 @@ export function assertDriverExecutionResult(
   }
 
   for (const key of Object.keys(value)) {
-    if (key === "messages" || key === "partial" || key === "resolution") {
+    if (
+      key === "messages" ||
+      key === "partial" ||
+      key === "resolution" ||
+      key === "toolExecutionMode"
+    ) {
       continue;
     }
 
@@ -176,6 +199,18 @@ export function assertDriverExecutionResult(
       messages: Array.isArray(value.messages) ? value.messages : undefined,
       partial: value.partial === true,
       resolution: value.resolution,
+    },
+    `${label}`
+  );
+  const toolExecutionMode =
+    value.toolExecutionMode === "parallel" ||
+    value.toolExecutionMode === "sequential"
+      ? value.toolExecutionMode
+      : undefined;
+  assertDriverToolExecutionMode(
+    {
+      messages: Array.isArray(value.messages) ? value.messages : undefined,
+      toolExecutionMode,
     },
     `${label}`
   );
@@ -368,6 +403,41 @@ function assertDriverPartialResult(
   if (!value.messages?.some((message) => message.role === "assistant")) {
     throw new KrakenValidationError(
       `${label}.partial requires a staged assistant message`,
+      {
+        code: "invalid_driver_result",
+        details: value,
+      }
+    );
+  }
+}
+
+function assertDriverToolExecutionMode(
+  value: {
+    messages?: KrakenMessage[];
+    toolExecutionMode?: DriverToolExecutionMode;
+  },
+  label: string
+): void {
+  const requestedToolCalls =
+    value.messages?.some(
+      (message) =>
+        message.role === "assistant" &&
+        message.parts.some((part) => part.type === "tool_call")
+    ) ?? false;
+
+  if (requestedToolCalls && value.toolExecutionMode === undefined) {
+    throw new KrakenValidationError(
+      `${label}.toolExecutionMode is required when driver messages request tool calls`,
+      {
+        code: "invalid_driver_result",
+        details: value,
+      }
+    );
+  }
+
+  if (!requestedToolCalls && value.toolExecutionMode !== undefined) {
+    throw new KrakenValidationError(
+      `${label}.toolExecutionMode is only valid when driver messages request tool calls`,
       {
         code: "invalid_driver_result",
         details: value,

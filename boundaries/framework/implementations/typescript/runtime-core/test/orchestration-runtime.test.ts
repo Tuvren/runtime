@@ -20,9 +20,10 @@ import type {
   DriverExecutionContext,
   DriverExecutionResult,
   KrakenDriver,
+  KrakenDriverFactory,
 } from "@kraken/framework-driver-api";
 import {
-  createDriverRegistry,
+  createDriverRegistry as createBaseDriverRegistry,
   createKrakenRuntimeCore,
   createOrchestrationRuntime,
 } from "../src/index.ts";
@@ -1156,6 +1157,69 @@ describe("orchestration-runtime", () => {
     ]);
   });
 });
+
+function createDriverRegistry(
+  drivers: Array<KrakenDriver | KrakenDriverFactory> = []
+) {
+  return createBaseDriverRegistry(drivers.map(wrapDriverEntry));
+}
+
+function wrapDriverEntry(
+  entry: KrakenDriver | KrakenDriverFactory
+): KrakenDriver | KrakenDriverFactory {
+  if (isKrakenDriverFactory(entry)) {
+    return {
+      create() {
+        return wrapDriver(entry.create());
+      },
+      id: entry.id,
+    };
+  }
+
+  return wrapDriver(entry);
+}
+
+function isKrakenDriverFactory(
+  entry: KrakenDriver | KrakenDriverFactory
+): entry is KrakenDriverFactory {
+  return "create" in entry && typeof entry.create === "function";
+}
+
+function wrapDriver(driver: KrakenDriver): KrakenDriver {
+  return {
+    async execute(context) {
+      return normalizeDriverResult(await driver.execute(context));
+    },
+    id: driver.id,
+    async resume(context) {
+      return normalizeDriverResult(await driver.resume(context));
+    },
+  };
+}
+
+function normalizeDriverResult(
+  result: DriverExecutionResult
+): DriverExecutionResult {
+  if (
+    result.toolExecutionMode !== undefined ||
+    !requestsToolExecution(result)
+  ) {
+    return result;
+  }
+
+  return {
+    ...result,
+    toolExecutionMode: "parallel",
+  };
+}
+
+function requestsToolExecution(result: DriverExecutionResult): boolean {
+  return (result.messages ?? []).some(
+    (message) =>
+      message.role === "assistant" &&
+      message.parts.some((part) => part.type === "tool_call")
+  );
+}
 
 function createStaticDriver(
   execute: (

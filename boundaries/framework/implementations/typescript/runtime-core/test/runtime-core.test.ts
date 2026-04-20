@@ -17,6 +17,7 @@
 // biome-ignore-all lint/suspicious/useAwait: Test drivers intentionally match the async framework driver contract.
 import { describe, expect, test } from "bun:test";
 import type {
+  DriverExecutionResult,
   KrakenDriver,
   KrakenDriverFactory,
 } from "@kraken/framework-driver-api";
@@ -35,8 +36,8 @@ import type {
 } from "@kraken/kernel-contract-protocol";
 import {
   collectSystemPrompts,
+  createDriverRegistry as createBaseDriverRegistry,
   createContextManifest,
-  createDriverRegistry,
   createKrakenRuntimeCore,
   createLastOutputOnlyHandoffContextBuilder,
   createPreserveTraceHandoffContextBuilder,
@@ -5093,7 +5094,7 @@ describe("framework-runtime-core", () => {
     ]);
   });
 
-  test("runs tool batches sequentially when the runtime selects sequential mode", async () => {
+  test("runs tool batches sequentially when the driver selects sequential mode", async () => {
     const harness = createFakeKernelHarness();
     const driver = {
       async execute(context) {
@@ -5120,6 +5121,7 @@ describe("framework-runtime-core", () => {
             resolution: {
               type: "continue_iteration",
             },
+            toolExecutionMode: "sequential",
           };
         }
 
@@ -5140,7 +5142,6 @@ describe("framework-runtime-core", () => {
       defaultDriverId: "fake",
       driverRegistry: createDriverRegistry([driver]),
       kernel: harness.kernel,
-      selectToolExecutionMode: () => "sequential",
     });
     const thread = await runtime.createThread({});
     const handle = runtime.executeTurn({
@@ -7304,6 +7305,70 @@ describe("framework-runtime-core", () => {
     ).toBe(false);
   });
 
+  test("global handoff builder overrides do not replace last_output_only semantics", async () => {
+    const harness = createFakeKernelHarness();
+    let overrideUsed = false;
+    const runtime = createKrakenRuntimeCore({
+      defaultDriverId: "fake",
+      driverRegistry: createDriverRegistry([
+        {
+          async execute(context) {
+            if (context.config.name === "primary") {
+              return {
+                messages: [assistantText("Final visible output")],
+                resolution: {
+                  contextPlan: context.handoff.createContextPlan({
+                    mode: "last_output_only",
+                    reason: "delegate",
+                    targetAgent: "reviewer",
+                  }),
+                  targetAgent: "reviewer",
+                  type: "handoff",
+                },
+              };
+            }
+
+            return {
+              messages: [assistantText("Reviewer complete.")],
+              resolution: {
+                reason: "done",
+                type: "end_turn",
+              },
+            };
+          },
+          id: "fake",
+          async resume() {
+            throw new Error("resume was not expected");
+          },
+        } satisfies KrakenDriver,
+      ]),
+      handoffContextBuilder: (context) => {
+        overrideUsed = true;
+        return createPreserveTraceHandoffContextBuilder()(context);
+      },
+      kernel: harness.kernel,
+      resolveAgentConfig: (agentName) =>
+        agentName === "reviewer" ? { name: "reviewer" } : undefined,
+    });
+    const thread = await runtime.createThread({});
+    const handle = runtime.executeTurn({
+      branchId: thread.branchId,
+      config: { name: "primary" },
+      signal: textSignal("Use fixed last output only"),
+      threadId: thread.threadId,
+    });
+
+    await collectEvents(handle.events());
+
+    expect(overrideUsed).toBe(false);
+    expect(
+      hasAssistantText(
+        await harness.readBranchMessages(thread.branchId),
+        "Reviewer complete."
+      )
+    ).toBe(true);
+  });
+
   test("does not leak per-turn tools across handoff transitions", async () => {
     const harness = createFakeKernelHarness();
     const agents: Record<string, AgentConfig> = {
@@ -7562,3 +7627,66 @@ describe("framework-runtime-core", () => {
     expect(steeringEvent?.messageId).toBe(extractLastMessageHash(manifest));
   });
 });
+
+function createDriverRegistry(
+  drivers: Array<KrakenDriver | KrakenDriverFactory> = []
+) {
+  return createBaseDriverRegistry(drivers.map(wrapDriverEntry));
+}
+
+function wrapDriverEntry(
+  entry: KrakenDriver | KrakenDriverFactory
+): KrakenDriver | KrakenDriverFactory {
+  if (isKrakenDriverFactory(entry)) {
+    return {
+      create() {
+        return wrapDriver(entry.create());
+      },
+      id: entry.id,
+    };
+  }
+
+  return wrapDriver(entry);
+}
+
+function isKrakenDriverFactory(
+  entry: KrakenDriver | KrakenDriverFactory
+): entry is KrakenDriverFactory {
+  return "create" in entry && typeof entry.create === "function";
+}
+
+function wrapDriver(driver: KrakenDriver): KrakenDriver {
+  return {
+    async execute(context) {
+      return normalizeDriverResult(await driver.execute(context));
+    },
+    id: driver.id,
+    async resume(context) {
+      return normalizeDriverResult(await driver.resume(context));
+    },
+  };
+}
+
+function normalizeDriverResult(
+  result: DriverExecutionResult
+): DriverExecutionResult {
+  if (
+    result.toolExecutionMode !== undefined ||
+    !requestsToolExecution(result)
+  ) {
+    return result;
+  }
+
+  return {
+    ...result,
+    toolExecutionMode: "parallel",
+  };
+}
+
+function requestsToolExecution(result: DriverExecutionResult): boolean {
+  return (result.messages ?? []).some(
+    (message) =>
+      message.role === "assistant" &&
+      message.parts.some((part) => part.type === "tool_call")
+  );
+}

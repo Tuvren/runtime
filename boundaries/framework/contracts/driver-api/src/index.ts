@@ -22,6 +22,7 @@ export type {
   DriverRegistry,
   DriverResumeContext,
   DriverRuntimePort,
+  DriverToolExecutionMode,
   KrakenDriver,
   KrakenDriverFactory,
 } from "./lib/driver-contracts.js";
