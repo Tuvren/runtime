@@ -369,7 +369,30 @@ Adding a separate `activeAgent` field to the driver result only weakens ownershi
 - Which handoff invariants are normative.
 - Which wording or formatting choices are intentionally implementation-defined.
 
-<!-- We must probably keep this as is for now -->
+**Working decision:**
+
+- Choose **Option B**: semantic invariants are normative; exact wording and formatting are implementation-defined.
+- The shared framework core owns handoff logic and guarantees, not sacred prose templates.
+
+Current shared-core guarantees to keep normative:
+
+- handoff is a control transition, not ordinary tool execution
+- handoff rewrites the active `messages` path on the same Turn and Branch
+- active agent changes durably
+- active execution scope is rebuilt from the target agent configuration
+- prior full history remains recoverable through prior TurnNodes rather than in-place raw replay
+
+Mode-level invariants:
+
+- **`preserve_trace`** preserves a chronological summarized trace without exposing raw history, raw tool-call inputs, or incompatible prior tool surfaces
+- **`last_output_only`** carries only the previous agent's final visible output parts and does not carry provider continuity metadata across the role transition
+
+Current implementation-defined details:
+
+- exact wrapper wording
+- exact section headings
+- exact text formatting of summaries and tool outcomes
+- exact prose templates used by the default builders
 
 ### 7. Sequence semantics as a strict orchestration mode
 
