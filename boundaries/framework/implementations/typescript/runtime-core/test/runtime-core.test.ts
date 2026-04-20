@@ -2603,6 +2603,137 @@ describe("framework-runtime-core", () => {
     expect(errorEvent?.error.code).toBe("invalid_driver_result");
   });
 
+  test("clones afterIteration resolution, response, and toolResults per hook invocation", async () => {
+    const harness = createFakeKernelHarness();
+    const capturedSnapshots: Array<{
+      resolutionType: string;
+      responsePartName?: string;
+      toolOutput: unknown;
+    }> = [];
+    const driver = {
+      async execute(context) {
+        const toolMessages = extractToolMessages(context.messages);
+
+        if (toolMessages.length === 0) {
+          return {
+            messages: [
+              assistantToolCalls([
+                {
+                  callId: "call-search",
+                  input: { query: "clone hook context" },
+                  name: "search",
+                },
+              ]),
+            ],
+            resolution: {
+              type: "continue_iteration",
+            },
+          };
+        }
+
+        return {
+          messages: [assistantText("Search complete.")],
+          resolution: {
+            reason: "done",
+            type: "end_turn",
+          },
+        };
+      },
+      id: "fake",
+      async resume() {
+        throw new Error("resume was not expected");
+      },
+    } satisfies KrakenDriver;
+    const runtime = createKrakenRuntimeCore({
+      defaultDriverId: "fake",
+      driverRegistry: createDriverRegistry([driver]),
+      kernel: harness.kernel,
+    });
+    const thread = await runtime.createThread({});
+    const handle = runtime.executeTurn({
+      branchId: thread.branchId,
+      config: {
+        extensions: [
+          {
+            afterIteration(context) {
+              if (context.resolution.type !== "continue_iteration") {
+                return undefined;
+              }
+
+              const firstPart = context.response.parts[0];
+              const firstToolResult = context.toolResults?.[0];
+              capturedSnapshots.push({
+                resolutionType: context.resolution.type,
+                responsePartName:
+                  firstPart?.type === "tool_call" ? firstPart.name : undefined,
+                toolOutput: firstToolResult?.output,
+              });
+              return undefined;
+            },
+            name: "capture",
+          },
+          {
+            afterIteration(context) {
+              const firstToolResult = context.toolResults?.[0];
+
+              if (firstToolResult !== undefined) {
+                firstToolResult.output = { mutated: true };
+              }
+
+              const firstPart = context.response.parts[0];
+
+              if (firstPart?.type === "tool_call") {
+                firstPart.name = "mutated";
+              }
+
+              if (context.resolution.type === "continue_iteration") {
+                Object.assign(context.resolution, {
+                  reason: "mutated",
+                  type: "end_turn",
+                });
+              }
+              return undefined;
+            },
+            name: "mutate",
+          },
+        ],
+        name: "primary",
+        tools: [
+          {
+            description: "Search docs",
+            execute(input: unknown) {
+              return {
+                query: readQueryInput(input),
+                result: "ok",
+              };
+            },
+            inputSchema: {
+              properties: {
+                query: { type: "string" },
+              },
+              required: ["query"],
+              type: "object",
+            },
+            name: "search",
+          },
+        ],
+      },
+      signal: textSignal("Clone afterIteration hook context"),
+      threadId: thread.threadId,
+    });
+
+    await collectEvents(handle.events());
+
+    expect(capturedSnapshots).toHaveLength(1);
+    expect(capturedSnapshots[0]?.resolutionType).toBe("continue_iteration");
+    expect(capturedSnapshots[0]?.toolOutput).toEqual({
+      query: "clone hook context",
+      result: "ok",
+    });
+    expect(capturedSnapshots[0]?.responsePartName).toBe("search");
+    expect(handle.status().phase).toBe("completed");
+  });
+
   test("rejects invalid context-engineering helper messages with a validation error", async () => {
     const harness = createFakeKernelHarness();
     const driver = {
@@ -4142,7 +4273,7 @@ describe("framework-runtime-core", () => {
     expect(errorEvent?.error.code).toBe("invalid_approval_request");
   });
 
-  test("aborts sibling tool work before surfacing malformed initial approval failures", async () => {
+  test("allows sibling tool side effects to continue without checkpointing malformed initial approval batches", async () => {
     const harness = createFakeKernelHarness();
     let searchSideEffectCount = 0;
     const driver = {
@@ -4264,7 +4395,7 @@ describe("framework-runtime-core", () => {
           },
         ],
       },
-      signal: textSignal("Abort sibling tools on malformed approval"),
+      signal: textSignal("Continue sibling tools on malformed approval"),
       threadId: thread.threadId,
     });
     const events = await collectEvents(handle.events());
@@ -4277,7 +4408,7 @@ describe("framework-runtime-core", () => {
 
     expect(handle.status().phase).toBe("failed");
     expect(errorEvent?.error.code).toBe("invalid_approval_request");
-    expect(searchSideEffectCount).toBe(0);
+    expect(searchSideEffectCount).toBe(1);
     expect(
       extractToolMessages(await harness.readBranchMessages(thread.branchId))
     ).toHaveLength(0);
@@ -4456,7 +4587,7 @@ describe("framework-runtime-core", () => {
     ]);
   });
 
-  test("aborts sibling tool work before surfacing malformed resumed approvals", async () => {
+  test("allows resumed sibling side effects to continue without checkpointing malformed approvals", async () => {
     const harness = createFakeKernelHarness();
     let searchSideEffectCount = 0;
     const driver = {
@@ -4595,7 +4726,9 @@ describe("framework-runtime-core", () => {
           },
         ],
       },
-      signal: textSignal("Abort resumed sibling tools on malformed approval"),
+      signal: textSignal(
+        "Continue resumed sibling tools on malformed approval"
+      ),
       threadId: thread.threadId,
     });
 
@@ -4612,7 +4745,7 @@ describe("framework-runtime-core", () => {
     await delay(60);
 
     expect(resumedHandle.status().phase).toBe("failed");
-    expect(searchSideEffectCount).toBe(0);
+    expect(searchSideEffectCount).toBe(1);
     expect(
       extractToolMessages(await harness.readBranchMessages(thread.branchId))
     ).toHaveLength(0);
@@ -7841,14 +7974,20 @@ function isKrakenDriverFactory(
 }
 
 function wrapDriver(driver: KrakenDriver): KrakenDriver {
+  const resume = driver.resume;
+
   return {
     async execute(context) {
       return normalizeDriverResult(await driver.execute(context));
     },
     id: driver.id,
-    async resume(context) {
-      return normalizeDriverResult(await driver.resume(context));
-    },
+    ...(resume === undefined
+      ? {}
+      : {
+          async resume(context) {
+            return normalizeDriverResult(await resume(context));
+          },
+        }),
   };
 }
 

@@ -877,7 +877,7 @@ export interface DriverExecutionResult {
 export interface KrakenDriver {
   readonly id: string;
   execute(context: DriverExecutionContext): Promise<DriverExecutionResult>;
-  resume(context: DriverResumeContext): Promise<DriverExecutionResult>;
+  resume?(context: DriverResumeContext): Promise<DriverExecutionResult>;
 }
 
 export interface KrakenDriverFactory {
@@ -892,7 +892,7 @@ export interface DriverRegistry {
 }
 ```
 
-`DriverExecutionResult` may contain at most one assistant message per iteration. `toolExecutionMode` is required when that assistant message requests tool calls and omitted otherwise. This keeps sequential-vs-parallel selection on the shared driver boundary instead of on runtime-core construction options.
+`DriverExecutionResult` may contain at most one assistant message per iteration. `toolExecutionMode` is required when that assistant message requests tool calls and omitted otherwise. This keeps sequential-vs-parallel selection on the shared driver boundary instead of on runtime-core construction options. Approval resume remains framework-owned; any driver `resume(...)` method is optional and not part of the current shared-core execution path.
 
 ## 5. Implementation Guidelines
 ### 5.1 Project Structure

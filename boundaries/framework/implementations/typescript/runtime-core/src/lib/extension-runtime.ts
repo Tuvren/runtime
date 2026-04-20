@@ -169,14 +169,14 @@ export async function runAfterIterationHooks(
             iterationCount: options.iterationCount,
             manifest: cloneValue(options.manifest),
             messages: cloneValue(options.messages),
-            resolution: options.resolution,
-            response: options.response,
+            resolution: cloneValue(options.resolution),
+            response: cloneValue(options.response),
             runId: options.runId,
             sharedExports: buildContextSharedExports(
               extensions,
               options.manifest
             ),
-            toolResults: options.toolResults,
+            toolResults: cloneValue(options.toolResults),
             turnId: options.turnId,
           }),
         extension.timeout,

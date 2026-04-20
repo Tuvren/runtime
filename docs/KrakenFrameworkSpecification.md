@@ -1152,6 +1152,8 @@ DriverExecutionResult
 
 The driver does not mutate framework-owned state by aliasing context objects in place. If a driver needs to influence framework state, it does so through explicit returned outputs such as `messages`, `resolution`, and `partial`, not through mutation of the execution context.
 
+The shared core does not require a driver-owned approval-resume path. Approval resume is handled by the framework around the paused tool batch, so any driver `resume(...)` method is optional and outside the current shared-core execution path.
+
 `DriverExecutionResult` is intentionally minimal:
 
 - `resolution` is always required

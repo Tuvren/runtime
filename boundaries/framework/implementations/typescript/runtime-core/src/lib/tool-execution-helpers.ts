@@ -69,42 +69,42 @@ export function createBatchScopedEnvironment(
   environment: ToolBatchEnvironment,
   batchSignal: AbortSignal
 ): ToolBatchEnvironment {
-  const signal =
+  const fenceSignal =
     environment.signal === undefined
       ? batchSignal
       : AbortSignal.any([environment.signal, batchSignal]);
   const throwIfAborted = () => {
-    if (!signal.aborted) {
+    if (!fenceSignal.aborted) {
       return;
     }
 
-    throw normalizeError(signal.reason);
+    throw normalizeError(fenceSignal.reason);
   };
 
   return {
     ...environment,
     publishCustom(event) {
-      if (signal.aborted) {
+      if (fenceSignal.aborted) {
         return;
       }
 
       environment.publishCustom(event);
     },
     publishEvent(event) {
-      if (signal.aborted) {
+      if (fenceSignal.aborted) {
         return;
       }
 
       environment.publishEvent(event);
     },
     reportSoftError(error) {
-      if (signal.aborted) {
+      if (fenceSignal.aborted) {
         return;
       }
 
       environment.reportSoftError(error);
     },
-    signal,
+    signal: environment.signal,
     async stageResult(result, orderIndex) {
       throwIfAborted();
       const hash = await environment.stageResult(result, orderIndex);

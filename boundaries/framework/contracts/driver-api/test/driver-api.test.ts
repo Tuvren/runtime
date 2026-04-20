@@ -62,6 +62,23 @@ describe("driver-api", () => {
     ).toBe("reviewer");
   });
 
+  test("accepts driver contracts without a resume method", () => {
+    const continueIteration = {
+      type: "continue_iteration",
+    } satisfies { type: "continue_iteration" };
+    const driver = {
+      execute() {
+        return Promise.resolve({
+          resolution: continueIteration,
+        });
+      },
+      id: "react",
+    } satisfies KrakenDriver;
+
+    expect(isKrakenDriver(driver)).toBe(true);
+    expect(() => assertKrakenDriver(driver)).not.toThrow();
+  });
+
   test("accepts toolExecutionMode when assistant messages request tool calls", () => {
     expect(() =>
       assertDriverExecutionResult({

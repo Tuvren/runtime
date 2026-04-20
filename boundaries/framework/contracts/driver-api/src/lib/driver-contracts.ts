@@ -84,7 +84,7 @@ export interface DriverExecutionResult {
 export interface KrakenDriver {
   execute(context: DriverExecutionContext): Promise<DriverExecutionResult>;
   readonly id: string;
-  resume(context: DriverResumeContext): Promise<DriverExecutionResult>;
+  resume?(context: DriverResumeContext): Promise<DriverExecutionResult>;
 }
 
 export interface KrakenDriverFactory {
@@ -111,8 +111,7 @@ export function isKrakenDriver(value: unknown): value is KrakenDriver {
       value.id.trim().length > 0 &&
       "execute" in value &&
       typeof value.execute === "function" &&
-      "resume" in value &&
-      typeof value.resume === "function"
+      (!("resume" in value) || typeof value.resume === "function")
   );
 }
 

@@ -33,6 +33,7 @@ import {
   assistantText,
   assistantToolCalls,
   collectEvents,
+  collectEventsForDuration,
   createStubExecutionHandle,
   delay,
   detachTestPromise,
@@ -184,8 +185,7 @@ describe("orchestration-runtime", () => {
       signal: textSignal("root"),
       threadId: "thread-root",
     });
-    const capture = startEventCapture(handle.allEvents());
-    detachTestPromise(handle.awaitResult());
+    const subtreeEvents = handle.allEvents();
 
     await delay(0);
     const childHandle = handle.spawn({
@@ -195,18 +195,9 @@ describe("orchestration-runtime", () => {
     await expect(childHandle.awaitResult()).rejects.toThrow(
       "child start failed"
     );
-    await waitFor(
-      () =>
-        capture.events.filter((event) => event.type === "error").length === 1
-    );
-    await delay(20);
+    const events = await collectEventsForDuration(subtreeEvents, 40);
 
-    expect(
-      capture.events.filter((event) => event.type === "error")
-    ).toHaveLength(1);
-
-    handle.cancel();
-    await capture.done;
+    expect(events.filter((event) => event.type === "error")).toHaveLength(1);
   });
 
   test("bridges descendant events through allEvents and does not inject worker_result into parent history", async () => {
@@ -1267,14 +1258,20 @@ function isKrakenDriverFactory(
 }
 
 function wrapDriver(driver: KrakenDriver): KrakenDriver {
+  const resume = driver.resume;
+
   return {
     async execute(context) {
       return normalizeDriverResult(await driver.execute(context));
     },
     id: driver.id,
-    async resume(context) {
-      return normalizeDriverResult(await driver.resume(context));
-    },
+    ...(resume === undefined
+      ? {}
+      : {
+          async resume(context) {
+            return normalizeDriverResult(await resume(context));
+          },
+        }),
   };
 }
 
