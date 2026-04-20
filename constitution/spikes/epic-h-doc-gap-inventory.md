@@ -468,6 +468,28 @@ If shared sequence-like logic proves reusable later, it can be added above the p
 
 It should **not** prematurely standardize rich orchestration ergonomics or opinionated workflow behavior above those primitives.
 
+**Working decision (sub-aspect 2):**
+
+- The minimum core orchestration surface should be handle/tree-based rather than runtime-global worker-registry-based.
+- Parent/worker relationships should be modeled as explicit execution-tree capabilities:
+  - a parent handle can spawn child handles
+  - child handles are ordinary execution handles, so pause/resume/cancel semantics stay local to the child
+  - any child may itself spawn children, allowing recursive parent/worker trees
+
+Current preferred primitive surface:
+
+- a way to spawn child execution from a handle
+- the normal execution-handle control surface on the child
+- one aggregated subtree event stream in addition to self-only `events()`
+
+Current preferred non-primitives to drop or defer:
+
+- runtime-global worker lookup by ID as the primary contract
+- separate `parentEvents()` and `workerEvents(workerId)` surfaces as core primitives
+- rich session-retention and ambiguity-resolution semantics
+
+This keeps orchestration aligned with the execution tree rather than forcing the shared core to standardize a global worker-management API too early.
+
 ### 9. Worker-result projection
 
 **Original gap in `docs/`:**
