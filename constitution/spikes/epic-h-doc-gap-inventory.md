@@ -313,6 +313,28 @@ That means:
 
 If a driver needs to influence framework state, it does so through explicit returned outputs such as `messages`, `resolution`, and `partial`, not through in-place mutation of the execution context.
 
+**Working decision (sub-aspect 3):**
+
+- Prefer the minimal shared `DriverExecutionResult` shape:
+  - `resolution`
+  - `messages?`
+  - `partial?`
+- Keep the stronger rules in docs and validators rather than encoding a heavier ReAct-shaped discriminated union in the shared type.
+
+Current semantic rules:
+
+- `resolution` is always required.
+- `messages` are required whenever the iteration produces durable assistant history.
+- `messages` may be absent only for:
+  - pure control outcomes with no durable assistant-history contribution
+  - failures before any durable assistant output was staged
+- `partial` is valid only for failed execution results that stage an assistant message.
+
+Explicit correction:
+
+- an "empty assistant turn" is **not** treated as a normal happy-path shared-contract case merely because the API call was request/response shaped.
+- no-`messages` outcomes are non-history outcomes, not ordinary assistant turns with empty content.
+
 ### 6. Handoff semantics versus exact wording
 
 **Original gap in `docs/`:**
