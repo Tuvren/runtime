@@ -1,9 +1,9 @@
 # Engineering Execution Plan
 
 ## 0. Version History & Changelog
+- v0.3.1 - Narrowed Epic H around the docs-first minimal shared-core model by removing sequence semantics from core scope, reducing orchestration to handle/tree primitives, and shrinking the shared driver contract surface.
 - v0.3.0 - Realigned the active backlog around Epic H after confirming Epics F and G already exist in repo reality, and expanded Epic H into the full brownfield-corrected shared framework foundation plan.
 - v0.2.0 - Replaced the kernel-only backlog with a driver-aware next-phase plan focused on SQLite, shared framework contracts, and shared framework foundations while deferring the first concrete driver and downstream integrations.
-- v0.1.0 - Initial kernel-first execution plan separating the active foundational scope from the broader TechSpec baseline.
 - ... [Older history truncated, refer to git logs]
 
 ## 1. Executive Summary & Active Critical Path
@@ -22,9 +22,9 @@
 - This section uses "iteration strategy" only because the planning framework requires that heading; the content below is dependency phasing and scope partitioning, not a commitment to Scrum-style iterations.
 
 ### Current Active Scope
-- Realign the shared runtime and driver contracts where the framework specification now requires orchestration and approval-resume surfaces that the brownfield packages did not yet expose.
-- Implement the full driver-neutral shared framework substrate in `runtime-core`, including durable kernel-backed helpers, event/control shell behavior, active-scope assembly, shared turn coordination, tool-gateway approval resume, context engineering, handoff, and orchestration runtime behavior.
-- Close Epic H with fake-driver and regression coverage proving the shared layer can host explicit drivers and orchestration without leaking ReAct-specific logic into the core framework package.
+- Realign the shared runtime and driver contracts where the framework specification now requires a narrower driver seam, explicit lineage, and minimal handle/tree orchestration primitives that the brownfield packages did not yet expose.
+- Implement the driver-neutral shared framework substrate in `runtime-core`, including durable kernel-backed helpers, event/control shell behavior, active-scope assembly, shared turn coordination, tool-gateway approval resume, context engineering, handoff, and minimal orchestration primitives.
+- Close Epic H with fake-driver and regression coverage proving the shared layer can host explicit drivers and minimal orchestration without leaking ReAct-specific or pipeline-specific policy into the core framework package.
 
 ### Future / Deferred Scope
 - Epic I will cover the first concrete driver, the ReAct Driver baseline.
@@ -71,7 +71,7 @@ flowchart LR
   KRTH006 --> KRTH007
   KRTH005 --> KRTH008[KRT-H008 Context Engineering and Handoff Coordination]
   KRTH006 --> KRTH008
-  KRTH001 --> KRTH009[KRT-H009 Public Orchestration Runtime]
+  KRTH001 --> KRTH009[KRT-H009 Minimal Core Orchestration Primitives]
   KRTH007 --> KRTH009
   KRTH008 --> KRTH009
   KRTH007 --> KRTH010[KRT-H010 Fake-Driver Closure and Regression Coverage]
@@ -234,7 +234,7 @@ Then model-provider integration depends on one Kraken-owned provider contract ra
 - **Effort:** 2
 - **Dependencies:** KRT-G003, KRT-G004, KRT-G005, KRT-G006
 - **Capability / Contract Mapping:** PRD `CAP-P0-019`, `CAP-P0-023`, `CAP-P0-026`, `CAP-P0-027`, `CAP-P0-033`; TechSpec `§4.1`, `§5.1`, `§5.2`; Architecture `§2`
-- **Description:** Correct the brownfield shared runtime and driver contracts so orchestration, worker status, approval resume, and driver execution context match the authoritative framework specification before runtime-core depends on them.
+- **Description:** Correct the brownfield shared runtime and driver contracts so lineage, minimal runtime status, approval resume, minimal handle/tree orchestration, and immutable driver execution context match the authoritative framework specification before runtime-core depends on them.
 - **Acceptance Criteria (Gherkin):**
 ```gherkin
 Given the shared framework contract packages already exist in repo reality
@@ -312,7 +312,7 @@ Then runtime-core can execute driver iterations end to end while keeping turn st
 - **Effort:** 5
 - **Dependencies:** KRT-H005, KRT-H006
 - **Capability / Contract Mapping:** PRD `CAP-P0-020`, `CAP-P0-021`, `CAP-P0-024`, `CAP-P0-033`; TechSpec `§4.1`, `§5.2`, `§5.4`; Architecture `§2`, `§4.1`
-- **Description:** Implement shared tool validation and execution staging, approval precedence, partial pause checkpoints, default reject or custom result synthesis, and resumed execution from unfinished approval-required calls.
+- **Description:** Implement shared tool validation and execution staging, approval precedence, partial pause checkpoints, canonical rejection-result synthesis for declined tool calls, timeout-safe post-timeout semantics, and resumed execution from unfinished approval-required calls.
 - **Acceptance Criteria (Gherkin):**
 ```gherkin
 Given the shared turn coordinator is running driver-neutral turns
@@ -333,17 +333,17 @@ When context engineering and handoff coordination are implemented
 Then the shared framework layer can rewrite active context and swap agents durably without redefining message history semantics per driver
 ```
 
-**KRT-H009 Public Orchestration Runtime**
+**KRT-H009 Minimal Core Orchestration Primitives**
 - **Type:** Feature
 - **Effort:** 5
 - **Dependencies:** KRT-H001, KRT-H007, KRT-H008
 - **Capability / Contract Mapping:** PRD `CAP-P0-023`, `CAP-P1-029`, `CAP-P0-033`; TechSpec `§4.1`, `§5.2`; Architecture `§2`, `§4.4`
-- **Description:** Implement the public orchestration runtime for worker launch and await, worker status tracking, parent and worker event demultiplexing, completion-to-steering bridging, queued delivery while parent is paused, and cascading cancellation.
+- **Description:** Implement the minimal shared-core orchestration primitive as a handle/tree model with child spawning, subtree event aggregation, child completion access, and local approval handling, without standardizing sequence policy, canonical worker-result payloads, or global worker registries.
 - **Acceptance Criteria (Gherkin):**
 ```gherkin
 Given runtime-core can pause, resume, and hand off shared execution
-When the public orchestration runtime is implemented
-Then hosts can coordinate worker turns through explicit shared orchestration contracts without importing driver-specific orchestration logic
+When the minimal core orchestration primitive is implemented
+Then hosts and drivers can coordinate child turns through explicit shared handle/tree contracts without importing driver-specific worker-plumbing logic or relying on a global worker registry
 ```
 
 **KRT-H010 Fake-Driver Closure and Regression Coverage**
@@ -351,7 +351,7 @@ Then hosts can coordinate worker turns through explicit shared orchestration con
 - **Effort:** 3
 - **Dependencies:** KRT-H007, KRT-H008, KRT-H009
 - **Capability / Contract Mapping:** PRD `CAP-P0-033`, `CAP-P1-034`; TechSpec `§5.2`, `§5.4`; Architecture `§2`
-- **Description:** Close Epic H with fake-driver integration suites, brownfield regression coverage, and documentation sync proving runtime-core can host explicit drivers, approval resume, handoff, and orchestration without ReAct-specific assumptions.
+- **Description:** Close Epic H with fake-driver integration suites, brownfield regression coverage, and documentation sync proving runtime-core can host explicit drivers, approval resume, handoff, and minimal orchestration without ReAct-specific or sequence-specific assumptions.
 - **Acceptance Criteria (Gherkin):**
 ```gherkin
 Given the shared framework substrate is implemented

@@ -1,11 +1,9 @@
 # Technical Specification
 
 ## 0. Version History & Changelog
+- v0.3.3 - Realigned the shared framework contract layer to the docs-first minimal core model: lineage path, minimal runtime status, handle/tree orchestration, and a reduced driver result seam.
 - v0.3.2 - Synced the published orchestration contract to the runtime-core reality by adding session-local worker state, worker approval resolution, parent-qualified worker launch, and narrowed orchestration resume typing.
 - v0.3.1 - Corrected the brownfield framework baseline to include the implemented contract packages, added the shared orchestration runtime contract surface, and expanded the driver seam so runtime-core can execute against explicit shared-runtime state.
-- v0.3.0 - Reframed the framework implementation as driver-oriented, added the initial ReAct-driver posture, and updated package structure and build sequence to separate shared framework services from driver implementations.
-- v0.2.3 - Defined the backend adapter repository interfaces and the `createMemoryBackend` factory surface so backend implementations no longer depend on implied persistence contracts.
-- v0.2.2 - Defined the concrete TypeScript kernel-contract shapes for `StepContext`, `ObserveResult`, and kernel observe signals so the run lifecycle surface no longer depends on implied upstream payload structure.
 - ... [Older history truncated, refer to git logs]
 
 ## 1. Stack Specification (Bill of Materials)
@@ -447,25 +445,16 @@ export interface ExecutionHandle {
   status(): ExecutionStatus;
 }
 
-export interface WorkerStatus {
-  workerId: string;
-  agent: string;
-  threadId: string;
-  status: "running" | "paused" | "completed" | "failed";
-  approval?: ApprovalRequest;
-  result?: unknown;
-}
-
 export interface OrchestrationHandle extends ExecutionHandle {
   resolveApproval(response: ApprovalResponse): OrchestrationHandle;
-  parentEvents(): AsyncIterable<KrakenStreamEvent>;
-  workerEvents(workerId: string): AsyncIterable<KrakenStreamEvent>;
+  spawn(input: { agent: string; task: unknown }): OrchestrationHandle;
   allEvents(): AsyncIterable<KrakenStreamEvent>;
-  workers(): ReadonlyMap<string, WorkerStatus>;
+  awaitResult(): Promise<unknown>;
 }
 
 export interface OrchestrationRuntime {
   executeTurn(input: {
+    agent: string;
     signal: InputSignal;
     threadId: string;
     branchId: string;
@@ -474,21 +463,6 @@ export interface OrchestrationRuntime {
     tools?: KrakenToolDefinition[];
     parentTurnId?: string | null;
   }): OrchestrationHandle;
-  launchWorker(
-    agent: string,
-    task: unknown,
-    options?: { parent: OrchestrationHandle }
-  ): Promise<string>;
-  awaitWorker(
-    workerId: string,
-    options?: { parent: OrchestrationHandle }
-  ): Promise<unknown>;
-  resolveWorkerApproval(
-    workerId: string,
-    response: ApprovalResponse,
-    options?: { parent: OrchestrationHandle }
-  ): void;
-  cancel(): void;
 }
 
 export interface ExecutionStatus {
@@ -874,11 +848,11 @@ export interface DriverExecutionContext {
   branchId: string;
   schemaId: string;
   iterationCount: number;
-  config: AgentConfig;
+  config: Readonly<AgentConfig>;
   handoff: DriverHandoffPort;
-  messages: KrakenMessage[];
-  manifest: ContextManifest;
-  toolRegistry: ToolRegistry;
+  messages: ReadonlyArray<KrakenMessage>;
+  manifest: Readonly<ContextManifest>;
+  toolRegistry: Readonly<ToolRegistry>;
   signal?: AbortSignal;
   runtime: DriverRuntimePort;
 }
@@ -890,10 +864,8 @@ export interface DriverResumeContext extends DriverExecutionContext {
 
 export interface DriverExecutionResult {
   resolution: RuntimeResolution;
-  activeAgent?: string;
   messages?: KrakenMessage[];
   partial?: boolean;
-  response?: KrakenModelResponse; // supplements, never replaces, staged assistant messages
 }
 
 export interface KrakenDriver {
