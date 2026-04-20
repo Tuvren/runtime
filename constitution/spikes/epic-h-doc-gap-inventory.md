@@ -335,6 +335,18 @@ Explicit correction:
 - an "empty assistant turn" is **not** treated as a normal happy-path shared-contract case merely because the API call was request/response shaped.
 - no-`messages` outcomes are non-history outcomes, not ordinary assistant turns with empty content.
 
+**Working decision (sub-aspect 4):**
+
+- `activeAgent` should not exist on the shared `DriverExecutionResult`.
+- Active-agent lifecycle is framework-owned rather than driver-owned.
+
+The shared driver seam already has the right control carriers for agent transitions:
+
+- `resolution.handoff.targetAgent`
+- framework-owned `runtime.status.activeAgent`
+
+Adding a separate `activeAgent` field to the driver result only weakens ownership clarity and invites conflicting sources of truth.
+
 ### 6. Handoff semantics versus exact wording
 
 **Original gap in `docs/`:**
