@@ -32,6 +32,7 @@ import type {
 import { type EpochMs, KrakenRuntimeError } from "@kraken/shared-core-types";
 import {
   AsyncEventQueue,
+  cloneExecutionStatus,
   createDeferred,
   createFrozenSnapshot,
   detachPromise,
@@ -72,6 +73,7 @@ class OrchestrationNode {
   private cancelledBeforeReady = false;
   private lastErrorProjection?: KrakenErrorProjection;
   private readonly now: () => EpochMs;
+  private readonly pendingSteering: InputSignal[] = [];
   private readonly resultState = createDeferred<unknown>();
   private readonly runtime: OrchestrationRuntimeImpl;
   private selfPhase: ExecutionStatus["phase"] = "running";
@@ -113,6 +115,12 @@ class OrchestrationNode {
       this.currentBindingPromise = options.bindingPromise
         .then((binding) => {
           this.currentBinding = binding;
+
+          for (const pendingSignal of this.pendingSteering) {
+            binding.handle.steer(pendingSignal);
+          }
+
+          this.pendingSteering.length = 0;
 
           if (this.cancelledBeforeReady) {
             binding.handle.cancel();
@@ -192,7 +200,38 @@ class OrchestrationNode {
   }
 
   steer(signal: InputSignal): void {
-    this.requireCurrentBinding("steer").handle.steer(signal);
+    const normalizedSignal = normalizeInputSignal(
+      signal,
+      "orchestration steering signal"
+    );
+
+    if (this.currentBinding !== undefined) {
+      this.currentBinding.handle.steer(normalizedSignal);
+      return;
+    }
+
+    if (!this.startedExecution || this.currentBindingPromise === undefined) {
+      throw new KrakenRuntimeError(
+        "steer() requires the orchestration handle to start execution first",
+        {
+          code: "orchestration_parent_not_started",
+        }
+      );
+    }
+
+    if (this.selfPhase !== "running") {
+      throw new KrakenRuntimeError(
+        "steer() requires a running orchestration handle",
+        {
+          code: "orchestration_parent_inactive",
+          details: {
+            phase: this.selfPhase,
+          },
+        }
+      );
+    }
+
+    this.pendingSteering.push(normalizedSignal);
   }
 
   replaceAfterApproval(response: ApprovalResponse): OrchestrationNode {
@@ -223,8 +262,6 @@ class OrchestrationNode {
   }
 
   spawn(input: ChildSpawnRequest): OrchestrationNode {
-    const binding = this.requireCurrentBinding("spawn");
-
     if (!this.startedExecution) {
       throw new KrakenRuntimeError(
         "spawn() requires the orchestration handle to start execution first",
@@ -234,31 +271,57 @@ class OrchestrationNode {
       );
     }
 
-    const phase = binding.handle.status().phase;
-
-    if (phase !== "running") {
-      throw new KrakenRuntimeError(
-        "spawn() requires a running orchestration handle",
-        {
-          code: "orchestration_parent_inactive",
-          details: {
-            phase,
-          },
-        }
-      );
-    }
-
     const workerId = this.runtime.createId();
+    const childBindingPromise =
+      this.currentBinding === undefined
+        ? this.requireCurrentBindingAsync("spawn").then(async (binding) => {
+            const phase = binding.handle.status().phase;
+
+            if (phase !== "running") {
+              throw new KrakenRuntimeError(
+                "spawn() requires a running orchestration handle",
+                {
+                  code: "orchestration_parent_inactive",
+                  details: {
+                    phase,
+                  },
+                }
+              );
+            }
+
+            return await this.runtime.createChildBinding(
+              binding,
+              workerId,
+              input
+            );
+          })
+        : (() => {
+            const phase = this.currentBinding.handle.status().phase;
+
+            if (phase !== "running") {
+              throw new KrakenRuntimeError(
+                "spawn() requires a running orchestration handle",
+                {
+                  code: "orchestration_parent_inactive",
+                  details: {
+                    phase,
+                  },
+                }
+              );
+            }
+
+            return this.runtime.createChildBinding(
+              this.currentBinding,
+              workerId,
+              input
+            );
+          })();
     const childNode = new OrchestrationNode(
       this.runtime,
       input.agent,
       this.now,
       {
-        bindingPromise: this.runtime.createChildBinding(
-          binding,
-          workerId,
-          input
-        ),
+        bindingPromise: childBindingPromise,
         workerId,
       }
     );
@@ -608,6 +671,7 @@ class OrchestrationNode {
 
 class OrchestrationHandleImpl implements OrchestrationHandle {
   private active = true;
+  private inactiveStatus?: ExecutionStatus;
   private readonly localSubtreeEvents = new EventFanout<KrakenStreamEvent>();
   private subtreeForwardingStarted = false;
   private readonly node: OrchestrationNode;
@@ -622,8 +686,9 @@ class OrchestrationHandleImpl implements OrchestrationHandle {
     return this.localSubtreeEvents.subscribe();
   }
 
-  awaitResult(): Promise<unknown> {
-    return this.node.awaitResult();
+  async awaitResult(): Promise<unknown> {
+    this.assertActive("awaitResult");
+    return await this.node.awaitResult();
   }
 
   cancel(): void {
@@ -638,8 +703,9 @@ class OrchestrationHandleImpl implements OrchestrationHandle {
 
   resolveApproval(response: ApprovalResponse): OrchestrationHandle {
     this.assertActive("resolveApproval");
+    const pausedStatus = this.node.currentStatus();
     const resumedNode = this.node.replaceAfterApproval(response);
-    this.deactivate();
+    this.deactivate(pausedStatus);
     return new OrchestrationHandleImpl(resumedNode);
   }
 
@@ -654,7 +720,12 @@ class OrchestrationHandleImpl implements OrchestrationHandle {
   }
 
   status(): ExecutionStatus {
-    return this.node.currentStatus();
+    const status =
+      this.active || this.inactiveStatus === undefined
+        ? this.node.currentStatus()
+        : this.inactiveStatus;
+
+    return cloneExecutionStatus(status);
   }
 
   steer(signal: InputSignal): void {
@@ -673,12 +744,15 @@ class OrchestrationHandleImpl implements OrchestrationHandle {
     }
   }
 
-  private deactivate(): void {
+  private deactivate(inactiveStatus?: ExecutionStatus): void {
     if (!this.active) {
       return;
     }
 
     this.active = false;
+    if (inactiveStatus !== undefined) {
+      this.inactiveStatus = cloneExecutionStatus(inactiveStatus);
+    }
     this.localSubtreeEvents.close();
   }
 

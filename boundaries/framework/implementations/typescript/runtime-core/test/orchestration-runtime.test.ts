@@ -762,6 +762,10 @@ describe("orchestration-runtime", () => {
     const resumedChildHandle = childHandle.resolveApproval({
       decisions: [{ callId: "call-approve-worker", type: "approve" }],
     });
+    await expect(childHandle.awaitResult()).rejects.toThrow(
+      "awaitResult() requires the current orchestration handle"
+    );
+    expect(childHandle.status().phase).toBe("paused");
     const childResult = await resumedChildHandle.awaitResult();
 
     await rootEventsPromise;
@@ -782,6 +786,7 @@ describe("orchestration-runtime", () => {
       driverRegistry: createDriverRegistry([
         createStaticDriver(async (context) => {
           if (context.config.name === "worker") {
+            await delay(20);
             return {
               messages: [assistantText("Child complete.")],
               resolution: {
