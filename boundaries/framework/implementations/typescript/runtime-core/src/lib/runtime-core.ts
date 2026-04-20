@@ -18,7 +18,6 @@ import { createHash, randomUUID } from "node:crypto";
 import type {
   DriverExecutionContext,
   DriverRegistry,
-  DriverResumeContext,
   KrakenDriver,
 } from "@kraken/framework-driver-api";
 import { assertDriverExecutionResult } from "@kraken/framework-driver-api";
@@ -616,7 +615,14 @@ class RuntimeCore implements KrakenRuntime {
       return false;
     }
 
-    await this.options.kernel.run.complete(resumeContext.pausedRunId, "failed");
+    await this.options.kernel.run.complete(
+      resumeContext.pausedRunId,
+      "failed",
+      await this.storeEventRecord({
+        turnId: handle.turnId,
+        type: "paused_run_resolved",
+      })
+    );
     this.publishEvent(
       handle,
       {
@@ -630,14 +636,9 @@ class RuntimeCore implements KrakenRuntime {
       handle,
       schemaId,
       loopState,
-      resumeContext.pauseContext.pausedIteration?.iterationCount ??
-        handle.status().iterationCount
+      resumeContext.pauseContext.pausedIteration.iterationCount
     );
     handle.clearPendingResumeCancellation();
-
-    if (resumeContext.pauseContext.kind !== "tool_approval") {
-      return false;
-    }
 
     const resumedOutcome = await this.resumePausedToolExecution(
       handle,
@@ -916,11 +917,6 @@ class RuntimeCore implements KrakenRuntime {
     schemaId: string,
     loopState: LoopState
   ): Promise<LoopOutcome> {
-    let pendingResume =
-      handle.resumedFrom?.pauseContext.kind === "driver_pause"
-        ? handle.resumedFrom
-        : undefined;
-
     while (true) {
       const nextIteration = handle.status().iterationCount + 1;
       loopState.enteredIterationLoop = true;
@@ -932,12 +928,7 @@ class RuntimeCore implements KrakenRuntime {
       }
 
       this.beginIteration(handle, loopState, nextIteration);
-      await this.incorporateQueuedSteeringIfNeeded(
-        handle,
-        schemaId,
-        loopState,
-        pendingResume
-      );
+      await this.incorporateQueuedSteeringIfNeeded(handle, schemaId, loopState);
 
       const preparation = await this.prepareIterationState(
         handle,
@@ -958,10 +949,8 @@ class RuntimeCore implements KrakenRuntime {
         schemaId,
         loopState,
         preparation.headState,
-        nextIteration,
-        pendingResume
+        nextIteration
       );
-      pendingResume = undefined;
 
       if (phaseResult.kind === "outcome") {
         return phaseResult.outcome;
@@ -1044,13 +1033,8 @@ class RuntimeCore implements KrakenRuntime {
   private async incorporateQueuedSteeringIfNeeded(
     handle: RuntimeExecutionHandle,
     schemaId: string,
-    loopState: LoopState,
-    pendingResume: ResumeContext | undefined
+    loopState: LoopState
   ): Promise<void> {
-    if (pendingResume !== undefined) {
-      return;
-    }
-
     const steeringSignal = handle.consumeSteeringSignal();
 
     if (steeringSignal !== undefined) {
@@ -1152,8 +1136,7 @@ class RuntimeCore implements KrakenRuntime {
     schemaId: string,
     loopState: LoopState,
     headState: HeadState | undefined,
-    iterationCount: number,
-    pendingResume: ResumeContext | undefined
+    iterationCount: number
   ): Promise<IterationPhaseResult> {
     if (headState === undefined) {
       throw new KrakenRuntimeError("iteration execution requires head state", {
@@ -1194,8 +1177,7 @@ class RuntimeCore implements KrakenRuntime {
         headState,
         iterationCount,
         emittedDriverEvents
-      ),
-      pendingResume
+      )
     );
     let resolution = driverResult.resolution;
     const driverMessages = [...(driverResult.messages ?? [])];
@@ -1214,18 +1196,10 @@ class RuntimeCore implements KrakenRuntime {
       (cancellationResolution !== undefined &&
         hasAssistantOutputMessages(driverMessages));
     const invalidDriverResolutionError =
-      cancellationResolution === undefined &&
-      requestedToolCalls.length > 0 &&
-      resolution.type !== "continue_iteration"
-        ? new KrakenRuntimeError(
-            "drivers must not return executable tool calls with a terminal resolution",
-            {
-              code: "invalid_driver_resolution",
-              details: {
-                resolutionType: resolution.type,
-                toolCallCount: requestedToolCalls.length,
-              },
-            }
+      cancellationResolution === undefined
+        ? this.findInvalidDriverResolution(
+            requestedToolCalls.length,
+            resolution
           )
         : undefined;
 
@@ -1339,6 +1313,18 @@ class RuntimeCore implements KrakenRuntime {
     );
     resolution = createCancelledResolution(handle) ?? resolution;
 
+    const invalidPauseOutcome = await this.failInvalidPauseResolutionIfNeeded(
+      handle,
+      iterationRunId,
+      headState.branchHeadHash,
+      requestedToolCalls.length,
+      resolution
+    );
+
+    if (invalidPauseOutcome !== undefined) {
+      return invalidPauseOutcome;
+    }
+
     return {
       kind: "executed",
       result: {
@@ -1350,6 +1336,82 @@ class RuntimeCore implements KrakenRuntime {
         toolExecutionMode,
         toolResults,
         turnNodeHash,
+      },
+    };
+  }
+
+  private findInvalidDriverResolution(
+    requestedToolCallCount: number,
+    resolution: RuntimeResolution
+  ): KrakenRuntimeError | undefined {
+    if (
+      requestedToolCallCount > 0 &&
+      resolution.type !== "continue_iteration"
+    ) {
+      return new KrakenRuntimeError(
+        "drivers must not return executable tool calls with a terminal resolution",
+        {
+          code: "invalid_driver_resolution",
+          details: {
+            pauseRequiresToolCalls: resolution.type === "pause",
+            resolutionType: resolution.type,
+            toolCallCount: requestedToolCallCount,
+          },
+        }
+      );
+    }
+
+    if (requestedToolCallCount === 0 && resolution.type === "pause") {
+      return new KrakenRuntimeError(
+        "shared core only permits approval pauses that originate from requested tool calls",
+        {
+          code: "invalid_driver_resolution",
+          details: {
+            pauseRequiresToolCalls: true,
+            resolutionType: resolution.type,
+            toolCallCount: requestedToolCallCount,
+          },
+        }
+      );
+    }
+
+    return undefined;
+  }
+
+  private async failInvalidPauseResolutionIfNeeded(
+    handle: RuntimeExecutionHandle,
+    iterationRunId: string,
+    stableHeadTurnNodeHash: HashString,
+    requestedToolCallCount: number,
+    resolution: RuntimeResolution
+  ): Promise<IterationPhaseResult | undefined> {
+    if (resolution.type !== "pause" || requestedToolCallCount > 0) {
+      return undefined;
+    }
+
+    const invalidPauseResolution = new KrakenRuntimeError(
+      "shared core only permits approval pauses that originate from requested tool calls",
+      {
+        code: "invalid_driver_resolution",
+        details: {
+          resolutionType: resolution.type,
+          toolCallCount: requestedToolCallCount,
+        },
+      }
+    );
+    await this.failTrackedRunWithoutBranchAdvance(
+      handle,
+      iterationRunId,
+      stableHeadTurnNodeHash
+    );
+    return {
+      kind: "outcome",
+      outcome: {
+        resolution: {
+          error: invalidPauseResolution,
+          fatality: "hard",
+          type: "fail",
+        },
       },
     };
   }
@@ -1604,20 +1666,13 @@ class RuntimeCore implements KrakenRuntime {
           activeToolRegistry: loopState.activeToolRegistry,
           approval: result.resolution.approval,
           carriedStateUpdates: [...loopState.carriedStateUpdates],
-          kind:
-            result.requestedToolCalls.length > 0
-              ? "tool_approval"
-              : "driver_pause",
           pauseReason: result.resolution.reason,
-          pausedIteration:
-            result.requestedToolCalls.length > 0
-              ? {
-                  iterationCount,
-                  response: result.driverResponse,
-                  toolExecutionMode: result.toolExecutionMode,
-                  toolResults: result.toolResults,
-                }
-              : undefined,
+          pausedIteration: {
+            iterationCount,
+            response: result.driverResponse,
+            toolExecutionMode: result.toolExecutionMode,
+            toolResults: result.toolResults,
+          },
           pausedRunId: result.iterationRunId,
           pausedTurnNodeHash: result.turnNodeHash,
         },
@@ -1649,15 +1704,6 @@ class RuntimeCore implements KrakenRuntime {
     resumeContext: ResumeContext
   ): Promise<LoopOutcome> {
     const pausedIteration = resumeContext.pauseContext.pausedIteration;
-
-    if (pausedIteration === undefined) {
-      throw new KrakenRuntimeError(
-        "tool approval resumes require paused iteration state",
-        {
-          code: "missing_paused_iteration_state",
-        }
-      );
-    }
 
     loopState.enteredIterationLoop = true;
     const headState = await this.loadHeadState(handle.request.branchId);
@@ -1823,7 +1869,6 @@ class RuntimeCore implements KrakenRuntime {
           activeToolRegistry: loopState.activeToolRegistry,
           approval: resolution.approval,
           carriedStateUpdates: [...loopState.carriedStateUpdates],
-          kind: "tool_approval",
           pauseReason: resolution.reason,
           pausedIteration: {
             iterationCount: pausedIteration.iterationCount,
@@ -1955,18 +2000,10 @@ class RuntimeCore implements KrakenRuntime {
 
   private async executeDriver(
     driver: KrakenDriver,
-    context: DriverExecutionContext,
-    resumeContext: ResumeContext | undefined
+    context: DriverExecutionContext
   ) {
     try {
-      const result =
-        resumeContext === undefined
-          ? await driver.execute(context)
-          : await driver.resume({
-              ...context,
-              approval: resumeContext.approval,
-              resumedFrom: resumeContext.pausedTurnNodeHash,
-            } satisfies DriverResumeContext);
+      const result = await driver.execute(context);
       assertDriverExecutionResult(result, "driverResult");
       return result;
     } catch (error: unknown) {
@@ -2741,7 +2778,7 @@ class RuntimeCore implements KrakenRuntime {
   private async finalizePausedCancellation(
     handle: RuntimeExecutionHandle,
     pauseContext: PauseContext,
-    error: Error
+    _error: Error
   ): Promise<void> {
     const loopState: LoopState = {
       activeConfig: pauseContext.activeConfig,
@@ -2750,54 +2787,29 @@ class RuntimeCore implements KrakenRuntime {
       carriedStateUpdates: [...pauseContext.carriedStateUpdates],
       enteredIterationLoop: true,
     };
-    await this.options.kernel.run.complete(pauseContext.pausedRunId, "failed");
+    await this.options.kernel.run.complete(
+      pauseContext.pausedRunId,
+      "failed",
+      await this.storeEventRecord({
+        turnId: handle.turnId,
+        type: "paused_run_cancelled",
+      })
+    );
 
-    if (
-      pauseContext.kind === "tool_approval" &&
-      pauseContext.pausedIteration !== undefined
-    ) {
-      const cancelledOutcome =
-        await this.finalizeRejectedPausedToolCancellation(
-          handle,
-          loopState,
-          pauseContext
-        );
+    const cancelledOutcome = await this.finalizeRejectedPausedToolCancellation(
+      handle,
+      loopState,
+      pauseContext
+    );
 
-      await this.completeExecution(
-        handle,
-        cancelledOutcome.resolution,
-        cancelledOutcome.partial ?? false,
-        loopState,
-        true
-      );
-      return;
-    }
-
-    const failureResolution: RuntimeResolution = {
-      error,
-      fatality: "hard",
-      type: "fail",
-    };
-    handle.rememberError(projectError(error));
-
-    if (loopState.carriedStateUpdates.length > 0) {
-      await this.commitPendingExtensionStateUpdates(
-        handle,
-        handle.schemaId,
-        loopState,
-        loopState.carriedStateUpdates,
-        handle.status().iterationCount
-      );
-      loopState.carriedStateUpdates = [];
-    }
-
-    await this.finalizeTurnStatus(handle, failureResolution, false, loopState);
-    handle.replaceStatus({
-      activeAgent: pauseContext.activeConfig.name,
-      iterationCount: handle.status().iterationCount,
-      manifest: handle.status().manifest,
-      phase: "failed",
-    });
+    await this.completeExecution(
+      handle,
+      cancelledOutcome.resolution,
+      cancelledOutcome.partial ?? false,
+      loopState,
+      true
+    );
+    return;
   }
 
   private async finalizeRejectedPausedToolCancellation(
@@ -2806,15 +2818,6 @@ class RuntimeCore implements KrakenRuntime {
     pauseContext: PauseContext
   ): Promise<LoopOutcome> {
     const pausedIteration = pauseContext.pausedIteration;
-
-    if (pausedIteration === undefined) {
-      throw new KrakenRuntimeError(
-        "tool approval cancellations require paused iteration state",
-        {
-          code: "missing_paused_iteration_state",
-        }
-      );
-    }
 
     loopState.enteredIterationLoop = true;
     const headState = await this.loadHeadState(handle.request.branchId);

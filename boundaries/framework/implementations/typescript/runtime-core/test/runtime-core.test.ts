@@ -3291,94 +3291,7 @@ describe("framework-runtime-core", () => {
     expect(handle.status().phase).toBe("completed");
   });
 
-  test("durably restages running status before driver pause resumes continue", async () => {
-    const harness = createFakeKernelHarness();
-    let resumed = false;
-    const driver = {
-      async execute(_context) {
-        return {
-          messages: [assistantText("Pause for driver approval.")],
-          resolution: {
-            approval: {
-              completedResults: [],
-              toolCalls: [
-                {
-                  callId: "driver-pause",
-                  decisions: ["approve", "reject"],
-                  input: { step: "resume" },
-                  message: "Resume the paused driver.",
-                  name: "driver_pause",
-                },
-              ],
-            },
-            reason: "approval_required",
-            type: "pause",
-          },
-        };
-      },
-      id: "fake",
-      async resume(_context) {
-        resumed = true;
-        await delay(40);
-        return {
-          messages: [assistantText("Driver resumed after approval.")],
-          resolution: {
-            reason: "done",
-            type: "end_turn",
-          },
-        };
-      },
-    } satisfies KrakenDriver;
-    const runtime = createKrakenRuntimeCore({
-      defaultDriverId: "fake",
-      driverRegistry: createDriverRegistry([driver]),
-      kernel: harness.kernel,
-    });
-    const thread = await runtime.createThread({});
-    const pausedHandle = runtime.executeTurn({
-      branchId: thread.branchId,
-      config: { name: "primary" },
-      signal: textSignal("Pause the driver"),
-      threadId: thread.threadId,
-    });
-
-    await collectEvents(pausedHandle.events());
-    const resumedHandle = pausedHandle.resolveApproval({
-      decisions: [{ callId: "driver-pause", type: "approve" }],
-    });
-    const resumedEventsPromise = collectEvents(resumedHandle.events());
-
-    await waitForAsync(async () => {
-      const runtimeStatus = await harness.readBranchRuntimeStatus(
-        thread.branchId
-      );
-
-      return (
-        resumed &&
-        runtimeStatus !== null &&
-        typeof runtimeStatus === "object" &&
-        "state" in runtimeStatus &&
-        runtimeStatus.state === "running"
-      );
-    });
-
-    expect(await harness.readBranchRuntimeStatus(thread.branchId)).toEqual({
-      activeAgent: "primary",
-      state: "running",
-    });
-
-    await resumedEventsPromise;
-
-    expect(resumedHandle.status().phase).toBe("completed");
-    expect(
-      hasAssistantText(
-        await harness.readBranchMessages(thread.branchId),
-        "Driver resumed after approval."
-      )
-    ).toBe(true);
-  });
-
-  test("preserves driver-specific pause reasons on the paused handle snapshot", async () => {
+  test("rejects driver-provided pause resolutions that are not rooted in tool approvals", async () => {
     const harness = createFakeKernelHarness();
     const driver = {
       async execute(_context) {
@@ -3419,14 +3332,17 @@ describe("framework-runtime-core", () => {
       signal: textSignal("Pause for driver review"),
       threadId: thread.threadId,
     });
-    await collectEvents(pausedHandle.events());
+    const events = await collectEvents(pausedHandle.events());
+    const errorEvent = events.find(
+      (event): event is Extract<(typeof events)[number], { type: "error" }> =>
+        event.type === "error"
+    );
 
-    expect(pausedHandle.status().phase).toBe("paused");
-    expect(pausedHandle.status().pauseReason).toBe("driver_review_required");
+    expect(pausedHandle.status().phase).toBe("failed");
+    expect(errorEvent?.error.code).toBe("invalid_driver_resolution");
     expect(await harness.readBranchRuntimeStatus(thread.branchId)).toEqual({
       activeAgent: "primary",
-      pauseReason: "driver_review_required",
-      state: "paused",
+      state: "failed",
     });
   });
 

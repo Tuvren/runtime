@@ -975,6 +975,8 @@ Before resumed tool execution begins, the framework MUST durably restage `runtim
 
 For `approve` and `edit` decisions, unfinished tool calls resume through the normal tool execution path. For `reject`, shared-core semantics require the canonical rejection `ToolResultPart` outcomes for the pending calls and then continue the same Turn through the normal iteration loop. The host chooses that explicit same-Turn rejection path by calling `resolveApproval(...)` with `reject` decisions; the paused-handle `cancel()` path remains the separate rejection-and-stop control surface described in §6.10.
 
+At the kernel layer, closing a paused Run still uses the kernel's `paused -> failed` transition before the continuation Run begins. That is a Run-lifecycle bookkeeping step required by the kernel contract; it MUST NOT be interpreted as a Turn-level approval failure or as a contradiction of the framework's approval semantics.
+
 ### 4.9 Recovery Protocol
 
 **Crash during input incorporation**: If TurnNode exists, input is durable — proceed. If not, re-incorporate from original signal.
@@ -1317,6 +1319,8 @@ Package topology: `@kraken/stream-agui`, `@kraken/stream-acp`, `@kraken/stream-s
 **User-initiated cancellation while running**: Host signals via `AbortSignal` through `handle.cancel()`. The driver aborts the provider stream, emits an `error` event with `fatal: true`, stages accumulated content as a partial assistant message (with `partial: true` on RuntimeStatus), completes the Run as `failed`, and yields `turn.end` with `"failed"`. The partial content is durable — on the next Turn, the model sees its own interrupted output.
 
 **User-initiated cancellation while paused for approval**: The shared-core semantic is equivalent to rejecting the pending tool calls and durably staging those rejection outcomes without re-entering the model on the same Turn. The framework MUST NOT reinterpret the paused Turn as failed solely because approval was declined. This is the host-facing rejection-and-stop path; higher layers remain responsible for any later host-initiated continuation after that staged rejection state.
+
+As with approval resolution, the kernel may still record the superseded paused Run through its `paused -> failed` transition because that is how paused Runs are closed at the kernel boundary. That Run-level status change does not alter the framework-level meaning of paused cancellation, which remains rejection-and-stop rather than Turn failure.
 
 **Provider stream interruption**: The driver emits an `error` event, stages an error message, and yields `turn.end` with `"failed"`.
 

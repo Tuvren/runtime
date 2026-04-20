@@ -52,8 +52,7 @@ export interface PauseContext {
   activeToolRegistry: ToolRegistry;
   approval: ApprovalRequest;
   carriedStateUpdates: ExtensionStateUpdate[];
-  kind: "driver_pause" | "tool_approval";
-  pausedIteration?: PausedIterationState;
+  pausedIteration: PausedIterationState;
   pausedRunId: string;
   pausedTurnNodeHash: HashString;
   pauseReason: string;
