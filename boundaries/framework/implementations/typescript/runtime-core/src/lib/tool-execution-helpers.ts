@@ -162,12 +162,18 @@ export function toExecutableToolCall(
   };
 }
 
-export function emitToolStartIfNeeded(
+export async function emitToolStartIfNeeded(
   toolCall: ExecutableToolCall,
   environment: ToolBatchEnvironment,
   toolStartState: ToolStartState,
   startBarrier: ToolStartBarrier
-): void {
+): Promise<void> {
+  if (toolStartState.emitted) {
+    return;
+  }
+
+  await toolStartState.waitForTurn();
+
   if (toolStartState.emitted) {
     return;
   }
@@ -182,6 +188,7 @@ export function emitToolStartIfNeeded(
     type: "tool.start",
   });
   startBarrier.markSettled();
+  toolStartState.releaseTurn();
 }
 
 export function createPendingToolCall(
@@ -554,43 +561,43 @@ export function normalizeAroundToolResult(
   environment: ToolBatchEnvironment,
   toolStartState: ToolStartState,
   startBarrier: ToolStartBarrier
-): RawSingleToolOutcome {
+): Promise<RawSingleToolOutcome> {
   if (isPauseResult(result)) {
     if (nestedResult !== undefined) {
-      return {
+      return Promise.resolve({
         result: nestedResult,
         updates: collectExtensionStateUpdate(
           extensionName,
           result.state,
           nestedUpdates
         ),
-      };
+      });
     }
 
-    settleToolStartIfNeeded(toolStartState, startBarrier);
+    return settleToolStartIfNeeded(toolStartState, startBarrier).then(() => {
+      const approval = normalizeApprovalRequest(
+        context.toolCall,
+        context.input,
+        result.approval
+      );
+      assertApprovalRequest(
+        approval,
+        `aroundTool approval from extension "${extensionName}"`
+      );
 
-    const approval = normalizeApprovalRequest(
-      context.toolCall,
-      context.input,
-      result.approval
-    );
-    assertApprovalRequest(
-      approval,
-      `aroundTool approval from extension "${extensionName}"`
-    );
-
-    return {
-      approval,
-      updates: collectExtensionStateUpdate(
-        extensionName,
-        result.state,
-        nestedUpdates
-      ),
-    };
+      return {
+        approval,
+        updates: collectExtensionStateUpdate(
+          extensionName,
+          result.state,
+          nestedUpdates
+        ),
+      };
+    });
   }
 
   if (isResultWithState(result)) {
-    emitToolStartIfNeeded(
+    return emitToolStartIfNeeded(
       toExecutableToolCall(
         {
           approvalDecision: context.approvalDecision,
@@ -603,25 +610,24 @@ export function normalizeAroundToolResult(
       environment,
       toolStartState,
       startBarrier
-    );
-    return {
+    ).then(() => ({
       result: result.result,
       updates: collectExtensionStateUpdate(
         extensionName,
         result.state,
         nestedUpdates
       ),
-    };
+    }));
   }
 
   if (nestedResult !== undefined && result === nestedResult) {
-    return {
+    return Promise.resolve({
       result,
       updates: nestedUpdates,
-    };
+    });
   }
 
-  emitToolStartIfNeeded(
+  return emitToolStartIfNeeded(
     toExecutableToolCall(
       {
         approvalDecision: context.approvalDecision,
@@ -634,11 +640,10 @@ export function normalizeAroundToolResult(
     environment,
     toolStartState,
     startBarrier
-  );
-  return {
+  ).then(() => ({
     result,
     updates: nestedUpdates,
-  };
+  }));
 }
 
 export function createToolStartBarrier(totalCalls: number): ToolStartBarrier {
@@ -670,16 +675,23 @@ export function createToolStartBarrier(totalCalls: number): ToolStartBarrier {
   };
 }
 
-export function settleToolStartIfNeeded(
+export async function settleToolStartIfNeeded(
   toolStartState: ToolStartState,
   startBarrier: ToolStartBarrier
-): void {
+): Promise<void> {
+  if (toolStartState.settled) {
+    return;
+  }
+
+  await toolStartState.waitForTurn();
+
   if (toolStartState.settled) {
     return;
   }
 
   toolStartState.settled = true;
   startBarrier.markSettled();
+  toolStartState.releaseTurn();
 }
 
 export function composeAbortSignals(

@@ -33,6 +33,7 @@ import { type EpochMs, KrakenRuntimeError } from "@kraken/shared-core-types";
 import {
   AsyncEventQueue,
   createDeferred,
+  createFrozenSnapshot,
   detachPromise,
   EventFanout,
   normalizeError,
@@ -131,11 +132,20 @@ class OrchestrationNode {
   }
 
   allEvents(): AsyncIterable<KrakenStreamEvent> {
-    this.ensureWatchingCurrentBinding();
+    this.startExecution();
     return this.subtreeEvents.subscribe();
   }
 
   async awaitResult(): Promise<unknown> {
+    if (!this.startedExecution) {
+      throw new KrakenRuntimeError(
+        "awaitResult() requires the orchestration handle to start execution first",
+        {
+          code: "orchestration_parent_not_started",
+        }
+      );
+    }
+
     this.ensureWatchingCurrentBinding();
     return await this.resultState.promise;
   }
@@ -167,7 +177,7 @@ class OrchestrationNode {
 
   events(): AsyncIterable<KrakenStreamEvent> {
     const queue = new AsyncEventQueue<KrakenStreamEvent>();
-    this.ensureWatchingCurrentBinding();
+    this.startExecution();
     detachPromise(this.forwardCurrentGenerationEvents(queue));
     return queue;
   }
@@ -253,8 +263,18 @@ class OrchestrationNode {
       }
     );
     this.registerChild(childNode);
-    childNode.ensureWatchingCurrentBinding();
+    childNode.startExecution();
     return childNode;
+  }
+
+  startExecution(): void {
+    if (this.startedExecution) {
+      this.ensureWatchingCurrentBinding();
+      return;
+    }
+
+    this.startedExecution = true;
+    this.ensureWatchingCurrentBinding();
   }
 
   private decorateEvent(
@@ -305,7 +325,6 @@ class OrchestrationNode {
       return;
     }
 
-    this.startedExecution = true;
     this.watchingGeneration = this.bindingGeneration;
     detachPromise(
       this.watchCurrentBinding(
@@ -698,7 +717,7 @@ class OrchestrationRuntimeImpl implements OrchestrationRuntime {
     now: () => EpochMs
   ) {
     this.framework = framework;
-    this.agents = agents;
+    this.agents = snapshotAgentConfigs(agents);
     this.now = now;
   }
 
@@ -713,6 +732,8 @@ class OrchestrationRuntimeImpl implements OrchestrationRuntime {
     tools?: AgentConfig["tools"];
   }): OrchestrationHandle {
     const config = this.resolveAgent(input.agent);
+    const requestedTools =
+      input.tools === undefined ? undefined : createFrozenSnapshot(input.tools);
     const handle = this.framework.executeTurn({
       branchId: input.branchId,
       config,
@@ -721,7 +742,7 @@ class OrchestrationRuntimeImpl implements OrchestrationRuntime {
       schemaId: input.schemaId,
       signal: input.signal,
       threadId: input.threadId,
-      tools: input.tools,
+      tools: requestedTools,
     });
     const node = new OrchestrationNode(this, input.agent, this.now, {
       binding: {
@@ -730,7 +751,7 @@ class OrchestrationRuntimeImpl implements OrchestrationRuntime {
         driverId: input.driverId,
         handle,
         threadId: input.threadId,
-        tools: input.tools,
+        tools: requestedTools,
       },
     });
     return new OrchestrationHandleImpl(node);
@@ -848,4 +869,16 @@ function cloneVisibleContentPart(part: ContentPart): ContentPart {
     default:
       return part;
   }
+}
+
+function snapshotAgentConfigs(
+  agents: Record<string, AgentConfig>
+): Record<string, AgentConfig> {
+  const snapshots: Record<string, AgentConfig> = {};
+
+  for (const [agentName, config] of Object.entries(agents)) {
+    snapshots[agentName] = createFrozenSnapshot(config);
+  }
+
+  return snapshots;
 }

@@ -973,7 +973,7 @@ Before resumed tool execution begins, the framework MUST durably restage `runtim
 
 `resolveApproval(...)` returns a **new** handle. The old paused handle remains exhausted/inert as the completed paused execution token and must not remain a second active owner of further control flow.
 
-For `approve` and `edit` decisions, unfinished tool calls resume through the normal tool execution path. For `reject`, shared-core semantics require only the canonical rejection `ToolResultPart` outcomes for the pending calls. Whether those rejection outcomes are fed directly back into the model on the same Turn or left durably staged for a later host-initiated continuation is higher-layer policy.
+For `approve` and `edit` decisions, unfinished tool calls resume through the normal tool execution path. For `reject`, shared-core semantics require the canonical rejection `ToolResultPart` outcomes for the pending calls and then continue the same Turn through the normal iteration loop. The host chooses that explicit same-Turn rejection path by calling `resolveApproval(...)` with `reject` decisions; the paused-handle `cancel()` path remains the separate rejection-and-stop control surface described in §6.10.
 
 ### 4.9 Recovery Protocol
 
@@ -1316,7 +1316,7 @@ Package topology: `@kraken/stream-agui`, `@kraken/stream-acp`, `@kraken/stream-s
 
 **User-initiated cancellation while running**: Host signals via `AbortSignal` through `handle.cancel()`. The driver aborts the provider stream, emits an `error` event with `fatal: true`, stages accumulated content as a partial assistant message (with `partial: true` on RuntimeStatus), completes the Run as `failed`, and yields `turn.end` with `"failed"`. The partial content is durable — on the next Turn, the model sees its own interrupted output.
 
-**User-initiated cancellation while paused for approval**: The shared-core semantic is equivalent to rejecting the pending tool calls. The framework MUST NOT reinterpret the paused Turn as failed solely because approval was declined. What happens after the rejection is a higher-layer policy decision: a host or concrete driver may feed the rejection results back into the model immediately on the same Turn, or may stop the paused execution after durably staging those rejection outcomes and require a later request to continue.
+**User-initiated cancellation while paused for approval**: The shared-core semantic is equivalent to rejecting the pending tool calls and durably staging those rejection outcomes without re-entering the model on the same Turn. The framework MUST NOT reinterpret the paused Turn as failed solely because approval was declined. This is the host-facing rejection-and-stop path; higher layers remain responsible for any later host-initiated continuation after that staged rejection state.
 
 **Provider stream interruption**: The driver emits an `error` event, stages an error message, and yields `turn.end` with `"failed"`.
 
@@ -1359,11 +1359,11 @@ ExecutionHandle
 
 **`events()`** — the primary output. The host iterates this to receive all execution events. Iteration drives execution — the driver advances as the consumer pulls events.
 
-**`cancel()`** — while the Turn is running, triggers the AbortSignal. The driver handles staging partial content and failing the Run. If the Turn is already paused for approval, `cancel()` is treated as rejection of the pending tool calls rather than as an automatic failed terminal state. Whether rejection immediately continues the same Turn or stops pending later host continuation is higher-layer policy.
+**`cancel()`** — while the Turn is running, triggers the AbortSignal. The driver handles staging partial content and failing the Run. If the Turn is already paused for approval, `cancel()` is treated as rejection of the pending tool calls rather than as an automatic failed terminal state. The shared-core `cancel()` path stages those rejection outcomes durably and stops the paused execution without re-entering the model on the same Turn. This is distinct from `resolveApproval(...)` with explicit `reject` decisions, which continues the same Turn through the normal iteration loop.
 
 **`steer(signal)`** — pushes a signal into the steering channel. The driver consumes it at the next iteration boundary. Only valid when `status().phase === "running"`. Rejected if the Turn is paused or completed.
 
-**`resolveApproval(response)`** — provides the human’s decision for a paused approval. Triggers the approval decision path (§4.8): closes the paused Run, applies decisions, resumes only unfinished approved or edited tool calls through the normal execution path, and returns a **new** `ExecutionHandle` for the continued Turn. Reject decisions produce canonical rejection `ToolResultPart` outcomes for the pending calls; whether those rejection outcomes immediately continue the same Turn or remain staged for a later host-initiated continuation is higher-layer policy. Only valid when `status().phase === "paused"` and `status().approval` is present.
+**`resolveApproval(response)`** — provides the human’s decision for a paused approval. Triggers the approval decision path (§4.8): closes the paused Run, applies decisions, resumes only unfinished approved or edited tool calls through the normal execution path, and returns a **new** `ExecutionHandle` for the continued Turn. Reject decisions produce canonical rejection `ToolResultPart` outcomes for the pending calls and then continue the same Turn through the normal iteration loop. Only valid when `status().phase === "paused"` and `status().approval` is present.
 
 The old handle’s `events()` iterable is already exhausted (it yielded `turn.end` with `paused` and returned). The new handle produces a fresh event sequence starting with `turn.start` (with `resumedFrom` set).
 
@@ -2104,6 +2104,7 @@ Child handles are ordinary execution handles:
 - each child owns its own pause/resume/cancel lifecycle
 - any child may itself spawn children, allowing recursive parent/worker trees
 - `spawn()` is valid only while the current orchestration handle is running
+- `spawn()` starts the child execution immediately; `awaitResult()` does not satisfy the parent launch precondition by itself
 - `allEvents()` means self + descendants
 - descendant events in `allEvents()` MUST carry `source` attribution sufficient to identify the originating execution node
 - child launches inherit the caller's explicit execution surface (for example `driverId` and per-request `tools`) because `spawn()` intentionally does not define its own override bag

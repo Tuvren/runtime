@@ -346,7 +346,10 @@ class RuntimeCore implements KrakenRuntime {
       {
         ...request,
         config: cloneAgentConfigForRequest(request.config),
-        tools: request.tools === undefined ? undefined : [...request.tools],
+        tools:
+          request.tools === undefined
+            ? undefined
+            : createFrozenSnapshot(request.tools),
         signal: normalizedSignal,
       },
       this.createId(),
@@ -1718,21 +1721,16 @@ class RuntimeCore implements KrakenRuntime {
     );
     const manifestHash = await this.stageManifest(runId, manifest);
 
-    const hasExecutableDecisions = hasExecutableApprovalDecisions(
-      resumeContext.approval
-    );
     let resolution: RuntimeResolution;
 
-    if (toolBatch.approval !== undefined) {
+    if (toolBatch.approval === undefined) {
+      resolution = { type: "continue_iteration" };
+    } else {
       resolution = {
         approval: toolBatch.approval,
         reason: "approval_required",
         type: "pause",
       };
-    } else if (hasExecutableDecisions) {
-      resolution = { type: "continue_iteration" };
-    } else {
-      resolution = createApprovalRejectionResolution();
     }
 
     const runtimeStatusHash =
@@ -2758,28 +2756,12 @@ class RuntimeCore implements KrakenRuntime {
       pauseContext.kind === "tool_approval" &&
       pauseContext.pausedIteration !== undefined
     ) {
-      await this.checkpointResumeRunningStatus(
-        handle,
-        handle.schemaId,
-        loopState,
-        pauseContext.pausedIteration.iterationCount
-      );
-      const cancelledOutcome = await this.resumePausedToolExecution(
-        handle,
-        handle.schemaId,
-        loopState,
-        {
-          approval: createRejectedApprovalResponse(pauseContext.approval),
-          pauseContext,
-          pausedRunId: pauseContext.pausedRunId,
-          pausedTurnNodeHash: pauseContext.pausedTurnNodeHash,
-        }
-      );
-
-      if (cancelledOutcome.pauseContext !== undefined) {
-        handle.rememberPauseContext(cancelledOutcome.pauseContext);
-        return;
-      }
+      const cancelledOutcome =
+        await this.finalizeRejectedPausedToolCancellation(
+          handle,
+          loopState,
+          pauseContext
+        );
 
       await this.completeExecution(
         handle,
@@ -2816,6 +2798,112 @@ class RuntimeCore implements KrakenRuntime {
       manifest: handle.status().manifest,
       phase: "failed",
     });
+  }
+
+  private async finalizeRejectedPausedToolCancellation(
+    handle: RuntimeExecutionHandle,
+    loopState: LoopState,
+    pauseContext: PauseContext
+  ): Promise<LoopOutcome> {
+    const pausedIteration = pauseContext.pausedIteration;
+
+    if (pausedIteration === undefined) {
+      throw new KrakenRuntimeError(
+        "tool approval cancellations require paused iteration state",
+        {
+          code: "missing_paused_iteration_state",
+        }
+      );
+    }
+
+    loopState.enteredIterationLoop = true;
+    const headState = await this.loadHeadState(handle.request.branchId);
+    const runId = this.createId();
+
+    await this.createTrackedRun(
+      handle,
+      runId,
+      handle.turnId,
+      handle.request.branchId,
+      handle.schemaId,
+      headState.branchHeadHash,
+      [
+        {
+          deterministic: false,
+          id: "iterate",
+          sideEffects: true,
+        },
+      ]
+    );
+    await this.options.kernel.run.beginStep(runId, "iterate");
+
+    let toolBatch: ToolBatchOutcome;
+
+    try {
+      toolBatch = await resumeToolBatch(
+        pauseContext.approval,
+        createRejectedApprovalResponse(pauseContext.approval),
+        this.createToolBatchEnvironment(
+          handle,
+          loopState,
+          headState.manifest,
+          pausedIteration.iterationCount,
+          runId
+        ),
+        pausedIteration.toolExecutionMode
+      );
+    } catch (resumeError: unknown) {
+      await this.failTrackedRunWithoutBranchAdvance(
+        handle,
+        runId,
+        headState.branchHeadHash
+      );
+      return {
+        resolution: {
+          error: normalizeError(resumeError),
+          fatality: "hard",
+          type: "fail",
+        },
+      };
+    }
+
+    const resumedMessages = toolBatch.results.map((result) => ({
+      parts: [result],
+      role: "tool",
+    })) satisfies KrakenMessage[];
+    const manifest = updateContextManifest(
+      headState.manifest,
+      resumedMessages,
+      toolBatch.updates,
+      []
+    );
+    const manifestHash = await this.stageManifest(runId, manifest);
+    const nextTreeHash = await this.createIterationTree(
+      handle.schemaId,
+      headState.turnNode.turnTreeHash,
+      headState.messageHashes,
+      toolBatch.resultHashes,
+      manifestHash
+    );
+
+    await this.completeIterationRun(
+      handle,
+      runId,
+      createApprovalRejectionResolution(),
+      manifest,
+      pausedIteration.iterationCount,
+      loopState,
+      nextTreeHash
+    );
+    handle.updateStatus({
+      activeAgent: loopState.activeConfig.name,
+      iterationCount: pausedIteration.iterationCount,
+      manifest,
+    });
+
+    return {
+      resolution: createApprovalRejectionResolution(),
+    };
   }
 
   private async loadHeadState(branchId: string): Promise<HeadState> {
@@ -3501,19 +3589,7 @@ function createDriverToolDefinitionSnapshot(
 }
 
 function cloneAgentConfigForRequest(config: AgentConfig): AgentConfig {
-  return {
-    ...config,
-    extensions:
-      config.extensions?.map((extension) => ({
-        ...extension,
-        state:
-          extension.state === undefined
-            ? undefined
-            : cloneValue(extension.state),
-        tools: extension.tools?.map((tool) => tool),
-      })) ?? undefined,
-    tools: config.tools?.map((tool) => tool) ?? undefined,
-  };
+  return createFrozenSnapshot(config);
 }
 
 function encodeKernelRecord(value: unknown, label: string): Uint8Array {
@@ -3805,12 +3881,6 @@ function createApprovalRejectionResolution(): RuntimeResolution {
     reason: "approval_rejected",
     type: "end_turn",
   };
-}
-
-function hasExecutableApprovalDecisions(response: ApprovalResponse): boolean {
-  return response.decisions.some(
-    (decision) => decision.type === "approve" || decision.type === "edit"
-  );
 }
 
 function toOptionalHash(value: PathValue): HashString | null {

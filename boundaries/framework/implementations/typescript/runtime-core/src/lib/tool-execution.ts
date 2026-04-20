@@ -109,7 +109,9 @@ export interface StagedToolResult {
 
 export interface ToolStartState {
   emitted: boolean;
+  releaseTurn(): void;
   settled: boolean;
+  waitForTurn(): Promise<void>;
 }
 
 export interface ToolStartBarrier {
@@ -544,13 +546,18 @@ async function executeSingleTool(
   toolCall: ExecutableToolCall,
   orderIndex: number,
   environment: ToolBatchEnvironment,
-  startBarrier: ToolStartBarrier
-): Promise<SingleToolOutcome> {
-  const toolStartState: ToolStartState = {
+  startBarrier: ToolStartBarrier,
+  toolStartState: ToolStartState = {
     emitted: false,
+    releaseTurn() {
+      return undefined;
+    },
     settled: false,
-  };
-
+    waitForTurn() {
+      return Promise.resolve();
+    },
+  }
+): Promise<SingleToolOutcome> {
   try {
     const sharedExports = buildSharedExports(
       environment.extensions,
@@ -598,7 +605,7 @@ async function executeSingleTool(
     };
   } catch (error: unknown) {
     if (error instanceof ToolPauseSignal) {
-      settleToolStartIfNeeded(toolStartState, startBarrier);
+      await settleToolStartIfNeeded(toolStartState, startBarrier);
       const completedResultHashes = await stageAndEmitResults(
         environment,
         error.approval.completedResults,
@@ -613,7 +620,7 @@ async function executeSingleTool(
     }
 
     if (isApprovalRequestValidationError(error)) {
-      settleToolStartIfNeeded(toolStartState, startBarrier);
+      await settleToolStartIfNeeded(toolStartState, startBarrier);
       throw error;
     }
 
@@ -622,7 +629,7 @@ async function executeSingleTool(
       error,
       toolCall.approvalDecision
     );
-    settleToolStartIfNeeded(toolStartState, startBarrier);
+    await settleToolStartIfNeeded(toolStartState, startBarrier);
     const resultHash = await stageAndEmitResult(
       environment,
       result,
@@ -648,12 +655,35 @@ async function executeConcurrentToolCalls(
     environment,
     batchAbortController.signal
   );
-  const outcomes = executable.map((toolCall) =>
+  let previousTurn = Promise.resolve();
+  const toolStartStates = executable.map(() => {
+    let releaseTurn: (() => void) | undefined;
+    const turnPromise = new Promise<void>((resolve) => {
+      releaseTurn = resolve;
+    });
+    const waitForTurn = previousTurn;
+    previousTurn = turnPromise;
+
+    return {
+      emitted: false,
+      releaseTurn() {
+        releaseTurn?.();
+        releaseTurn = undefined;
+      },
+      settled: false,
+      waitForTurn() {
+        return waitForTurn;
+      },
+    } satisfies ToolStartState;
+  });
+
+  const outcomes = executable.map((toolCall, index) =>
     executeSingleTool(
       toolCall.executable,
       toolCall.index,
       scopedEnvironment,
-      startBarrier
+      startBarrier,
+      toolStartStates[index]
     ).catch((error: unknown) => {
       if (!batchAbortController.signal.aborted) {
         batchAbortController.abort(normalizeError(error));
@@ -695,29 +725,43 @@ async function runAroundToolHandlers(
 ): Promise<RawSingleToolOutcome> {
   if (index >= handlers.length) {
     const timeoutController = new AbortController();
-    emitToolStartIfNeeded(toolCall, environment, toolStartState, startBarrier);
-    const output = await runWithTimeout(
-      () =>
-        toolCall.tool.execute(
-          toolCall.input,
-          createToolExecutionContext(
-            toolCall.toolCall,
-            toolCall.tool,
-            environment,
-            composeAbortSignals(environment.signal, timeoutController.signal)
-          )
-        ),
-      toolCall.tool.timeout,
-      () =>
-        new Error(
-          `tool "${toolCall.tool.name}" timed out after ${toolCall.tool.timeout}ms`
-        ),
-      {
-        onTimeout: (error) => {
-          timeoutController.abort(error);
-        },
-      }
+    const startPromise = emitToolStartIfNeeded(
+      toolCall,
+      environment,
+      toolStartState,
+      startBarrier
     );
+    let output: unknown;
+
+    try {
+      output = await runWithTimeout(
+        () =>
+          toolCall.tool.execute(
+            toolCall.input,
+            createToolExecutionContext(
+              toolCall.toolCall,
+              toolCall.tool,
+              environment,
+              composeAbortSignals(environment.signal, timeoutController.signal)
+            )
+          ),
+        toolCall.tool.timeout,
+        () =>
+          new Error(
+            `tool "${toolCall.tool.name}" timed out after ${toolCall.tool.timeout}ms`
+          ),
+        {
+          onTimeout: (error) => {
+            timeoutController.abort(error);
+          },
+        }
+      );
+    } catch (error: unknown) {
+      await startPromise;
+      throw error;
+    }
+
+    await startPromise;
 
     return {
       result: {
@@ -776,7 +820,7 @@ async function runAroundToolHandlers(
       }
     );
 
-    return normalizeAroundToolResult(
+    return await normalizeAroundToolResult(
       extensionName,
       handlerResult,
       nestedUpdates,

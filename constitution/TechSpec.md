@@ -466,6 +466,7 @@ export interface OrchestrationRuntime {
 }
 
 - `spawn()` is valid only while the current orchestration handle is running.
+- `spawn()` starts the child execution immediately; `awaitResult()` does not satisfy the parent launch precondition by itself.
 - Child launches inherit the caller's explicit execution surface (`driverId`, per-request `tools`) because `spawn()` intentionally stays minimal.
 
 export interface ExecutionStatus {

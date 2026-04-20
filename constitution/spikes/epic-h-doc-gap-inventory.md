@@ -73,7 +73,9 @@ This note exists to preserve the conclusions reached while unwinding the long-ru
 - Canceling a paused HITL run is semantically equivalent to rejecting the pending tool calls.
 - It is not a framework-owned automatic failure transition.
 - Shared core owns the canonical meaning of approval rejection.
-- Higher layers decide whether rejection is fed directly back into the model on the same Turn or whether the paused execution stops and a later host request continues from the durably staged rejection outcome.
+- The host chooses between the two rejection paths through the existing paused-handle controls:
+  - `resolveApproval(...)` with explicit `reject` decisions feeds the canonical rejection results back into the model on the same Turn.
+  - `cancel()` on the paused handle stages the canonical rejection results durably and stops without re-entering the model on the same Turn.
 
 **Boundary**
 

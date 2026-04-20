@@ -618,6 +618,103 @@ describe("framework-runtime-core", () => {
     ]);
   });
 
+  test("snapshots explicit request tools at executeTurn time", async () => {
+    const harness = createFakeKernelHarness();
+    const driver = {
+      async execute(context) {
+        const toolMessages = context.messages.filter(
+          (message) => message.role === "tool"
+        );
+
+        if (toolMessages.length === 0) {
+          return {
+            messages: [
+              assistantToolCalls([
+                {
+                  callId: "call-request-tool",
+                  input: { query: "snapshot" },
+                  name: "request-tool",
+                },
+              ]),
+            ],
+            resolution: {
+              type: "continue_iteration",
+            },
+          };
+        }
+
+        return {
+          messages: [assistantText("Request tool complete.")],
+          resolution: {
+            reason: "done",
+            type: "end_turn",
+          },
+        };
+      },
+      id: "fake",
+      async resume() {
+        throw new Error("resume was not expected");
+      },
+    } satisfies KrakenDriver;
+    const runtime = createKrakenRuntimeCore({
+      defaultDriverId: "fake",
+      driverRegistry: createDriverRegistry([driver]),
+      kernel: harness.kernel,
+    });
+    const thread = await runtime.createThread({});
+    const requestTool = {
+      description: "Original request-scoped tool",
+      execute() {
+        return { status: "original" };
+      },
+      inputSchema: {
+        properties: {
+          query: { type: "string" },
+        },
+        required: ["query"],
+        type: "object",
+      },
+      metadata: {
+        version: "original",
+      },
+      name: "request-tool",
+    };
+    const handle = runtime.executeTurn({
+      branchId: thread.branchId,
+      config: {
+        name: "primary",
+      },
+      signal: textSignal("Use the request-scoped tool"),
+      threadId: thread.threadId,
+      tools: [requestTool],
+    });
+
+    requestTool.description = "mutated";
+    requestTool.execute = () => ({ status: "mutated" });
+    requestTool.metadata = {
+      version: "mutated",
+    };
+
+    await collectEvents(handle.events());
+    const toolMessages = extractToolMessages(
+      await harness.readBranchMessages(thread.branchId)
+    );
+
+    expect(toolMessages).toEqual([
+      {
+        parts: [
+          {
+            callId: "call-request-tool",
+            name: "request-tool",
+            output: { status: "original" },
+            type: "tool_result",
+          },
+        ],
+        role: "tool",
+      },
+    ]);
+  });
+
   test("rejects non-cloneable stream events before they reach the handle fanout", async () => {
     const harness = createFakeKernelHarness();
     const driver = {
@@ -5323,6 +5420,135 @@ describe("framework-runtime-core", () => {
     expect(completedCalls).toEqual(["fast:fast", "delayed:delayed"]);
   });
 
+  test("preserves original parallel tool.start order when the first call has the slower preflight", async () => {
+    const harness = createFakeKernelHarness();
+    const completedCalls: string[] = [];
+    const driver = {
+      async execute(context) {
+        const toolMessages = context.messages.filter(
+          (message) => message.role === "tool"
+        );
+
+        if (toolMessages.length === 0) {
+          return {
+            messages: [
+              assistantToolCalls([
+                {
+                  callId: "call-delayed",
+                  input: { query: "delayed" },
+                  name: "delayed",
+                },
+                {
+                  callId: "call-fast",
+                  input: { query: "fast" },
+                  name: "fast",
+                },
+              ]),
+            ],
+            resolution: {
+              type: "continue_iteration",
+            },
+          };
+        }
+
+        return {
+          messages: [assistantText("Tools finished.")],
+          resolution: {
+            reason: "done",
+            type: "end_turn",
+          },
+        };
+      },
+      id: "fake",
+      async resume() {
+        throw new Error("resume was not expected");
+      },
+    } satisfies KrakenDriver;
+    const runtime = createKrakenRuntimeCore({
+      defaultDriverId: "fake",
+      driverRegistry: createDriverRegistry([driver]),
+      kernel: harness.kernel,
+    });
+    const thread = await runtime.createThread({});
+    const handle = runtime.executeTurn({
+      branchId: thread.branchId,
+      config: {
+        extensions: [
+          {
+            async aroundTool(context, next) {
+              if (context.tool.name === "delayed") {
+                await delay(20);
+              }
+
+              return await next();
+            },
+            name: "delayed-preflight",
+          },
+        ],
+        name: "primary",
+        tools: [
+          {
+            description: "Finish after preflight",
+            execute(input: unknown) {
+              completedCalls.push(`delayed:${readQueryInput(input)}`);
+              return {
+                status: "delayed",
+              };
+            },
+            inputSchema: {
+              properties: {
+                query: { type: "string" },
+              },
+              required: ["query"],
+              type: "object",
+            },
+            name: "delayed",
+          },
+          {
+            description: "Finish quickly",
+            execute(input: unknown) {
+              completedCalls.push(`fast:${readQueryInput(input)}`);
+              return {
+                status: "fast",
+              };
+            },
+            inputSchema: {
+              properties: {
+                query: { type: "string" },
+              },
+              required: ["query"],
+              type: "object",
+            },
+            name: "fast",
+          },
+        ],
+      },
+      signal: textSignal("Run delayed-first preflight tools"),
+      threadId: thread.threadId,
+    });
+
+    const events = await collectEvents(handle.events());
+    const firstToolResultIndex = events.findIndex(
+      (event) => event.type === "tool.result"
+    );
+    const startEventsBeforeFirstResult = events.filter(
+      (
+        event,
+        index
+      ): event is Extract<
+        (typeof events)[number],
+        { callId: string; type: "tool.start" }
+      > => index < firstToolResultIndex && event.type === "tool.start"
+    );
+
+    expect(firstToolResultIndex).toBeGreaterThan(0);
+    expect(startEventsBeforeFirstResult.map((event) => event.callId)).toEqual([
+      "call-delayed",
+      "call-fast",
+    ]);
+    expect(completedCalls).toEqual(["fast:fast", "delayed:delayed"]);
+  });
+
   test("incrementally stages completed tool results before slower siblings finish", async () => {
     const harness = createFakeKernelHarness();
     let releaseSlowTool: (() => void) | undefined;
@@ -5951,7 +6177,7 @@ describe("framework-runtime-core", () => {
     });
   });
 
-  test("synthesizes rejected approval results without executing the tool", async () => {
+  test("continues the same turn after explicit rejected approval decisions without executing the tool", async () => {
     const harness = createFakeKernelHarness();
     let emailCalls = 0;
     const driver = {
@@ -6055,7 +6281,7 @@ describe("framework-runtime-core", () => {
       );
     }
     expect(hasAssistantText(messages, "Acknowledged rejected tool.")).toBe(
-      false
+      true
     );
     expect(resumedHandle.status().phase).toBe("completed");
   });

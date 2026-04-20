@@ -80,6 +80,53 @@ describe("orchestration-runtime", () => {
     );
   });
 
+  test("awaitResult does not satisfy the parent stream-start precondition for spawn", async () => {
+    const harness = createFakeKernelHarness();
+    const framework = createKrakenRuntimeCore({
+      defaultDriverId: "fake",
+      driverRegistry: createDriverRegistry([
+        createStaticDriver(async (context) => {
+          await delay(20);
+          return {
+            messages: [assistantText(`Finished ${context.config.name}.`)],
+            resolution: {
+              reason: "done",
+              type: "end_turn",
+            },
+          };
+        }),
+      ]),
+      kernel: harness.kernel,
+    });
+    const orchestration = createOrchestrationRuntime({
+      agents: {
+        primary: { name: "primary" },
+        worker: { name: "worker" },
+      },
+      framework,
+    });
+    const thread = await framework.createThread({});
+    const handle = orchestration.executeTurn({
+      agent: "primary",
+      branchId: thread.branchId,
+      signal: textSignal("Stay lazy"),
+      threadId: thread.threadId,
+    });
+
+    await expect(handle.awaitResult()).rejects.toThrow(
+      "awaitResult() requires the orchestration handle to start execution first"
+    );
+
+    expect(() =>
+      handle.spawn({
+        agent: "worker",
+        signal: textSignal("still-too-early"),
+      })
+    ).toThrow(
+      "spawn() requires the orchestration handle to start execution first"
+    );
+  });
+
   test("bridges descendant events through allEvents and does not inject worker_result into parent history", async () => {
     const harness = createFakeKernelHarness();
     const framework = createKrakenRuntimeCore({
@@ -981,6 +1028,125 @@ describe("orchestration-runtime", () => {
         name: "research",
         output: { status: "inherited" },
         type: "tool_result",
+      },
+    ]);
+  });
+
+  test("snapshots orchestration agent configs at runtime creation", async () => {
+    const harness = createFakeKernelHarness();
+    const framework = createKrakenRuntimeCore({
+      defaultDriverId: "fake",
+      driverRegistry: createDriverRegistry([
+        createStaticDriver(async (context) => {
+          if (context.config.name === "worker") {
+            const toolMessages = context.messages.filter(
+              (message) => message.role === "tool"
+            );
+
+            if (toolMessages.length > 0) {
+              return {
+                messages: [assistantText("Worker complete.")],
+                resolution: {
+                  reason: "done",
+                  type: "end_turn",
+                },
+              };
+            }
+
+            return {
+              messages: [
+                assistantToolCalls([
+                  {
+                    callId: "call-research",
+                    input: { query: "snapshot" },
+                    name: "research",
+                  },
+                ]),
+              ],
+              resolution: {
+                type: "continue_iteration",
+              },
+            };
+          }
+
+          await delay(20);
+          return {
+            messages: [assistantText("Parent complete.")],
+            resolution: {
+              reason: "done",
+              type: "end_turn",
+            },
+          };
+        }),
+      ]),
+      kernel: harness.kernel,
+    });
+    const agents = {
+      primary: { name: "primary" },
+      worker: {
+        name: "worker",
+        tools: [
+          {
+            description: "Snapshot-sensitive research tool",
+            execute() {
+              return { status: "original" };
+            },
+            inputSchema: {
+              properties: {
+                query: { type: "string" },
+              },
+              required: ["query"],
+              type: "object",
+            },
+            name: "research",
+          },
+        ],
+      },
+    };
+    const orchestration = createOrchestrationRuntime({
+      agents,
+      framework,
+    });
+    const originalTool = agents.worker.tools?.[0];
+
+    if (originalTool === undefined) {
+      throw new Error("expected a worker research tool");
+    }
+
+    originalTool.description = "mutated";
+    originalTool.execute = () => ({ status: "mutated" });
+
+    const thread = await framework.createThread({});
+    const handle = orchestration.executeTurn({
+      agent: "primary",
+      branchId: thread.branchId,
+      signal: textSignal("Start root"),
+      threadId: thread.threadId,
+    });
+
+    detachTestPromise(collectEvents(handle.events()));
+    await delay(0);
+    const childHandle = handle.spawn({
+      agent: "worker",
+      signal: textSignal("research"),
+    });
+    const childEvents = await collectEvents(childHandle.events());
+
+    expect(
+      childEvents.some(
+        (event) =>
+          event.type === "tool.result" &&
+          event.name === "research" &&
+          typeof event.output === "object" &&
+          event.output !== null &&
+          "status" in event.output &&
+          event.output.status === "original"
+      )
+    ).toBe(true);
+    expect(await childHandle.awaitResult()).toEqual([
+      {
+        text: "Worker complete.",
+        type: "text",
       },
     ]);
   });
