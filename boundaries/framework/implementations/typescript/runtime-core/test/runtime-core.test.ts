@@ -4014,7 +4014,7 @@ describe("framework-runtime-core", () => {
     expect(errorEvent?.error.code).toBe("invalid_approval_request");
   });
 
-  test("surfaces malformed initial approval failures without checkpointing sibling tool results", async () => {
+  test("aborts sibling tool work before surfacing malformed initial approval failures", async () => {
     const harness = createFakeKernelHarness();
     let searchSideEffectCount = 0;
     const driver = {
@@ -4149,7 +4149,7 @@ describe("framework-runtime-core", () => {
 
     expect(handle.status().phase).toBe("failed");
     expect(errorEvent?.error.code).toBe("invalid_approval_request");
-    expect(searchSideEffectCount).toBe(1);
+    expect(searchSideEffectCount).toBe(0);
     expect(
       extractToolMessages(await harness.readBranchMessages(thread.branchId))
     ).toHaveLength(0);
@@ -4328,7 +4328,7 @@ describe("framework-runtime-core", () => {
     ]);
   });
 
-  test("surfaces malformed resumed approvals without checkpointing sibling tool results", async () => {
+  test("aborts sibling tool work before surfacing malformed resumed approvals", async () => {
     const harness = createFakeKernelHarness();
     let searchSideEffectCount = 0;
     const driver = {
@@ -4484,7 +4484,7 @@ describe("framework-runtime-core", () => {
     await delay(60);
 
     expect(resumedHandle.status().phase).toBe("failed");
-    expect(searchSideEffectCount).toBe(1);
+    expect(searchSideEffectCount).toBe(0);
     expect(
       extractToolMessages(await harness.readBranchMessages(thread.branchId))
     ).toHaveLength(0);
@@ -6056,101 +6056,6 @@ describe("framework-runtime-core", () => {
     }
     expect(hasAssistantText(messages, "Acknowledged rejected tool.")).toBe(
       false
-    );
-    expect(resumedHandle.status().phase).toBe("completed");
-  });
-
-  test("can continue the same turn after approval rejection when the host selects that policy", async () => {
-    const harness = createFakeKernelHarness();
-    let emailCalls = 0;
-    const driver = {
-      async execute(context) {
-        const toolMessages = context.messages.filter(
-          (message) => message.role === "tool"
-        );
-
-        if (toolMessages.length === 0) {
-          return {
-            messages: [
-              assistantToolCalls([
-                {
-                  callId: "call-email",
-                  input: { subject: "Status update", to: "ops@example.com" },
-                  name: "email",
-                },
-              ]),
-            ],
-            resolution: {
-              type: "continue_iteration",
-            },
-          };
-        }
-
-        return {
-          messages: [assistantText("Acknowledged rejected tool.")],
-          resolution: {
-            reason: "done",
-            type: "end_turn",
-          },
-        };
-      },
-      id: "fake",
-      async resume() {
-        throw new Error("resume was not expected");
-      },
-    } satisfies KrakenDriver;
-    const runtime = createKrakenRuntimeCore({
-      approvalRejectionContinuationMode: "continue_iteration",
-      defaultDriverId: "fake",
-      driverRegistry: createDriverRegistry([driver]),
-      kernel: harness.kernel,
-    });
-    const thread = await runtime.createThread({});
-    const pausedHandle = runtime.executeTurn({
-      branchId: thread.branchId,
-      config: {
-        name: "primary",
-        tools: [
-          {
-            approval: true,
-            description: "Send a status email",
-            execute() {
-              emailCalls += 1;
-              return { sent: true };
-            },
-            inputSchema: {
-              properties: {
-                subject: { type: "string" },
-                to: { type: "string" },
-              },
-              required: ["to", "subject"],
-              type: "object",
-            },
-            name: "email",
-          },
-        ],
-      },
-      signal: textSignal("Reject then continue"),
-      threadId: thread.threadId,
-    });
-
-    await collectEvents(pausedHandle.events());
-    const resumedHandle = pausedHandle.resolveApproval({
-      decisions: [{ callId: "call-email", type: "reject" }],
-    });
-    await collectEvents(resumedHandle.events());
-    const messages = await harness.readBranchMessages(thread.branchId);
-
-    expect(emailCalls).toBe(0);
-    expect(
-      extractToolMessages(messages).some(
-        (message) =>
-          message.parts[0]?.type === "tool_result" &&
-          message.parts[0].callId === "call-email"
-      )
-    ).toBe(true);
-    expect(hasAssistantText(messages, "Acknowledged rejected tool.")).toBe(
-      true
     );
     expect(resumedHandle.status().phase).toBe("completed");
   });

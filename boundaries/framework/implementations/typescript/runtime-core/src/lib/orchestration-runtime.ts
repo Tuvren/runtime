@@ -49,8 +49,10 @@ export interface OrchestrationRuntimeOptions {
 interface ExecutionBinding {
   agent: string;
   branchId: string;
+  driverId?: string;
   handle: ExecutionHandle;
   threadId: string;
+  tools?: AgentConfig["tools"];
   workerId?: string;
 }
 
@@ -73,7 +75,7 @@ class OrchestrationNode {
   private readonly runtime: OrchestrationRuntimeImpl;
   private selfPhase: ExecutionStatus["phase"] = "running";
   private selfResultResolved = false;
-  private selfVisibleResult?: ContentPart[] | ToolResultPart;
+  private selfVisibleResult?: ContentPart[];
   private startedExecution = false;
   private readonly subtreeEvents = new EventFanout<KrakenStreamEvent>();
   private subtreeSettled = false;
@@ -224,9 +226,9 @@ class OrchestrationNode {
 
     const phase = binding.handle.status().phase;
 
-    if (phase !== "running" && phase !== "paused") {
+    if (phase !== "running") {
       throw new KrakenRuntimeError(
-        "spawn() requires a running or paused orchestration handle",
+        "spawn() requires a running orchestration handle",
         {
           code: "orchestration_parent_inactive",
           details: {
@@ -453,7 +455,8 @@ class OrchestrationNode {
     event: KrakenStreamEvent,
     state: {
       assistantParts: ContentPart[];
-      lastVisible: ContentPart[] | ToolResultPart | undefined;
+      lastVisible: ContentPart[] | undefined;
+      toolResults: ToolResultPart[];
     }
   ): void {
     switch (event.type) {
@@ -485,19 +488,28 @@ class OrchestrationNode {
         });
         return;
       case "tool.result":
-        state.lastVisible = {
+        state.toolResults.push({
           callId: event.callId,
           isError: event.isError,
           name: event.name,
           output: event.output,
           type: "tool_result",
-        };
+        });
+        state.lastVisible = state.toolResults.map((result) => ({
+          ...result,
+          output: structuredClone(result.output),
+          providerMetadata:
+            result.providerMetadata === undefined
+              ? undefined
+              : structuredClone(result.providerMetadata),
+        }));
         return;
       case "message.done":
         if (state.assistantParts.length > 0) {
           state.lastVisible = state.assistantParts.map((part) =>
             cloneVisibleContentPart(part)
           );
+          state.toolResults = [];
         }
 
         state.assistantParts = [];
@@ -519,9 +531,14 @@ class OrchestrationNode {
       const visibleState = {
         assistantParts: [],
         lastVisible: this.selfVisibleResult,
+        toolResults:
+          this.selfVisibleResult?.filter(
+            (part): part is ToolResultPart => part.type === "tool_result"
+          ) ?? [],
       } satisfies {
         assistantParts: ContentPart[];
-        lastVisible: ContentPart[] | ToolResultPart | undefined;
+        lastVisible: ContentPart[] | undefined;
+        toolResults: ToolResultPart[];
       };
 
       for await (const event of binding.handle.events()) {
@@ -710,8 +727,10 @@ class OrchestrationRuntimeImpl implements OrchestrationRuntime {
       binding: {
         agent: input.agent,
         branchId: input.branchId,
+        driverId: input.driverId,
         handle,
         threadId: input.threadId,
+        tools: input.tools,
       },
     });
     return new OrchestrationHandleImpl(node);
@@ -743,15 +762,19 @@ class OrchestrationRuntimeImpl implements OrchestrationRuntime {
     const childHandle = this.framework.executeTurn({
       branchId: childThread.branchId,
       config,
+      driverId: parentBinding.driverId,
       signal: normalizeInputSignal(input.signal, "orchestration child signal"),
       threadId: childThread.threadId,
+      tools: parentBinding.tools,
     });
 
     return {
       agent: input.agent,
       branchId: childThread.branchId,
+      driverId: parentBinding.driverId,
       handle: childHandle,
       threadId: childThread.threadId,
+      tools: parentBinding.tools,
       workerId,
     };
   }

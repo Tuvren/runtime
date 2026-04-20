@@ -39,6 +39,7 @@ import {
   applyApprovalDecisionMetadata,
   composeAbortSignals,
   createAroundToolContext,
+  createBatchScopedEnvironment,
   createErrorToolResult,
   createExecutionFailureResult,
   createPendingToolCall,
@@ -642,13 +643,24 @@ async function executeConcurrentToolCalls(
   environment: ToolBatchEnvironment,
   startBarrier: ToolStartBarrier
 ): Promise<SingleToolOutcome[]> {
+  const batchAbortController = new AbortController();
+  const scopedEnvironment = createBatchScopedEnvironment(
+    environment,
+    batchAbortController.signal
+  );
   const outcomes = executable.map((toolCall) =>
     executeSingleTool(
       toolCall.executable,
       toolCall.index,
-      environment,
+      scopedEnvironment,
       startBarrier
-    )
+    ).catch((error: unknown) => {
+      if (!batchAbortController.signal.aborted) {
+        batchAbortController.abort(normalizeError(error));
+      }
+
+      throw error;
+    })
   );
   const settledOutcomes = await Promise.allSettled(outcomes);
   const rejection = settledOutcomes.find(isRejectedPromiseResult);

@@ -305,13 +305,137 @@ describe("orchestration-runtime", () => {
     ]);
   });
 
-  test("keeps subtree events flowing while the parent is paused", async () => {
+  test("awaitResult preserves tool-only child completions in call order", async () => {
     const harness = createFakeKernelHarness();
     const framework = createKrakenRuntimeCore({
       defaultDriverId: "fake",
       driverRegistry: createDriverRegistry([
         createStaticDriver(async (context) => {
           if (context.config.name === "worker") {
+            const toolMessages = context.messages.filter(
+              (message) => message.role === "tool"
+            );
+
+            if (toolMessages.length === 0) {
+              return {
+                messages: [
+                  assistantToolCalls([
+                    {
+                      callId: "call-first",
+                      input: { query: "first" },
+                      name: "first",
+                    },
+                    {
+                      callId: "call-second",
+                      input: { query: "second" },
+                      name: "second",
+                    },
+                  ]),
+                ],
+                resolution: {
+                  type: "continue_iteration",
+                },
+              };
+            }
+
+            return {
+              resolution: {
+                reason: "done",
+                type: "end_turn",
+              },
+            };
+          }
+
+          await delay(20);
+          return {
+            messages: [assistantText("Parent complete.")],
+            resolution: {
+              reason: "done",
+              type: "end_turn",
+            },
+          };
+        }),
+      ]),
+      kernel: harness.kernel,
+    });
+    const orchestration = createOrchestrationRuntime({
+      agents: {
+        primary: { name: "primary" },
+        worker: {
+          name: "worker",
+          tools: [
+            {
+              description: "First worker tool",
+              execute() {
+                return { status: "first" };
+              },
+              inputSchema: {
+                properties: {
+                  query: { type: "string" },
+                },
+                required: ["query"],
+                type: "object",
+              },
+              name: "first",
+            },
+            {
+              description: "Second worker tool",
+              execute() {
+                return { status: "second" };
+              },
+              inputSchema: {
+                properties: {
+                  query: { type: "string" },
+                },
+                required: ["query"],
+                type: "object",
+              },
+              name: "second",
+            },
+          ],
+        },
+      },
+      framework,
+    });
+    const thread = await framework.createThread({});
+    const handle = orchestration.executeTurn({
+      agent: "primary",
+      branchId: thread.branchId,
+      signal: textSignal("Start root"),
+      threadId: thread.threadId,
+    });
+
+    detachTestPromise(collectEvents(handle.events()));
+    await delay(0);
+    const childHandle = handle.spawn({
+      agent: "worker",
+      signal: textSignal("tool-only"),
+    });
+
+    expect(await childHandle.awaitResult()).toEqual([
+      {
+        callId: "call-first",
+        name: "first",
+        output: { status: "first" },
+        type: "tool_result",
+      },
+      {
+        callId: "call-second",
+        name: "second",
+        output: { status: "second" },
+        type: "tool_result",
+      },
+    ]);
+  });
+
+  test("keeps existing subtree events flowing while the parent is paused", async () => {
+    const harness = createFakeKernelHarness();
+    const framework = createKrakenRuntimeCore({
+      defaultDriverId: "fake",
+      driverRegistry: createDriverRegistry([
+        createStaticDriver(async (context) => {
+          if (context.config.name === "worker") {
+            await delay(40);
             return {
               messages: [assistantText("Background worker finished.")],
               resolution: {
@@ -388,12 +512,11 @@ describe("orchestration-runtime", () => {
     });
     const capture = startEventCapture(handle.allEvents());
 
-    await waitFor(() => handle.status().phase === "paused");
-
     const childHandle = handle.spawn({
       agent: "worker",
       signal: textSignal("background"),
     });
+    await waitFor(() => handle.status().phase === "paused");
     await childHandle.awaitResult();
     await waitFor(() =>
       capture.events.some(
@@ -411,6 +534,89 @@ describe("orchestration-runtime", () => {
     await capture.done;
 
     expect(resumedHandle).not.toBe(handle);
+  });
+
+  test("rejects spawning fresh children while the parent is paused", async () => {
+    const harness = createFakeKernelHarness();
+    const framework = createKrakenRuntimeCore({
+      defaultDriverId: "fake",
+      driverRegistry: createDriverRegistry([
+        createStaticDriver(async (context) => {
+          const toolMessages = context.messages.filter(
+            (message) => message.role === "tool"
+          );
+
+          if (toolMessages.length === 0) {
+            return {
+              messages: [
+                assistantToolCalls([
+                  {
+                    callId: "call-hold",
+                    input: { hold: true },
+                    name: "hold",
+                  },
+                ]),
+              ],
+              resolution: {
+                type: "continue_iteration",
+              },
+            };
+          }
+
+          return {
+            messages: [assistantText("Parent resumed.")],
+            resolution: {
+              reason: "done",
+              type: "end_turn",
+            },
+          };
+        }),
+      ]),
+      kernel: harness.kernel,
+    });
+    const orchestration = createOrchestrationRuntime({
+      agents: {
+        primary: {
+          name: "primary",
+          tools: [
+            {
+              approval: true,
+              description: "Pause the parent turn",
+              execute() {
+                return { approved: true };
+              },
+              inputSchema: {
+                properties: {
+                  hold: { type: "boolean" },
+                },
+                required: ["hold"],
+                type: "object",
+              },
+              name: "hold",
+            },
+          ],
+        },
+        worker: { name: "worker" },
+      },
+      framework,
+    });
+    const thread = await framework.createThread({});
+    const handle = orchestration.executeTurn({
+      agent: "primary",
+      branchId: thread.branchId,
+      signal: textSignal("Pause root"),
+      threadId: thread.threadId,
+    });
+
+    await collectEvents(handle.events());
+
+    expect(handle.status().phase).toBe("paused");
+    expect(() =>
+      handle.spawn({
+        agent: "worker",
+        signal: textSignal("background"),
+      })
+    ).toThrow("spawn() requires a running orchestration handle");
   });
 
   test("resolveApproval returns a fresh child handle and awaitResult resolves through the resumed child", async () => {
@@ -652,12 +858,139 @@ describe("orchestration-runtime", () => {
 
     await expect(childHandle.awaitResult()).rejects.toThrow("worker exploded");
   });
+
+  test("inherits the caller driverId and explicit tools when spawning a child", async () => {
+    const harness = createFakeKernelHarness();
+    const defaultDriver = createStaticDriver(async (context) => {
+      if (context.config.name === "worker") {
+        return {
+          messages: [assistantText("Default worker driver.")],
+          resolution: {
+            reason: "done",
+            type: "end_turn",
+          },
+        };
+      }
+
+      await delay(20);
+      return {
+        messages: [assistantText("Default parent driver.")],
+        resolution: {
+          reason: "done",
+          type: "end_turn",
+        },
+      };
+    }, "default");
+    const specialDriver = createStaticDriver(async (context) => {
+      if (context.config.name === "worker") {
+        const toolMessages = context.messages.filter(
+          (message) => message.role === "tool"
+        );
+
+        if (toolMessages.length === 0) {
+          return {
+            messages: [
+              assistantToolCalls([
+                {
+                  callId: "call-research",
+                  input: { query: "inherit" },
+                  name: "research",
+                },
+              ]),
+            ],
+            resolution: {
+              type: "continue_iteration",
+            },
+          };
+        }
+
+        return {
+          resolution: {
+            reason: "done",
+            type: "end_turn",
+          },
+        };
+      }
+
+      await delay(20);
+      return {
+        messages: [assistantText("Special parent driver.")],
+        resolution: {
+          reason: "done",
+          type: "end_turn",
+        },
+      };
+    }, "special");
+    const framework = createKrakenRuntimeCore({
+      defaultDriverId: "default",
+      driverRegistry: createDriverRegistry([defaultDriver, specialDriver]),
+      kernel: harness.kernel,
+    });
+    const orchestration = createOrchestrationRuntime({
+      agents: {
+        primary: { name: "primary" },
+        worker: { name: "worker" },
+      },
+      framework,
+    });
+    const thread = await framework.createThread({});
+    const handle = orchestration.executeTurn({
+      agent: "primary",
+      branchId: thread.branchId,
+      driverId: "special",
+      signal: textSignal("Start root"),
+      threadId: thread.threadId,
+      tools: [
+        {
+          description: "Inherited research tool",
+          execute() {
+            return { status: "inherited" };
+          },
+          inputSchema: {
+            properties: {
+              query: { type: "string" },
+            },
+            required: ["query"],
+            type: "object",
+          },
+          name: "research",
+        },
+      ],
+    });
+
+    detachTestPromise(collectEvents(handle.events()));
+    await delay(0);
+    const childHandle = handle.spawn({
+      agent: "worker",
+      signal: textSignal("research"),
+    });
+    const childEvents = await collectEvents(childHandle.events());
+    const childResult = await childHandle.awaitResult();
+
+    expect(
+      childEvents.some(
+        (event) =>
+          event.type === "tool.result" &&
+          event.source?.driver === "special" &&
+          event.name === "research"
+      )
+    ).toBe(true);
+    expect(childResult).toEqual([
+      {
+        callId: "call-research",
+        name: "research",
+        output: { status: "inherited" },
+        type: "tool_result",
+      },
+    ]);
+  });
 });
 
 function createStaticDriver(
   execute: (
     context: DriverExecutionContext
-  ) => DriverExecutionResult | Promise<DriverExecutionResult>
+  ) => DriverExecutionResult | Promise<DriverExecutionResult>,
+  id = "fake"
 ): KrakenDriver {
   let emittedMessageSequence = 0;
 
@@ -728,7 +1061,7 @@ function createStaticDriver(
 
       return result;
     },
-    id: "fake",
+    id,
     async resume() {
       throw new Error("resume was not expected");
     },

@@ -128,7 +128,6 @@ export const DEFAULT_AGENT_SCHEMA: TurnTreeSchema = {
 };
 
 export interface RuntimeCoreOptions {
-  approvalRejectionContinuationMode?: "continue_iteration" | "end_turn";
   createId?: () => string;
   defaultDriverId: string;
   driverRegistry?: DriverRegistry;
@@ -153,7 +152,6 @@ export interface RuntimeCoreOptions {
 }
 
 interface ResolvedRuntimeCoreOptions {
-  approvalRejectionContinuationMode: "continue_iteration" | "end_turn";
   createId: () => string;
   defaultDriverId: string;
   driverRegistry: DriverRegistry;
@@ -256,8 +254,6 @@ class RuntimeCore implements KrakenRuntime {
 
   constructor(options: RuntimeCoreOptions) {
     this.options = {
-      approvalRejectionContinuationMode:
-        options.approvalRejectionContinuationMode ?? "end_turn",
       createId: options.createId ?? randomUUID,
       defaultDriverId: options.defaultDriverId,
       driverRegistry: options.driverRegistry ?? createDriverRegistry(),
@@ -1736,9 +1732,7 @@ class RuntimeCore implements KrakenRuntime {
     } else if (hasExecutableDecisions) {
       resolution = { type: "continue_iteration" };
     } else {
-      resolution = createApprovalRejectionResolution(
-        this.options.approvalRejectionContinuationMode
-      );
+      resolution = createApprovalRejectionResolution();
     }
 
     const runtimeStatusHash =
@@ -3806,13 +3800,7 @@ function createRejectedApprovalResponse(
   };
 }
 
-function createApprovalRejectionResolution(
-  mode: "continue_iteration" | "end_turn"
-): RuntimeResolution {
-  if (mode === "continue_iteration") {
-    return { type: "continue_iteration" };
-  }
-
+function createApprovalRejectionResolution(): RuntimeResolution {
   return {
     reason: "approval_rejected",
     type: "end_turn",

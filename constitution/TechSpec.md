@@ -465,6 +465,9 @@ export interface OrchestrationRuntime {
   }): OrchestrationHandle;
 }
 
+- `spawn()` is valid only while the current orchestration handle is running.
+- Child launches inherit the caller's explicit execution surface (`driverId`, per-request `tools`) because `spawn()` intentionally stays minimal.
+
 export interface ExecutionStatus {
   phase: "running" | "paused" | "completed" | "failed";
   iterationCount: number;

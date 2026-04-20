@@ -2103,8 +2103,10 @@ Child handles are ordinary execution handles:
 
 - each child owns its own pause/resume/cancel lifecycle
 - any child may itself spawn children, allowing recursive parent/worker trees
+- `spawn()` is valid only while the current orchestration handle is running
 - `allEvents()` means self + descendants
 - descendant events in `allEvents()` MUST carry `source` attribution sufficient to identify the originating execution node
+- child launches inherit the caller's explicit execution surface (for example `driverId` and per-request `tools`) because `spawn()` intentionally does not define its own override bag
 
 `awaitResult()` waits for the child execution to reach a terminal state. It resolves with the child execution's final visible result surface on successful completion and rejects on failed completion. The shared core does not prescribe how higher layers feed that result into parent conversational context.
 
