@@ -418,7 +418,18 @@ Current implementation-defined details:
 
 - Whether sequences are a best-effort convenience or a rigid orchestration mode.
 
-<!-- The goal of the framework core is to provide the primitives, the opinionated aspects will be inside the specific drivers and any shared logic can be added to the core afterworks when found to be necessary -->
+**Working decision:**
+
+- Sequence semantics should not exist as part of the shared framework core.
+- Pipelines are a thin driver-level pattern built on top of the shared handoff mechanism rather than a first-class core semantic.
+
+This means:
+
+- the shared core keeps handoff primitives and guarantees
+- a pipeline-oriented driver may layer ordered next-agent progression on top of those handoff primitives
+- fixed sequence validation and progression policy are not part of the canonical framework substrate
+
+If shared sequence-like logic proves reusable later, it can be added above the primitives after concrete driver experience justifies it.
 
 ### 8. Public orchestration runtime contract
 
