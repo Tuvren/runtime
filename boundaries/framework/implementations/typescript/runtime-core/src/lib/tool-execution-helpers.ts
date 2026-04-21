@@ -104,7 +104,7 @@ export function createBatchScopedEnvironment(
 
       environment.reportSoftError(error);
     },
-    signal: environment.signal,
+    signal: fenceSignal,
     async stageResult(result, orderIndex) {
       throwIfAborted();
       const hash = await environment.stageResult(result, orderIndex);

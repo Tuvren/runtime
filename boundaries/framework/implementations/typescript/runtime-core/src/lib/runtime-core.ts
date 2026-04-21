@@ -1202,6 +1202,12 @@ class RuntimeCore implements KrakenRuntime {
       };
     }
 
+    const driverEventsForResponse = this.flushBufferedDriverEventsIfNeeded(
+      handle,
+      resolution,
+      emittedDriverEvents
+    );
+
     const stagedMessages = [...driverMessages];
     const stagedMessageHashes = await this.stageDriverMessages(
       iterationRunId,
@@ -1211,7 +1217,7 @@ class RuntimeCore implements KrakenRuntime {
     const driverResponse = synthesizeResponse(
       driverMessages,
       resolution,
-      emittedDriverEvents
+      driverEventsForResponse
     );
     const toolResults: ToolResultPart[] = [];
 
@@ -1441,8 +1447,9 @@ class RuntimeCore implements KrakenRuntime {
             );
           }
 
-          emittedDriverEvents.push(clonedEvent);
-          this.publishEvent(handle, event, loopState);
+          emittedDriverEvents.push(
+            this.createPublishedEvent(handle, clonedEvent, loopState)
+          );
         },
         now: () => this.now(),
       },
@@ -2463,10 +2470,6 @@ class RuntimeCore implements KrakenRuntime {
       sourceContext: {
         ...plan.sourceContext,
         helpers: helperBundle.helpers,
-        manifest: headState.manifest,
-        messages: headState.messages,
-        sourceAgent: loopState.activeConfig,
-        targetAgent: targetConfig,
       } satisfies HandoffSourceContext,
       targetAgent: targetConfig.name,
     } satisfies HandoffContextPlan;
@@ -3424,6 +3427,14 @@ class RuntimeCore implements KrakenRuntime {
     event: KrakenStreamEvent,
     loopState: LoopState
   ): void {
+    handle.publish(this.createPublishedEvent(handle, event, loopState));
+  }
+
+  private createPublishedEvent(
+    handle: RuntimeExecutionHandle,
+    event: KrakenStreamEvent,
+    loopState: LoopState
+  ): KrakenStreamEvent {
     const publishedEvent = {
       ...event,
       source: event.source ?? {
@@ -3433,7 +3444,29 @@ class RuntimeCore implements KrakenRuntime {
       },
     };
     assertKrakenStreamEvent(publishedEvent, "stream event");
-    handle.publish(publishedEvent);
+    return publishedEvent;
+  }
+
+  private flushBufferedDriverEvents(
+    handle: RuntimeExecutionHandle,
+    events: KrakenStreamEvent[]
+  ): void {
+    for (const event of events) {
+      handle.publish(event);
+    }
+  }
+
+  private flushBufferedDriverEventsIfNeeded(
+    handle: RuntimeExecutionHandle,
+    resolution: RuntimeResolution,
+    events: KrakenStreamEvent[]
+  ): KrakenStreamEvent[] {
+    if (shouldSuppressBufferedDriverEvents(resolution)) {
+      return [];
+    }
+
+    this.flushBufferedDriverEvents(handle, events);
+    return events;
   }
 
   private publishProjectedError(
@@ -3790,6 +3823,27 @@ function createCancelledResolution(
     fatality: "hard",
     type: "fail",
   };
+}
+
+function shouldSuppressBufferedDriverEvents(
+  resolution: RuntimeResolution
+): boolean {
+  if (resolution.type !== "fail" || resolution.fatality !== "hard") {
+    return false;
+  }
+
+  if (!isRecord(resolution.error)) {
+    return false;
+  }
+
+  const code = resolution.error.code;
+
+  return (
+    typeof code === "string" &&
+    (code === "invalid_driver_result" ||
+      code === "invalid_driver_resolution" ||
+      code === "invalid_stream_event")
+  );
 }
 
 function formatToolResultTaskId(orderIndex: number, callId: string): string {

@@ -50,7 +50,7 @@ export interface RuntimeExecutionHandleRuntime {
 export class RuntimeExecutionHandle implements ExecutionHandle {
   private activeRunId?: string;
   private readonly abortController = new AbortController();
-  private readonly eventsFanout = new EventFanout<KrakenStreamEvent>();
+  private readonly eventsFanout: EventFanout<KrakenStreamEvent>;
   private lastErrorProjection?: KrakenErrorProjection;
   private materializedDriver?: KrakenDriver;
   private materializedDriverId?: string;
@@ -78,6 +78,13 @@ export class RuntimeExecutionHandle implements ExecutionHandle {
     this.turnId = turnId;
     this.schemaIdValue = schemaId;
     this.resumedFrom = resumedFrom;
+    this.eventsFanout = new EventFanout<KrakenStreamEvent>(() => {
+      if (!this.started || this.statusSnapshot.phase !== "running") {
+        return;
+      }
+
+      this.cancel();
+    });
     this.statusSnapshot = {
       activeAgent: request.config.name,
       iterationCount: 0,
@@ -99,14 +106,41 @@ export class RuntimeExecutionHandle implements ExecutionHandle {
   }
 
   events(): AsyncIterable<KrakenStreamEvent> {
-    const events = this.eventsFanout.subscribe();
+    const subscription = this.eventsFanout.subscribe();
+    let startedConsumption = false;
+    const ensureStarted = () => {
+      if (startedConsumption || this.started) {
+        startedConsumption = true;
+        return;
+      }
 
-    if (!this.started) {
+      startedConsumption = true;
       this.started = true;
       detachPromise(this.runtime.startExecution(this));
-    }
+    };
 
-    return events;
+    return {
+      [Symbol.asyncIterator]: () => {
+        const iterator = subscription[Symbol.asyncIterator]();
+
+        return {
+          next: async () => {
+            ensureStarted();
+            return await iterator.next();
+          },
+          return: async () => {
+            if (iterator.return === undefined) {
+              return {
+                done: true,
+                value: undefined,
+              };
+            }
+
+            return await iterator.return();
+          },
+        };
+      },
+    };
   }
 
   finish(): void {

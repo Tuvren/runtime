@@ -487,6 +487,90 @@ describe("framework-runtime-core", () => {
     );
   });
 
+  test("does not start execution until the event stream is consumed", async () => {
+    const harness = createFakeKernelHarness();
+    let executeCalls = 0;
+    const driver = {
+      async execute(_context) {
+        executeCalls += 1;
+        return {
+          messages: [assistantText("Started on demand.")],
+          resolution: {
+            reason: "done",
+            type: "end_turn",
+          },
+        };
+      },
+      id: "fake",
+    } satisfies KrakenDriver;
+    const runtime = createKrakenRuntimeCore({
+      defaultDriverId: "fake",
+      driverRegistry: createDriverRegistry([driver]),
+      kernel: harness.kernel,
+    });
+    const thread = await runtime.createThread({});
+    const handle = runtime.executeTurn({
+      branchId: thread.branchId,
+      config: { name: "primary" },
+      signal: textSignal("Wait to start"),
+      threadId: thread.threadId,
+    });
+    const events = handle.events();
+
+    await delay(25);
+
+    expect(executeCalls).toBe(0);
+    expect(await harness.readBranchMessages(thread.branchId)).toEqual([]);
+
+    await collectEvents(events);
+
+    expect(executeCalls).toBe(1);
+    expect(handle.status().phase).toBe("completed");
+  });
+
+  test("cancels running execution when the last event subscriber stops consuming", async () => {
+    const harness = createFakeKernelHarness();
+    let driverStarted = false;
+    let observedAbort = false;
+    const driver = {
+      async execute(context) {
+        driverStarted = true;
+        await waitForAbort(context.signal);
+        observedAbort = context.signal?.aborted === true;
+        return {
+          resolution: {
+            type: "continue_iteration",
+          },
+        };
+      },
+      id: "fake",
+    } satisfies KrakenDriver;
+    const runtime = createKrakenRuntimeCore({
+      defaultDriverId: "fake",
+      driverRegistry: createDriverRegistry([driver]),
+      kernel: harness.kernel,
+    });
+    const thread = await runtime.createThread({});
+    const handle = runtime.executeTurn({
+      branchId: thread.branchId,
+      config: { name: "primary" },
+      signal: textSignal("Cancel on stream close"),
+      threadId: thread.threadId,
+    });
+    const iterator = handle.events()[Symbol.asyncIterator]();
+    const firstEvent = await iterator.next();
+
+    expect(firstEvent.done).toBe(false);
+    expect(firstEvent.value?.type).toBe("turn.start");
+
+    await waitFor(() => driverStarted);
+    await iterator.return?.();
+    await waitFor(() => handle.status().phase === "failed");
+
+    expect(observedAbort).toBe(true);
+    expect(handle.status().phase).toBe("failed");
+  });
+
   test("gives drivers frozen execution snapshots instead of live framework state", async () => {
     const harness = createFakeKernelHarness();
     let configMutationError: unknown;
@@ -3474,6 +3558,70 @@ describe("framework-runtime-core", () => {
     });
   });
 
+  test("suppresses buffered driver events when the driver returns an invalid resolution", async () => {
+    const harness = createFakeKernelHarness();
+    const driver = {
+      async execute(context) {
+        context.runtime.emit({
+          data: {
+            leaked: true,
+          },
+          name: "ghost.output",
+          timestamp: context.runtime.now(),
+          type: "custom",
+        });
+
+        return {
+          messages: [
+            assistantToolCalls([
+              {
+                callId: "call-search",
+                input: { query: "invalid resolution" },
+                name: "search",
+              },
+            ]),
+          ],
+          resolution: {
+            reason: "done",
+            type: "end_turn",
+          },
+        };
+      },
+      id: "fake",
+    } satisfies KrakenDriver;
+    const runtime = createKrakenRuntimeCore({
+      defaultDriverId: "fake",
+      driverRegistry: createDriverRegistry([driver]),
+      kernel: harness.kernel,
+    });
+    const thread = await runtime.createThread({});
+    const handle = runtime.executeTurn({
+      branchId: thread.branchId,
+      config: { name: "primary" },
+      signal: textSignal("Reject ghost output"),
+      threadId: thread.threadId,
+    });
+    const events = await collectEvents(handle.events());
+    const errorEvent = events.find(
+      (event): event is Extract<(typeof events)[number], { type: "error" }> =>
+        event.type === "error"
+    );
+
+    expect(
+      events.some(
+        (event) => event.type === "custom" && event.name === "ghost.output"
+      )
+    ).toBe(false);
+    expect(handle.status().phase).toBe("failed");
+    expect(errorEvent?.error.code).toBe("invalid_driver_resolution");
+    expect(await harness.readBranchMessages(thread.branchId)).toEqual([
+      {
+        parts: [{ text: "Reject ghost output", type: "text" }],
+        role: "user",
+      },
+    ]);
+  });
+
   test("stages rejected tool results instead of failing the turn when the host cancels a paused approval", async () => {
     const harness = createFakeKernelHarness();
     let emailCalls = 0;
@@ -4273,7 +4421,7 @@ describe("framework-runtime-core", () => {
     expect(errorEvent?.error.code).toBe("invalid_approval_request");
   });
 
-  test("allows sibling tool side effects to continue without checkpointing malformed initial approval batches", async () => {
+  test("aborts cooperative sibling tools without checkpointing malformed initial approval batches", async () => {
     const harness = createFakeKernelHarness();
     let searchSideEffectCount = 0;
     const driver = {
@@ -4408,7 +4556,7 @@ describe("framework-runtime-core", () => {
 
     expect(handle.status().phase).toBe("failed");
     expect(errorEvent?.error.code).toBe("invalid_approval_request");
-    expect(searchSideEffectCount).toBe(1);
+    expect(searchSideEffectCount).toBe(0);
     expect(
       extractToolMessages(await harness.readBranchMessages(thread.branchId))
     ).toHaveLength(0);
@@ -4587,7 +4735,7 @@ describe("framework-runtime-core", () => {
     ]);
   });
 
-  test("allows resumed sibling side effects to continue without checkpointing malformed approvals", async () => {
+  test("aborts cooperative resumed sibling tools without checkpointing malformed approvals", async () => {
     const harness = createFakeKernelHarness();
     let searchSideEffectCount = 0;
     const driver = {
@@ -4745,7 +4893,7 @@ describe("framework-runtime-core", () => {
     await delay(60);
 
     expect(resumedHandle.status().phase).toBe("failed");
-    expect(searchSideEffectCount).toBe(1);
+    expect(searchSideEffectCount).toBe(0);
     expect(
       extractToolMessages(await harness.readBranchMessages(thread.branchId))
     ).toHaveLength(0);
@@ -7505,6 +7653,92 @@ describe("framework-runtime-core", () => {
     expect(capturedAgents[0]?.target.tools?.[0]?.name).toBe("review_draft");
     expect(capturedAgents[0]?.target.systemPrompt).toBe("You review drafts.");
     expect(capturedAgents[0]?.target.responseFormat?.name).toBe("review");
+  });
+
+  test("preserves explicit source context supplied in raw handoff plans", async () => {
+    const harness = createFakeKernelHarness();
+    const customMessages = [assistantText("Provided source context.")];
+    const customManifest = createContextManifest(customMessages);
+    const agents: Record<string, AgentConfig> = {
+      primary: { name: "primary" },
+      reviewer: { name: "reviewer" },
+    };
+    const providedSourceAgent: AgentConfig = {
+      name: "provided-source",
+      systemPrompt: "Use the provided source context.",
+    };
+    let capturedSourceContext: HandoffSourceContext | undefined;
+    const driver = {
+      async execute(context) {
+        if (context.config.name === "reviewer") {
+          return {
+            messages: [assistantText("Reviewer finished.")],
+            resolution: {
+              reason: "done",
+              type: "end_turn",
+            },
+          };
+        }
+
+        return {
+          resolution: {
+            contextPlan: {
+              builder(sourceContext) {
+                capturedSourceContext = sourceContext;
+                return sourceContext.helpers.storeMessages([]);
+              },
+              mode: "preserve_trace",
+              reason: "delegate",
+              sourceContext: {
+                handoffIntent: {
+                  reason: "delegate",
+                  targetAgent: "reviewer",
+                },
+                helpers: {
+                  loadMessage() {
+                    return null;
+                  },
+                  storeMessage() {
+                    return "unused";
+                  },
+                  storeMessages() {
+                    return [];
+                  },
+                },
+                manifest: customManifest,
+                messages: customMessages,
+                sourceAgent: providedSourceAgent,
+                targetAgent: agents.reviewer,
+              },
+              targetAgent: "reviewer",
+            },
+            targetAgent: "reviewer",
+            type: "handoff",
+          },
+        };
+      },
+      id: "fake",
+    } satisfies KrakenDriver;
+    const runtime = createKrakenRuntimeCore({
+      defaultDriverId: "fake",
+      driverRegistry: createDriverRegistry([driver]),
+      kernel: harness.kernel,
+      resolveAgentConfig: (agentName) => agents[agentName],
+    });
+    const thread = await runtime.createThread({});
+    const handle = runtime.executeTurn({
+      branchId: thread.branchId,
+      config: agents.primary,
+      signal: textSignal("Use explicit source context"),
+      threadId: thread.threadId,
+    });
+
+    await collectEvents(handle.events());
+
+    expect(capturedSourceContext?.messages).toEqual(customMessages);
+    expect(capturedSourceContext?.manifest).toEqual(customManifest);
+    expect(capturedSourceContext?.sourceAgent).toEqual(providedSourceAgent);
+    expect(capturedSourceContext?.targetAgent).toEqual(agents.reviewer);
   });
 
   test("last_output_only handoff forwards the final visible assistant parts", () => {
