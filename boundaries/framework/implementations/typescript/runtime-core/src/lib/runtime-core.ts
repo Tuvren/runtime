@@ -26,6 +26,7 @@ import type {
   AgentConfig,
   ApprovalRequest,
   ApprovalResponse,
+  ContentPart,
   ContextEngineeringContext,
   ContextEngineeringHelpers,
   ContextEngineeringPlan,
@@ -4197,6 +4198,204 @@ function validateDriverAssistantEvents(
     }
   }
 
+  const deltaValidationError = validateDriverAssistantDeltas(
+    assistantMessage,
+    assistantEvents
+  );
+
+  if (deltaValidationError !== undefined) {
+    return deltaValidationError;
+  }
+
+  return undefined;
+}
+
+function validateDriverAssistantDeltas(
+  message: Extract<KrakenMessage, { role: "assistant" }>,
+  assistantEvents: KrakenStreamEvent[]
+): KrakenRuntimeError | undefined {
+  const state: AssistantDeltaValidationState = {
+    deltaBuffer: "",
+    partIndex: 0,
+    toolCallStarted: false,
+  };
+
+  for (const event of assistantEvents) {
+    if (event.type === "message.start" || event.type === "message.done") {
+      continue;
+    }
+
+    const validationError = validateDriverAssistantDeltaEvent(
+      message.parts,
+      event,
+      state
+    );
+
+    if (validationError !== undefined) {
+      return validationError;
+    }
+  }
+
+  if (state.deltaBuffer !== "" || state.toolCallStarted) {
+    return createAssistantDeltaValidationError();
+  }
+
+  return undefined;
+}
+
+interface AssistantDeltaValidationState {
+  deltaBuffer: string;
+  partIndex: number;
+  toolCallStarted: boolean;
+}
+
+function validateDriverAssistantDeltaEvent(
+  parts: Extract<KrakenMessage, { role: "assistant" }>["parts"],
+  event: KrakenStreamEvent,
+  state: AssistantDeltaValidationState
+): KrakenRuntimeError | undefined {
+  const currentPart = parts[state.partIndex];
+
+  if (currentPart === undefined) {
+    return createAssistantDeltaValidationError();
+  }
+
+  switch (currentPart.type) {
+    case "file":
+      return validateFileAssistantDeltaEvent(event, state);
+    case "reasoning":
+      return validateReasoningAssistantDeltaEvent(currentPart, event, state);
+    case "structured":
+      return validateStructuredAssistantDeltaEvent(currentPart, event, state);
+    case "text":
+      return validateTextAssistantDeltaEvent(currentPart, event, state);
+    case "tool_call":
+      return validateToolCallAssistantDeltaEvent(currentPart, event, state);
+    default:
+      return createAssistantDeltaValidationError();
+  }
+}
+
+function validateFileAssistantDeltaEvent(
+  event: KrakenStreamEvent,
+  state: AssistantDeltaValidationState
+): KrakenRuntimeError | undefined {
+  if (event.type !== "file.done") {
+    return createAssistantDeltaValidationError();
+  }
+
+  state.partIndex += 1;
+  return undefined;
+}
+
+function validateReasoningAssistantDeltaEvent(
+  part: Extract<ContentPart, { type: "reasoning" }>,
+  event: KrakenStreamEvent,
+  state: AssistantDeltaValidationState
+): KrakenRuntimeError | undefined {
+  if (event.type === "reasoning.delta") {
+    state.deltaBuffer += event.delta;
+    return undefined;
+  }
+
+  if (event.type !== "reasoning.done") {
+    return createAssistantDeltaValidationError();
+  }
+
+  if (
+    state.deltaBuffer !== "" &&
+    (part.redacted || state.deltaBuffer !== part.text)
+  ) {
+    return createAssistantDeltaValidationError();
+  }
+
+  state.deltaBuffer = "";
+  state.partIndex += 1;
+  return undefined;
+}
+
+function validateStructuredAssistantDeltaEvent(
+  part: Extract<ContentPart, { type: "structured" }>,
+  event: KrakenStreamEvent,
+  state: AssistantDeltaValidationState
+): KrakenRuntimeError | undefined {
+  if (event.type === "structured.delta") {
+    state.deltaBuffer += event.delta;
+    return undefined;
+  }
+
+  if (event.type !== "structured.done") {
+    return createAssistantDeltaValidationError();
+  }
+
+  if (
+    state.deltaBuffer !== "" &&
+    !doesSerializedDeltaMatchValue(state.deltaBuffer, part.data)
+  ) {
+    return createAssistantDeltaValidationError();
+  }
+
+  state.deltaBuffer = "";
+  state.partIndex += 1;
+  return undefined;
+}
+
+function validateTextAssistantDeltaEvent(
+  part: Extract<ContentPart, { type: "text" }>,
+  event: KrakenStreamEvent,
+  state: AssistantDeltaValidationState
+): KrakenRuntimeError | undefined {
+  if (event.type === "text.delta") {
+    state.deltaBuffer += event.delta;
+    return undefined;
+  }
+
+  if (event.type !== "text.done") {
+    return createAssistantDeltaValidationError();
+  }
+
+  if (state.deltaBuffer !== "" && state.deltaBuffer !== part.text) {
+    return createAssistantDeltaValidationError();
+  }
+
+  state.deltaBuffer = "";
+  state.partIndex += 1;
+  return undefined;
+}
+
+function validateToolCallAssistantDeltaEvent(
+  part: Extract<ContentPart, { type: "tool_call" }>,
+  event: KrakenStreamEvent,
+  state: AssistantDeltaValidationState
+): KrakenRuntimeError | undefined {
+  if (!state.toolCallStarted) {
+    if (event.type !== "tool_call.start") {
+      return createAssistantDeltaValidationError();
+    }
+
+    state.toolCallStarted = true;
+    return undefined;
+  }
+
+  if (event.type === "tool_call.args_delta") {
+    state.deltaBuffer += event.delta;
+    return undefined;
+  }
+
+  if (event.type !== "tool_call.done") {
+    return createAssistantDeltaValidationError();
+  }
+
+  if (
+    state.deltaBuffer !== "" &&
+    !doesSerializedDeltaMatchValue(state.deltaBuffer, part.input)
+  ) {
+    return createAssistantDeltaValidationError();
+  }
+
+  state.deltaBuffer = "";
+  state.partIndex += 1;
+  state.toolCallStarted = false;
   return undefined;
 }
 
@@ -4350,6 +4549,30 @@ function areStreamEventValuesEqual(left: unknown, right: unknown): boolean {
   }
 
   return isDeepStrictEqual(left, right);
+}
+
+function doesSerializedDeltaMatchValue(
+  serializedDelta: string,
+  expectedValue: unknown
+): boolean {
+  if (typeof expectedValue === "string" && serializedDelta === expectedValue) {
+    return true;
+  }
+
+  try {
+    return isDeepStrictEqual(JSON.parse(serializedDelta), expectedValue);
+  } catch {
+    return false;
+  }
+}
+
+function createAssistantDeltaValidationError(): KrakenRuntimeError {
+  return new KrakenRuntimeError(
+    "driver-emitted assistant deltas must match the durable assistant message",
+    {
+      code: "invalid_stream_event",
+    }
+  );
 }
 
 function formatToolResultTaskId(orderIndex: number, callId: string): string {

@@ -1338,6 +1338,197 @@ describe("framework-runtime-core", () => {
     ]);
   });
 
+  test("rejects reasoning deltas that do not reconcile to the durable assistant message", async () => {
+    const harness = createFakeKernelHarness();
+    const driver = {
+      async execute(context) {
+        context.runtime.emit({
+          messageId: "assistant-reasoning",
+          role: "assistant",
+          timestamp: context.runtime.now(),
+          type: "message.start",
+        });
+        context.runtime.emit({
+          delta: "secret reasoning leak",
+          messageId: "assistant-reasoning",
+          timestamp: context.runtime.now(),
+          type: "reasoning.delta",
+        });
+        context.runtime.emit({
+          messageId: "assistant-reasoning",
+          text: "safe output",
+          timestamp: context.runtime.now(),
+          type: "text.done",
+        });
+        context.runtime.emit({
+          finishReason: "stop",
+          messageId: "assistant-reasoning",
+          timestamp: context.runtime.now(),
+          type: "message.done",
+        });
+
+        return {
+          messages: [assistantText("safe output")],
+          resolution: {
+            reason: "done",
+            type: "end_turn",
+          },
+        };
+      },
+      id: "fake",
+      async resume() {
+        throw new Error("resume was not expected");
+      },
+    } satisfies KrakenDriver;
+    const runtime = createKrakenRuntimeCore({
+      defaultDriverId: "fake",
+      driverRegistry: createDriverRegistry([driver]),
+      kernel: harness.kernel,
+    });
+    const thread = await runtime.createThread({});
+    const handle = runtime.executeTurn({
+      branchId: thread.branchId,
+      config: { name: "primary" },
+      signal: textSignal("Reject leaked reasoning delta"),
+      threadId: thread.threadId,
+    });
+
+    const events = await collectEvents(handle.events());
+    const errorEvent = events.find(
+      (event): event is Extract<(typeof events)[number], { type: "error" }> =>
+        event.type === "error"
+    );
+
+    expect(handle.status().phase).toBe("failed");
+    expect(errorEvent?.error.code).toBe("invalid_stream_event");
+    expect(
+      events.some(
+        (event) =>
+          event.type === "reasoning.delta" &&
+          event.delta === "secret reasoning leak"
+      )
+    ).toBe(false);
+    expect(await harness.readBranchMessages(thread.branchId)).toEqual([
+      {
+        parts: [{ text: "Reject leaked reasoning delta", type: "text" }],
+        role: "user",
+      },
+    ]);
+  });
+
+  test("rejects tool-call args deltas that do not reconcile to the durable tool input", async () => {
+    const harness = createFakeKernelHarness();
+    const driver = {
+      async execute(context) {
+        context.runtime.emit({
+          messageId: "assistant-tool-args",
+          role: "assistant",
+          timestamp: context.runtime.now(),
+          type: "message.start",
+        });
+        context.runtime.emit({
+          callId: "call-search",
+          messageId: "assistant-tool-args",
+          name: "search",
+          timestamp: context.runtime.now(),
+          type: "tool_call.start",
+        });
+        context.runtime.emit({
+          callId: "call-search",
+          delta: '{"value":"WRONG"}',
+          timestamp: context.runtime.now(),
+          type: "tool_call.args_delta",
+        });
+        context.runtime.emit({
+          callId: "call-search",
+          input: { value: "persisted-right" },
+          name: "search",
+          timestamp: context.runtime.now(),
+          type: "tool_call.done",
+        });
+        context.runtime.emit({
+          finishReason: "tool_call",
+          messageId: "assistant-tool-args",
+          timestamp: context.runtime.now(),
+          type: "message.done",
+        });
+
+        return {
+          messages: [
+            assistantToolCalls([
+              {
+                callId: "call-search",
+                input: { value: "persisted-right" },
+                name: "search",
+              },
+            ]),
+          ],
+          resolution: {
+            type: "continue_iteration",
+          },
+          toolExecutionMode: "parallel",
+        };
+      },
+      id: "fake",
+      async resume() {
+        throw new Error("resume was not expected");
+      },
+    } satisfies KrakenDriver;
+    const runtime = createKrakenRuntimeCore({
+      defaultDriverId: "fake",
+      driverRegistry: createDriverRegistry([driver]),
+      kernel: harness.kernel,
+    });
+    const thread = await runtime.createThread({});
+    const handle = runtime.executeTurn({
+      branchId: thread.branchId,
+      config: {
+        name: "primary",
+        tools: [
+          {
+            description: "Search",
+            execute() {
+              return { ok: true };
+            },
+            inputSchema: {
+              properties: {
+                value: { type: "string" },
+              },
+              required: ["value"],
+              type: "object",
+            },
+            name: "search",
+          },
+        ],
+      },
+      signal: textSignal("Reject mismatched args delta"),
+      threadId: thread.threadId,
+    });
+
+    const events = await collectEvents(handle.events());
+    const errorEvent = events.find(
+      (event): event is Extract<(typeof events)[number], { type: "error" }> =>
+        event.type === "error"
+    );
+
+    expect(handle.status().phase).toBe("failed");
+    expect(errorEvent?.error.code).toBe("invalid_stream_event");
+    expect(events.some((event) => event.type === "tool_call.args_delta")).toBe(
+      false
+    );
+    expect(
+      events.some(
+        (event) => event.type === "tool.start" || event.type === "tool.result"
+      )
+    ).toBe(false);
+    expect(await harness.readBranchMessages(thread.branchId)).toEqual([
+      {
+        parts: [{ text: "Reject mismatched args delta", type: "text" }],
+        role: "user",
+      },
+    ]);
+  });
+
   test("rejects malformed initial input signals before staging branch history", async () => {
     const harness = createFakeKernelHarness();
     const driver = {
