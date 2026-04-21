@@ -1419,6 +1419,141 @@ describe("framework-runtime-core", () => {
     ]);
   });
 
+  test("rejects assistant stream events whose message ids do not reconcile", async () => {
+    const harness = createFakeKernelHarness();
+    const driver = {
+      async execute(context) {
+        context.runtime.emit({
+          messageId: "assistant-a",
+          role: "assistant",
+          timestamp: context.runtime.now(),
+          type: "message.start",
+        });
+        context.runtime.emit({
+          messageId: "assistant-b",
+          text: "split identity",
+          timestamp: context.runtime.now(),
+          type: "text.done",
+        });
+        context.runtime.emit({
+          finishReason: "stop",
+          messageId: "assistant-b",
+          timestamp: context.runtime.now(),
+          type: "message.done",
+        });
+
+        return {
+          messages: [assistantText("split identity")],
+          resolution: {
+            reason: "done",
+            type: "end_turn",
+          },
+        };
+      },
+      id: "fake",
+      async resume() {
+        throw new Error("resume was not expected");
+      },
+    } satisfies KrakenDriver;
+    const runtime = createKrakenRuntimeCore({
+      defaultDriverId: "fake",
+      driverRegistry: createDriverRegistry([driver]),
+      kernel: harness.kernel,
+    });
+    const thread = await runtime.createThread({});
+    const handle = runtime.executeTurn({
+      branchId: thread.branchId,
+      config: { name: "primary" },
+      signal: textSignal("Reject split assistant identity"),
+      threadId: thread.threadId,
+    });
+
+    const events = await collectEvents(handle.events());
+    const errorEvent = events.find(
+      (event): event is Extract<(typeof events)[number], { type: "error" }> =>
+        event.type === "error"
+    );
+
+    expect(handle.status().phase).toBe("failed");
+    expect(errorEvent?.error.code).toBe("invalid_stream_event");
+    expect(await harness.readBranchMessages(thread.branchId)).toEqual([
+      {
+        parts: [{ text: "Reject split assistant identity", type: "text" }],
+        role: "user",
+      },
+    ]);
+  });
+
+  test("rejects assistant delta events that arrive before message.start", async () => {
+    const harness = createFakeKernelHarness();
+    const driver = {
+      async execute(context) {
+        context.runtime.emit({
+          delta: "out-of-order",
+          messageId: "assistant-out-of-order",
+          timestamp: context.runtime.now(),
+          type: "text.delta",
+        });
+        context.runtime.emit({
+          messageId: "assistant-out-of-order",
+          role: "assistant",
+          timestamp: context.runtime.now(),
+          type: "message.start",
+        });
+        context.runtime.emit({
+          messageId: "assistant-out-of-order",
+          text: "out-of-order",
+          timestamp: context.runtime.now(),
+          type: "text.done",
+        });
+        context.runtime.emit({
+          finishReason: "stop",
+          messageId: "assistant-out-of-order",
+          timestamp: context.runtime.now(),
+          type: "message.done",
+        });
+
+        return {
+          messages: [assistantText("out-of-order")],
+          resolution: {
+            reason: "done",
+            type: "end_turn",
+          },
+        };
+      },
+      id: "fake",
+      async resume() {
+        throw new Error("resume was not expected");
+      },
+    } satisfies KrakenDriver;
+    const runtime = createKrakenRuntimeCore({
+      defaultDriverId: "fake",
+      driverRegistry: createDriverRegistry([driver]),
+      kernel: harness.kernel,
+    });
+    const thread = await runtime.createThread({});
+    const handle = runtime.executeTurn({
+      branchId: thread.branchId,
+      config: { name: "primary" },
+      signal: textSignal("Reject out-of-order assistant delta"),
+      threadId: thread.threadId,
+    });
+
+    const events = await collectEvents(handle.events());
+    const errorEvent = events.find(
+      (event): event is Extract<(typeof events)[number], { type: "error" }> =>
+        event.type === "error"
+    );
+
+    expect(handle.status().phase).toBe("failed");
+    expect(errorEvent?.error.code).toBe("invalid_stream_event");
+    expect(
+      events.some(
+        (event) => event.type === "text.delta" && event.delta === "out-of-order"
+      )
+    ).toBe(false);
+  });
+
   test("rejects reasoning deltas that do not reconcile to the durable assistant message", async () => {
     const harness = createFakeKernelHarness();
     const driver = {
@@ -1492,6 +1627,81 @@ describe("framework-runtime-core", () => {
     expect(await harness.readBranchMessages(thread.branchId)).toEqual([
       {
         parts: [{ text: "Reject leaked reasoning delta", type: "text" }],
+        role: "user",
+      },
+    ]);
+  });
+
+  test("rejects non-redacted reasoning parts that omit reasoning.delta content", async () => {
+    const harness = createFakeKernelHarness();
+    const driver = {
+      async execute(context) {
+        context.runtime.emit({
+          messageId: "assistant-reasoning-missing",
+          role: "assistant",
+          timestamp: context.runtime.now(),
+          type: "message.start",
+        });
+        context.runtime.emit({
+          messageId: "assistant-reasoning-missing",
+          timestamp: context.runtime.now(),
+          type: "reasoning.done",
+        });
+        context.runtime.emit({
+          finishReason: "stop",
+          messageId: "assistant-reasoning-missing",
+          timestamp: context.runtime.now(),
+          type: "message.done",
+        });
+
+        return {
+          messages: [
+            {
+              parts: [
+                {
+                  redacted: false,
+                  text: "visible reasoning",
+                  type: "reasoning",
+                },
+              ],
+              role: "assistant",
+            },
+          ],
+          resolution: {
+            reason: "done",
+            type: "end_turn",
+          },
+        };
+      },
+      id: "fake",
+      async resume() {
+        throw new Error("resume was not expected");
+      },
+    } satisfies KrakenDriver;
+    const runtime = createKrakenRuntimeCore({
+      defaultDriverId: "fake",
+      driverRegistry: createDriverRegistry([driver]),
+      kernel: harness.kernel,
+    });
+    const thread = await runtime.createThread({});
+    const handle = runtime.executeTurn({
+      branchId: thread.branchId,
+      config: { name: "primary" },
+      signal: textSignal("Reject missing reasoning delta"),
+      threadId: thread.threadId,
+    });
+
+    const events = await collectEvents(handle.events());
+    const errorEvent = events.find(
+      (event): event is Extract<(typeof events)[number], { type: "error" }> =>
+        event.type === "error"
+    );
+
+    expect(handle.status().phase).toBe("failed");
+    expect(errorEvent?.error.code).toBe("invalid_stream_event");
+    expect(await harness.readBranchMessages(thread.branchId)).toEqual([
+      {
+        parts: [{ text: "Reject missing reasoning delta", type: "text" }],
         role: "user",
       },
     ]);
@@ -1605,6 +1815,175 @@ describe("framework-runtime-core", () => {
     expect(await harness.readBranchMessages(thread.branchId)).toEqual([
       {
         parts: [{ text: "Reject mismatched args delta", type: "text" }],
+        role: "user",
+      },
+    ]);
+  });
+
+  test("rejects tool-call args deltas whose call ids do not match the current tool call", async () => {
+    const harness = createFakeKernelHarness();
+    const driver = {
+      async execute(context) {
+        context.runtime.emit({
+          messageId: "assistant-tool-call-id",
+          role: "assistant",
+          timestamp: context.runtime.now(),
+          type: "message.start",
+        });
+        context.runtime.emit({
+          callId: "call-search",
+          messageId: "assistant-tool-call-id",
+          name: "search",
+          timestamp: context.runtime.now(),
+          type: "tool_call.start",
+        });
+        context.runtime.emit({
+          callId: "call-other",
+          delta: '{"value":"persisted-right"}',
+          timestamp: context.runtime.now(),
+          type: "tool_call.args_delta",
+        });
+        context.runtime.emit({
+          callId: "call-search",
+          input: { value: "persisted-right" },
+          name: "search",
+          timestamp: context.runtime.now(),
+          type: "tool_call.done",
+        });
+        context.runtime.emit({
+          finishReason: "tool_call",
+          messageId: "assistant-tool-call-id",
+          timestamp: context.runtime.now(),
+          type: "message.done",
+        });
+
+        return {
+          messages: [
+            assistantToolCalls([
+              {
+                callId: "call-search",
+                input: { value: "persisted-right" },
+                name: "search",
+              },
+            ]),
+          ],
+          resolution: {
+            type: "continue_iteration",
+          },
+          toolExecutionMode: "parallel",
+        };
+      },
+      id: "fake",
+      async resume() {
+        throw new Error("resume was not expected");
+      },
+    } satisfies KrakenDriver;
+    const runtime = createKrakenRuntimeCore({
+      defaultDriverId: "fake",
+      driverRegistry: createDriverRegistry([driver]),
+      kernel: harness.kernel,
+    });
+    const thread = await runtime.createThread({});
+    const handle = runtime.executeTurn({
+      branchId: thread.branchId,
+      config: {
+        name: "primary",
+        tools: [
+          {
+            description: "Search",
+            execute() {
+              return { ok: true };
+            },
+            inputSchema: {
+              properties: {
+                value: { type: "string" },
+              },
+              required: ["value"],
+              type: "object",
+            },
+            name: "search",
+          },
+        ],
+      },
+      signal: textSignal("Reject mismatched args delta call id"),
+      threadId: thread.threadId,
+    });
+
+    const events = await collectEvents(handle.events());
+    const errorEvent = events.find(
+      (event): event is Extract<(typeof events)[number], { type: "error" }> =>
+        event.type === "error"
+    );
+
+    expect(handle.status().phase).toBe("failed");
+    expect(errorEvent?.error.code).toBe("invalid_stream_event");
+    expect(
+      events.some(
+        (event) => event.type === "tool.start" || event.type === "tool.result"
+      )
+    ).toBe(false);
+  });
+
+  test("rejects assistant message.done events whose finishReason disagrees with durable output", async () => {
+    const harness = createFakeKernelHarness();
+    const driver = {
+      async execute(context) {
+        context.runtime.emit({
+          messageId: "assistant-finish-reason",
+          role: "assistant",
+          timestamp: context.runtime.now(),
+          type: "message.start",
+        });
+        context.runtime.emit({
+          messageId: "assistant-finish-reason",
+          text: "wrong finish reason",
+          timestamp: context.runtime.now(),
+          type: "text.done",
+        });
+        context.runtime.emit({
+          finishReason: "tool_call",
+          messageId: "assistant-finish-reason",
+          timestamp: context.runtime.now(),
+          type: "message.done",
+        });
+
+        return {
+          messages: [assistantText("wrong finish reason")],
+          resolution: {
+            reason: "done",
+            type: "end_turn",
+          },
+        };
+      },
+      id: "fake",
+      async resume() {
+        throw new Error("resume was not expected");
+      },
+    } satisfies KrakenDriver;
+    const runtime = createKrakenRuntimeCore({
+      defaultDriverId: "fake",
+      driverRegistry: createDriverRegistry([driver]),
+      kernel: harness.kernel,
+    });
+    const thread = await runtime.createThread({});
+    const handle = runtime.executeTurn({
+      branchId: thread.branchId,
+      config: { name: "primary" },
+      signal: textSignal("Reject mismatched finish reason"),
+      threadId: thread.threadId,
+    });
+
+    const events = await collectEvents(handle.events());
+    const errorEvent = events.find(
+      (event): event is Extract<(typeof events)[number], { type: "error" }> =>
+        event.type === "error"
+    );
+
+    expect(handle.status().phase).toBe("failed");
+    expect(errorEvent?.error.code).toBe("invalid_stream_event");
+    expect(await harness.readBranchMessages(thread.branchId)).toEqual([
+      {
+        parts: [{ text: "Reject mismatched finish reason", type: "text" }],
         role: "user",
       },
     ]);

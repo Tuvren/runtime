@@ -4171,7 +4171,14 @@ function validateDriverAssistantEvents(
   const actualEvents = assistantEvents.filter((event) =>
     isAssistantValidationEvent(event.type)
   );
-  const expectedEvents = synthesizeAssistantValidationEvents(assistantMessage);
+  const messageId =
+    actualEvents[0]?.type === "message.start"
+      ? actualEvents[0].messageId
+      : "assistant-validation";
+  const expectedEvents = synthesizeAssistantValidationEvents(
+    assistantMessage,
+    messageId
+  );
 
   if (actualEvents.length !== expectedEvents.length) {
     return new KrakenRuntimeError(
@@ -4215,14 +4222,28 @@ function validateDriverAssistantDeltas(
   assistantEvents: KrakenStreamEvent[]
 ): KrakenRuntimeError | undefined {
   const state: AssistantDeltaValidationState = {
+    completed: false,
+    currentMessageId: undefined,
     deltaBuffer: "",
     partIndex: 0,
+    started: false,
     toolCallStarted: false,
   };
+  const expectedFinishReason = inferFinishReason(message);
 
   for (const event of assistantEvents) {
-    if (event.type === "message.start" || event.type === "message.done") {
+    const boundaryValidation = validateAssistantMessageBoundary(
+      event,
+      expectedFinishReason,
+      state
+    );
+
+    if (boundaryValidation.handled) {
       continue;
+    }
+
+    if (boundaryValidation.error !== undefined) {
+      return boundaryValidation.error;
     }
 
     const validationError = validateDriverAssistantDeltaEvent(
@@ -4236,7 +4257,11 @@ function validateDriverAssistantDeltas(
     }
   }
 
-  if (state.deltaBuffer !== "" || state.toolCallStarted) {
+  if (
+    !(state.started && state.completed) ||
+    state.deltaBuffer !== "" ||
+    state.toolCallStarted
+  ) {
     return createAssistantDeltaValidationError();
   }
 
@@ -4244,9 +4269,111 @@ function validateDriverAssistantDeltas(
 }
 
 interface AssistantDeltaValidationState {
+  completed: boolean;
+  currentMessageId: string | undefined;
   deltaBuffer: string;
   partIndex: number;
+  started: boolean;
   toolCallStarted: boolean;
+}
+
+interface AssistantBoundaryValidation {
+  error?: KrakenRuntimeError;
+  handled: boolean;
+}
+
+function validateAssistantMessageBoundary(
+  event: KrakenStreamEvent,
+  expectedFinishReason: KrakenModelResponse["finishReason"],
+  state: AssistantDeltaValidationState
+): AssistantBoundaryValidation {
+  if (!state.started) {
+    if (event.type !== "message.start") {
+      return {
+        error: createAssistantDeltaValidationError(),
+        handled: false,
+      };
+    }
+
+    state.currentMessageId = event.messageId;
+    state.started = true;
+    return {
+      handled: true,
+    };
+  }
+
+  if (state.completed) {
+    return {
+      error: createAssistantDeltaValidationError(),
+      handled: false,
+    };
+  }
+
+  if (!assistantEventBelongsToCurrentMessage(event, state.currentMessageId)) {
+    return {
+      error: createAssistantDeltaValidationError(),
+      handled: false,
+    };
+  }
+
+  if (event.type === "message.start") {
+    return {
+      error: createAssistantDeltaValidationError(),
+      handled: false,
+    };
+  }
+
+  if (event.type !== "message.done") {
+    return {
+      handled: false,
+    };
+  }
+
+  if (
+    !doesFinishReasonMatchAssistantContent(
+      event.finishReason,
+      expectedFinishReason
+    )
+  ) {
+    return {
+      error: createAssistantDeltaValidationError(),
+      handled: false,
+    };
+  }
+
+  state.completed = true;
+  return {
+    handled: true,
+  };
+}
+
+function assistantEventBelongsToCurrentMessage(
+  event: KrakenStreamEvent,
+  currentMessageId: string | undefined
+): boolean {
+  const eventMessageId = getAssistantEventMessageId(event);
+
+  return eventMessageId === undefined || eventMessageId === currentMessageId;
+}
+
+function getAssistantEventMessageId(
+  event: KrakenStreamEvent
+): string | undefined {
+  switch (event.type) {
+    case "file.done":
+    case "message.done":
+    case "message.start":
+    case "reasoning.delta":
+    case "reasoning.done":
+    case "structured.delta":
+    case "structured.done":
+    case "text.delta":
+    case "text.done":
+    case "tool_call.start":
+      return event.messageId;
+    default:
+      return undefined;
+  }
 }
 
 function validateDriverAssistantDeltaEvent(
@@ -4299,6 +4426,10 @@ function validateReasoningAssistantDeltaEvent(
   }
 
   if (event.type !== "reasoning.done") {
+    return createAssistantDeltaValidationError();
+  }
+
+  if (!part.redacted && part.text !== "" && state.deltaBuffer === "") {
     return createAssistantDeltaValidationError();
   }
 
@@ -4378,6 +4509,10 @@ function validateToolCallAssistantDeltaEvent(
   }
 
   if (event.type === "tool_call.args_delta") {
+    if (event.callId !== part.callId) {
+      return createAssistantDeltaValidationError();
+    }
+
     state.deltaBuffer += event.delta;
     return undefined;
   }
@@ -4400,9 +4535,9 @@ function validateToolCallAssistantDeltaEvent(
 }
 
 function synthesizeAssistantValidationEvents(
-  message: Extract<KrakenMessage, { role: "assistant" }>
+  message: Extract<KrakenMessage, { role: "assistant" }>,
+  messageId: string
 ): KrakenStreamEvent[] {
-  const messageId = "assistant-validation";
   const events: KrakenStreamEvent[] = [
     {
       messageId,
@@ -4492,17 +4627,25 @@ function assistantValidationEventsMatch(
 
   switch (actualEvent.type) {
     case "message.start":
-      return expectedEvent.type === "message.start";
+      return (
+        expectedEvent.type === "message.start" &&
+        actualEvent.messageId === expectedEvent.messageId
+      );
     case "text.done":
       return (
         expectedEvent.type === "text.done" &&
+        actualEvent.messageId === expectedEvent.messageId &&
         actualEvent.text === expectedEvent.text
       );
     case "reasoning.done":
-      return expectedEvent.type === "reasoning.done";
+      return (
+        expectedEvent.type === "reasoning.done" &&
+        actualEvent.messageId === expectedEvent.messageId
+      );
     case "file.done":
       return (
         expectedEvent.type === "file.done" &&
+        actualEvent.messageId === expectedEvent.messageId &&
         actualEvent.filename === expectedEvent.filename &&
         actualEvent.mediaType === expectedEvent.mediaType &&
         areStreamEventValuesEqual(actualEvent.data, expectedEvent.data)
@@ -4510,12 +4653,14 @@ function assistantValidationEventsMatch(
     case "structured.done":
       return (
         expectedEvent.type === "structured.done" &&
+        actualEvent.messageId === expectedEvent.messageId &&
         actualEvent.name === expectedEvent.name &&
         isDeepStrictEqual(actualEvent.data, expectedEvent.data)
       );
     case "tool_call.start":
       return (
         expectedEvent.type === "tool_call.start" &&
+        actualEvent.messageId === expectedEvent.messageId &&
         actualEvent.callId === expectedEvent.callId &&
         actualEvent.name === expectedEvent.name
       );
@@ -4527,10 +4672,28 @@ function assistantValidationEventsMatch(
         isDeepStrictEqual(actualEvent.input, expectedEvent.input)
       );
     case "message.done":
-      return expectedEvent.type === "message.done";
+      return (
+        expectedEvent.type === "message.done" &&
+        actualEvent.messageId === expectedEvent.messageId &&
+        doesFinishReasonMatchAssistantContent(
+          actualEvent.finishReason,
+          expectedEvent.finishReason
+        )
+      );
     default:
       return false;
   }
+}
+
+function doesFinishReasonMatchAssistantContent(
+  actualFinishReason: KrakenModelResponse["finishReason"],
+  expectedFinishReason: KrakenModelResponse["finishReason"]
+): boolean {
+  if (expectedFinishReason === "tool_call") {
+    return actualFinishReason === "tool_call";
+  }
+
+  return actualFinishReason !== "tool_call";
 }
 
 function areStreamEventValuesEqual(left: unknown, right: unknown): boolean {
