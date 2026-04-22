@@ -784,6 +784,46 @@ describe("framework-runtime-core", () => {
     expect(structuredDoneIndex).toBeGreaterThan(structuredDeltaIndex);
   });
 
+  test("synthesizes structured string deltas as serialized JSON strings", async () => {
+    const harness = createFakeKernelHarness();
+    const driver = {
+      async execute() {
+        return {
+          messages: [assistantStructured("result", "hello")],
+          resolution: {
+            reason: "done",
+            type: "end_turn",
+          },
+        };
+      },
+      id: "fake",
+      async resume() {
+        throw new Error("resume was not expected");
+      },
+    } satisfies KrakenDriver;
+    const runtime = createKrakenRuntimeCore({
+      defaultDriverId: "fake",
+      driverRegistry: createDriverRegistry([driver]),
+      kernel: harness.kernel,
+    });
+    const thread = await runtime.createThread({});
+    const handle = runtime.executeTurn({
+      branchId: thread.branchId,
+      config: { name: "primary" },
+      signal: textSignal("Return structured string output"),
+      threadId: thread.threadId,
+    });
+
+    const events = await collectEvents(handle.events());
+
+    expect(
+      events.some(
+        (event) =>
+          event.type === "structured.delta" && event.delta === '"hello"'
+      )
+    ).toBe(true);
+  });
+
   test("synthesizes tool-call args deltas when a driver returns durable tool calls without streaming them", async () => {
     const harness = createFakeKernelHarness();
     const driver = {
@@ -868,6 +908,84 @@ describe("framework-runtime-core", () => {
 
     expect(argsDeltaIndex).toBeGreaterThan(-1);
     expect(toolCallDoneIndex).toBeGreaterThan(argsDeltaIndex);
+  });
+
+  test("synthesizes string tool-call arg deltas as serialized JSON strings", async () => {
+    const harness = createFakeKernelHarness();
+    const driver = {
+      async execute(context) {
+        const toolMessages = context.messages.filter(
+          (message) => message.role === "tool"
+        );
+
+        if (toolMessages.length === 0) {
+          return {
+            messages: [
+              assistantToolCalls([
+                {
+                  callId: "call-echo",
+                  input: "hello",
+                  name: "echo",
+                },
+              ]),
+            ],
+            resolution: {
+              type: "continue_iteration",
+            },
+            toolExecutionMode: "parallel",
+          };
+        }
+
+        return {
+          messages: [assistantText("Done.")],
+          resolution: {
+            reason: "done",
+            type: "end_turn",
+          },
+        };
+      },
+      id: "fake",
+      async resume() {
+        throw new Error("resume was not expected");
+      },
+    } satisfies KrakenDriver;
+    const runtime = createKrakenRuntimeCore({
+      defaultDriverId: "fake",
+      driverRegistry: createDriverRegistry([driver]),
+      kernel: harness.kernel,
+    });
+    const thread = await runtime.createThread({});
+    const handle = runtime.executeTurn({
+      branchId: thread.branchId,
+      config: {
+        name: "primary",
+        tools: [
+          {
+            description: "Echo",
+            execute() {
+              return { ok: true };
+            },
+            inputSchema: {
+              type: "string",
+            },
+            name: "echo",
+          },
+        ],
+      },
+      signal: textSignal("Synthesize string tool call delta"),
+      threadId: thread.threadId,
+    });
+
+    const events = await collectEvents(handle.events());
+
+    expect(
+      events.some(
+        (event) =>
+          event.type === "tool_call.args_delta" &&
+          event.callId === "call-echo" &&
+          event.delta === '"hello"'
+      )
+    ).toBe(true);
   });
 
   test("does not start execution until the event stream is consumed", async () => {
@@ -5102,11 +5220,18 @@ describe("framework-runtime-core", () => {
     });
     const resumedEvents = await collectEvents(resumedHandle.events());
     const messages = await harness.readBranchMessages(thread.branchId);
+    const resumedTurnStartIndex = resumedEvents.findIndex(
+      (event) => event.type === "turn.start"
+    );
+    const approvalResolvedIndex = resumedEvents.findIndex(
+      (event) => event.type === "approval.resolved"
+    );
 
-    expect(resumedEvents[0]?.type).toBe("turn.start");
+    expect(resumedTurnStartIndex).toBeGreaterThan(-1);
     expect(
       resumedEvents.some((event) => event.type === "approval.resolved")
     ).toBe(true);
+    expect(approvalResolvedIndex).toBeGreaterThan(resumedTurnStartIndex);
     expect(
       resumedEvents.some(
         (event) => event.type === "tool.start" && event.callId === "call-email"
@@ -5122,6 +5247,114 @@ describe("framework-runtime-core", () => {
     expect(afterIterationCount).toBe(3);
     expect(messages).toHaveLength(5);
     expect(resumedHandle.status().phase).toBe("completed");
+  });
+
+  test("does not publish resumed turn.start when closing the paused run fails", async () => {
+    const harness = createFakeKernelHarness();
+    let failPausedRunClose = false;
+    const originalComplete = harness.kernel.run.complete;
+    harness.kernel.run.complete = async (runId, status, eventHash) => {
+      if (failPausedRunClose && status === "failed") {
+        failPausedRunClose = false;
+        throw new Error("paused run close failed");
+      }
+
+      return await originalComplete(runId, status, eventHash);
+    };
+
+    const driver = {
+      async execute(context) {
+        const toolMessages = context.messages.filter(
+          (message) => message.role === "tool"
+        );
+
+        if (toolMessages.length === 0) {
+          return {
+            messages: [
+              assistantToolCalls([
+                {
+                  callId: "call-email",
+                  input: { subject: "Approval needed", to: "ops@example.com" },
+                  name: "email",
+                },
+              ]),
+            ],
+            resolution: {
+              type: "continue_iteration",
+            },
+          };
+        }
+
+        return {
+          messages: [assistantText("This should not resume.")],
+          resolution: {
+            reason: "done",
+            type: "end_turn",
+          },
+        };
+      },
+      id: "fake",
+      async resume() {
+        throw new Error("resume was not expected");
+      },
+    } satisfies KrakenDriver;
+    const runtime = createKrakenRuntimeCore({
+      defaultDriverId: "fake",
+      driverRegistry: createDriverRegistry([driver]),
+      kernel: harness.kernel,
+    });
+    const thread = await runtime.createThread({});
+    const pausedHandle = runtime.executeTurn({
+      branchId: thread.branchId,
+      config: {
+        name: "primary",
+        tools: [
+          {
+            approval: true,
+            description: "Pause for approval",
+            execute() {
+              return {
+                sent: true,
+              };
+            },
+            inputSchema: {
+              properties: {
+                subject: { type: "string" },
+                to: { type: "string" },
+              },
+              required: ["to", "subject"],
+              type: "object",
+            },
+            name: "email",
+          },
+        ],
+      },
+      signal: textSignal("Pause before failed resume prelude"),
+      threadId: thread.threadId,
+    });
+
+    await collectEvents(pausedHandle.events());
+    failPausedRunClose = true;
+
+    const resumedHandle = pausedHandle.resolveApproval({
+      decisions: [{ callId: "call-email", type: "approve" }],
+    });
+    const resumedEvents = await collectEvents(resumedHandle.events());
+    const errorEvent = resumedEvents.find(
+      (
+        event
+      ): event is Extract<(typeof resumedEvents)[number], { type: "error" }> =>
+        event.type === "error"
+    );
+
+    expect(resumedEvents.some((event) => event.type === "turn.start")).toBe(
+      false
+    );
+    expect(
+      resumedEvents.some((event) => event.type === "approval.resolved")
+    ).toBe(false);
+    expect(resumedHandle.status().phase).toBe("failed");
+    expect(errorEvent?.error.message).toBe("paused run close failed");
   });
 
   test("surfaces normalized approval inputs and executes the same normalized payload after resume", async () => {

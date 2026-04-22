@@ -414,9 +414,38 @@ class RuntimeCore implements KrakenRuntime {
       const branchHeadHash = await this.resolveExecutionBranchHead(handle);
       await this.createExecutionTurnIfNeeded(handle, branchHeadHash);
       const loopState = this.createExecutionLoopState(handle);
+
+      const resumedStart = await this.prepareResumedExecutionStartPrelude(
+        handle,
+        schemaId,
+        loopState
+      );
+
+      if (resumedStart?.completed === true) {
+        return;
+      }
+
       this.publishTurnStart(handle, loopState);
 
-      if (await this.prepareExecutionStart(handle, schemaId, loopState)) {
+      if (resumedStart !== undefined) {
+        this.publishApprovalResolved(
+          handle,
+          handle.resumedFrom?.approval,
+          loopState
+        );
+      }
+
+      if (
+        resumedStart !== undefined &&
+        (await this.finishResumedExecutionStart(handle, schemaId, loopState))
+      ) {
+        return;
+      }
+
+      if (
+        resumedStart === undefined &&
+        (await this.prepareFreshExecutionStart(handle, schemaId, loopState))
+      ) {
         return;
       }
 
@@ -532,18 +561,6 @@ class RuntimeCore implements KrakenRuntime {
     );
   }
 
-  private async prepareExecutionStart(
-    handle: RuntimeExecutionHandle,
-    schemaId: string,
-    loopState: LoopState
-  ): Promise<boolean> {
-    if (handle.resumedFrom === undefined) {
-      return await this.prepareFreshExecutionStart(handle, schemaId, loopState);
-    }
-
-    return await this.prepareResumedExecutionStart(handle, schemaId, loopState);
-  }
-
   private async prepareFreshExecutionStart(
     handle: RuntimeExecutionHandle,
     schemaId: string,
@@ -606,15 +623,15 @@ class RuntimeCore implements KrakenRuntime {
     return true;
   }
 
-  private async prepareResumedExecutionStart(
+  private async prepareResumedExecutionStartPrelude(
     handle: RuntimeExecutionHandle,
     schemaId: string,
     loopState: LoopState
-  ): Promise<boolean> {
+  ): Promise<{ completed: boolean } | undefined> {
     const resumeContext = handle.resumedFrom;
 
     if (resumeContext === undefined) {
-      return false;
+      return undefined;
     }
 
     await this.options.kernel.run.complete(
@@ -625,21 +642,28 @@ class RuntimeCore implements KrakenRuntime {
         type: "paused_run_resolved",
       })
     );
-    this.publishEvent(
-      handle,
-      {
-        response: resumeContext.approval,
-        timestamp: this.now(),
-        type: "approval.resolved",
-      },
-      loopState
-    );
     await this.checkpointResumeRunningStatus(
       handle,
       schemaId,
       loopState,
       resumeContext.pauseContext.pausedIteration.iterationCount
     );
+    return {
+      completed: false,
+    };
+  }
+
+  private async finishResumedExecutionStart(
+    handle: RuntimeExecutionHandle,
+    schemaId: string,
+    loopState: LoopState
+  ): Promise<boolean> {
+    const resumeContext = handle.resumedFrom;
+
+    if (resumeContext === undefined) {
+      return false;
+    }
+
     handle.clearPendingResumeCancellation();
     const cancelledOutcome = createCancelledLoopOutcome(handle);
 
@@ -736,6 +760,26 @@ class RuntimeCore implements KrakenRuntime {
       loopState
     );
     return true;
+  }
+
+  private publishApprovalResolved(
+    handle: RuntimeExecutionHandle,
+    response: ApprovalResponse | undefined,
+    loopState: LoopState
+  ): void {
+    if (response === undefined) {
+      return;
+    }
+
+    this.publishEvent(
+      handle,
+      {
+        response,
+        timestamp: this.now(),
+        type: "approval.resolved",
+      },
+      loopState
+    );
   }
 
   private async handleExecutionFailure(
@@ -5168,10 +5212,6 @@ function doesSerializedDeltaMatchValue(
 }
 
 function serializeAssistantDeltaValue(value: unknown): string {
-  if (typeof value === "string") {
-    return value;
-  }
-
   return JSON.stringify(value) ?? "null";
 }
 
