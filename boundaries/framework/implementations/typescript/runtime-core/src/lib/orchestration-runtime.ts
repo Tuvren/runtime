@@ -33,6 +33,7 @@ import { type EpochMs, KrakenRuntimeError } from "@kraken/shared-core-types";
 import {
   AsyncEventQueue,
   cloneExecutionStatus,
+  cloneSnapshotPreservingFunctions,
   createDeferred,
   createFrozenSnapshot,
   detachPromise,
@@ -449,7 +450,10 @@ class OrchestrationNode {
       ...event,
       source: {
         ...(event.source ?? {}),
-        agent: binding.agent,
+        // Preserve the runtime-emitted agent because child execution may
+        // hand off mid-turn even though the orchestration worker identity is
+        // still the same subtree node.
+        agent: event.source?.agent ?? binding.agent,
         threadId: binding.threadId,
         workerId: binding.workerId,
       },
@@ -1165,7 +1169,9 @@ function snapshotAgentConfigs(
   const snapshots: Record<string, AgentConfig> = {};
 
   for (const [agentName, config] of Object.entries(agents)) {
-    snapshots[agentName] = createFrozenSnapshot(config);
+    // Snapshot orchestration-owned agent configs up front without freezing the
+    // receiver objects that live execution invokes as method-style hooks.
+    snapshots[agentName] = cloneSnapshotPreservingFunctions(config);
   }
 
   return snapshots;

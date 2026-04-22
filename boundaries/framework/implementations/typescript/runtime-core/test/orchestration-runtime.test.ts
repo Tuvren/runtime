@@ -1301,6 +1301,173 @@ describe("orchestration-runtime", () => {
     ]);
   });
 
+  test("keeps live extension receiver state mutable during orchestrated execution", async () => {
+    interface ReceiverExtension {
+      beforeIteration(): undefined;
+      beforeTurn(): undefined;
+      beforeTurnCalls: number;
+      name: string;
+    }
+
+    const harness = createFakeKernelHarness();
+    const extension: ReceiverExtension = {
+      beforeIteration() {
+        if (this.beforeTurnCalls !== 1) {
+          throw new Error(
+            `expected beforeTurnCalls to be 1, received ${this.beforeTurnCalls}`
+          );
+        }
+
+        return undefined;
+      },
+      beforeTurn() {
+        this.beforeTurnCalls += 1;
+        return undefined;
+      },
+      beforeTurnCalls: 0,
+      name: "orchestration-mutable-receiver",
+    };
+    const framework = createKrakenRuntimeCore({
+      defaultDriverId: "fake",
+      driverRegistry: createDriverRegistry([
+        createStaticDriver(async () => ({
+          messages: [assistantText("Hook receiver stayed mutable.")],
+          resolution: {
+            reason: "done",
+            type: "end_turn",
+          },
+        })),
+      ]),
+      kernel: harness.kernel,
+    });
+    const orchestration = createOrchestrationRuntime({
+      agents: {
+        primary: {
+          extensions: [extension],
+          name: "primary",
+        },
+      },
+      framework,
+    });
+    const thread = await framework.createThread({});
+    const handle = orchestration.executeTurn({
+      agent: "primary",
+      branchId: thread.branchId,
+      signal: textSignal("Start root"),
+      threadId: thread.threadId,
+    });
+
+    const events = await collectEvents(handle.events());
+
+    expect(handle.status().phase).toBe("completed");
+    expect(events.some((event) => event.type === "error")).toBe(false);
+    expect(
+      toKrakenMessages(await harness.readBranchMessages(thread.branchId))
+    ).toEqual([
+      {
+        parts: [{ text: "Start root", type: "text" }],
+        role: "user",
+      },
+      {
+        parts: [{ text: "Hook receiver stayed mutable.", type: "text" }],
+        role: "assistant",
+      },
+    ]);
+  });
+
+  test("preserves handed-off child agent attribution on orchestration streams", async () => {
+    const harness = createFakeKernelHarness();
+    const agents = {
+      primary: { name: "primary" },
+      reviewer: { name: "reviewer" },
+      worker: { name: "worker" },
+    };
+    const framework = createKrakenRuntimeCore({
+      defaultDriverId: "fake",
+      driverRegistry: createDriverRegistry([
+        createStaticDriver(async (context) => {
+          if (context.config.name === "worker") {
+            return {
+              messages: [assistantText("Passing this to reviewer.")],
+              resolution: {
+                contextPlan: context.handoff.createContextPlan({
+                  mode: "last_output_only",
+                  reason: "review_handoff",
+                  targetAgent: "reviewer",
+                }),
+                targetAgent: "reviewer",
+                type: "handoff",
+              },
+            };
+          }
+
+          if (context.config.name === "reviewer") {
+            return {
+              messages: [assistantText("Reviewer done.")],
+              resolution: {
+                reason: "done",
+                type: "end_turn",
+              },
+            };
+          }
+
+          await delay(20);
+          return {
+            messages: [assistantText("Parent complete.")],
+            resolution: {
+              reason: "done",
+              type: "end_turn",
+            },
+          };
+        }),
+      ]),
+      kernel: harness.kernel,
+      resolveAgentConfig(agentName) {
+        return agents[agentName];
+      },
+    });
+    const orchestration = createOrchestrationRuntime({
+      agents,
+      framework,
+    });
+    const thread = await framework.createThread({});
+    const handle = orchestration.executeTurn({
+      agent: "primary",
+      branchId: thread.branchId,
+      signal: textSignal("Start root"),
+      threadId: thread.threadId,
+    });
+    const rootCapture = startEventCapture(handle.allEvents());
+
+    await delay(0);
+    const childHandle = handle.spawn({
+      agent: "worker",
+      signal: textSignal("handoff child"),
+    });
+    const childEvents = await collectEvents(childHandle.events());
+    const childResult = await childHandle.awaitResult();
+    await rootCapture.done;
+
+    const childReviewerEvent = childEvents.find(
+      (event) => event.type === "text.done" && event.text === "Reviewer done."
+    );
+    const rootReviewerEvent = rootCapture.events.find(
+      (event) =>
+        event.type === "text.done" &&
+        event.text === "Reviewer done." &&
+        event.source?.workerId !== undefined
+    );
+
+    expect(childResult).toEqual([
+      {
+        text: "Reviewer done.",
+        type: "text",
+      },
+    ]);
+    expect(childReviewerEvent?.source?.agent).toBe("reviewer");
+    expect(rootReviewerEvent?.source?.agent).toBe("reviewer");
+  });
+
   test("snapshots orchestration agent configs at runtime creation", async () => {
     const harness = createFakeKernelHarness();
     const framework = createKrakenRuntimeCore({
