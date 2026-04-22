@@ -198,6 +198,10 @@ export function cloneValue<T>(value: T): T {
   return globalThis.structuredClone(value);
 }
 
+export function cloneSnapshotPreservingFunctions<T>(value: T): T {
+  return cloneValuePreservingFunctions(value);
+}
+
 export function createFrozenSnapshot<T>(value: T): T {
   return freezeSnapshot(cloneValuePreservingFunctions(value));
 }

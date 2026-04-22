@@ -88,6 +88,7 @@ import {
   createPreserveTraceHandoffContextBuilder,
 } from "./handoff-builders.js";
 import {
+  cloneSnapshotPreservingFunctions,
   cloneValue,
   createFrozenSnapshot,
   detachPromise,
@@ -1246,11 +1247,7 @@ class RuntimeCore implements KrakenRuntime {
       };
     }
 
-    const driverEventsForResponse = this.flushBufferedDriverEventsIfNeeded(
-      handle,
-      resolution,
-      emittedEvents
-    );
+    this.flushBufferedDriverEventsIfNeeded(handle, resolution, emittedEvents);
 
     const stagedMessages = [...driverMessages];
     const stagedMessageHashes = await this.stageDriverMessages(
@@ -3950,7 +3947,7 @@ function createDriverToolDefinitionSnapshot(
 }
 
 function cloneAgentConfigForRequest(config: AgentConfig): AgentConfig {
-  return createFrozenSnapshot(config);
+  return cloneSnapshotPreservingFunctions(config);
 }
 
 function encodeKernelRecord(value: unknown, label: string): Uint8Array {

@@ -3808,6 +3808,75 @@ describe("framework-runtime-core", () => {
     });
   });
 
+  test("keeps runtime hook receiver state mutable across live extension execution", async () => {
+    interface ReceiverExtension extends KrakenExtension {
+      beforeIteration(): undefined;
+      beforeTurn(): undefined;
+      beforeTurnCalls: number;
+    }
+
+    const harness = createFakeKernelHarness();
+    const extension: ReceiverExtension = {
+      beforeIteration() {
+        if (this.beforeTurnCalls !== 1) {
+          throw new Error(
+            `expected beforeTurnCalls to be 1, received ${this.beforeTurnCalls}`
+          );
+        }
+
+        return undefined;
+      },
+      beforeTurn() {
+        this.beforeTurnCalls += 1;
+        return undefined;
+      },
+      beforeTurnCalls: 0,
+      name: "mutable-receiver",
+    };
+    const runtime = createKrakenRuntimeCore({
+      defaultDriverId: "fake",
+      driverRegistry: createDriverRegistry([
+        {
+          async execute() {
+            return {
+              messages: [assistantText("Hook receiver stayed mutable.")],
+              resolution: {
+                reason: "done",
+                type: "end_turn",
+              },
+            };
+          },
+          id: "fake",
+          async resume() {
+            throw new Error("resume was not expected");
+          },
+        } satisfies KrakenDriver,
+      ]),
+      kernel: harness.kernel,
+    });
+    const thread = await runtime.createThread({});
+    const handle = runtime.executeTurn({
+      branchId: thread.branchId,
+      config: {
+        extensions: [extension],
+        name: "primary",
+      },
+      signal: textSignal("Exercise mutable hook receiver"),
+      threadId: thread.threadId,
+    });
+
+    const events = await collectEvents(handle.events());
+
+    expect(handle.status().phase).toBe("completed");
+    expect(events.some((event) => event.type === "error")).toBe(false);
+    expect(
+      hasAssistantText(
+        await harness.readBranchMessages(thread.branchId),
+        "Hook receiver stayed mutable."
+      )
+    ).toBe(true);
+  });
+
   test("persists beforeTurn state updates on terminal short-circuits", async () => {
     const harness = createFakeKernelHarness();
     let driverCalls = 0;
@@ -6109,10 +6178,12 @@ describe("framework-runtime-core", () => {
         context: AroundToolContext,
         next: (context?: AroundToolContext) => Promise<ToolResultPart>
       ): Promise<AroundToolResult> | AroundToolResult;
+      aroundToolCalls: number;
       label: string;
     }
 
     interface AroundToolSpecReceiver {
+      calls: number;
       handler(
         context: AroundToolContext,
         next: (context?: AroundToolContext) => Promise<ToolResultPart>
@@ -6124,23 +6195,33 @@ describe("framework-runtime-core", () => {
     const harness = createFakeKernelHarness();
     const methodExtension: MethodAroundToolExtension = {
       aroundTool(_context, next) {
-        if (this.label !== "method") {
+        this.aroundToolCalls += 1;
+
+        if (this.label !== "method" || this.aroundToolCalls !== 1) {
           throw new Error("lost function-form aroundTool receiver");
         }
 
         return next();
       },
+      aroundToolCalls: 0,
       label: "method",
       name: "method-around-tool",
     };
     const aroundToolSpec: AroundToolSpecReceiver = {
       handler(context, next) {
-        if (this.label !== "spec" || !this.tools.includes(context.tool.name)) {
+        this.calls += 1;
+
+        if (
+          this.label !== "spec" ||
+          this.calls !== 1 ||
+          !this.tools.includes(context.tool.name)
+        ) {
           throw new Error("lost object-form aroundTool receiver");
         }
 
         return next();
       },
+      calls: 0,
       label: "spec",
       tools: ["email"],
     };
