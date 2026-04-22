@@ -805,7 +805,7 @@ export type KrakenStreamEvent =
   | { type: "turn.end"; turnId: string; status: "completed" | "paused" | "failed"; timestamp: EpochMs; source?: EventSource }
   | { type: "iteration.start" | "iteration.end"; iterationCount: number; timestamp: EpochMs; source?: EventSource }
   | { type: "message.start"; messageId: string; role: "assistant"; timestamp: EpochMs; source?: EventSource }
-  | { type: "file.done"; messageId: string; data: string | Uint8Array; filename?: string; mediaType?: string; timestamp: EpochMs; source?: EventSource }
+  | { type: "file.done"; messageId: string; data: string | Uint8Array; filename?: string; mediaType: string; timestamp: EpochMs; source?: EventSource }
   | { type: "text.delta"; messageId: string; delta: string; timestamp: EpochMs; source?: EventSource }
   | { type: "text.done"; messageId: string; text: string; timestamp: EpochMs; source?: EventSource }
   | { type: "reasoning.delta"; messageId: string; delta: string; timestamp: EpochMs; source?: EventSource }

@@ -53,6 +53,7 @@ import {
 } from "../src/index.ts";
 import { createFakeKernelHarness } from "./fake-kernel.ts";
 import {
+  assistantStructured,
   assistantText,
   assistantToolCalls,
   buildHandoffPlan,
@@ -518,6 +519,12 @@ describe("framework-runtime-core", () => {
           type: "message.start",
         });
         context.runtime.emit({
+          delta: "Hello from Kraken.",
+          messageId: "assistant-1",
+          timestamp: context.runtime.now(),
+          type: "text.delta",
+        });
+        context.runtime.emit({
           messageId: "assistant-1",
           text: "Hello from Kraken.",
           timestamp: context.runtime.now(),
@@ -611,7 +618,30 @@ describe("framework-runtime-core", () => {
     });
 
     const events = await collectEvents(handle.events());
+    const messageStartIndex = events.findIndex(
+      (event) => event.type === "message.start"
+    );
+    const textDeltaIndex = events.findIndex(
+      (event) =>
+        event.type === "text.delta" &&
+        event.delta === "Visible without explicit runtime.emit."
+    );
+    const textDoneIndex = events.findIndex(
+      (event) =>
+        event.type === "text.done" &&
+        event.text === "Visible without explicit runtime.emit."
+    );
+    const messageDoneIndex = events.findIndex(
+      (event) => event.type === "message.done"
+    );
 
+    expect(
+      events.some(
+        (event) =>
+          event.type === "text.delta" &&
+          event.delta === "Visible without explicit runtime.emit."
+      )
+    ).toBe(true);
     expect(
       events.some(
         (event) =>
@@ -620,6 +650,9 @@ describe("framework-runtime-core", () => {
       )
     ).toBe(true);
     expect(events.some((event) => event.type === "message.done")).toBe(true);
+    expect(messageStartIndex).toBeLessThan(textDeltaIndex);
+    expect(textDeltaIndex).toBeLessThan(textDoneIndex);
+    expect(textDoneIndex).toBeLessThan(messageDoneIndex);
     expect(await harness.readBranchMessages(thread.branchId)).toEqual([
       {
         parts: [{ text: "Show durable output", type: "text" }],
@@ -635,6 +668,138 @@ describe("framework-runtime-core", () => {
         role: "assistant",
       },
     ]);
+  });
+
+  test("synthesizes structured delta events when a driver returns durable structured output without streaming it", async () => {
+    const harness = createFakeKernelHarness();
+    const driver = {
+      async execute() {
+        return {
+          messages: [assistantStructured("result", { answer: "ok" })],
+          resolution: {
+            reason: "done",
+            type: "end_turn",
+          },
+        };
+      },
+      id: "fake",
+      async resume() {
+        throw new Error("resume was not expected");
+      },
+    } satisfies KrakenDriver;
+    const runtime = createKrakenRuntimeCore({
+      defaultDriverId: "fake",
+      driverRegistry: createDriverRegistry([driver]),
+      kernel: harness.kernel,
+    });
+    const thread = await runtime.createThread({});
+    const handle = runtime.executeTurn({
+      branchId: thread.branchId,
+      config: { name: "primary" },
+      signal: textSignal("Return structured output"),
+      threadId: thread.threadId,
+    });
+
+    const events = await collectEvents(handle.events());
+    const structuredDeltaIndex = events.findIndex(
+      (event) =>
+        event.type === "structured.delta" && event.delta === '{"answer":"ok"}'
+    );
+    const structuredDoneIndex = events.findIndex(
+      (event) =>
+        event.type === "structured.done" &&
+        event.name === "result" &&
+        toOptionalRecord(event.data)?.answer === "ok"
+    );
+
+    expect(structuredDeltaIndex).toBeGreaterThan(-1);
+    expect(structuredDoneIndex).toBeGreaterThan(structuredDeltaIndex);
+  });
+
+  test("synthesizes tool-call args deltas when a driver returns durable tool calls without streaming them", async () => {
+    const harness = createFakeKernelHarness();
+    const driver = {
+      async execute(context) {
+        const toolMessages = context.messages.filter(
+          (message) => message.role === "tool"
+        );
+
+        if (toolMessages.length === 0) {
+          return {
+            messages: [
+              assistantToolCalls([
+                {
+                  callId: "call-search",
+                  input: { query: "search term" },
+                  name: "search",
+                },
+              ]),
+            ],
+            resolution: {
+              type: "continue_iteration",
+            },
+            toolExecutionMode: "parallel",
+          };
+        }
+
+        return {
+          messages: [assistantText("Done.")],
+          resolution: {
+            reason: "done",
+            type: "end_turn",
+          },
+        };
+      },
+      id: "fake",
+      async resume() {
+        throw new Error("resume was not expected");
+      },
+    } satisfies KrakenDriver;
+    const runtime = createKrakenRuntimeCore({
+      defaultDriverId: "fake",
+      driverRegistry: createDriverRegistry([driver]),
+      kernel: harness.kernel,
+    });
+    const thread = await runtime.createThread({});
+    const handle = runtime.executeTurn({
+      branchId: thread.branchId,
+      config: {
+        name: "primary",
+        tools: [
+          {
+            description: "Search",
+            execute() {
+              return { ok: true };
+            },
+            inputSchema: {
+              properties: {
+                query: { type: "string" },
+              },
+              required: ["query"],
+              type: "object",
+            },
+            name: "search",
+          },
+        ],
+      },
+      signal: textSignal("Synthesize tool call deltas"),
+      threadId: thread.threadId,
+    });
+
+    const events = await collectEvents(handle.events());
+    const argsDeltaIndex = events.findIndex(
+      (event) =>
+        event.type === "tool_call.args_delta" &&
+        event.callId === "call-search" &&
+        event.delta === '{"query":"search term"}'
+    );
+    const toolCallDoneIndex = events.findIndex(
+      (event) =>
+        event.type === "tool_call.done" && event.callId === "call-search"
+    );
+
+    expect(argsDeltaIndex).toBeGreaterThan(-1);
+    expect(toolCallDoneIndex).toBeGreaterThan(argsDeltaIndex);
   });
 
   test("does not start execution until the event stream is consumed", async () => {
@@ -1255,6 +1420,222 @@ describe("framework-runtime-core", () => {
     ]);
   });
 
+  test("allows multiple assistant message sequences when only the final retry response becomes durable", async () => {
+    const harness = createFakeKernelHarness();
+    const driver = {
+      async execute(context) {
+        context.runtime.emit({
+          messageId: "assistant-attempt-1",
+          role: "assistant",
+          timestamp: context.runtime.now(),
+          type: "message.start",
+        });
+        context.runtime.emit({
+          delta: "First attempt",
+          messageId: "assistant-attempt-1",
+          timestamp: context.runtime.now(),
+          type: "text.delta",
+        });
+        context.runtime.emit({
+          messageId: "assistant-attempt-1",
+          text: "First attempt",
+          timestamp: context.runtime.now(),
+          type: "text.done",
+        });
+        context.runtime.emit({
+          finishReason: "stop",
+          messageId: "assistant-attempt-1",
+          timestamp: context.runtime.now(),
+          type: "message.done",
+        });
+        context.runtime.emit({
+          messageId: "assistant-attempt-2",
+          role: "assistant",
+          timestamp: context.runtime.now(),
+          type: "message.start",
+        });
+        context.runtime.emit({
+          delta: "Final attempt",
+          messageId: "assistant-attempt-2",
+          timestamp: context.runtime.now(),
+          type: "text.delta",
+        });
+        context.runtime.emit({
+          messageId: "assistant-attempt-2",
+          text: "Final attempt",
+          timestamp: context.runtime.now(),
+          type: "text.done",
+        });
+        context.runtime.emit({
+          finishReason: "stop",
+          messageId: "assistant-attempt-2",
+          timestamp: context.runtime.now(),
+          type: "message.done",
+        });
+
+        return {
+          messages: [assistantText("Final attempt")],
+          resolution: {
+            reason: "done",
+            type: "end_turn",
+          },
+        };
+      },
+      id: "fake",
+      async resume() {
+        throw new Error("resume was not expected");
+      },
+    } satisfies KrakenDriver;
+    const runtime = createKrakenRuntimeCore({
+      defaultDriverId: "fake",
+      driverRegistry: createDriverRegistry([driver]),
+      kernel: harness.kernel,
+    });
+    const thread = await runtime.createThread({});
+    const handle = runtime.executeTurn({
+      branchId: thread.branchId,
+      config: { name: "primary" },
+      signal: textSignal("Allow retry-shaped assistant streams"),
+      threadId: thread.threadId,
+    });
+
+    const events = await collectEvents(handle.events());
+
+    expect(handle.status().phase).toBe("completed");
+    expect(events.filter((event) => event.type === "message.done").length).toBe(
+      2
+    );
+    expect(await harness.readBranchMessages(thread.branchId)).toEqual([
+      {
+        parts: [{ text: "Allow retry-shaped assistant streams", type: "text" }],
+        role: "user",
+      },
+      {
+        parts: [{ text: "Final attempt", type: "text" }],
+        role: "assistant",
+      },
+    ]);
+  });
+
+  test("rejects text assistant streams that omit text.delta", async () => {
+    const harness = createFakeKernelHarness();
+    const driver = {
+      async execute(context) {
+        context.runtime.emit({
+          messageId: "assistant-text-without-delta",
+          role: "assistant",
+          timestamp: context.runtime.now(),
+          type: "message.start",
+        });
+        context.runtime.emit({
+          messageId: "assistant-text-without-delta",
+          text: "missing delta",
+          timestamp: context.runtime.now(),
+          type: "text.done",
+        });
+        context.runtime.emit({
+          finishReason: "stop",
+          messageId: "assistant-text-without-delta",
+          timestamp: context.runtime.now(),
+          type: "message.done",
+        });
+
+        return {
+          messages: [assistantText("missing delta")],
+          resolution: {
+            reason: "done",
+            type: "end_turn",
+          },
+        };
+      },
+      id: "fake",
+      async resume() {
+        throw new Error("resume was not expected");
+      },
+    } satisfies KrakenDriver;
+    const runtime = createKrakenRuntimeCore({
+      defaultDriverId: "fake",
+      driverRegistry: createDriverRegistry([driver]),
+      kernel: harness.kernel,
+    });
+    const thread = await runtime.createThread({});
+    const handle = runtime.executeTurn({
+      branchId: thread.branchId,
+      config: { name: "primary" },
+      signal: textSignal("Reject missing text delta"),
+      threadId: thread.threadId,
+    });
+
+    const events = await collectEvents(handle.events());
+    const errorEvent = events.find(
+      (event): event is Extract<(typeof events)[number], { type: "error" }> =>
+        event.type === "error"
+    );
+
+    expect(handle.status().phase).toBe("failed");
+    expect(errorEvent?.error.code).toBe("invalid_stream_event");
+  });
+
+  test("rejects structured assistant streams that omit structured.delta", async () => {
+    const harness = createFakeKernelHarness();
+    const driver = {
+      async execute(context) {
+        context.runtime.emit({
+          messageId: "assistant-structured-without-delta",
+          role: "assistant",
+          timestamp: context.runtime.now(),
+          type: "message.start",
+        });
+        context.runtime.emit({
+          data: { answer: "ok" },
+          messageId: "assistant-structured-without-delta",
+          name: "result",
+          timestamp: context.runtime.now(),
+          type: "structured.done",
+        });
+        context.runtime.emit({
+          finishReason: "stop",
+          messageId: "assistant-structured-without-delta",
+          timestamp: context.runtime.now(),
+          type: "message.done",
+        });
+
+        return {
+          messages: [assistantStructured("result", { answer: "ok" })],
+          resolution: {
+            reason: "done",
+            type: "end_turn",
+          },
+        };
+      },
+      id: "fake",
+      async resume() {
+        throw new Error("resume was not expected");
+      },
+    } satisfies KrakenDriver;
+    const runtime = createKrakenRuntimeCore({
+      defaultDriverId: "fake",
+      driverRegistry: createDriverRegistry([driver]),
+      kernel: harness.kernel,
+    });
+    const thread = await runtime.createThread({});
+    const handle = runtime.executeTurn({
+      branchId: thread.branchId,
+      config: { name: "primary" },
+      signal: textSignal("Reject missing structured delta"),
+      threadId: thread.threadId,
+    });
+
+    const events = await collectEvents(handle.events());
+    const errorEvent = events.find(
+      (event): event is Extract<(typeof events)[number], { type: "error" }> =>
+        event.type === "error"
+    );
+
+    expect(handle.status().phase).toBe("failed");
+    expect(errorEvent?.error.code).toBe("invalid_stream_event");
+  });
+
   test("rejects tool-call stream previews that do not match the durable tool call", async () => {
     const harness = createFakeKernelHarness();
     const driver = {
@@ -1357,6 +1738,104 @@ describe("framework-runtime-core", () => {
         role: "user",
       },
     ]);
+  });
+
+  test("rejects tool-call assistant streams that omit tool_call.args_delta", async () => {
+    const harness = createFakeKernelHarness();
+    const driver = {
+      async execute(context) {
+        context.runtime.emit({
+          messageId: "assistant-tool-call-without-delta",
+          role: "assistant",
+          timestamp: context.runtime.now(),
+          type: "message.start",
+        });
+        context.runtime.emit({
+          callId: "call-search",
+          messageId: "assistant-tool-call-without-delta",
+          name: "search",
+          timestamp: context.runtime.now(),
+          type: "tool_call.start",
+        });
+        context.runtime.emit({
+          callId: "call-search",
+          input: { value: "persisted-right" },
+          name: "search",
+          timestamp: context.runtime.now(),
+          type: "tool_call.done",
+        });
+        context.runtime.emit({
+          finishReason: "tool_call",
+          messageId: "assistant-tool-call-without-delta",
+          timestamp: context.runtime.now(),
+          type: "message.done",
+        });
+
+        return {
+          messages: [
+            assistantToolCalls([
+              {
+                callId: "call-search",
+                input: { value: "persisted-right" },
+                name: "search",
+              },
+            ]),
+          ],
+          resolution: {
+            type: "continue_iteration",
+          },
+          toolExecutionMode: "parallel",
+        };
+      },
+      id: "fake",
+      async resume() {
+        throw new Error("resume was not expected");
+      },
+    } satisfies KrakenDriver;
+    const runtime = createKrakenRuntimeCore({
+      defaultDriverId: "fake",
+      driverRegistry: createDriverRegistry([driver]),
+      kernel: harness.kernel,
+    });
+    const thread = await runtime.createThread({});
+    const handle = runtime.executeTurn({
+      branchId: thread.branchId,
+      config: {
+        name: "primary",
+        tools: [
+          {
+            description: "Search",
+            execute() {
+              return { ok: true };
+            },
+            inputSchema: {
+              properties: {
+                value: { type: "string" },
+              },
+              required: ["value"],
+              type: "object",
+            },
+            name: "search",
+          },
+        ],
+      },
+      signal: textSignal("Reject missing tool-call args delta"),
+      threadId: thread.threadId,
+    });
+
+    const events = await collectEvents(handle.events());
+    const errorEvent = events.find(
+      (event): event is Extract<(typeof events)[number], { type: "error" }> =>
+        event.type === "error"
+    );
+
+    expect(handle.status().phase).toBe("failed");
+    expect(errorEvent?.error.code).toBe("invalid_stream_event");
+    expect(
+      events.some(
+        (event) => event.type === "tool.start" || event.type === "tool.result"
+      )
+    ).toBe(false);
   });
 
   test("rejects incomplete assistant event sequences", async () => {
@@ -3755,6 +4234,12 @@ describe("framework-runtime-core", () => {
           role: "assistant",
           timestamp: context.runtime.now(),
           type: "message.start",
+        });
+        context.runtime.emit({
+          delta: "Visible output",
+          messageId: "message-1",
+          timestamp: context.runtime.now(),
+          type: "text.delta",
         });
         context.runtime.emit({
           messageId: "message-1",
@@ -6964,6 +7449,121 @@ describe("framework-runtime-core", () => {
       "tool.start:call-fast",
       "tool.result:call-fast",
     ]);
+  });
+
+  test("stops resolving later sequential tool calls after the first approval gate", async () => {
+    const harness = createFakeKernelHarness();
+    const approvalChecks: string[] = [];
+    const driver = {
+      async execute(context) {
+        const toolMessages = context.messages.filter(
+          (message) => message.role === "tool"
+        );
+
+        if (toolMessages.length === 0) {
+          return {
+            messages: [
+              assistantToolCalls([
+                {
+                  callId: "call-first",
+                  input: { query: "first" },
+                  name: "first",
+                },
+                {
+                  callId: "call-second",
+                  input: { query: "second" },
+                  name: "second",
+                },
+              ]),
+            ],
+            resolution: {
+              type: "continue_iteration",
+            },
+            toolExecutionMode: "sequential",
+          };
+        }
+
+        return {
+          messages: [assistantText("This should not be reached.")],
+          resolution: {
+            reason: "done",
+            type: "end_turn",
+          },
+        };
+      },
+      id: "fake",
+      async resume() {
+        throw new Error("resume was not expected");
+      },
+    } satisfies KrakenDriver;
+    const runtime = createKrakenRuntimeCore({
+      defaultDriverId: "fake",
+      driverRegistry: createDriverRegistry([driver]),
+      kernel: harness.kernel,
+    });
+    const thread = await runtime.createThread({});
+    const handle = runtime.executeTurn({
+      branchId: thread.branchId,
+      config: {
+        name: "primary",
+        tools: [
+          {
+            approval() {
+              approvalChecks.push("first");
+              return true;
+            },
+            description: "Pause first",
+            execute() {
+              return { ok: false };
+            },
+            inputSchema: {
+              properties: {
+                query: { type: "string" },
+              },
+              required: ["query"],
+              type: "object",
+            },
+            name: "first",
+          },
+          {
+            approval() {
+              approvalChecks.push("second");
+              return false;
+            },
+            description: "Should not be inspected yet",
+            execute() {
+              return { ok: true };
+            },
+            inputSchema: {
+              properties: {
+                query: { type: "string" },
+              },
+              required: ["query"],
+              type: "object",
+            },
+            name: "second",
+          },
+        ],
+      },
+      signal: textSignal("Pause sequentially at the first approval gate"),
+      threadId: thread.threadId,
+    });
+
+    const events = await collectEvents(handle.events());
+    const approvalEvent = events.find(
+      (
+        event
+      ): event is Extract<
+        (typeof events)[number],
+        { type: "approval.requested" }
+      > => event.type === "approval.requested"
+    );
+
+    expect(handle.status().phase).toBe("paused");
+    expect(approvalChecks).toEqual(["first"]);
+    expect(
+      approvalEvent?.request.toolCalls.map((toolCall) => toolCall.callId)
+    ).toEqual(["call-first"]);
   });
 
   test("emits all parallel tool.start events before any tool.result when aroundTool preflights are delayed", async () => {

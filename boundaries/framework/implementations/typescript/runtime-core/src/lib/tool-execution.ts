@@ -203,15 +203,25 @@ async function runToolBatch(
   mode: ToolExecutionMode,
   resolveStep: (index: number) => Promise<ResolvedToolBatchStep | undefined>
 ): Promise<ToolBatchOutcome> {
+  if (mode === "sequential") {
+    return await runSequentialToolBatch(totalCalls, environment, resolveStep);
+  }
+
+  const resolvedSteps = await resolveToolBatchSteps(totalCalls, resolveStep);
+  return await runParallelToolBatch(resolvedSteps, environment);
+}
+
+async function resolveToolBatchSteps(
+  totalCalls: number,
+  resolveStep: (index: number) => Promise<ResolvedToolBatchStep | undefined>
+): Promise<Array<ResolvedToolBatchStep | undefined>> {
   const resolvedSteps: Array<ResolvedToolBatchStep | undefined> = [];
 
   for (let index = 0; index < totalCalls; index += 1) {
     resolvedSteps[index] = await resolveStep(index);
   }
 
-  return mode === "sequential"
-    ? await runSequentialToolBatch(resolvedSteps, environment)
-    : await runParallelToolBatch(resolvedSteps, environment);
+  return resolvedSteps;
 }
 
 async function runParallelToolBatch(
@@ -297,17 +307,20 @@ async function runParallelToolBatch(
 }
 
 async function runSequentialToolBatch(
-  resolvedSteps: Array<ResolvedToolBatchStep | undefined>,
-  environment: ToolBatchEnvironment
+  totalCalls: number,
+  environment: ToolBatchEnvironment,
+  resolveStep: (index: number) => Promise<ResolvedToolBatchStep | undefined>
 ): Promise<ToolBatchOutcome> {
   const orderedResults = Array.from(
-    { length: resolvedSteps.length },
+    { length: totalCalls },
     (): StagedToolResult[] => []
   );
   const pendingToolCalls: PendingToolCall[] = [];
   const updates: ExtensionStateUpdate[] = [];
 
-  for (const [index, resolved] of resolvedSteps.entries()) {
+  for (let index = 0; index < totalCalls; index += 1) {
+    const resolved = await resolveStep(index);
+
     if (resolved === undefined) {
       continue;
     }

@@ -3653,6 +3653,12 @@ class RuntimeCore implements KrakenRuntime {
           break;
         case "structured":
           events.push({
+            delta: serializeAssistantDeltaValue(part.data),
+            messageId,
+            timestamp: this.now(),
+            type: "structured.delta",
+          });
+          events.push({
             data: cloneValue(part.data),
             messageId,
             name: part.name,
@@ -3661,6 +3667,12 @@ class RuntimeCore implements KrakenRuntime {
           });
           break;
         case "text":
+          events.push({
+            delta: part.text,
+            messageId,
+            timestamp: this.now(),
+            type: "text.delta",
+          });
           events.push({
             messageId,
             text: part.text,
@@ -3675,6 +3687,12 @@ class RuntimeCore implements KrakenRuntime {
             name: part.name,
             timestamp: this.now(),
             type: "tool_call.start",
+          });
+          events.push({
+            callId: part.callId,
+            delta: serializeAssistantDeltaValue(part.input),
+            timestamp: this.now(),
+            type: "tool_call.args_delta",
           });
           events.push({
             callId: part.callId,
@@ -4168,7 +4186,29 @@ function validateDriverAssistantEvents(
     );
   }
 
-  const actualEvents = assistantEvents.filter((event) =>
+  const assistantSequencesOrError =
+    splitAssistantEventSequences(assistantEvents);
+
+  if (assistantSequencesOrError instanceof KrakenRuntimeError) {
+    return assistantSequencesOrError;
+  }
+
+  const finalAssistantSequence = assistantSequencesOrError.at(-1);
+
+  if (finalAssistantSequence === undefined) {
+    return createAssistantDeltaValidationError();
+  }
+
+  for (const sequence of assistantSequencesOrError.slice(0, -1)) {
+    const sequenceValidationError =
+      validateStandaloneAssistantSequence(sequence);
+
+    if (sequenceValidationError !== undefined) {
+      return sequenceValidationError;
+    }
+  }
+
+  const actualEvents = finalAssistantSequence.filter((event) =>
     isAssistantValidationEvent(event.type)
   );
   const messageId =
@@ -4207,7 +4247,7 @@ function validateDriverAssistantEvents(
 
   const deltaValidationError = validateDriverAssistantDeltas(
     assistantMessage,
-    assistantEvents
+    finalAssistantSequence
   );
 
   if (deltaValidationError !== undefined) {
@@ -4226,6 +4266,7 @@ function validateDriverAssistantDeltas(
     currentMessageId: undefined,
     deltaBuffer: "",
     partIndex: 0,
+    sawDelta: false,
     started: false,
     toolCallStarted: false,
   };
@@ -4260,6 +4301,7 @@ function validateDriverAssistantDeltas(
   if (
     !(state.started && state.completed) ||
     state.deltaBuffer !== "" ||
+    state.sawDelta ||
     state.toolCallStarted
   ) {
     return createAssistantDeltaValidationError();
@@ -4273,6 +4315,7 @@ interface AssistantDeltaValidationState {
   currentMessageId: string | undefined;
   deltaBuffer: string;
   partIndex: number;
+  sawDelta: boolean;
   started: boolean;
   toolCallStarted: boolean;
 }
@@ -4422,6 +4465,7 @@ function validateReasoningAssistantDeltaEvent(
 ): KrakenRuntimeError | undefined {
   if (event.type === "reasoning.delta") {
     state.deltaBuffer += event.delta;
+    state.sawDelta = true;
     return undefined;
   }
 
@@ -4441,6 +4485,7 @@ function validateReasoningAssistantDeltaEvent(
   }
 
   state.deltaBuffer = "";
+  state.sawDelta = false;
   state.partIndex += 1;
   return undefined;
 }
@@ -4452,6 +4497,7 @@ function validateStructuredAssistantDeltaEvent(
 ): KrakenRuntimeError | undefined {
   if (event.type === "structured.delta") {
     state.deltaBuffer += event.delta;
+    state.sawDelta = true;
     return undefined;
   }
 
@@ -4460,13 +4506,16 @@ function validateStructuredAssistantDeltaEvent(
   }
 
   if (
-    state.deltaBuffer !== "" &&
-    !doesSerializedDeltaMatchValue(state.deltaBuffer, part.data)
+    !(
+      state.sawDelta &&
+      doesSerializedDeltaMatchValue(state.deltaBuffer, part.data)
+    )
   ) {
     return createAssistantDeltaValidationError();
   }
 
   state.deltaBuffer = "";
+  state.sawDelta = false;
   state.partIndex += 1;
   return undefined;
 }
@@ -4478,6 +4527,7 @@ function validateTextAssistantDeltaEvent(
 ): KrakenRuntimeError | undefined {
   if (event.type === "text.delta") {
     state.deltaBuffer += event.delta;
+    state.sawDelta = true;
     return undefined;
   }
 
@@ -4485,11 +4535,12 @@ function validateTextAssistantDeltaEvent(
     return createAssistantDeltaValidationError();
   }
 
-  if (state.deltaBuffer !== "" && state.deltaBuffer !== part.text) {
+  if (!state.sawDelta || state.deltaBuffer !== part.text) {
     return createAssistantDeltaValidationError();
   }
 
   state.deltaBuffer = "";
+  state.sawDelta = false;
   state.partIndex += 1;
   return undefined;
 }
@@ -4504,6 +4555,10 @@ function validateToolCallAssistantDeltaEvent(
       return createAssistantDeltaValidationError();
     }
 
+    if (event.callId !== part.callId || event.name !== part.name) {
+      return createAssistantDeltaValidationError();
+    }
+
     state.toolCallStarted = true;
     return undefined;
   }
@@ -4514,6 +4569,7 @@ function validateToolCallAssistantDeltaEvent(
     }
 
     state.deltaBuffer += event.delta;
+    state.sawDelta = true;
     return undefined;
   }
 
@@ -4522,15 +4578,300 @@ function validateToolCallAssistantDeltaEvent(
   }
 
   if (
-    state.deltaBuffer !== "" &&
+    event.callId !== part.callId ||
+    event.name !== part.name ||
+    !state.sawDelta ||
     !doesSerializedDeltaMatchValue(state.deltaBuffer, part.input)
   ) {
     return createAssistantDeltaValidationError();
   }
 
   state.deltaBuffer = "";
+  state.sawDelta = false;
   state.partIndex += 1;
   state.toolCallStarted = false;
+  return undefined;
+}
+
+function splitAssistantEventSequences(
+  assistantEvents: KrakenStreamEvent[]
+): KrakenRuntimeError | KrakenStreamEvent[][] {
+  const sequences: KrakenStreamEvent[][] = [];
+  let currentSequence: KrakenStreamEvent[] | undefined;
+
+  for (const event of assistantEvents) {
+    if (event.type === "message.start") {
+      if (currentSequence !== undefined) {
+        return createAssistantDeltaValidationError();
+      }
+
+      currentSequence = [event];
+      continue;
+    }
+
+    if (currentSequence === undefined) {
+      return createAssistantDeltaValidationError();
+    }
+
+    currentSequence.push(event);
+
+    if (event.type === "message.done") {
+      sequences.push(currentSequence);
+      currentSequence = undefined;
+    }
+  }
+
+  if (currentSequence !== undefined || sequences.length === 0) {
+    return createAssistantDeltaValidationError();
+  }
+
+  return sequences;
+}
+
+interface StandaloneAssistantActivePartState {
+  deltaBuffer: string;
+  kind: "reasoning" | "structured" | "text";
+  sawDelta: boolean;
+}
+
+interface StandaloneAssistantToolCallState {
+  callId: string;
+  deltaBuffer: string;
+  kind: "tool_call";
+  name: string;
+  sawDelta: boolean;
+}
+
+type StandaloneAssistantPartState =
+  | { kind: "idle" }
+  | StandaloneAssistantActivePartState
+  | StandaloneAssistantToolCallState;
+
+interface StandaloneAssistantValidationState {
+  currentMessageId: string;
+  partState: StandaloneAssistantPartState;
+  sawToolCallPart: boolean;
+}
+
+function validateStandaloneAssistantSequence(
+  assistantEvents: KrakenStreamEvent[]
+): KrakenRuntimeError | undefined {
+  const firstEvent = assistantEvents[0];
+  const lastEvent = assistantEvents.at(-1);
+
+  if (
+    firstEvent?.type !== "message.start" ||
+    lastEvent?.type !== "message.done"
+  ) {
+    return createAssistantDeltaValidationError();
+  }
+
+  const state: StandaloneAssistantValidationState = {
+    currentMessageId: firstEvent.messageId,
+    partState: { kind: "idle" },
+    sawToolCallPart: false,
+  };
+
+  for (const event of assistantEvents.slice(1, -1)) {
+    if (!assistantEventBelongsToCurrentMessage(event, state.currentMessageId)) {
+      return createAssistantDeltaValidationError();
+    }
+
+    const validationError = validateStandaloneAssistantPartEvent(event, state);
+
+    if (validationError !== undefined) {
+      return validationError;
+    }
+  }
+
+  if (state.partState.kind !== "idle") {
+    return createAssistantDeltaValidationError();
+  }
+
+  if (
+    !doesFinishReasonMatchToolCallPresence(
+      lastEvent.finishReason,
+      state.sawToolCallPart
+    )
+  ) {
+    return createAssistantDeltaValidationError();
+  }
+
+  return undefined;
+}
+
+function validateStandaloneAssistantPartEvent(
+  event: KrakenStreamEvent,
+  state: StandaloneAssistantValidationState
+): KrakenRuntimeError | undefined {
+  if (event.type === "message.start" || event.type === "message.done") {
+    return createAssistantDeltaValidationError();
+  }
+
+  switch (state.partState.kind) {
+    case "idle":
+      return validateStandaloneIdleAssistantEvent(event, state);
+    case "reasoning":
+      return validateStandaloneReasoningAssistantEvent(event, state);
+    case "structured":
+      return validateStandaloneStructuredAssistantEvent(event, state);
+    case "text":
+      return validateStandaloneTextAssistantEvent(event, state);
+    case "tool_call":
+      return validateStandaloneToolCallAssistantEvent(event, state);
+    default:
+      return createAssistantDeltaValidationError();
+  }
+}
+
+function validateStandaloneIdleAssistantEvent(
+  event: KrakenStreamEvent,
+  state: StandaloneAssistantValidationState
+): KrakenRuntimeError | undefined {
+  switch (event.type) {
+    case "file.done":
+      return undefined;
+    case "reasoning.delta":
+      state.partState = {
+        deltaBuffer: event.delta,
+        kind: "reasoning",
+        sawDelta: true,
+      };
+      return undefined;
+    case "reasoning.done":
+      return undefined;
+    case "structured.delta":
+      state.partState = {
+        deltaBuffer: event.delta,
+        kind: "structured",
+        sawDelta: true,
+      };
+      return undefined;
+    case "text.delta":
+      state.partState = {
+        deltaBuffer: event.delta,
+        kind: "text",
+        sawDelta: true,
+      };
+      return undefined;
+    case "tool_call.start":
+      state.partState = {
+        callId: event.callId,
+        deltaBuffer: "",
+        kind: "tool_call",
+        name: event.name,
+        sawDelta: false,
+      };
+      state.sawToolCallPart = true;
+      return undefined;
+    default:
+      return createAssistantDeltaValidationError();
+  }
+}
+
+function validateStandaloneReasoningAssistantEvent(
+  event: KrakenStreamEvent,
+  state: StandaloneAssistantValidationState
+): KrakenRuntimeError | undefined {
+  if (state.partState.kind !== "reasoning") {
+    return createAssistantDeltaValidationError();
+  }
+
+  if (event.type === "reasoning.delta") {
+    state.partState.deltaBuffer += event.delta;
+    state.partState.sawDelta = true;
+    return undefined;
+  }
+
+  if (event.type !== "reasoning.done") {
+    return createAssistantDeltaValidationError();
+  }
+
+  state.partState = { kind: "idle" };
+  return undefined;
+}
+
+function validateStandaloneStructuredAssistantEvent(
+  event: KrakenStreamEvent,
+  state: StandaloneAssistantValidationState
+): KrakenRuntimeError | undefined {
+  if (state.partState.kind !== "structured") {
+    return createAssistantDeltaValidationError();
+  }
+
+  if (event.type === "structured.delta") {
+    state.partState.deltaBuffer += event.delta;
+    state.partState.sawDelta = true;
+    return undefined;
+  }
+
+  if (
+    event.type !== "structured.done" ||
+    !state.partState.sawDelta ||
+    !doesSerializedDeltaMatchValue(state.partState.deltaBuffer, event.data)
+  ) {
+    return createAssistantDeltaValidationError();
+  }
+
+  state.partState = { kind: "idle" };
+  return undefined;
+}
+
+function validateStandaloneTextAssistantEvent(
+  event: KrakenStreamEvent,
+  state: StandaloneAssistantValidationState
+): KrakenRuntimeError | undefined {
+  if (state.partState.kind !== "text") {
+    return createAssistantDeltaValidationError();
+  }
+
+  if (event.type === "text.delta") {
+    state.partState.deltaBuffer += event.delta;
+    state.partState.sawDelta = true;
+    return undefined;
+  }
+
+  if (
+    event.type !== "text.done" ||
+    !state.partState.sawDelta ||
+    state.partState.deltaBuffer !== event.text
+  ) {
+    return createAssistantDeltaValidationError();
+  }
+
+  state.partState = { kind: "idle" };
+  return undefined;
+}
+
+function validateStandaloneToolCallAssistantEvent(
+  event: KrakenStreamEvent,
+  state: StandaloneAssistantValidationState
+): KrakenRuntimeError | undefined {
+  if (state.partState.kind !== "tool_call") {
+    return createAssistantDeltaValidationError();
+  }
+
+  if (event.type === "tool_call.args_delta") {
+    if (event.callId !== state.partState.callId) {
+      return createAssistantDeltaValidationError();
+    }
+
+    state.partState.deltaBuffer += event.delta;
+    state.partState.sawDelta = true;
+    return undefined;
+  }
+
+  if (
+    event.type !== "tool_call.done" ||
+    event.callId !== state.partState.callId ||
+    event.name !== state.partState.name ||
+    !state.partState.sawDelta ||
+    !doesSerializedDeltaMatchValue(state.partState.deltaBuffer, event.input)
+  ) {
+    return createAssistantDeltaValidationError();
+  }
+
+  state.partState = { kind: "idle" };
   return undefined;
 }
 
@@ -4696,6 +5037,17 @@ function doesFinishReasonMatchAssistantContent(
   return actualFinishReason !== "tool_call";
 }
 
+function doesFinishReasonMatchToolCallPresence(
+  finishReason: KrakenModelResponse["finishReason"],
+  hasToolCallPart: boolean
+): boolean {
+  if (hasToolCallPart) {
+    return finishReason === "tool_call";
+  }
+
+  return finishReason !== "tool_call";
+}
+
 function areStreamEventValuesEqual(left: unknown, right: unknown): boolean {
   if (left instanceof Uint8Array && right instanceof Uint8Array) {
     if (left.length !== right.length) {
@@ -4727,6 +5079,14 @@ function doesSerializedDeltaMatchValue(
   } catch {
     return false;
   }
+}
+
+function serializeAssistantDeltaValue(value: unknown): string {
+  if (typeof value === "string") {
+    return value;
+  }
+
+  return JSON.stringify(value) ?? "null";
 }
 
 function createAssistantDeltaValidationError(): KrakenRuntimeError {

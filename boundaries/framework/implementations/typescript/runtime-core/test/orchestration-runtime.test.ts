@@ -1533,6 +1533,12 @@ function createStaticDriver(
               break;
             case "structured":
               context.runtime.emit({
+                delta: serializeDriverDeltaValue(part.data),
+                messageId,
+                timestamp: context.runtime.now(),
+                type: "structured.delta",
+              });
+              context.runtime.emit({
                 data: part.data,
                 messageId,
                 name: part.name,
@@ -1550,6 +1556,12 @@ function createStaticDriver(
               });
               context.runtime.emit({
                 callId: part.callId,
+                delta: serializeDriverDeltaValue(part.input),
+                timestamp: context.runtime.now(),
+                type: "tool_call.args_delta",
+              });
+              context.runtime.emit({
+                callId: part.callId,
                 input: part.input,
                 name: part.name,
                 timestamp: context.runtime.now(),
@@ -1558,6 +1570,12 @@ function createStaticDriver(
               break;
             case "text":
               context.runtime.emit({
+                delta: part.text,
+                messageId,
+                timestamp: context.runtime.now(),
+                type: "text.delta",
+              });
+              context.runtime.emit({
                 messageId,
                 text: part.text,
                 timestamp: context.runtime.now(),
@@ -1565,6 +1583,15 @@ function createStaticDriver(
               });
               break;
             case "reasoning":
+              if (!part.redacted) {
+                context.runtime.emit({
+                  delta: part.text,
+                  messageId,
+                  timestamp: context.runtime.now(),
+                  type: "reasoning.delta",
+                });
+              }
+
               context.runtime.emit({
                 messageId,
                 timestamp: context.runtime.now(),
@@ -1593,4 +1620,12 @@ function createStaticDriver(
       throw new Error("resume was not expected");
     },
   };
+}
+
+function serializeDriverDeltaValue(value: unknown): string {
+  if (typeof value === "string") {
+    return value;
+  }
+
+  return JSON.stringify(value) ?? "null";
 }
