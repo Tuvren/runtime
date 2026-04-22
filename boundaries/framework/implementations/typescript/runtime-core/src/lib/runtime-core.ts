@@ -1470,7 +1470,7 @@ class RuntimeCore implements KrakenRuntime {
 
     return {
       branchId: handle.request.branchId,
-      config: createFrozenSnapshot(loopState.activeConfig),
+      config: createDriverAgentConfigSnapshot(loopState.activeConfig),
       handoff: {
         createContextPlan: (input) =>
           this.createDriverHandoffContextPlan(input, headState, loopState),
@@ -3920,6 +3920,21 @@ function createReadonlyDriverToolRegistry(
   } satisfies ToolRegistry);
 }
 
+function createDriverAgentConfigSnapshot(config: AgentConfig): AgentConfig {
+  return createFrozenSnapshot({
+    ...config,
+    extensions: config.extensions?.map((extension) => ({
+      ...extension,
+      tools: extension.tools?.map((tool) =>
+        createDriverToolDefinitionSnapshot(tool)
+      ),
+    })),
+    tools: config.tools?.map((tool) =>
+      createDriverToolDefinitionSnapshot(tool)
+    ),
+  });
+}
+
 function createDriverToolDefinitionSnapshot(
   tool: KrakenToolDefinition
 ): KrakenToolDefinition {
@@ -3943,6 +3958,7 @@ function createDriverToolDefinitionSnapshot(
         ? undefined
         : createFrozenSnapshot(tool.metadata),
     name: tool.name,
+    timeout: tool.timeout,
   };
 }
 

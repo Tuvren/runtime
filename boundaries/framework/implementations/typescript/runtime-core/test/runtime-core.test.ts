@@ -961,6 +961,8 @@ describe("framework-runtime-core", () => {
     let messageMutationError: unknown;
     let toolMutationError: unknown;
     let registryMutationError: unknown;
+    let configToolExecutionError: unknown;
+    let observedToolTimeout: number | undefined;
     const driver = {
       async execute(context) {
         try {
@@ -989,12 +991,23 @@ describe("framework-runtime-core", () => {
           const tool = context.toolRegistry.get("safe");
 
           if (tool !== undefined) {
+            observedToolTimeout = tool.timeout;
             Object.defineProperty(tool, "description", {
               value: "mutated description",
             });
           }
         } catch (error: unknown) {
           toolMutationError = error;
+        }
+
+        try {
+          const configTool = context.config.tools?.[0];
+
+          if (configTool !== undefined) {
+            configTool.execute({}, { callId: "driver-bypass", name: "safe" });
+          }
+        } catch (error: unknown) {
+          configToolExecutionError = error;
         }
 
         try {
@@ -1016,7 +1029,9 @@ describe("framework-runtime-core", () => {
 
         return {
           messages: [
-            assistantText(`rogue:${String(context.toolRegistry.has("rogue"))}`),
+            assistantText(
+              `rogue:${String(context.toolRegistry.has("rogue"))};timeout:${String(observedToolTimeout)};configBlocked:${String(configToolExecutionError instanceof Error)}`
+            ),
           ],
           resolution: {
             reason: "done",
@@ -1051,6 +1066,7 @@ describe("framework-runtime-core", () => {
               type: "object",
             },
             name: "safe",
+            timeout: 1000,
           },
         ],
       },
@@ -1070,6 +1086,7 @@ describe("framework-runtime-core", () => {
     expect(messageMutationError).toBeInstanceOf(TypeError);
     expect(toolMutationError).toBeInstanceOf(TypeError);
     expect(registryMutationError).toBeInstanceOf(Error);
+    expect(configToolExecutionError).toBeInstanceOf(Error);
     expect(handle.status().phase).toBe("completed");
     expect(handle.status().activeAgent).toBe("primary");
     expect(manifest.messageCount).toBe(2);
@@ -1080,7 +1097,12 @@ describe("framework-runtime-core", () => {
         role: "user",
       },
       {
-        parts: [{ text: "rogue:false", type: "text" }],
+        parts: [
+          {
+            text: "rogue:false;timeout:1000;configBlocked:true",
+            type: "text",
+          },
+        ],
         role: "assistant",
       },
     ]);
