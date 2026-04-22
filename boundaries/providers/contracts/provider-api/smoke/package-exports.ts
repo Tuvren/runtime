@@ -16,7 +16,10 @@
 
 import { describe, expect, test } from "bun:test";
 import {
+  assertKrakenModelResponse,
   assertProviderStreamChunk,
+  isKrakenModelResponse,
+  type KrakenModelResponse,
   type ProviderStreamChunk,
 } from "@kraken/provider-api";
 
@@ -28,5 +31,15 @@ describe("provider-api package exports", () => {
     } satisfies ProviderStreamChunk;
 
     expect(() => assertProviderStreamChunk(chunk)).not.toThrow();
+  });
+
+  test("export model-response validators from the facade surface", () => {
+    const response = {
+      finishReason: "stop",
+      parts: [{ text: "ok", type: "text" }],
+    } satisfies KrakenModelResponse;
+
+    expect(isKrakenModelResponse(response)).toBe(true);
+    expect(() => assertKrakenModelResponse(response)).not.toThrow();
   });
 });

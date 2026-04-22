@@ -17,6 +17,7 @@
 import { describe, expect, test } from "bun:test";
 import {
   assertKrakenStreamEvent,
+  type FileDoneEvent,
   type TextDoneEvent,
 } from "@kraken/framework-event-stream";
 
@@ -28,6 +29,18 @@ describe("framework-event-stream package exports", () => {
       timestamp: 1,
       type: "text.done",
     } satisfies TextDoneEvent;
+
+    expect(() => assertKrakenStreamEvent(event)).not.toThrow();
+  });
+
+  test("export file.done event types from the facade surface", () => {
+    const event = {
+      data: "hello",
+      mediaType: "text/plain",
+      messageId: "message-2",
+      timestamp: 2,
+      type: "file.done",
+    } satisfies FileDoneEvent;
 
     expect(() => assertKrakenStreamEvent(event)).not.toThrow();
   });

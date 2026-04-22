@@ -27,6 +27,8 @@ export type {
   StructuredOutputRequest,
 } from "@kraken/framework-runtime-api/provider";
 export {
+  assertKrakenModelResponse,
   assertProviderStreamChunk,
+  isKrakenModelResponse,
   isProviderStreamChunk,
 } from "@kraken/framework-runtime-api/provider";
