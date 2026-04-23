@@ -31,7 +31,7 @@ Formatting and linting are owned by Biome. Keep package entrypoints small and ex
 
 Name boundaries matter:
 - `Tuvren` is the product and host-developer surface: package names, imports, public runtime APIs, and examples
-- `Kraken` marks engine internals and subsystem wrappers such as `KrakenKernel` and `KrakenDriver`
+- `Kraken` marks engine internals and subsystem wrappers, while public contract symbols should use `Tuvren*` or neutral runtime names such as `RuntimeKernel` and `RuntimeDriver`
 
 If a change makes ordinary library consumers type `Kraken*`, treat that as a boundary check.
 

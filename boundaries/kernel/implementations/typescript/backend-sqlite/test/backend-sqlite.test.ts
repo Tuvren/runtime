@@ -37,7 +37,7 @@ import { pathToFileURL } from "node:url";
 import { TuvrenPersistenceError } from "@tuvren/core-types";
 import {
   encodeDeterministicKernelRecord,
-  type KrakenBackendTx,
+  type RuntimeBackendTx as KrakenBackendTx,
 } from "@tuvren/kernel-protocol";
 import {
   createCanonicalKernelTestSchema,

@@ -25,7 +25,7 @@ import {
   encodeDeterministicKernelRecord,
   hashTurnNodeIdentity,
   hashTurnTreeIdentity,
-  type KrakenKernel,
+  type RuntimeKernel as KrakenKernel,
   type PathValue,
   type RecoveryState,
   type RunRecord,

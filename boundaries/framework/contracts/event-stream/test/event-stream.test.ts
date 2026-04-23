@@ -22,7 +22,7 @@ import {
 } from "../src/index.ts";
 
 describe("event-stream contracts", () => {
-  test("re-exports the canonical Kraken event vocabulary and named variants", () => {
+  test("re-exports the canonical runtime event vocabulary and named variants", () => {
     const event = {
       messageId: "message-1",
       source: {

@@ -71,7 +71,7 @@ export function assertKernelRecord(
 ): asserts value is KernelRecord {
   if (!isKernelRecord(value)) {
     throw new TypeError(
-      `${label} must match the restricted Kraken kernel record profile`
+      `${label} must match the restricted runtime kernel record profile`
     );
   }
 }

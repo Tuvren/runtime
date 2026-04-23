@@ -529,7 +529,7 @@ export interface StepContext {
   signals: KernelSignal[];
 }
 
-export interface KrakenKernel {
+export interface RuntimeKernel {
   store: {
     put(blob: Uint8Array, mediaType?: string): Promise<HashString>;
     get(hash: HashString): Promise<Uint8Array | null>;
@@ -651,8 +651,8 @@ export interface KrakenKernel {
 - **Error model:** backend-specific errors normalized into `TuvrenError` persistence codes
 
 ```ts
-export interface KrakenBackend {
-  transact<T>(work: (tx: KrakenBackendTx) => Promise<T>): Promise<T>;
+export interface RuntimeBackend {
+  transact<T>(work: (tx: RuntimeBackendTx) => Promise<T>): Promise<T>;
   health(): Promise<{ ok: true } | { ok: false; reason: string }>;
 }
 
@@ -720,7 +720,7 @@ export interface StagedResultRepository {
   set(record: StoredStagedResult): Promise<void>;
 }
 
-export interface KrakenBackendTx {
+export interface RuntimeBackendTx {
   objects: ObjectRepository;
   schemas: SchemaRepository;
   turnTrees: TurnTreeRepository;
@@ -738,7 +738,7 @@ export declare function createMemoryBackend(
   options?: {
     now?: () => EpochMs;
   }
-): KrakenBackend;
+): RuntimeBackend;
 ```
 
 ### 4.4 Provider Bridge Contract
@@ -876,21 +876,21 @@ export interface DriverExecutionResult {
   toolExecutionMode?: "parallel" | "sequential";
 }
 
-export interface KrakenDriver {
+export interface RuntimeDriver {
   readonly id: string;
   execute(context: DriverExecutionContext): Promise<DriverExecutionResult>;
   resume?(context: DriverResumeContext): Promise<DriverExecutionResult>;
 }
 
-export interface KrakenDriverFactory {
+export interface RuntimeDriverFactory {
   readonly id: string;
-  create(): KrakenDriver;
+  create(): RuntimeDriver;
 }
 
 export interface DriverRegistry {
-  register(driver: KrakenDriver | KrakenDriverFactory): void;
-  resolve(driverId: string): KrakenDriver | KrakenDriverFactory | undefined;
-  list(): Array<KrakenDriver | KrakenDriverFactory>;
+  register(driver: RuntimeDriver | RuntimeDriverFactory): void;
+  resolve(driverId: string): RuntimeDriver | RuntimeDriverFactory | undefined;
+  list(): Array<RuntimeDriver | RuntimeDriverFactory>;
 }
 ```
 

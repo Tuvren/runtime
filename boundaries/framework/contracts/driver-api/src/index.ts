@@ -23,14 +23,14 @@ export type {
   DriverResumeContext,
   DriverRuntimePort,
   DriverToolExecutionMode,
-  KrakenDriver,
-  KrakenDriverFactory,
+  RuntimeDriver,
+  RuntimeDriverFactory,
 } from "./lib/driver-contracts.js";
 export {
   assertDriverExecutionResult,
   assertDriverHandoffContextPlan,
   assertDriverHandoffSourceContext,
   assertDriverRuntimeResolution,
-  assertKrakenDriver,
-  isKrakenDriver,
+  assertRuntimeDriver,
+  isRuntimeDriver,
 } from "./lib/driver-contracts.js";

@@ -90,7 +90,7 @@ describe("KernelRecord", () => {
     }
 
     expect(() => assertKernelRecord(new Map([["a", 1]]), "record")).toThrow(
-      "record must match the restricted Kraken kernel record profile"
+      "record must match the restricted runtime kernel record profile"
     );
   });
 
@@ -101,7 +101,7 @@ describe("KernelRecord", () => {
 
     expect(isKernelRecord(sparseArray)).toBe(false);
     expect(() => assertKernelRecord(sparseArray, "record")).toThrow(
-      "record must match the restricted Kraken kernel record profile"
+      "record must match the restricted runtime kernel record profile"
     );
   });
 
@@ -115,7 +115,7 @@ describe("KernelRecord", () => {
     try {
       expect(isKernelRecord(inheritedArray)).toBe(false);
       expect(() => assertKernelRecord(inheritedArray, "record")).toThrow(
-        "record must match the restricted Kraken kernel record profile"
+        "record must match the restricted runtime kernel record profile"
       );
     } finally {
       if (hadOwnPrototypeElement) {
@@ -148,7 +148,7 @@ describe("KernelRecord", () => {
     expect(isKernelRecord(accessorArray)).toBe(false);
     expect(isKernelRecord(symbolArray)).toBe(false);
     expect(() => assertKernelRecord(hiddenPropertyArray, "record")).toThrow(
-      "record must match the restricted Kraken kernel record profile"
+      "record must match the restricted runtime kernel record profile"
     );
   });
 
@@ -161,7 +161,7 @@ describe("KernelRecord", () => {
 
     expect(isKernelRecord(hiddenPropertyObject)).toBe(false);
     expect(() => assertKernelRecord(hiddenPropertyObject, "record")).toThrow(
-      "record must match the restricted Kraken kernel record profile"
+      "record must match the restricted runtime kernel record profile"
     );
   });
 
@@ -179,7 +179,7 @@ describe("KernelRecord", () => {
     expect(isKernelRecord(accessorObject)).toBe(false);
     expect(getterCalls).toBe(0);
     expect(() => assertKernelRecord(accessorObject, "record")).toThrow(
-      "record must match the restricted Kraken kernel record profile"
+      "record must match the restricted runtime kernel record profile"
     );
     expect(getterCalls).toBe(0);
   });
@@ -194,10 +194,10 @@ describe("KernelRecord", () => {
     expect(isKernelRecord(cyclicObject)).toBe(false);
     expect(isKernelRecord(cyclicArray)).toBe(false);
     expect(() => assertKernelRecord(cyclicObject, "record")).toThrow(
-      "record must match the restricted Kraken kernel record profile"
+      "record must match the restricted runtime kernel record profile"
     );
     expect(() => assertKernelRecord(cyclicArray, "record")).toThrow(
-      "record must match the restricted Kraken kernel record profile"
+      "record must match the restricted runtime kernel record profile"
     );
   });
 
@@ -205,7 +205,7 @@ describe("KernelRecord", () => {
     expect(isKernelRecord(-0)).toBe(false);
     expect(isKernelRecord({ n: -0 })).toBe(false);
     expect(() => assertKernelRecord(-0, "record")).toThrow(
-      "record must match the restricted Kraken kernel record profile"
+      "record must match the restricted runtime kernel record profile"
     );
   });
 

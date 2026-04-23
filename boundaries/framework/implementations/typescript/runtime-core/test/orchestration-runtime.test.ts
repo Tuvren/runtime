@@ -19,8 +19,8 @@ import { describe, expect, test } from "bun:test";
 import type {
   DriverExecutionContext,
   DriverExecutionResult,
-  KrakenDriver,
-  KrakenDriverFactory,
+  RuntimeDriver as KrakenDriver,
+  RuntimeDriverFactory as KrakenDriverFactory,
 } from "@tuvren/driver-api";
 import type { AgentConfig, TuvrenRuntime } from "@tuvren/runtime-api";
 import {

@@ -87,21 +87,21 @@ export interface DriverExecutionResult {
   toolExecutionMode?: DriverToolExecutionMode;
 }
 
-export interface KrakenDriver {
+export interface RuntimeDriver {
   execute(context: DriverExecutionContext): Promise<DriverExecutionResult>;
   readonly id: string;
   resume?(context: DriverResumeContext): Promise<DriverExecutionResult>;
 }
 
-export interface KrakenDriverFactory {
-  create(): KrakenDriver;
+export interface RuntimeDriverFactory {
+  create(): RuntimeDriver;
   readonly id: string;
 }
 
 export interface DriverRegistry {
-  list(): Array<KrakenDriver | KrakenDriverFactory>;
-  register(driver: KrakenDriver | KrakenDriverFactory): void;
-  resolve(driverId: string): KrakenDriver | KrakenDriverFactory | undefined;
+  list(): Array<RuntimeDriver | RuntimeDriverFactory>;
+  register(driver: RuntimeDriver | RuntimeDriverFactory): void;
+  resolve(driverId: string): RuntimeDriver | RuntimeDriverFactory | undefined;
 }
 
 const DRIVER_RESULT_KEYS = new Set([
@@ -144,7 +144,7 @@ const STRUCTURED_OUTPUT_REQUEST_KEYS = new Set(["name", "schema", "strict"]);
 const CONTEXT_POLICY_KEYS = new Set(["evaluate"]);
 const LOOP_POLICY_KEYS = new Set(["evaluate"]);
 
-export function isKrakenDriver(value: unknown): value is KrakenDriver {
+export function isRuntimeDriver(value: unknown): value is RuntimeDriver {
   // Driver installation guards stay structural on purpose. Verifying execute
   // or resume result semantics would require invoking arbitrary plugin code,
   // so runtime-core validates the returned data at the call boundary instead.
@@ -161,12 +161,12 @@ export function isKrakenDriver(value: unknown): value is KrakenDriver {
   );
 }
 
-export function assertKrakenDriver(
+export function assertRuntimeDriver(
   value: unknown,
   label = "value"
-): asserts value is KrakenDriver {
-  if (!isKrakenDriver(value)) {
-    throw new TuvrenValidationError(`${label} must be a valid KrakenDriver`, {
+): asserts value is RuntimeDriver {
+  if (!isRuntimeDriver(value)) {
+    throw new TuvrenValidationError(`${label} must be a valid RuntimeDriver`, {
       code: "invalid_driver_contract",
       details: value,
     });

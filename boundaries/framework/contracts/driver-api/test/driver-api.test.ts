@@ -17,10 +17,10 @@
 import { describe, expect, test } from "bun:test";
 import {
   assertDriverExecutionResult,
-  assertKrakenDriver,
+  assertRuntimeDriver,
   type DriverExecutionContext,
-  isKrakenDriver,
-  type KrakenDriver,
+  isRuntimeDriver,
+  type RuntimeDriver,
 } from "../src/index.ts";
 
 describe("driver-api", () => {
@@ -40,10 +40,10 @@ describe("driver-api", () => {
           resolution: continueIteration,
         });
       },
-    } satisfies KrakenDriver;
+    } satisfies RuntimeDriver;
 
-    expect(isKrakenDriver(driver)).toBe(true);
-    expect(() => assertKrakenDriver(driver)).not.toThrow();
+    expect(isRuntimeDriver(driver)).toBe(true);
+    expect(() => assertRuntimeDriver(driver)).not.toThrow();
 
     const context = createDriverExecutionContext();
     await expect(driver.execute(context)).resolves.toEqual({
@@ -73,10 +73,10 @@ describe("driver-api", () => {
         });
       },
       id: "react",
-    } satisfies KrakenDriver;
+    } satisfies RuntimeDriver;
 
-    expect(isKrakenDriver(driver)).toBe(true);
-    expect(() => assertKrakenDriver(driver)).not.toThrow();
+    expect(isRuntimeDriver(driver)).toBe(true);
+    expect(() => assertRuntimeDriver(driver)).not.toThrow();
   });
 
   test("accepts toolExecutionMode when assistant messages request tool calls", () => {

@@ -16,10 +16,10 @@
 
 import { TuvrenRuntimeError } from "@tuvren/core-types";
 import {
-  assertKrakenDriver,
+  assertRuntimeDriver as assertKrakenDriver,
   type DriverRegistry,
-  type KrakenDriver,
-  type KrakenDriverFactory,
+  type RuntimeDriver as KrakenDriver,
+  type RuntimeDriverFactory as KrakenDriverFactory,
 } from "@tuvren/driver-api";
 
 type DriverEntry = KrakenDriver | KrakenDriverFactory;

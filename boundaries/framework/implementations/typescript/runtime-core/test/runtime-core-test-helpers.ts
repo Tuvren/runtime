@@ -14,11 +14,11 @@
  * limitations under the License.
  */
 
-import type { KrakenDriver } from "@tuvren/driver-api";
+import type { RuntimeDriver as KrakenDriver } from "@tuvren/driver-api";
 import {
   decodeDeterministicKernelRecord,
   encodeDeterministicKernelRecord,
-  type KrakenKernel,
+  type RuntimeKernel as KrakenKernel,
 } from "@tuvren/kernel-protocol";
 import type {
   AgentConfig,

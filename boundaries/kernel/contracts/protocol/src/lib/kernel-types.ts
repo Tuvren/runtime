@@ -394,7 +394,7 @@ export interface StagedResultRepository {
   set(record: StoredStagedResult): Promise<void>;
 }
 
-export interface KrakenBackendTx {
+export interface RuntimeBackendTx {
   branches: BranchRepository;
   objects: ObjectRepository;
   orderedPathChunks: OrderedPathChunkRepository;
@@ -408,12 +408,12 @@ export interface KrakenBackendTx {
   turnTrees: TurnTreeRepository;
 }
 
-export interface KrakenBackend {
+export interface RuntimeBackend {
   health(): Promise<{ ok: true } | { ok: false; reason: string }>;
-  transact<T>(work: (tx: KrakenBackendTx) => Promise<T>): Promise<T>;
+  transact<T>(work: (tx: RuntimeBackendTx) => Promise<T>): Promise<T>;
 }
 
-export interface KrakenKernel {
+export interface RuntimeKernel {
   branch: {
     create(
       branchId: string,

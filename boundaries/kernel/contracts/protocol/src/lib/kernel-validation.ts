@@ -2592,7 +2592,7 @@ function assertKernelRecord(
     throw validationError(
       error instanceof Error
         ? error.message
-        : `${label} must match the restricted Kraken kernel record profile`,
+        : `${label} must match the restricted runtime kernel record profile`,
       "invalid_kernel_record",
       { value }
     );

@@ -15,7 +15,7 @@
  */
 
 import { TuvrenRuntimeError } from "@tuvren/core-types";
-import type { KrakenDriver } from "@tuvren/driver-api";
+import type { RuntimeDriver as KrakenDriver } from "@tuvren/driver-api";
 import type {
   ApprovalResponse,
   ExecutionHandle,

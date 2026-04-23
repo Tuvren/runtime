@@ -20,7 +20,7 @@ import { TuvrenPersistenceError } from "@tuvren/core-types";
 import {
   decodeDeterministicKernelRecord,
   encodeDeterministicKernelRecord,
-  type KrakenBackendTx,
+  type RuntimeBackendTx as KrakenBackendTx,
   type StoredBranch,
   type StoredObject,
   type StoredRun,

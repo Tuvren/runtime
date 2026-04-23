@@ -597,7 +597,7 @@ describe("schema validation", () => {
       assertTurnTreeSchema(
         kernelProtocolInvalidFixtures.invalidSchemaWithDateMetadata
       )
-    ).toThrow("must match the restricted Kraken kernel record profile");
+    ).toThrow("must match the restricted runtime kernel record profile");
   });
 
   test("does not accept required fields inherited from Object.prototype", () => {

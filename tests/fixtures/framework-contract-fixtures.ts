@@ -169,7 +169,7 @@ export const frameworkContractFixtures = {
     extensions: [],
     maxIterations: 8,
     name: "primary",
-    systemPrompt: "You are Kraken.",
+    systemPrompt: "You are Tuvren Runtime.",
     tools: [
       {
         description: "Search documentation",

@@ -27,14 +27,14 @@ import {
 import type {
   DriverExecutionContext,
   DriverRegistry,
-  KrakenDriver,
+  RuntimeDriver as KrakenDriver,
 } from "@tuvren/driver-api";
 import { assertDriverExecutionResult } from "@tuvren/driver-api";
 import {
   decodeDeterministicKernelRecord,
   encodeDeterministicKernelRecord,
-  type KrakenKernel,
   type PathValue,
+  type RuntimeKernel as KrakenKernel,
   type RunCompletionStatus,
   type TurnNode,
   type TurnTreeSchema,

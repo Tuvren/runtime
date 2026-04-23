@@ -18,10 +18,13 @@
 import { describe, expect, test } from "bun:test";
 import type {
   DriverExecutionResult,
-  KrakenDriver,
-  KrakenDriverFactory,
+  RuntimeDriver as KrakenDriver,
+  RuntimeDriverFactory as KrakenDriverFactory,
 } from "@tuvren/driver-api";
-import type { KrakenKernel, TurnTreeSchema } from "@tuvren/kernel-protocol";
+import type {
+  RuntimeKernel as KrakenKernel,
+  TurnTreeSchema,
+} from "@tuvren/kernel-protocol";
 import type {
   AgentConfig,
   AroundToolContext,
