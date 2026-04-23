@@ -6,6 +6,8 @@
 
 Read this after the kernel specification. This document is authoritative for the initial Kraken framework driver behavior built on the frozen kernel.
 
+Kraken is the execution engine inside Tuvren Runtime. This specification defines the engine-layer framework and driver semantics, not the public product namespace.
+
 This is the single authoritative specification for the shared framework semantic model plus the initial ReAct Driver execution semantics. It does not claim that ReAct is the only possible Kraken driver. Future drivers may reuse the shared framework types and kernel primitives defined here while specifying different control-flow behavior. The companion rationale document is explanatory only.
 
 ---
@@ -87,7 +89,7 @@ Structured output is assistant-authored structured data — a distinct content k
 ```
 NonEmptyArray<T> = [T, ...T[]]
 
-KrakenMessage =
+TuvrenMessage =
   | { role: "system",    content: string }
   | { role: "user",      parts: NonEmptyArray<ContentPart> }
   | { role: "assistant", parts: NonEmptyArray<ContentPart>, providerMetadata?: Record<string, unknown> }
@@ -106,7 +108,7 @@ InputSignal
                                       // Extend only if a future extra is irreducible.
 ```
 
-`InputSignal` is not a persisted message. The framework normalizes it into a `KrakenMessage` during input incorporation. Empty `parts` arrays are invalid at the shared contract boundary.
+`InputSignal` is not a persisted message. The framework normalizes it into a `TuvrenMessage` during input incorporation. Empty `parts` arrays are invalid at the shared contract boundary.
 
 ### 1.4 Prompt and Response
 
@@ -116,7 +118,7 @@ RenderedToolDefinition
 ├─ description: string
 └─ inputSchema: JSONSchema
 
-KrakenModelConfig
+TuvrenModelConfig
 ├─ model?: string
 ├─ provider?: string
 └─ settings?: Record<string, unknown>
@@ -134,13 +136,13 @@ StructuredOutputRequest
 `StructuredOutputRequest` is the provider-neutral contract for requesting schema-constrained model output. `schema` is the JSON Schema the response must satisfy. `name` is an optional identifier for the schema (mapped to provider-native name fields where applicable). `strict` is an enforcement hint — providers that support native structured output enforcement (OpenAI’s strict mode, Google’s `responseSchema`) apply it at generation time; providers that do not support native enforcement must either reject with a clear error or fall back through a documented compatibility path (e.g., schema-in-prompt instruction).
 
 ```
-KrakenPrompt
-├─ messages: KrakenMessage[]
+TuvrenPrompt
+├─ messages: TuvrenMessage[]
 ├─ tools?: RenderedToolDefinition[]
-├─ config?: KrakenModelConfig
+├─ config?: TuvrenModelConfig
 └─ responseFormat?: StructuredOutputRequest
 
-KrakenModelResponse
+TuvrenModelResponse
 ├─ parts: ContentPart[]
 ├─ finishReason: "stop" | "tool_call" | "length" | "error" | "content_filter"
 ├─ usage?: { inputTokens: number, outputTokens: number }
@@ -162,13 +164,13 @@ RuntimeResolution =
 
 ```
 ContextEngineeringHelpers
-├─ loadMessage(hash: Hash) → KrakenMessage | null
-├─ storeMessage(message: KrakenMessage) → Hash
-└─ storeMessages(messages: KrakenMessage[]) → Hash[]
+├─ loadMessage(hash: Hash) → TuvrenMessage | null
+├─ storeMessage(message: TuvrenMessage) → Hash
+└─ storeMessages(messages: TuvrenMessage[]) → Hash[]
 
 ContextEngineeringContext
 ├─ messageHashes: Hash[]
-├─ messages: KrakenMessage[]
+├─ messages: TuvrenMessage[]
 ├─ manifest: ContextManifest
 └─ helpers: ContextEngineeringHelpers
 
@@ -184,7 +186,7 @@ HandoffContextPlan
 └─ sourceContext: HandoffSourceContext
 
 HandoffSourceContext
-├─ messages: KrakenMessage[]
+├─ messages: TuvrenMessage[]
 ├─ handoffIntent: { targetAgent: string, reason?: string, payload?: unknown }
 ├─ sourceAgent: AgentConfig
 ├─ targetAgent: AgentConfig
@@ -280,7 +282,7 @@ Each approval decision applies to exactly one pending tool call, linked by frame
 
 `ApprovalDecision.message` remains optional for every decision type. When present, it is incorporated into the resulting `ToolResultPart` produced by the approval outcome; it does not create a separate `user` message and is not treated as steering. For `approve` and `edit`, the message is attached to the executed tool result. For `reject` and custom decisions, the message is attached to the synthesized error `ToolResultPart`. When `reject` or a custom decision omits `message`, the framework MUST still synthesize a coherent error `ToolResultPart` using a framework-defined default explanation.
 
-### 1.8 KrakenStreamEvent
+### 1.8 TuvrenStreamEvent
 
 The internal event vocabulary. Discriminated union on `type`. Every event carries `type`, `timestamp`, and optional `source` (for multi-agent attribution).
 
@@ -376,7 +378,7 @@ Four paths. Four objectTypes. Four incorporation rules.
 
 ### 2.2 Messages Path (ordered)
 
-Each Object is a serialized `KrakenMessage`. Array order IS the conversation order.
+Each Object is a serialized `TuvrenMessage`. Array order IS the conversation order.
 
 One message = one Object. A message with three tool calls is still one Object. Staged as `objectType: "message"`.
 
@@ -430,15 +432,15 @@ All operations use `tree.create` with a base tree. Only changed path hashes reco
 ### 3.1 Interface
 
 ```
-KrakenProvider
+TuvrenProvider
 ├─ id: string
-├─ generate(prompt: KrakenPrompt) → Promise<KrakenModelResponse>
-└─ stream(prompt: KrakenPrompt) → AsyncIterable<ProviderStreamChunk>
+├─ generate(prompt: TuvrenPrompt) → Promise<TuvrenModelResponse>
+└─ stream(prompt: TuvrenPrompt) → AsyncIterable<ProviderStreamChunk>
 ```
 
 `generate` returns a complete response. `stream` yields normalized intermediate chunks. Authentication, retry, rate limiting, timeout, HTTP config are internal to each adapter.
 
-The provider never generates framework execution identity (`messageId`, `timestamp`). Those are driver concerns. The provider translates between its native wire format and the normalized `ProviderStreamChunk` / `KrakenModelResponse` types.
+The provider never generates framework execution identity (`messageId`, `timestamp`). Those are driver concerns. The provider translates between its native wire format and the normalized `ProviderStreamChunk` / `TuvrenModelResponse` types.
 
 ### 3.2 ProviderStreamChunk
 
@@ -465,35 +467,35 @@ ProviderStreamChunk =
 
 ### 3.3 StreamAccumulator
 
-The accumulator builds a complete `KrakenModelResponse` from provider stream chunks. The driver uses it to bridge the live path (immediate events) and the durable path (complete response for staging).
+The accumulator builds a complete `TuvrenModelResponse` from provider stream chunks. The driver uses it to bridge the live path (immediate events) and the durable path (complete response for staging).
 
 ```
 StreamAccumulator
 ├─ absorb(chunk: ProviderStreamChunk): void
-├─ finalize(): KrakenModelResponse
+├─ finalize(): TuvrenModelResponse
 ├─ hasContent(): boolean
 ```
 
-`absorb` processes one chunk: appends text deltas, accumulates tool call arguments, accumulates structured output deltas, captures usage and metadata. `finalize` produces the complete `KrakenModelResponse` with all parts assembled, arguments parsed, structured output parsed into `StructuredPart.data`, and metadata merged. If structured output cannot be parsed (malformed JSON or equivalent), `finalize` produces an error response. `hasContent` returns whether any chunks have been absorbed — used by the driver to detect aroundModel short-circuits that need synthetic event generation (§6.5).
+`absorb` processes one chunk: appends text deltas, accumulates tool call arguments, accumulates structured output deltas, captures usage and metadata. `finalize` produces the complete `TuvrenModelResponse` with all parts assembled, arguments parsed, structured output parsed into `StructuredPart.data`, and metadata merged. If structured output cannot be parsed (malformed JSON or equivalent), `finalize` produces an error response. `hasContent` returns whether any chunks have been absorbed — used by the driver to detect aroundModel short-circuits that need synthetic event generation (§6.5).
 
 ### 3.4 Adapter Strategy
 
-**Direct adapters** implement `KrakenProvider` by calling a provider’s API directly.
+**Direct adapters** implement `TuvrenProvider` by calling a provider’s API directly.
 
-**Bridge adapters** implement `KrakenProvider` by wrapping another framework’s provider integration (e.g., Vercel AI SDK).
+**Bridge adapters** implement `TuvrenProvider` by wrapping another framework’s provider integration (e.g., Vercel AI SDK).
 
 Both produce identical behavior from the framework’s perspective. Package topology:
 
 ```
-@kraken/types                         zero dependencies, types only
-@kraken/provider-anthropic            direct, depends on @anthropic-ai/sdk
-@kraken/provider-openai               direct, depends on openai
-@kraken/provider-google               direct, depends on @google/genai
-@kraken/provider-vercel               bridge, depends on @ai-sdk/*
-@kraken/provider-langchain            bridge, depends on @langchain/*
+@tuvren/core-types                         zero dependencies, types only
+@tuvren/provider-anthropic            direct, depends on @anthropic-ai/sdk
+@tuvren/provider-openai               direct, depends on openai
+@tuvren/provider-google               direct, depends on @google/genai
+@tuvren/provider-vercel               bridge, depends on @ai-sdk/*
+@tuvren/provider-langchain            bridge, depends on @langchain/*
 ```
 
-Each adapter implements two conversion directions: outbound (`KrakenPrompt → provider payload`) and inbound (`provider response/stream → KrakenModelResponse/ProviderStreamChunk`). Typically 50–150 lines per direction.
+Each adapter implements two conversion directions: outbound (`TuvrenPrompt → provider payload`) and inbound (`provider response/stream → TuvrenModelResponse/ProviderStreamChunk`). Typically 50–150 lines per direction.
 
 ### 3.5 Structured Output
 
@@ -503,7 +505,7 @@ Structured output is model-authored structured data requested via `StructuredOut
 
 Provider adapters normalize provider-native structured responses into `StructuredPart` before durable staging. The canonical model never exposes provider-specific structured output types.
 
-Outbound: when `KrakenPrompt.responseFormat` is set, the adapter maps `StructuredOutputRequest` to the provider's native structured output mechanism (OpenAI's `response_format`, Google's `generationConfig.responseSchema`, or equivalent). When the provider does not support native structured output, the adapter must either reject with a clear error identifying the unsupported capability, or fall back through a documented compatibility path (e.g., injecting the schema into the system prompt as an instruction). The choice between rejection and fallback is adapter-specific and must be documented per adapter.
+Outbound: when `TuvrenPrompt.responseFormat` is set, the adapter maps `StructuredOutputRequest` to the provider's native structured output mechanism (OpenAI's `response_format`, Google's `generationConfig.responseSchema`, or equivalent). When the provider does not support native structured output, the adapter must either reject with a clear error identifying the unsupported capability, or fall back through a documented compatibility path (e.g., injecting the schema into the system prompt as an instruction). The choice between rejection and fallback is adapter-specific and must be documented per adapter.
 
 Inbound: the adapter maps the provider's structured response into a `StructuredPart` with `data` containing the parsed result and `name` carrying the schema identifier from the request. Provider-specific structured output metadata (e.g., refusal reasons, schema enforcement details) is preserved in `providerMetadata`.
 
@@ -533,7 +535,7 @@ Structured output is ordinary assistant content. A `StructuredPart` lives on an 
 
 Structured output survives checkpointing, recovery, rollback, handoff, and context engineering through the same mechanisms as any other content part. No special handling is required. Context assembly includes structured outputs in history unless explicitly removed by context engineering policy. Handoff context builders can read structured outputs from message history through the standard `ContextEngineeringHelpers`.
 
-No kernel primitive or syscall changes are required. Structured output is stored as part of serialized `KrakenMessage` Objects in the content-addressed store.
+No kernel primitive or syscall changes are required. Structured output is stored as part of serialized `TuvrenMessage` Objects in the content-addressed store.
 
 ---
 
@@ -1057,10 +1059,10 @@ If a `beforeIteration` hook returns a CE plan, the hook’s plan executes first.
 ### 5.2 Renderer
 
 ```
-renderer.render(messages: KrakenMessage[], tools: RenderedToolDefinition[],
-                config: KrakenModelConfig, systemPrompts: string[],
+renderer.render(messages: TuvrenMessage[], tools: RenderedToolDefinition[],
+                config: TuvrenModelConfig, systemPrompts: string[],
                 responseFormat?: StructuredOutputRequest)
-  → KrakenPrompt
+  → TuvrenPrompt
 ```
 
 Pure function. Same inputs, same output. `systemPrompts` contains the final ordered system prompt sequence supplied to the model: extension contributions in registration order followed by the active agent’s base system prompt. Default: identity pass-through with system prompts prepended and response format forwarded.
@@ -1068,7 +1070,7 @@ Pure function. Same inputs, same output. `systemPrompts` contains the final orde
 ### 5.3 Loop Policy
 
 ```
-loopPolicy.evaluate(response: KrakenModelResponse, manifest: ContextManifest, iterationCount: number)
+loopPolicy.evaluate(response: TuvrenModelResponse, manifest: ContextManifest, iterationCount: number)
   → IterationDecision
 
 IterationDecision
@@ -1115,7 +1117,7 @@ Shared drivers execute against immutable snapshots of framework-owned state plus
 
 ```
 DriverRuntimePort
-├─ emit(event: KrakenStreamEvent): void | Promise<void>
+├─ emit(event: TuvrenStreamEvent): void | Promise<void>
 └─ now(): EpochMs
 
 DriverHandoffPort
@@ -1134,7 +1136,7 @@ DriverExecutionContext
 ├─ schemaId: string
 ├─ iterationCount: number
 ├─ config: AgentConfig                 // read-only snapshot
-├─ messages: KrakenMessage[]           // read-only snapshot
+├─ messages: TuvrenMessage[]           // read-only snapshot
 ├─ manifest: ContextManifest           // read-only snapshot
 ├─ toolRegistry: ToolRegistry          // read-only driver-facing view
 ├─ runtime: DriverRuntimePort
@@ -1147,7 +1149,7 @@ DriverResumeContext extends DriverExecutionContext
 
 DriverExecutionResult
 ├─ resolution: RuntimeResolution
-├─ messages?: KrakenMessage[]
+├─ messages?: TuvrenMessage[]
 ├─ partial?: boolean
 └─ toolExecutionMode?: "parallel" | "sequential"
 ```
@@ -1177,11 +1179,11 @@ The shared driver seam does **not** carry a generic raw `response` object. Riche
 
 Three distinct surfaces exist for streaming. Each has one role.
 
-**Internal driver** (not public): A generator function that yields `KrakenStreamEvent`. Receives control signals (cancel, steer) through injected channels. The host never interacts with the generator directly.
+**Internal driver** (not public): A generator function that yields `TuvrenStreamEvent`. Receives control signals (cancel, steer) through injected channels. The host never interacts with the generator directly.
 
 **Host-facing control surface** (public): The `ExecutionHandle` (§7.1). Wraps the internal driver. Exposes `events()` for iteration, plus `cancel()`, `steer()`, and `resolveApproval()` for control.
 
-**Protocol adapter consumption** (public): Adapters receive `AsyncIterable<KrakenStreamEvent>` from `handle.events()` and transform it into external formats. Adapters never touch the handle.
+**Protocol adapter consumption** (public): Adapters receive `AsyncIterable<TuvrenStreamEvent>` from `handle.events()` and transform it into external formats. Adapters never touch the handle.
 
 ```
 Internal driver (generator)
@@ -1195,13 +1197,13 @@ Kraken's event stream plays the same architectural role on the outbound side tha
 
 During a model call, two consumers need different things simultaneously:
 
-**Live path**: Provider stream chunks are translated into `KrakenStreamEvent` and yielded to the output iterable. These reach protocol adapters immediately. The user sees tokens appearing in real time.
+**Live path**: Provider stream chunks are translated into `TuvrenStreamEvent` and yielded to the output iterable. These reach protocol adapters immediately. The user sees tokens appearing in real time.
 
-**Durable path**: The same chunks are simultaneously accumulated into a complete `KrakenModelResponse` via the `StreamAccumulator` (§3.3). This complete response is what the aroundModel chain receives, what the loop policy evaluates, and what gets staged as a durable assistant message.
+**Durable path**: The same chunks are simultaneously accumulated into a complete `TuvrenModelResponse` via the `StreamAccumulator` (§3.3). This complete response is what the aroundModel chain receives, what the loop policy evaluates, and what gets staged as a durable assistant message.
 
 ```
 function executeModelCall(runId, prompt, config, iterationCount):
-  → { response: KrakenModelResponse, state?: Record<string, unknown> }
+  → { response: TuvrenModelResponse, state?: Record<string, unknown> }
 
   messageId = generateId()
   callIdMap = {}                    // providerCallId → framework callId
@@ -1229,7 +1231,7 @@ function executeModelCall(runId, prompt, config, iterationCount):
   return modelResult
 ```
 
-`toStreamEvents` maps `ProviderStreamChunk` → `KrakenStreamEvent`, adding `messageId`, `timestamp`, and translating `providerCallId` → framework `callId` via `callIdMap`.
+`toStreamEvents` maps `ProviderStreamChunk` → `TuvrenStreamEvent`, adding `messageId`, `timestamp`, and translating `providerCallId` → framework `callId` via `callIdMap`.
 
 ### 6.3 Non-Streaming Fallback
 
@@ -1275,7 +1277,7 @@ For any batch mode, non-executed outcomes that are already known (for example in
 
 ### 6.5 aroundModel Interaction with Streaming
 
-The `aroundModel` wrapper receives the complete `KrakenModelResponse` from `next()`. It does not see or control the event stream. Stream events are emitted by the driver as the provider stream progresses, before the around chain receives the complete response.
+The `aroundModel` wrapper receives the complete `TuvrenModelResponse` from `next()`. It does not see or control the event stream. Stream events are emitted by the driver as the provider stream progresses, before the around chain receives the complete response.
 
 **Short-circuit**: If aroundModel returns without calling `next()` (cache hit, static response), no streaming events were emitted during the call. The driver detects this via `accumulator.hasContent()` and synthesizes events from the returned response using the same mechanism as the non-streaming fallback (§6.3). The consumer sees one complete message sequence.
 
@@ -1301,7 +1303,7 @@ Extensions inject events into the output stream via two mechanisms:
 
 **`ctx.emit({ name, data })`** — creates a `CustomEvent` and injects it into the output stream at the point of emission, preserving temporal ordering. Available on all extension handler contexts (intercepts and arounds).
 
-**`ctx.forward(event, source)`** — injects any `KrakenStreamEvent` into the output stream with the `source` field set (§1.8). Available only on `AroundToolContext` and `ToolExecutionContext`. This is the mechanism for worker sub-agent streaming — a tool call that internally runs a sub-agent forwards its events with source attribution.
+**`ctx.forward(event, source)`** — injects any `TuvrenStreamEvent` into the output stream with the `source` field set (§1.8). Available only on `AroundToolContext` and `ToolExecutionContext`. This is the mechanism for worker sub-agent streaming — a tool call that internally runs a sub-agent forwards its events with source attribution.
 
 ```
 // Worker streaming from inside a tool's aroundTool or execute function:
@@ -1317,11 +1319,11 @@ Extensions that need to observe the raw event stream (for telemetry, logging, or
 ### 6.9 Protocol Adapter Boundary
 
 ```
-type ProtocolAdapter<T> = (events: AsyncIterable<KrakenStreamEvent>) → AsyncIterable<T>
-type ProtocolSink = (events: AsyncIterable<KrakenStreamEvent>) → Promise<void>
+type ProtocolAdapter<T> = (events: AsyncIterable<TuvrenStreamEvent>) → AsyncIterable<T>
+type ProtocolSink = (events: AsyncIterable<TuvrenStreamEvent>) → Promise<void>
 ```
 
-Package topology: `@kraken/stream-agui`, `@kraken/stream-acp`, `@kraken/stream-sse`. Multiple adapters can consume the same stream via tee or multicast at the host layer.
+Package topology: `@tuvren/stream-agui`, `@tuvren/stream-acp`, `@tuvren/stream-sse`. Multiple adapters can consume the same stream via tee or multicast at the host layer.
 
 ### 6.10 Cancellation
 
@@ -1338,9 +1340,9 @@ As with approval resolution, the kernel may still record the superseded paused R
 ```
                     EPHEMERAL                                   DURABLE
 
-ProviderStreamChunk → accumulator → KrakenModelResponse → staging.stage → checkpoint
+ProviderStreamChunk → accumulator → TuvrenModelResponse → staging.stage → checkpoint
                          │
-                         ├─→ KrakenStreamEvent → adapter → UI
+                         ├─→ TuvrenStreamEvent → adapter → UI
                          │       (ephemeral)
 ```
 
@@ -1355,7 +1357,7 @@ When optional state observability is enabled, the framework emits:
 
 ## 7. Host Contract
 
-The host is the process or service that embeds the Kraken framework and exposes it to external consumers (APIs, UIs, protocol endpoints).
+The host is the process or service that embeds Tuvren Runtime and, through it, exposes the Kraken framework to external consumers (APIs, UIs, protocol endpoints).
 
 ### 7.1 ExecutionHandle
 
@@ -1363,7 +1365,7 @@ The control surface a host uses to drive and observe a Turn.
 
 ```
 ExecutionHandle
-├─ events(): AsyncIterable<KrakenStreamEvent>
+├─ events(): AsyncIterable<TuvrenStreamEvent>
 ├─ cancel(): void
 ├─ steer(signal: InputSignal): void
 ├─ resolveApproval(response: ApprovalResponse): ExecutionHandle
@@ -1448,10 +1450,10 @@ handle.steer({ parts: [{ type: "text", text: "Focus on the budget section" }] })
 
 ## 8. Tool Dispatch
 
-### 8.1 KrakenToolDefinition
+### 8.1 TuvrenToolDefinition
 
 ```
-KrakenToolDefinition
+TuvrenToolDefinition
 ├─ name: string                           // unique within tool set
 ├─ description: string
 ├─ inputSchema: KrakenSchema
@@ -1494,7 +1496,7 @@ ToolExecutionContext
 ├─ name: string
 ├─ signal?: AbortSignal
 ├─ emit?: (event: { name: string, data: unknown }) → void
-├─ forward?: (event: KrakenStreamEvent, source: EventSource) → void
+├─ forward?: (event: TuvrenStreamEvent, source: EventSource) → void
 └─ metadata?: Record<string, unknown>
 ```
 
@@ -1508,16 +1510,16 @@ type ApprovalPolicy =
   | (input: unknown, context: ToolExecutionContext) → boolean | Promise<boolean>
 ```
 
-The `approval` field on `KrakenToolDefinition` is a declarative shorthand. When `true` (or when the function returns `true`), the tool is marked as pending approval. The aroundTool chain in the extension system (§9.5) is the imperative mechanism for the same gating — an aroundTool handler can return a pause verdict with an `ApprovalRequest` for any tool, regardless of the tool’s own `approval` field.
+The `approval` field on `TuvrenToolDefinition` is a declarative shorthand. When `true` (or when the function returns `true`), the tool is marked as pending approval. The aroundTool chain in the extension system (§9.5) is the imperative mechanism for the same gating — an aroundTool handler can return a pause verdict with an `ApprovalRequest` for any tool, regardless of the tool’s own `approval` field.
 
 ### 8.5 Tool Registry
 
 ```
 ToolRegistry
-├─ register(tool: KrakenToolDefinition): void
-├─ get(name: string): KrakenToolDefinition | undefined
+├─ register(tool: TuvrenToolDefinition): void
+├─ get(name: string): TuvrenToolDefinition | undefined
 ├─ has(name: string): boolean
-├─ list(): KrakenToolDefinition[]
+├─ list(): TuvrenToolDefinition[]
 └─ toDefinitions(): RenderedToolDefinition[]
 ```
 
@@ -1574,7 +1576,7 @@ createExtension({
   name: string
 
   // ── Contributions ──
-  tools?: KrakenToolDefinition[]
+  tools?: TuvrenToolDefinition[]
   systemPrompt?: string | SystemPromptFn
   exports?: string[]                           // state keys visible to other extensions via sharedExports
 
@@ -1606,7 +1608,7 @@ If a tool name conflicts with an explicitly registered tool or another extension
 
 #### Tools
 
-Extension-contributed tools satisfy `KrakenToolDefinition` and merge into the tool registry at Turn start. The tool executor does not distinguish between explicit and extension-contributed tools.
+Extension-contributed tools satisfy `TuvrenToolDefinition` and merge into the tool registry at Turn start. The tool executor does not distinguish between explicit and extension-contributed tools.
 
 #### System Prompt
 
@@ -1668,7 +1670,7 @@ InterceptContext
 ├─ sharedExports: Record<string, Record<string, unknown>>
 ├─ manifest: ContextManifest
 ├─ iterationCount: number
-├─ messages: KrakenMessage[]                   // read-only snapshot
+├─ messages: TuvrenMessage[]                   // read-only snapshot
 ├─ turnId: string
 ├─ runId: string
 └─ emit: (event: { name: string, data: unknown }) → void
@@ -1728,7 +1730,7 @@ When `cePlan` is returned, the framework executes the context engineering action
 type AfterIterationHandler = (ctx: AfterIterationContext) → InterceptResult | void | Promise<...>
 
 AfterIterationContext extends InterceptContext
-├─ response: KrakenModelResponse               // the model's response this iteration
+├─ response: TuvrenModelResponse               // the model's response this iteration
 ├─ toolResults?: ToolResultPart[]               // if tools were executed
 └─ resolution: RuntimeResolution                // the iteration's current resolution
 ```
@@ -1750,15 +1752,15 @@ AroundModelContext
 ├─ extensionState: Record<string, unknown>
 ├─ sharedExports: Record<string, Record<string, unknown>>
 ├─ manifest: ContextManifest
-├─ messages: KrakenMessage[]
-├─ prompt: KrakenPrompt                        // mutable
+├─ messages: TuvrenMessage[]
+├─ prompt: TuvrenPrompt                        // mutable
 ├─ tools: RenderedToolDefinition[]             // mutable
-├─ config: KrakenModelConfig                   // mutable
+├─ config: TuvrenModelConfig                   // mutable
 ├─ iterationCount: number
 └─ emit: (event: { name: string, data: unknown }) → void
 
-type NextModelFn = (ctx?: AroundModelContext) → Promise<KrakenModelResponse>
-type AroundModelResult = KrakenModelResponse | { response: KrakenModelResponse, state?: Record<string, unknown> }
+type NextModelFn = (ctx?: AroundModelContext) → Promise<TuvrenModelResponse>
+type AroundModelResult = TuvrenModelResponse | { response: TuvrenModelResponse, state?: Record<string, unknown> }
 ```
 
 `next` accepts an optional modified context — this is how tool filtering, prompt modification, model swapping, and retry work. These are call-scoped execution mechanics, not persistent policy decisions. aroundModel is an execution wrapper, not a generic verdict surface.
@@ -1778,12 +1780,12 @@ AroundToolContext
 ├─ extensionState: Record<string, unknown>
 ├─ sharedExports: Record<string, Record<string, unknown>>
 ├─ toolCall: ToolCallPart
-├─ tool: KrakenToolDefinition
+├─ tool: TuvrenToolDefinition
 ├─ input: unknown
 ├─ callId: string
 ├─ approvalDecision?: ApprovalDecision        // present when resuming this exact call after approval
 ├─ emit: (event: { name: string, data: unknown }) → void
-└─ forward: (event: KrakenStreamEvent, source: EventSource) → void
+└─ forward: (event: TuvrenStreamEvent, source: EventSource) → void
 
 type NextToolFn = (ctx?: AroundToolContext) → Promise<ToolResultPart>
 type AroundToolResult =
@@ -1823,7 +1825,7 @@ Registration order: `[ext1.systemPrompt, ext2.systemPrompt, ext3.systemPrompt, b
 
 aroundModel and aroundTool interact with the streaming system as defined in §6.5 and §6.6. The key rules:
 
-- aroundModel receives the complete `KrakenModelResponse`, not streaming events. Stream events are emitted by the driver during the provider stream, before aroundModel sees the response.
+- aroundModel receives the complete `TuvrenModelResponse`, not streaming events. Stream events are emitted by the driver during the provider stream, before aroundModel sees the response.
 - Short-circuit (no `next()` call): driver synthesizes events from the returned response.
 - Retry (multiple `next()` calls): each produces a stream sequence with a new `messageId`. Only the final response is durable.
 - aroundTool is invisible to the event stream. One `tool.start` and one `tool.result` regardless of internal retries.
@@ -1865,9 +1867,9 @@ Multi-agent orchestration is a framework pattern built on existing primitives: t
 ```
 AgentConfig
 ├─ name: string
-├─ model?: string | KrakenProvider
+├─ model?: string | TuvrenProvider
 ├─ systemPrompt?: string
-├─ tools?: KrakenToolDefinition[]
+├─ tools?: TuvrenToolDefinition[]
 ├─ extensions?: Extension[]
 ├─ loopPolicy?: LoopPolicy
 ├─ contextPolicy?: ContextPolicy
@@ -2088,7 +2090,7 @@ OrchestrationRuntime
 OrchestrationHandle extends ExecutionHandle
 ├─ resolveApproval(response: ApprovalResponse) → OrchestrationHandle
 ├─ spawn(input: { agent: string, signal: InputSignal }) → OrchestrationHandle
-├─ allEvents(): AsyncIterable<KrakenStreamEvent>
+├─ allEvents(): AsyncIterable<TuvrenStreamEvent>
 └─ awaitResult(): Promise<unknown>
 ```
 
