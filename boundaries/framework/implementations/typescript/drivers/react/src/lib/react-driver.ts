@@ -43,7 +43,6 @@ import type {
 import { assertTuvrenModelResponse } from "@tuvren/provider-api";
 import {
   type NormalizedAroundModelResult,
-  cloneAroundModelContext,
   createAroundModelContextSnapshot,
   createExtensionStateSnapshot,
   normalizeNextAroundModelContext,
@@ -278,13 +277,20 @@ async function runAroundModelChain(
 
     const extension = handlers[index];
     const nextOutcomes: ModelExecutionOutcome[] = [];
-    const extensionContext = {
-      ...cloneAroundModelContext(currentContext),
+    const extensionContext = createAroundModelContextSnapshot({
+      config: currentContext.config,
+      emit: currentContext.emit,
       extensionState: createExtensionStateSnapshot(
         currentContext.manifest,
         extension.name
       ),
-    } satisfies AroundModelContext;
+      iterationCount: currentContext.iterationCount,
+      manifest: currentContext.manifest,
+      messages: currentContext.messages,
+      prompt: currentContext.prompt,
+      sharedExports: currentContext.sharedExports,
+      tools: currentContext.tools,
+    });
     const result = normalizeAroundModelResult(
       await extension.aroundModel(extensionContext, async (nextContext) => {
         const normalizedNextContext = normalizeNextAroundModelContext(

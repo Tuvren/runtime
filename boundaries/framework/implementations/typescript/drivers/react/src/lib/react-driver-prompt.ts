@@ -80,7 +80,6 @@ export function preparePromptState(input: {
   iterationCount: number;
   manifest: Readonly<ContextManifest>;
   messages: readonly TuvrenMessage[];
-  onSystemPromptError?(input: { error: Error; extensionName: string }): void;
   tools: RenderedToolDefinition[];
 }): PreparedPromptState {
   const extensions = input.config.extensions ?? [];
@@ -90,8 +89,7 @@ export function preparePromptState(input: {
     input.config.systemPrompt,
     input.manifest,
     input.iterationCount,
-    sharedExports,
-    input.onSystemPromptError
+    sharedExports
   );
   const baseMessages = [
     ...systemMessages,
@@ -116,22 +114,6 @@ export function preparePromptState(input: {
     sharedExports,
     tools,
   };
-}
-
-export function cloneAroundModelContext(
-  context: AroundModelContext
-): AroundModelContext {
-  return createAroundModelContextSnapshot({
-    config: context.config,
-    emit: context.emit,
-    extensionState: context.extensionState,
-    iterationCount: context.iterationCount,
-    manifest: context.manifest,
-    messages: context.messages,
-    prompt: context.prompt,
-    sharedExports: context.sharedExports,
-    tools: context.tools,
-  });
 }
 
 export function normalizeNextAroundModelContext(
@@ -205,8 +187,7 @@ function collectSystemMessages(
   basePrompt: string | undefined,
   manifest: Readonly<ContextManifest>,
   iterationCount: number,
-  sharedExports: Record<string, Record<string, unknown>>,
-  onError?: (input: { error: Error; extensionName: string }) => void
+  sharedExports: Record<string, Record<string, unknown>>
 ): TuvrenMessage[] {
   const messages: TuvrenMessage[] = [];
 
@@ -237,11 +218,8 @@ function collectSystemMessages(
           role: "system",
         });
       }
-    } catch (error: unknown) {
-      onError?.({
-        error: normalizeError(error),
-        extensionName: extension.name,
-      });
+    } catch {
+      // System-prompt contributions are best-effort and must not abort the turn.
     }
   }
 
@@ -311,10 +289,6 @@ function asRecord(value: unknown): Record<string, unknown> {
 
 function cloneValue<T>(value: T): T {
   return structuredClone(value);
-}
-
-function normalizeError(error: unknown): Error {
-  return error instanceof Error ? error : new Error(String(error));
 }
 
 function createPromptSnapshot(input: {
