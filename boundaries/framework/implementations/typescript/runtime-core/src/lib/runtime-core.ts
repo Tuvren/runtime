@@ -1264,10 +1264,14 @@ class RuntimeCore implements TuvrenRuntime {
     let resolution = driverResult.resolution;
     const driverMessages = [...(driverResult.messages ?? [])];
     const cancellationResolution = createCancelledResolution(handle);
+    const allowsAroundModelDivergence = (
+      loopState.activeConfig.extensions ?? []
+    ).some((extension) => extension.aroundModel !== undefined);
     const assistantEventValidationError = validateDriverAssistantEvents(
       driverMessages,
       emittedDriverEvents,
-      cancellationResolution ?? resolution
+      cancellationResolution ?? resolution,
+      allowsAroundModelDivergence
     );
     const synthesizedAssistantEvents = this.ensureDriverAssistantEvents(
       handle,
@@ -4367,7 +4371,8 @@ function assertDriverRuntimeEvent(event: TuvrenStreamEvent): void {
 function validateDriverAssistantEvents(
   messages: TuvrenMessage[],
   emittedEvents: TuvrenStreamEvent[],
-  resolution: RuntimeResolution
+  resolution: RuntimeResolution,
+  allowsDurableAssistantDivergence: boolean
 ): TuvrenRuntimeError | undefined {
   const assistantEvents = emittedEvents.filter((event) =>
     isAssistantContentStreamEvent(event.type)
@@ -4413,6 +4418,10 @@ function validateDriverAssistantEvents(
     if (sequenceValidationError !== undefined) {
       return sequenceValidationError;
     }
+  }
+
+  if (allowsDurableAssistantDivergence) {
+    return validateStandaloneAssistantSequence(finalAssistantSequence);
   }
 
   const actualEvents = finalAssistantSequence.filter((event) =>

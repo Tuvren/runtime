@@ -373,16 +373,11 @@ class StreamAccumulator {
           },
         ];
       case "tool_call_done":
-        this.completeToolCall(chunk.providerCallId, chunk.input, chunk.name);
-        return [
-          {
-            callId: this.requireToolCall(chunk.providerCallId).callId,
-            input: cloneValue(chunk.input),
-            name: chunk.name,
-            timestamp: this.now(),
-            type: "tool_call.done",
-          },
-        ];
+        return this.completeToolCallAndCreateEvents(
+          chunk.providerCallId,
+          chunk.input,
+          chunk.name
+        );
       case "finish":
         this.finishChunk = cloneValue(chunk);
         this.messageDonePublished = true;
@@ -578,6 +573,37 @@ class StreamAccumulator {
     state.done = true;
     state.input = cloneValue(input);
     state.name = name;
+  }
+
+  private completeToolCallAndCreateEvents(
+    providerCallId: string,
+    input: unknown,
+    name: string
+  ): TuvrenStreamEvent[] {
+    this.completeToolCall(providerCallId, input, name);
+    const state = this.requireToolCall(providerCallId);
+    const events: TuvrenStreamEvent[] = [];
+
+    if (state.argsDelta === "") {
+      const synthesizedArgsDelta = JSON.stringify(input) ?? "null";
+      state.argsDelta = synthesizedArgsDelta;
+      events.push({
+        callId: state.callId,
+        delta: synthesizedArgsDelta,
+        timestamp: this.now(),
+        type: "tool_call.args_delta",
+      });
+    }
+
+    events.push({
+      callId: state.callId,
+      input: cloneValue(input),
+      name,
+      timestamp: this.now(),
+      type: "tool_call.done",
+    });
+
+    return events;
   }
 
   private createTerminalEventsFromFinish(

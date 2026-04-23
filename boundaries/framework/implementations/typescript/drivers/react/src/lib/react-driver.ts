@@ -42,7 +42,9 @@ import { assertTuvrenModelResponse } from "@tuvren/provider-api";
 import {
   type NormalizedAroundModelResult,
   cloneAroundModelContext,
+  createAroundModelContextSnapshot,
   createExtensionStateSnapshot,
+  normalizeNextAroundModelContext,
   normalizeAroundModelResult,
   preparePromptState,
 } from "./react-driver-prompt.js";
@@ -269,12 +271,11 @@ async function runAroundModelChain(
     } satisfies AroundModelContext;
     const result = normalizeAroundModelResult(
       await extension.aroundModel(extensionContext, async (nextContext) => {
-        const nextOutcome = await invokeAt(
-          index + 1,
-          nextContext === undefined
-            ? cloneAroundModelContext(extensionContext)
-            : cloneAroundModelContext(nextContext)
+        const normalizedNextContext = normalizeNextAroundModelContext(
+          currentContext,
+          nextContext ?? extensionContext
         );
+        const nextOutcome = await invokeAt(index + 1, normalizedNextContext);
         nextOutcomes.push(nextOutcome);
         return cloneValue(nextOutcome.response);
       })
@@ -313,13 +314,13 @@ async function callProvider(
     providerCallMode === "generate"
       ? await executeGenerateCall({
           now: context.runtime.now,
-          prompt: aroundContext.prompt,
+          prompt: createProviderPrompt(aroundContext),
           provider,
           runtime: context.runtime,
         })
       : await executeStreamCall({
           now: context.runtime.now,
-          prompt: aroundContext.prompt,
+          prompt: createProviderPrompt(aroundContext),
           provider,
           runtime: context.runtime,
         });
@@ -335,7 +336,7 @@ function createAroundModelContext(
   context: DriverExecutionContext,
   promptState: ReturnType<typeof preparePromptState>
 ): AroundModelContext {
-  return {
+  return createAroundModelContextSnapshot({
     config: cloneValue(promptState.config),
     emit: (event) => {
       context.runtime.emit({
@@ -352,7 +353,7 @@ function createAroundModelContext(
     prompt: cloneValue(promptState.prompt),
     sharedExports: cloneValue(promptState.sharedExports),
     tools: cloneValue(promptState.tools),
-  };
+  });
 }
 
 function resolveProvider(model: AgentConfig["model"]): TuvrenProvider {
@@ -485,6 +486,12 @@ function finalizeAroundModelSequences(
     ];
   }
 
+  const lastSequences = cloneAssistantSequences(lastOutcome.assistantSequences);
+
+  if (lastSequences.some((sequence) => sequence.published)) {
+    return [...priorSequences, ...lastSequences];
+  }
+
   return [
     ...priorSequences,
     createBufferedAssistantSequence(result.response, now),
@@ -510,6 +517,18 @@ function responsesMatch(
 
 function hasRequestedToolCalls(response: TuvrenModelResponse): boolean {
   return response.parts.some((part) => part.type === "tool_call");
+}
+
+function createProviderPrompt(aroundContext: AroundModelContext) {
+  return {
+    config: cloneValue(aroundContext.config),
+    messages: cloneValue(aroundContext.messages),
+    responseFormat: cloneValue(aroundContext.prompt.responseFormat),
+    tools:
+      aroundContext.tools.length === 0
+        ? undefined
+        : cloneValue(aroundContext.tools),
+  };
 }
 
 function normalizeExecutionError(error: unknown): Error {

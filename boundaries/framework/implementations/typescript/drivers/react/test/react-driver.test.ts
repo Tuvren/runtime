@@ -19,6 +19,7 @@ import type { DriverExecutionContext } from "@tuvren/driver-api";
 import type {
   ContextManifest,
   InputSignal,
+  TuvrenPrompt,
   TuvrenExtension,
   TuvrenMessage,
   TuvrenModelResponse,
@@ -423,11 +424,15 @@ describe("driver-react", () => {
     });
   });
 
-  test("uses in-place aroundModel context mutations when next() is called without an explicit context", async () => {
+  test("applies top-level aroundModel config, message, and tool mutations when next() is called without an explicit context", async () => {
     let capturedMessages: TuvrenMessage[] = [];
+    let capturedConfig: TuvrenPrompt["config"];
+    let capturedToolsLength = 0;
     const provider = {
       async generate(prompt) {
         capturedMessages = prompt.messages;
+        capturedConfig = prompt.config;
+        capturedToolsLength = prompt.tools?.length ?? 0;
         return {
           finishReason: "stop",
           parts: [{ text: "mutated prompt", type: "text" }],
@@ -448,10 +453,21 @@ describe("driver-react", () => {
           extensions: [
             {
               async aroundModel(context, next) {
-                context.prompt.messages.push({
-                  content: "Injected guidance",
-                  role: "system",
-                });
+                context.config = {
+                  ...context.config,
+                  model: "mutated-model",
+                  settings: {
+                    temperature: 0.1,
+                  },
+                };
+                context.messages = [
+                  ...context.messages,
+                  {
+                    content: "Injected guidance",
+                    role: "system",
+                  },
+                ];
+                context.tools = [];
                 return await next();
               },
               name: "mutator",
@@ -460,9 +476,17 @@ describe("driver-react", () => {
           model: provider,
           name: "primary",
         },
+        toolDefinitions: [createSearchTool()],
       })
     );
 
+    expect(capturedConfig).toEqual({
+      model: "mutated-model",
+      provider: "provider",
+      settings: {
+        temperature: 0.1,
+      },
+    });
     expect(capturedMessages).toEqual(
       expect.arrayContaining([
         {
@@ -471,6 +495,64 @@ describe("driver-react", () => {
         },
       ])
     );
+    expect(capturedToolsLength).toBe(0);
+  });
+
+  test("does not emit a second live assistant sequence when aroundModel replaces a single next() response", async () => {
+    const emittedEvents: TuvrenStreamEvent[] = [];
+    const provider = {
+      async generate() {
+        return {
+          finishReason: "stop",
+          parts: [{ text: "provider", type: "text" }],
+        } satisfies TuvrenModelResponse;
+      },
+      id: "provider",
+      async *stream() {
+        yield* [];
+      },
+    } satisfies TuvrenProvider;
+    const driver = createReActDriver({
+      providerCallMode: "generate",
+    }).create();
+
+    const result = await driver.execute(
+      createDriverExecutionContext({
+        config: {
+          extensions: [
+            {
+              async aroundModel(_context, next) {
+                const response = await next();
+                return {
+                  ...response,
+                  parts: [{ text: "modified", type: "text" }],
+                };
+              },
+              name: "rewriter",
+            },
+          ],
+          model: provider,
+          name: "primary",
+        },
+        emittedEvents,
+      })
+    );
+
+    expect(
+      emittedEvents
+        .filter(
+          (event): event is Extract<TuvrenStreamEvent, { type: "text.done" }> =>
+            event.type === "text.done"
+        )
+        .map((event) => event.text)
+    ).toEqual(["provider"]);
+    expect(
+      emittedEvents.filter((event) => event.type === "message.start").length
+    ).toBe(1);
+    expect(result.messages?.[0]).toEqual({
+      parts: [{ text: "modified", type: "text" }],
+      role: "assistant",
+    });
   });
 
   test("supports aroundModel retry with distinct generated assistant sequences", async () => {
@@ -616,6 +698,70 @@ describe("driver-react", () => {
       "structured.done",
       "message.done",
     ]);
+  });
+
+  test("synthesizes tool-call args deltas when provider streams complete tool calls without incremental args chunks", async () => {
+    const emittedEvents: TuvrenStreamEvent[] = [];
+    const provider = {
+      async generate() {
+        throw new Error("generate should not be called");
+      },
+      id: "provider",
+      async *stream() {
+        yield {
+          providerCallId: "native-call-1",
+          name: "search",
+          type: "tool_call_start",
+        } as const;
+        yield {
+          input: { query: "runtime" },
+          name: "search",
+          providerCallId: "native-call-1",
+          type: "tool_call_done",
+        } as const;
+        yield {
+          finishReason: "tool_call",
+          type: "finish",
+        } as const;
+      },
+    } satisfies TuvrenProvider;
+    const driver = createReActDriver({
+      providerCallMode: "stream",
+      toolExecutionMode: "parallel",
+    }).create();
+
+    const result = await driver.execute(
+      createDriverExecutionContext({
+        config: {
+          model: provider,
+          name: "primary",
+        },
+        emittedEvents,
+      })
+    );
+
+    expect(result.resolution).toEqual({
+      type: "continue_iteration",
+    });
+    expect(emittedEvents.map((event) => event.type)).toEqual([
+      "message.start",
+      "tool_call.start",
+      "tool_call.args_delta",
+      "tool_call.done",
+      "message.done",
+    ]);
+    expect(
+      emittedEvents.find(
+        (
+          event
+        ): event is Extract<
+          TuvrenStreamEvent,
+          { type: "tool_call.args_delta" }
+        > => event.type === "tool_call.args_delta"
+      )
+    ).toMatchObject({
+      delta: '{"query":"runtime"}',
+    });
   });
 
   test("fails hard when config.model is not a concrete provider", async () => {
@@ -1010,6 +1156,76 @@ describe("driver-react", () => {
     );
   });
 
+  test("executes end to end through runtime-core when aroundModel replaces the durable response after one next() call", async () => {
+    const harness = createFakeKernelHarness();
+    const provider = {
+      async generate() {
+        return {
+          finishReason: "stop",
+          parts: [{ text: "provider", type: "text" }],
+        } satisfies TuvrenModelResponse;
+      },
+      id: "provider",
+      async *stream() {
+        yield* [];
+      },
+    } satisfies TuvrenProvider;
+    const runtime = createTuvrenRuntimeCore({
+      defaultDriverId: REACT_DRIVER_ID,
+      driverRegistry: createDriverRegistry([
+        createReActDriver({
+          providerCallMode: "generate",
+        }),
+      ]),
+      kernel: harness.kernel,
+    });
+    const thread = await runtime.createThread({});
+    const handle = runtime.executeTurn({
+      branchId: thread.branchId,
+      config: {
+        extensions: [
+          {
+            async aroundModel(_context, next) {
+              const response = await next();
+              return {
+                ...response,
+                parts: [{ text: "modified", type: "text" }],
+              };
+            },
+            name: "rewriter",
+          },
+        ],
+        model: provider,
+        name: "primary",
+      },
+      signal: textSignal("Rewrite output"),
+      threadId: thread.threadId,
+    });
+
+    const events = await collectEvents(handle.events());
+    const messages = await harness.readBranchMessages(thread.branchId);
+
+    expect(handle.status().phase).toBe("completed");
+    expect(
+      events
+        .filter(
+          (
+            event
+          ): event is Extract<(typeof events)[number], { type: "text.done" }> =>
+            event.type === "text.done"
+        )
+        .map((event) => event.text)
+    ).toEqual(["provider"]);
+    expect(messages).toEqual(
+      expect.arrayContaining([
+        {
+          parts: [{ text: "modified", type: "text" }],
+          role: "assistant",
+        },
+      ])
+    );
+  });
+
   test("persists aroundModel state updates through the runtime-core checkpoint path", async () => {
     const harness = createFakeKernelHarness();
     const provider = {
@@ -1160,6 +1376,80 @@ describe("driver-react", () => {
         },
       ])
     );
+  });
+
+  test("executes end to end through runtime-core for streamed tool calls without provider args deltas", async () => {
+    const harness = createFakeKernelHarness();
+    let iteration = 0;
+    const provider = {
+      async generate() {
+        throw new Error("generate should not be called");
+      },
+      id: "provider",
+      async *stream() {
+        if (iteration === 0) {
+          iteration += 1;
+          yield {
+            providerCallId: "provider-call-1",
+            name: "search",
+            type: "tool_call_start",
+          } as const;
+          yield {
+            input: { query: "docs" },
+            name: "search",
+            providerCallId: "provider-call-1",
+            type: "tool_call_done",
+          } as const;
+          yield {
+            finishReason: "tool_call",
+            type: "finish",
+          } as const;
+          return;
+        }
+
+        yield {
+          text: "Tool run complete",
+          type: "text_delta",
+        } as const;
+        yield {
+          finishReason: "stop",
+          type: "finish",
+        } as const;
+      },
+    } satisfies TuvrenProvider;
+    const runtime = createTuvrenRuntimeCore({
+      defaultDriverId: REACT_DRIVER_ID,
+      driverRegistry: createDriverRegistry([
+        createReActDriver({
+          providerCallMode: "stream",
+          toolExecutionMode: "sequential",
+        }),
+      ]),
+      kernel: harness.kernel,
+    });
+    const thread = await runtime.createThread({});
+    const handle = runtime.executeTurn({
+      branchId: thread.branchId,
+      config: {
+        model: provider,
+        name: "primary",
+      },
+      signal: textSignal("Use the search tool"),
+      threadId: thread.threadId,
+      tools: [createSearchTool()],
+    });
+
+    const events = await collectEvents(handle.events());
+
+    expect(handle.status().phase).toBe("completed");
+    expect(events.some((event) => event.type === "tool_call.args_delta")).toBe(
+      true
+    );
+    expect(
+      events.some(
+        (event) => event.type === "tool.result" && event.name === "search"
+      )
+    ).toBe(true);
   });
 
   test("surfaces provider stream failures through runtime-core without invalid assistant stream errors", async () => {

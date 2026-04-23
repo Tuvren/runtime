@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+import { isDeepStrictEqual } from "node:util";
 import type {
   AgentConfig,
   AroundModelContext,
@@ -38,6 +39,40 @@ export interface PreparedPromptState {
 export interface NormalizedAroundModelResult {
   response: TuvrenModelResponse;
   state?: Record<string, unknown>;
+}
+
+export function createAroundModelContextSnapshot(input: {
+  config: TuvrenModelConfig;
+  emit: AroundModelContext["emit"];
+  extensionState: Record<string, unknown>;
+  iterationCount: number;
+  manifest: ContextManifest;
+  messages: TuvrenMessage[];
+  prompt: TuvrenPrompt;
+  sharedExports: Record<string, Record<string, unknown>>;
+  tools: RenderedToolDefinition[];
+}): AroundModelContext {
+  const config = cloneValue(input.config);
+  const messages = cloneValue(input.messages);
+  const tools = cloneValue(input.tools);
+  const prompt = createPromptSnapshot({
+    config,
+    messages,
+    responseFormat: cloneValue(input.prompt.responseFormat),
+    tools,
+  });
+
+  return {
+    config,
+    emit: input.emit,
+    extensionState: cloneRecord(input.extensionState),
+    iterationCount: input.iterationCount,
+    manifest: cloneValue(input.manifest),
+    messages,
+    prompt,
+    sharedExports: cloneValue(input.sharedExports),
+    tools,
+  };
 }
 
 export function preparePromptState(input: {
@@ -86,17 +121,61 @@ export function preparePromptState(input: {
 export function cloneAroundModelContext(
   context: AroundModelContext
 ): AroundModelContext {
-  return {
-    config: cloneValue(context.config),
+  return createAroundModelContextSnapshot({
+    config: context.config,
     emit: context.emit,
-    extensionState: cloneRecord(context.extensionState),
+    extensionState: context.extensionState,
     iterationCount: context.iterationCount,
-    manifest: cloneValue(context.manifest),
-    messages: cloneValue(context.messages),
-    prompt: cloneValue(context.prompt),
-    sharedExports: cloneValue(context.sharedExports),
-    tools: cloneValue(context.tools),
-  };
+    manifest: context.manifest,
+    messages: context.messages,
+    prompt: context.prompt,
+    sharedExports: context.sharedExports,
+    tools: context.tools,
+  });
+}
+
+export function normalizeNextAroundModelContext(
+  currentContext: AroundModelContext,
+  nextContext: AroundModelContext
+): AroundModelContext {
+  const resolvedConfig = resolveAroundModelSurface({
+    basePromptValue: currentContext.prompt.config ?? {},
+    baseValue: currentContext.config,
+    nextPromptValue: nextContext.prompt.config ?? {},
+    nextValue: nextContext.config,
+  });
+  const resolvedMessages = resolveAroundModelSurface({
+    basePromptValue: currentContext.prompt.messages,
+    baseValue: currentContext.messages,
+    nextPromptValue: nextContext.prompt.messages,
+    nextValue: nextContext.messages,
+  });
+  const resolvedTools = resolveAroundModelSurface({
+    basePromptValue: currentContext.prompt.tools ?? [],
+    baseValue: currentContext.tools,
+    nextPromptValue: nextContext.prompt.tools ?? [],
+    nextValue: nextContext.tools,
+  });
+
+  return createAroundModelContextSnapshot({
+    config: resolvedConfig,
+    emit: nextContext.emit,
+    extensionState: nextContext.extensionState,
+    iterationCount: nextContext.iterationCount,
+    manifest: nextContext.manifest,
+    messages: resolvedMessages,
+    prompt: {
+      responseFormat: cloneValue(nextContext.prompt.responseFormat),
+      ...createPromptSnapshot({
+        config: resolvedConfig,
+        messages: resolvedMessages,
+        responseFormat: cloneValue(nextContext.prompt.responseFormat),
+        tools: resolvedTools,
+      }),
+    },
+    sharedExports: nextContext.sharedExports,
+    tools: resolvedTools,
+  });
 }
 
 export function normalizeAroundModelResult(
@@ -236,4 +315,51 @@ function cloneValue<T>(value: T): T {
 
 function normalizeError(error: unknown): Error {
   return error instanceof Error ? error : new Error(String(error));
+}
+
+function createPromptSnapshot(input: {
+  config: TuvrenModelConfig;
+  messages: TuvrenMessage[];
+  responseFormat: TuvrenPrompt["responseFormat"];
+  tools: RenderedToolDefinition[];
+}): TuvrenPrompt {
+  return {
+    config: input.config,
+    messages: input.messages,
+    responseFormat: input.responseFormat,
+    tools: input.tools.length === 0 ? undefined : input.tools,
+  };
+}
+
+function resolveAroundModelSurface<T>(input: {
+  basePromptValue: T;
+  baseValue: T;
+  nextPromptValue: T;
+  nextValue: T;
+}): T {
+  const promptChanged = !surfacesMatch(
+    input.basePromptValue,
+    input.nextPromptValue
+  );
+  const valueChanged = !surfacesMatch(input.baseValue, input.nextValue);
+
+  if (promptChanged && !valueChanged) {
+    return cloneValue(input.nextPromptValue);
+  }
+
+  if (valueChanged && !promptChanged) {
+    return cloneValue(input.nextValue);
+  }
+
+  if (promptChanged && valueChanged) {
+    return surfacesMatch(input.nextPromptValue, input.nextValue)
+      ? cloneValue(input.nextValue)
+      : cloneValue(input.nextPromptValue);
+  }
+
+  return cloneValue(input.nextValue);
+}
+
+function surfacesMatch(left: unknown, right: unknown): boolean {
+  return isDeepStrictEqual(left, right);
 }
