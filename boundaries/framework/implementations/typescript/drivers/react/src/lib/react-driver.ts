@@ -415,13 +415,28 @@ function resolveProviderCallMode(
   context: DriverExecutionContext,
   provider: TuvrenProvider
 ): ReActDriverProviderCallMode {
-  return typeof resolver === "function"
-    ? resolver({
-        config: context.config,
-        iterationCount: context.iterationCount,
-        provider,
-      })
-    : resolver;
+  const resolvedMode: unknown =
+    typeof resolver === "function"
+      ? resolver({
+          config: context.config,
+          iterationCount: context.iterationCount,
+          provider,
+        })
+      : resolver;
+
+  if (resolvedMode === "generate" || resolvedMode === "stream") {
+    return resolvedMode;
+  }
+
+  throw new TuvrenRuntimeError(
+    'providerCallMode must resolve to "generate" or "stream"',
+    {
+      code: "react_driver_invalid_provider_call_mode",
+      details: {
+        providerCallMode: resolvedMode,
+      },
+    }
+  );
 }
 
 function resolveToolExecutionMode(
@@ -429,13 +444,28 @@ function resolveToolExecutionMode(
   context: DriverExecutionContext,
   response: TuvrenModelResponse
 ): DriverToolExecutionMode {
-  return typeof resolver === "function"
-    ? resolver({
-        config: context.config,
-        iterationCount: context.iterationCount,
-        response,
-      })
-    : resolver;
+  const resolvedMode: unknown =
+    typeof resolver === "function"
+      ? resolver({
+          config: context.config,
+          iterationCount: context.iterationCount,
+          response,
+        })
+      : resolver;
+
+  if (resolvedMode === "parallel" || resolvedMode === "sequential") {
+    return resolvedMode;
+  }
+
+  throw new TuvrenRuntimeError(
+    'toolExecutionMode must resolve to "parallel" or "sequential"',
+    {
+      code: "react_driver_invalid_tool_execution_mode",
+      details: {
+        toolExecutionMode: resolvedMode,
+      },
+    }
+  );
 }
 
 function validateStructuredOutput(

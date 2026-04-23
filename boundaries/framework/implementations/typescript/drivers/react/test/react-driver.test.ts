@@ -235,6 +235,99 @@ describe("driver-react", () => {
     });
   });
 
+  test("fails hard when providerCallMode resolves to an invalid value", async () => {
+    let generateCalls = 0;
+    let streamCalls = 0;
+    const provider = {
+      async generate() {
+        generateCalls += 1;
+        return {
+          finishReason: "stop",
+          parts: [{ text: "unused", type: "text" }],
+        } satisfies TuvrenModelResponse;
+      },
+      id: "provider",
+      async *stream() {
+        streamCalls += 1;
+        yield* [];
+      },
+    } satisfies TuvrenProvider;
+    const driver = createReActDriver({
+      providerCallMode() {
+        return JSON.parse('"bogus"');
+      },
+    }).create();
+
+    const result = await driver.execute(
+      createDriverExecutionContext({
+        config: {
+          model: provider,
+          name: "primary",
+        },
+      })
+    );
+
+    expect(generateCalls).toBe(0);
+    expect(streamCalls).toBe(0);
+    expect(result.resolution.type).toBe("fail");
+    if (result.resolution.type !== "fail") {
+      throw new Error("expected a failed resolution");
+    }
+    expect(result.resolution.fatality).toBe("hard");
+    expect(result.resolution.error).toMatchObject({
+      code: "react_driver_invalid_provider_call_mode",
+    });
+  });
+
+  test("fails hard when toolExecutionMode resolves to an invalid value", async () => {
+    let generateCalls = 0;
+    const provider = {
+      async generate() {
+        generateCalls += 1;
+        return {
+          finishReason: "tool_call",
+          parts: [
+            {
+              callId: "tool-1",
+              input: { query: "docs" },
+              name: "search",
+              type: "tool_call",
+            },
+          ],
+        } satisfies TuvrenModelResponse;
+      },
+      id: "provider",
+      async *stream() {
+        yield* [];
+      },
+    } satisfies TuvrenProvider;
+    const driver = createReActDriver({
+      providerCallMode: "generate",
+      toolExecutionMode() {
+        return JSON.parse('"bogus"');
+      },
+    }).create();
+
+    const result = await driver.execute(
+      createDriverExecutionContext({
+        config: {
+          model: provider,
+          name: "primary",
+        },
+      })
+    );
+
+    expect(generateCalls).toBe(1);
+    expect(result.resolution.type).toBe("fail");
+    if (result.resolution.type !== "fail") {
+      throw new Error("expected a failed resolution");
+    }
+    expect(result.resolution.fatality).toBe("hard");
+    expect(result.resolution.error).toMatchObject({
+      code: "react_driver_invalid_tool_execution_mode",
+    });
+  });
+
   test("streams canonical tool-call events and preserves provider call metadata", async () => {
     const emittedEvents: TuvrenStreamEvent[] = [];
     const provider = {
