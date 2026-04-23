@@ -25,6 +25,7 @@ import type {
   TuvrenPrompt,
   TuvrenProvider,
 } from "@tuvren/provider-api";
+import { assertProviderStreamChunk } from "@tuvren/provider-api";
 
 export interface BufferedAssistantSequence {
   events: TuvrenStreamEvent[];
@@ -64,7 +65,13 @@ export async function executeStreamCall(input: {
   );
 
   for await (const chunk of input.provider.stream(cloneValue(input.prompt))) {
-    await appendAllAndEmit(events, accumulator.absorb(chunk), input.runtime);
+    const validatedChunk = cloneValue(chunk);
+    assertProviderStreamChunk(validatedChunk, "provider stream chunk");
+    await appendAllAndEmit(
+      events,
+      accumulator.absorb(validatedChunk),
+      input.runtime
+    );
   }
 
   const response = accumulator.finalize();

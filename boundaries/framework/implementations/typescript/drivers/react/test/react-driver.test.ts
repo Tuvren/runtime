@@ -683,6 +683,129 @@ describe("driver-react", () => {
     ).toBe(2);
   });
 
+  test("fails hard when aroundModel retry returns a stale generate response instead of the final next() result", async () => {
+    let generateCalls = 0;
+    const provider = {
+      async generate() {
+        generateCalls += 1;
+        return {
+          finishReason: "stop",
+          parts: [
+            {
+              text: generateCalls === 1 ? "first attempt" : "second attempt",
+              type: "text",
+            },
+          ],
+        } satisfies TuvrenModelResponse;
+      },
+      id: "provider",
+      async *stream() {
+        yield* [];
+      },
+    } satisfies TuvrenProvider;
+    const driver = createReActDriver({
+      providerCallMode: "generate",
+    }).create();
+
+    const result = await driver.execute(
+      createDriverExecutionContext({
+        config: {
+          extensions: [
+            {
+              async aroundModel(context, next) {
+                const firstResponse = await next(context);
+                await next(context);
+                return firstResponse;
+              },
+              name: "retry",
+            },
+          ],
+          model: provider,
+          name: "primary",
+        },
+      })
+    );
+
+    expect(generateCalls).toBe(2);
+    expect(result.resolution.type).toBe("fail");
+
+    if (result.resolution.type !== "fail") {
+      throw new Error("expected a fail resolution");
+    }
+
+    expect(
+      "code" in result.resolution.error
+        ? result.resolution.error.code
+        : undefined
+    ).toBe("react_driver_invalid_around_model_retry");
+  });
+
+  test("fails hard when aroundModel retry returns a stale streamed response instead of the final next() result", async () => {
+    const emittedEvents: TuvrenStreamEvent[] = [];
+    let streamCalls = 0;
+    const provider = {
+      async generate() {
+        throw new Error("generate should not be called");
+      },
+      id: "provider",
+      async *stream() {
+        streamCalls += 1;
+        yield {
+          text: streamCalls === 1 ? "first attempt" : "second attempt",
+          type: "text_delta",
+        } as const;
+        yield {
+          finishReason: "stop",
+          type: "finish",
+        } as const;
+      },
+    } satisfies TuvrenProvider;
+    const driver = createReActDriver({
+      providerCallMode: "stream",
+    }).create();
+
+    const result = await driver.execute(
+      createDriverExecutionContext({
+        config: {
+          extensions: [
+            {
+              async aroundModel(context, next) {
+                const firstResponse = await next(context);
+                await next(context);
+                return firstResponse;
+              },
+              name: "retry",
+            },
+          ],
+          model: provider,
+          name: "primary",
+        },
+        emittedEvents,
+      })
+    );
+
+    expect(streamCalls).toBe(2);
+    expect(
+      emittedEvents
+        .filter(
+          (event): event is Extract<TuvrenStreamEvent, { type: "text.done" }> =>
+            event.type === "text.done"
+        )
+        .map((event) => event.text)
+    ).toEqual(["first attempt", "second attempt"]);
+    expect(result.resolution.type).toBe("fail");
+
+    if (result.resolution.type !== "fail") {
+      throw new Error("expected a fail resolution");
+    }
+
+    expect(
+      "code" in result.resolution.error
+        ? result.resolution.error.code
+        : undefined
+    ).toBe("react_driver_invalid_around_model_retry");
+  });
+
   test("maps reasoning and structured parts from streamed provider responses", async () => {
     const emittedEvents: TuvrenStreamEvent[] = [];
     const provider = {
@@ -993,6 +1116,49 @@ describe("driver-react", () => {
         ? result.resolution.error.code
         : undefined
     ).toBe("react_driver_provider_failure");
+  });
+
+  test("fails hard when provider.stream yields an invalid chunk shape", async () => {
+    const emittedEvents: TuvrenStreamEvent[] = [];
+    const provider = {
+      async generate() {
+        throw new Error("generate should not be called");
+      },
+      id: "provider",
+      async *stream() {
+        yield {
+          finishReason: "stop",
+          type: "finish",
+          unexpected: true,
+        } as const;
+      },
+    } satisfies TuvrenProvider;
+    const driver = createReActDriver({
+      providerCallMode: "stream",
+    }).create();
+
+    const result = await driver.execute(
+      createDriverExecutionContext({
+        config: {
+          model: provider,
+          name: "primary",
+        },
+        emittedEvents,
+      })
+    );
+
+    expect(result.resolution.type).toBe("fail");
+
+    if (result.resolution.type !== "fail") {
+      throw new Error("expected a fail resolution");
+    }
+
+    expect(
+      "code" in result.resolution.error
+        ? result.resolution.error.code
+        : undefined
+    ).toBe("invalid_provider_stream_chunk");
+    expect(emittedEvents.map((event) => event.type)).toEqual(["message.start"]);
   });
 
   test("fails hard when streamed structured output cannot be parsed", async () => {
@@ -1354,6 +1520,86 @@ describe("driver-react", () => {
         },
       ])
     );
+  });
+
+  test("fails end to end through runtime-core when aroundModel retry returns a stale streamed response", async () => {
+    const harness = createFakeKernelHarness();
+    let streamCalls = 0;
+    const provider = {
+      async generate() {
+        throw new Error("generate should not be called");
+      },
+      id: "provider",
+      async *stream() {
+        streamCalls += 1;
+        yield {
+          text: streamCalls === 1 ? "first attempt" : "second attempt",
+          type: "text_delta",
+        } as const;
+        yield {
+          finishReason: "stop",
+          type: "finish",
+        } as const;
+      },
+    } satisfies TuvrenProvider;
+    const runtime = createTuvrenRuntimeCore({
+      defaultDriverId: REACT_DRIVER_ID,
+      driverRegistry: createDriverRegistry([
+        createReActDriver({
+          providerCallMode: "stream",
+        }),
+      ]),
+      kernel: harness.kernel,
+    });
+    const thread = await runtime.createThread({});
+    const handle = runtime.executeTurn({
+      branchId: thread.branchId,
+      config: {
+        extensions: [
+          {
+            async aroundModel(context, next) {
+              const firstResponse = await next(context);
+              await next(context);
+              return firstResponse;
+            },
+            name: "retry",
+          },
+        ],
+        model: provider,
+        name: "primary",
+      },
+      signal: textSignal("Trigger stale retry response"),
+      threadId: thread.threadId,
+    });
+
+    const events = await collectEvents(handle.events());
+    const messages = await harness.readBranchMessages(thread.branchId);
+
+    expect(streamCalls).toBe(2);
+    expect(handle.status().phase).toBe("failed");
+    expect(
+      events.some(
+        (event) =>
+          event.type === "error" &&
+          event.error.code === "react_driver_invalid_around_model_retry"
+      )
+    ).toBe(true);
+    expect(
+      events
+        .filter(
+          (
+            event
+          ): event is Extract<(typeof events)[number], { type: "text.done" }> =>
+            event.type === "text.done"
+        )
+        .map((event) => event.text)
+    ).toEqual(["first attempt", "second attempt"]);
+    expect(messages).toEqual([
+      {
+        parts: [{ text: "Trigger stale retry response", type: "text" }],
+        role: "user",
+      },
+    ]);
   });
 
   test("persists aroundModel state updates through the runtime-core checkpoint path", async () => {

@@ -296,6 +296,7 @@ async function runAroundModelChain(
         return cloneValue(nextOutcome.response);
       })
     );
+    validateAroundModelRetryDurability(result, nextOutcomes);
 
     return {
       assistantEventReconciliation: resolveAssistantEventReconciliation(
@@ -563,6 +564,37 @@ function resolveAroundModelResponseFormat(
   }
 
   return cloneValue(nextOutcomes.at(-1)?.responseFormat);
+}
+
+function validateAroundModelRetryDurability(
+  result: NormalizedAroundModelResult,
+  nextOutcomes: ModelExecutionOutcome[]
+): void {
+  if (nextOutcomes.length <= 1) {
+    return;
+  }
+
+  const lastOutcome = nextOutcomes.at(-1);
+
+  if (lastOutcome === undefined) {
+    return;
+  }
+
+  if (responsesMatch(lastOutcome.response, result.response)) {
+    return;
+  }
+
+  throw new TuvrenRuntimeError(
+    "aroundModel handlers that call next() multiple times must return the final next() response",
+    {
+      code: "react_driver_invalid_around_model_retry",
+      details: {
+        finalNextResponse: lastOutcome.response,
+        nextCallCount: nextOutcomes.length,
+        returnedResponse: result.response,
+      },
+    }
+  );
 }
 
 function resolveAssistantEventReconciliation(
