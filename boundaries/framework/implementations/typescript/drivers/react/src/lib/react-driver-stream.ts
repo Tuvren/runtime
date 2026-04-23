@@ -526,7 +526,7 @@ class StreamAccumulator {
   ): TuvrenStreamEvent[] {
     return [
       ...(options?.partial === true
-        ? this.createPartialCompletionEvents(response)
+        ? this.createPartialCompletionEvents()
         : this.createCompletionEvents()),
       {
         finishReason: response.finishReason,
@@ -682,13 +682,11 @@ class StreamAccumulator {
     return events;
   }
 
-  private createPartialCompletionEvents(
-    response: TuvrenModelResponse
-  ): TuvrenStreamEvent[] {
+  private createPartialCompletionEvents(): TuvrenStreamEvent[] {
     const events: TuvrenStreamEvent[] = [];
 
-    for (const part of response.parts) {
-      switch (part.type) {
+    for (const part of this.parts) {
+      switch (part.kind) {
         case "text":
           events.push({
             messageId: this.messageId,
@@ -698,29 +696,46 @@ class StreamAccumulator {
           });
           break;
         case "reasoning":
-          events.push({
-            messageId: this.messageId,
-            timestamp: this.now(),
-            type: "reasoning.done",
-          });
+          if (!part.done) {
+            events.push({
+              messageId: this.messageId,
+              timestamp: this.now(),
+              type: "reasoning.done",
+            });
+            part.done = true;
+          }
           break;
         case "structured":
-          events.push({
-            data: cloneValue(part.data),
-            messageId: this.messageId,
-            name: part.name,
-            timestamp: this.now(),
-            type: "structured.done",
-          });
+          if (!part.done) {
+            const data = parsePartialStructuredPart(part, true);
+
+            if (data !== undefined) {
+              events.push({
+                data: cloneValue(data),
+                messageId: this.messageId,
+                name: part.name,
+                timestamp: this.now(),
+                type: "structured.done",
+              });
+              part.done = true;
+            }
+          }
           break;
         case "tool_call":
-          events.push({
-            callId: part.callId,
-            input: cloneValue(part.input),
-            name: part.name,
-            timestamp: this.now(),
-            type: "tool_call.done",
-          });
+          if (!part.state.done) {
+            const input = parsePartialToolCallInput(part.state, true);
+
+            if (input !== undefined) {
+              events.push({
+                callId: part.state.callId,
+                input: cloneValue(input),
+                name: part.state.name,
+                timestamp: this.now(),
+                type: "tool_call.done",
+              });
+              part.state.done = true;
+            }
+          }
           break;
         default:
           break;

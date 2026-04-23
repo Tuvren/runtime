@@ -1172,6 +1172,7 @@ The shared core does not require a driver-owned approval-resume path. Approval r
 - `assistantEventReconciliation` is optional and only valid for explicit driver-signaled cases such as `aroundModel` post-stream durable replacement
 - `stateUpdates` carries per-extension manifest updates that must be merged at the same checkpoint that commits the assistant message and updated manifest
 - `toolExecutionMode` is required when the driver requests tool calls through assistant messages, and invalid otherwise
+- failed `partial` results may include interrupted tool-call content; those calls are durable context only, still require `toolExecutionMode` for contract completeness, and are not executed because the resolution is failed
 
 The shared driver seam does **not** carry a generic raw `response` object. Richer transient iteration artifacts belong in driver-local or runtime-internal layers unless a future shared-core need proves otherwise.
 

@@ -5071,6 +5071,64 @@ describe("framework-runtime-core", () => {
     expect(capturedFinishReason).toBe("error");
   });
 
+  test("checkpoints failed partial tool-call messages without executing tools", async () => {
+    const harness = createFakeKernelHarness();
+    const partialToolCall = assistantToolCalls([
+      {
+        callId: "call-search",
+        input: { query: "interrupted" },
+        name: "search",
+      },
+    ]);
+    const driver = {
+      async execute(_context) {
+        return {
+          messages: [partialToolCall],
+          partial: true,
+          resolution: {
+            error: new Error("execution interrupted"),
+            fatality: "hard",
+            type: "fail",
+          },
+          toolExecutionMode: "sequential",
+        };
+      },
+      id: "fake",
+      async resume() {
+        throw new Error("resume was not expected");
+      },
+    } satisfies KrakenDriver;
+    const runtime = createTuvrenRuntimeCore({
+      defaultDriverId: "fake",
+      driverRegistry: createDriverRegistry([driver]),
+      kernel: harness.kernel,
+    });
+    const thread = await runtime.createThread({});
+    const handle = runtime.executeTurn({
+      branchId: thread.branchId,
+      config: { name: "primary" },
+      signal: textSignal("Cancel during tool call"),
+      threadId: thread.threadId,
+    });
+
+    const events = await collectEvents(handle.events());
+    const errorEvent = events.find(
+      (event): event is Extract<(typeof events)[number], { type: "error" }> =>
+        event.type === "error"
+    );
+
+    expect(handle.status().phase).toBe("failed");
+    expect(errorEvent?.error.code).not.toBe("invalid_driver_resolution");
+    expect(events.some((event) => event.type === "tool.start")).toBe(false);
+    expect(await harness.readBranchMessages(thread.branchId)).toEqual([
+      {
+        parts: [{ text: "Cancel during tool call", type: "text" }],
+        role: "user",
+      },
+      partialToolCall,
+    ]);
+  });
+
   test("preserves emitted finish reason, usage, and provider metadata in synthesized afterIteration responses", async () => {
     const harness = createFakeKernelHarness();
     let capturedResponse: TuvrenModelResponse | undefined;

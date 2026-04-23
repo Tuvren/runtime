@@ -169,6 +169,33 @@ describe("driver-api", () => {
     ).not.toThrow();
   });
 
+  test("permits failed partial execution results with interrupted tool calls", () => {
+    expect(() =>
+      assertDriverExecutionResult({
+        messages: [
+          {
+            parts: [
+              {
+                callId: "call-search",
+                input: { query: "kraken" },
+                name: "search",
+                type: "tool_call",
+              },
+            ],
+            role: "assistant",
+          },
+        ],
+        partial: true,
+        resolution: {
+          error: new Error("execution cancelled"),
+          fatality: "hard",
+          type: "fail",
+        },
+        toolExecutionMode: "parallel",
+      })
+    ).not.toThrow();
+  });
+
   test("rejects partial execution results that are not failed assistant output", () => {
     expect(() =>
       assertDriverExecutionResult({

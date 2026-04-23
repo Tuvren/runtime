@@ -1290,6 +1290,7 @@ class RuntimeCore implements TuvrenRuntime {
       requestedToolCalls.length,
       resolution,
       cancellationResolution,
+      partial,
       assistantEventValidationError,
       driverResult.stateUpdates
     );
@@ -1433,11 +1434,13 @@ class RuntimeCore implements TuvrenRuntime {
 
   private findInvalidDriverResolution(
     requestedToolCallCount: number,
-    resolution: RuntimeResolution
+    resolution: RuntimeResolution,
+    partial: boolean
   ): TuvrenRuntimeError | undefined {
     if (
       requestedToolCallCount > 0 &&
-      resolution.type !== "continue_iteration"
+      resolution.type !== "continue_iteration" &&
+      !(partial && resolution.type === "fail")
     ) {
       return new TuvrenRuntimeError(
         "drivers must not return executable tool calls with a terminal resolution",
@@ -1474,13 +1477,15 @@ class RuntimeCore implements TuvrenRuntime {
     requestedToolCallCount: number,
     resolution: RuntimeResolution,
     cancellationResolution: RuntimeResolution | undefined,
+    partial: boolean,
     assistantEventValidationError: TuvrenRuntimeError | undefined,
     stateUpdates: DriverExecutionResult["stateUpdates"]
   ): TuvrenRuntimeError | undefined {
     if (cancellationResolution === undefined) {
       const invalidDriverResolutionError = this.findInvalidDriverResolution(
         requestedToolCallCount,
-        resolution
+        resolution,
+        partial
       );
 
       if (invalidDriverResolutionError !== undefined) {

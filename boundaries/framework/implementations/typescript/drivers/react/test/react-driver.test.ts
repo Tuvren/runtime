@@ -17,7 +17,10 @@
 // biome-ignore-all lint/suspicious/useAwait: Test doubles intentionally match async provider and extension contracts.
 import { describe, expect, test } from "bun:test";
 import { TuvrenProviderError } from "@tuvren/core-types";
-import type { DriverExecutionContext } from "@tuvren/driver-api";
+import {
+  assertDriverExecutionResult,
+  type DriverExecutionContext,
+} from "@tuvren/driver-api";
 import type {
   ContextManifest,
   InputSignal,
@@ -1425,6 +1428,32 @@ describe("driver-react", () => {
     ).toBe("react_driver_missing_provider");
   });
 
+  test("fails hard when config.model is an object that is not a provider", async () => {
+    const driver = createReActDriver().create();
+    const config: DriverExecutionContext["config"] = JSON.parse(
+      '{"model":{"id":"provider"},"name":"primary"}'
+    );
+
+    const result = await driver.execute(
+      createDriverExecutionContext({
+        config,
+      })
+    );
+
+    expect(result.resolution.type).toBe("fail");
+
+    if (result.resolution.type !== "fail") {
+      throw new Error("expected a fail resolution");
+    }
+
+    expect(result.resolution.fatality).toBe("hard");
+    expect(
+      "code" in result.resolution.error
+        ? result.resolution.error.code
+        : undefined
+    ).toBe("react_driver_missing_provider");
+  });
+
   test("fails hard when structured output violates the requested schema", async () => {
     const provider = {
       async generate() {
@@ -1929,6 +1958,147 @@ describe("driver-react", () => {
       "text.done",
       "message.done",
     ]);
+  });
+
+  test("returns a contract-valid partial tool-call message when stream aborts after a tool call", async () => {
+    const emittedEvents: TuvrenStreamEvent[] = [];
+    const controller = new AbortController();
+    const provider = {
+      async generate() {
+        throw new Error("generate should not be called");
+      },
+      id: "provider",
+      async *stream() {
+        yield {
+          providerCallId: "native-call-1",
+          name: "search",
+          type: "tool_call_start",
+        };
+        yield {
+          input: { query: "runtime" },
+          name: "search",
+          providerCallId: "native-call-1",
+          type: "tool_call_done",
+        };
+        controller.abort(new Error("cancelled during stream"));
+        await wait(1000);
+      },
+    } satisfies TuvrenProvider;
+    const driver = createReActDriver({
+      providerCallMode: "stream",
+      toolExecutionMode: "sequential",
+    }).create();
+
+    const result = await Promise.race([
+      driver.execute(
+        createDriverExecutionContext({
+          config: {
+            model: provider,
+            name: "primary",
+          },
+          emittedEvents,
+          signal: controller.signal,
+        })
+      ),
+      wait(100).then(() => "timed_out"),
+    ]);
+
+    if (typeof result === "string") {
+      throw new Error("driver did not stop waiting after stream abort");
+    }
+
+    expect(() => assertDriverExecutionResult(result)).not.toThrow();
+    expect(result.partial).toBe(true);
+    expect(result.toolExecutionMode).toBe("sequential");
+    expect(result.resolution.type).toBe("fail");
+
+    const message = result.messages?.[0];
+
+    if (message?.role !== "assistant") {
+      throw new Error("expected a partial assistant message");
+    }
+
+    const part = message.parts[0];
+
+    if (part?.type !== "tool_call") {
+      throw new Error("expected a partial tool call");
+    }
+
+    expect(part.input).toEqual({ query: "runtime" });
+    expect(emittedEvents.map((event) => event.type)).toEqual([
+      "message.start",
+      "tool_call.start",
+      "tool_call.args_delta",
+      "tool_call.done",
+      "message.done",
+    ]);
+    expect(
+      emittedEvents.filter((event) => event.type === "tool_call.done")
+    ).toHaveLength(1);
+  });
+
+  test("does not replay completed reasoning or structured done events during stream cancellation", async () => {
+    const emittedEvents: TuvrenStreamEvent[] = [];
+    const controller = new AbortController();
+    const provider = {
+      async generate() {
+        throw new Error("generate should not be called");
+      },
+      id: "provider",
+      async *stream() {
+        yield {
+          text: "thinking",
+          type: "reasoning_delta",
+        };
+        yield {
+          type: "reasoning_done",
+        };
+        yield {
+          data: { answer: "yes" },
+          name: "answer",
+          type: "structured_done",
+        };
+        controller.abort(new Error("cancelled during stream"));
+        await wait(1000);
+      },
+    } satisfies TuvrenProvider;
+    const driver = createReActDriver({
+      providerCallMode: "stream",
+    }).create();
+
+    const result = await Promise.race([
+      driver.execute(
+        createDriverExecutionContext({
+          config: {
+            model: provider,
+            name: "primary",
+          },
+          emittedEvents,
+          signal: controller.signal,
+        })
+      ),
+      wait(100).then(() => "timed_out"),
+    ]);
+
+    if (typeof result === "string") {
+      throw new Error("driver did not stop waiting after stream abort");
+    }
+
+    expect(() => assertDriverExecutionResult(result)).not.toThrow();
+    expect(result.partial).toBe(true);
+    expect(emittedEvents.map((event) => event.type)).toEqual([
+      "message.start",
+      "reasoning.delta",
+      "reasoning.done",
+      "structured.done",
+      "message.done",
+    ]);
+    expect(
+      emittedEvents.filter((event) => event.type === "reasoning.done")
+    ).toHaveLength(1);
+    expect(
+      emittedEvents.filter((event) => event.type === "structured.done")
+    ).toHaveLength(1);
   });
 
   test("runtime-core cancellation stops a pending provider stream and checkpoints partial output", async () => {

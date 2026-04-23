@@ -267,6 +267,7 @@ export function assertDriverExecutionResult(
           ? value.assistantEventReconciliation
           : undefined,
       messages: Array.isArray(value.messages) ? value.messages : undefined,
+      partial: value.partial === true,
       resolution: value.resolution,
     },
     `${label}`
@@ -564,13 +565,20 @@ function assertDriverResolutionCompatibility(
   value: {
     assistantEventReconciliation?: DriverAssistantEventReconciliation;
     messages?: TuvrenMessage[];
+    partial: boolean;
     resolution: RuntimeResolution;
   },
   label: string
 ): void {
   const requestedToolCalls = hasRequestedToolCalls(value.messages);
+  const failedPartialToolCall =
+    value.partial && value.resolution.type === "fail";
 
-  if (requestedToolCalls && value.resolution.type !== "continue_iteration") {
+  if (
+    requestedToolCalls &&
+    value.resolution.type !== "continue_iteration" &&
+    !failedPartialToolCall
+  ) {
     throw new TuvrenValidationError(
       `${label}.resolution must continue iteration when driver messages request tool calls`,
       {

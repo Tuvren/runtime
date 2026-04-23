@@ -267,6 +267,15 @@ async function executeIteration(
       partial: true,
       resolution: createExecutionCancelledResolution(),
       stateUpdates,
+      ...(requestsTools
+        ? {
+            toolExecutionMode: resolveToolExecutionMode(
+              options.toolExecutionMode,
+              context,
+              response
+            ),
+          }
+        : {}),
     };
   }
 
@@ -467,7 +476,7 @@ function createExecutionCancelledResolution(): Extract<
 }
 
 function resolveProvider(model: AgentConfig["model"]): TuvrenProvider {
-  if (model !== undefined && typeof model !== "string") {
+  if (isConcreteProvider(model)) {
     return model;
   }
 
@@ -480,6 +489,23 @@ function resolveProvider(model: AgentConfig["model"]): TuvrenProvider {
       },
     }
   );
+}
+
+function isConcreteProvider(value: unknown): value is TuvrenProvider {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  return (
+    typeof value.id === "string" &&
+    value.id.trim().length > 0 &&
+    typeof value.generate === "function" &&
+    typeof value.stream === "function"
+  );
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
 function resolveProviderCallMode(
