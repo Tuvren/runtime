@@ -35,12 +35,15 @@ import type {
   AroundModelContext,
   StructuredPart,
   TuvrenExtension,
+  TuvrenJsonSchema,
   TuvrenMessage,
   TuvrenModelResponse,
   TuvrenPrompt,
   TuvrenProvider,
 } from "@tuvren/runtime-api";
 import Ajv from "ajv";
+import Ajv2019 from "ajv/dist/2019";
+import Ajv2020 from "ajv/dist/2020";
 import {
   createAroundModelContextSnapshot,
   createExtensionStateSnapshot,
@@ -57,10 +60,36 @@ import {
   flushBufferedAssistantSequences,
 } from "./react-driver-stream.js";
 
-const AJV = new Ajv({
+const DRAFT_7_AJV = new Ajv({
   allErrors: true,
   strict: false,
 });
+const DRAFT_2019_09_AJV = new Ajv2019({
+  allErrors: true,
+  strict: false,
+});
+const DRAFT_2020_12_AJV = new Ajv2020({
+  allErrors: true,
+  strict: false,
+});
+const JSON_SCHEMA_DRAFT_7_URIS = new Set([
+  "http://json-schema.org/draft-07/schema",
+  "http://json-schema.org/draft-07/schema#",
+  "https://json-schema.org/draft-07/schema",
+  "https://json-schema.org/draft-07/schema#",
+]);
+const JSON_SCHEMA_DRAFT_2019_09_URIS = new Set([
+  "http://json-schema.org/draft/2019-09/schema",
+  "http://json-schema.org/draft/2019-09/schema#",
+  "https://json-schema.org/draft/2019-09/schema",
+  "https://json-schema.org/draft/2019-09/schema#",
+]);
+const JSON_SCHEMA_DRAFT_2020_12_URIS = new Set([
+  "http://json-schema.org/draft/2020-12/schema",
+  "http://json-schema.org/draft/2020-12/schema#",
+  "https://json-schema.org/draft/2020-12/schema",
+  "https://json-schema.org/draft/2020-12/schema#",
+]);
 
 export const REACT_DRIVER_ID = "react";
 
@@ -490,7 +519,7 @@ function validateStructuredOutput(
     });
   }
 
-  const validator = AJV.compile(request.schema);
+  const validator = compileStructuredOutputSchema(request.schema);
 
   for (const part of structuredParts) {
     if (!validator(part.data)) {
@@ -503,6 +532,68 @@ function validateStructuredOutput(
       });
     }
   }
+}
+
+function compileStructuredOutputSchema(schema: TuvrenJsonSchema) {
+  const ajv = selectStructuredOutputAjv(schema);
+
+  try {
+    return ajv.compile(schema);
+  } catch (error: unknown) {
+    throw new TuvrenProviderError("structured output validation failed", {
+      code: "structured_output_validation",
+      details: {
+        message: error instanceof Error ? error.message : String(error),
+        reason: "schema_compilation_failed",
+        schemaDialect: getStructuredOutputSchemaDialect(schema),
+      },
+    });
+  }
+}
+
+function selectStructuredOutputAjv(
+  schema: TuvrenJsonSchema
+): Ajv | Ajv2019 | Ajv2020 {
+  const schemaDialect = getStructuredOutputSchemaDialect(schema);
+
+  if (
+    schemaDialect === undefined ||
+    JSON_SCHEMA_DRAFT_7_URIS.has(schemaDialect)
+  ) {
+    return DRAFT_7_AJV;
+  }
+
+  if (JSON_SCHEMA_DRAFT_2019_09_URIS.has(schemaDialect)) {
+    return DRAFT_2019_09_AJV;
+  }
+
+  if (JSON_SCHEMA_DRAFT_2020_12_URIS.has(schemaDialect)) {
+    return DRAFT_2020_12_AJV;
+  }
+
+  throw new TuvrenProviderError("structured output validation failed", {
+    code: "structured_output_validation",
+    details: {
+      reason: "unsupported_schema_dialect",
+      schemaDialect,
+    },
+  });
+}
+
+function getStructuredOutputSchemaDialect(
+  schema: TuvrenJsonSchema
+): string | undefined {
+  if (typeof schema === "boolean") {
+    return undefined;
+  }
+
+  const schemaDialect = schema.$schema;
+
+  if (schemaDialect === undefined) {
+    return undefined;
+  }
+
+  return typeof schemaDialect === "string" ? schemaDialect : undefined;
 }
 
 function collectAroundModelStateUpdates(

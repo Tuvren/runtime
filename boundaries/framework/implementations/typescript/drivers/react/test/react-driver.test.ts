@@ -1355,6 +1355,180 @@ describe("driver-react", () => {
     ).toBe("structured_output_validation");
   });
 
+  test("validates draft 2020-12 structured output using the declared schema dialect", async () => {
+    const provider = {
+      async generate() {
+        return {
+          finishReason: "stop",
+          parts: [
+            {
+              data: ["x"],
+              name: "answer",
+              type: "structured",
+            },
+          ],
+        } satisfies TuvrenModelResponse;
+      },
+      id: "provider",
+      async *stream() {
+        yield* [];
+      },
+    } satisfies TuvrenProvider;
+    const driver = createReActDriver({
+      providerCallMode: "generate",
+    }).create();
+
+    const result = await driver.execute(
+      createDriverExecutionContext({
+        config: {
+          model: provider,
+          name: "primary",
+          responseFormat: {
+            name: "answer",
+            schema: {
+              $schema: "https://json-schema.org/draft/2020-12/schema",
+              items: false,
+              prefixItems: [{ type: "string" }],
+              type: "array",
+            },
+          },
+        },
+      })
+    );
+
+    expect(result.resolution).toEqual({
+      reason: "done",
+      type: "end_turn",
+    });
+    expect(result.messages).toEqual([
+      {
+        parts: [
+          {
+            data: ["x"],
+            name: "answer",
+            type: "structured",
+          },
+        ],
+        role: "assistant",
+      },
+    ]);
+  });
+
+  test("validates draft 2019-09 structured output using the declared schema dialect", async () => {
+    const provider = {
+      async generate() {
+        return {
+          finishReason: "stop",
+          parts: [
+            {
+              data: { answer: "ok", extra: true },
+              name: "answer",
+              type: "structured",
+            },
+          ],
+        } satisfies TuvrenModelResponse;
+      },
+      id: "provider",
+      async *stream() {
+        yield* [];
+      },
+    } satisfies TuvrenProvider;
+    const driver = createReActDriver({
+      providerCallMode: "generate",
+    }).create();
+
+    const result = await driver.execute(
+      createDriverExecutionContext({
+        config: {
+          model: provider,
+          name: "primary",
+          responseFormat: {
+            name: "answer",
+            schema: {
+              $schema: "https://json-schema.org/draft/2019-09/schema",
+              properties: {
+                answer: { type: "string" },
+              },
+              required: ["answer"],
+              type: "object",
+              unevaluatedProperties: false,
+            },
+          },
+        },
+      })
+    );
+
+    expect(result.resolution.type).toBe("fail");
+
+    if (result.resolution.type !== "fail") {
+      throw new Error("expected a fail resolution");
+    }
+
+    expect(result.resolution.fatality).toBe("hard");
+    expect(
+      "code" in result.resolution.error
+        ? result.resolution.error.code
+        : undefined
+    ).toBe("structured_output_validation");
+  });
+
+  test("fails hard when structured output declares an unsupported schema dialect", async () => {
+    const provider = {
+      async generate() {
+        return {
+          finishReason: "stop",
+          parts: [
+            {
+              data: { answer: "ok" },
+              name: "answer",
+              type: "structured",
+            },
+          ],
+        } satisfies TuvrenModelResponse;
+      },
+      id: "provider",
+      async *stream() {
+        yield* [];
+      },
+    } satisfies TuvrenProvider;
+    const driver = createReActDriver({
+      providerCallMode: "generate",
+    }).create();
+
+    const result = await driver.execute(
+      createDriverExecutionContext({
+        config: {
+          model: provider,
+          name: "primary",
+          responseFormat: {
+            name: "answer",
+            schema: {
+              $schema: "https://example.com/json-schema/latest",
+              properties: {
+                answer: { type: "string" },
+              },
+              required: ["answer"],
+              type: "object",
+            },
+          },
+        },
+      })
+    );
+
+    expect(result.resolution.type).toBe("fail");
+
+    if (result.resolution.type !== "fail") {
+      throw new Error("expected a fail resolution");
+    }
+
+    expect(result.resolution.fatality).toBe("hard");
+    expect(
+      "code" in result.resolution.error
+        ? result.resolution.error.code
+        : undefined
+    ).toBe("structured_output_validation");
+  });
+
   test("fails hard when a structured response request ends with plain text only", async () => {
     const provider = {
       async generate() {
