@@ -529,8 +529,8 @@ export async function stageImmediateResultsWhileExecuting(
   );
 
   // Known non-executing outcomes are staged before slower siblings finish so they
-  // survive crashes, but they still wait on the start barrier to preserve the
-  // contract that every executable tool emits `tool.start` before any `tool.result`.
+  // survive crashes, but they still wait for the first execution wave to emit
+  // `tool.start` events before any immediate `tool.result` is published.
   await stageImmediateResults(
     environment,
     immediateResults,

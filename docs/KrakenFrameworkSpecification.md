@@ -1950,6 +1950,8 @@ Any higher-layer projection of child completion into parent context should be ba
 
 **Launch precondition**: A parent handle must have actually started execution before it can spawn children. In the default lazy execution model that means at least one parent-facing event stream (`events()` or `allEvents()`) has started consumption.
 
+**Subtree streams**: `allEvents()` is also single-consumer for each orchestration handle. When a parent `allEvents()` stream is active, the runtime forwards child subtree events through an internal subscription path. This does not consume the child's host-visible `allEvents()` stream; a host may still consume the child's own `allEvents()` once, independently of the ancestor subtree forwarder.
+
 ### 10.4 Handoffs
 
 #### Agent-Signaled Handoff

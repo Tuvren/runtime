@@ -91,6 +91,9 @@ class OrchestrationNode {
   private selfResultResolved = false;
   private selfVisibleResult?: ContentPart[];
   private startedExecution = false;
+  private readonly subtreeEventSubscribers = new Set<
+    AsyncEventQueue<TuvrenStreamEvent>
+  >();
   private subtreeEventsClaimed = false;
   private subtreeEventsQueue?: AsyncEventQueue<TuvrenStreamEvent>;
   private subtreeSettled = false;
@@ -161,25 +164,11 @@ class OrchestrationNode {
       },
       onClose: async () => {
         this.subtreeEventsQueue = undefined;
-        this.activeSubtreeStreams -= 1;
-
-        if (this.activeSubtreeStreams === 0) {
-          await this.stopAllChildForwarders();
-        }
-
-        this.maybeCancelUnobservedExecution();
+        await this.closeSubtreeConsumer();
       },
       onStart: (queue) => {
         this.subtreeEventsQueue = queue;
-        this.activeSubtreeStreams += 1;
-        this.startExecution();
-
-        if (this.subtreeSettled) {
-          queue.close();
-          return;
-        }
-
-        this.startChildForwardingForAllChildren();
+        this.startSubtreeConsumer(queue);
       },
     });
   }
@@ -488,7 +477,17 @@ class OrchestrationNode {
     }
 
     this.subtreeSettled = true;
-    this.subtreeEventsQueue?.close();
+    this.closeSubtreeEventStreams();
+  }
+
+  private async closeSubtreeConsumer(): Promise<void> {
+    this.activeSubtreeStreams -= 1;
+
+    if (this.activeSubtreeStreams === 0) {
+      await this.stopAllChildForwarders();
+    }
+
+    this.maybeCancelUnobservedExecution();
   }
 
   private maybeCancelUnobservedExecution(): void {
@@ -582,7 +581,7 @@ class OrchestrationNode {
       return;
     }
 
-    const iterator = child.allEvents()[Symbol.asyncIterator]();
+    const iterator = child.subscribeInternalSubtreeEvents();
     this.childForwarders.set(child, iterator);
     detachPromise(
       (async () => {
@@ -594,7 +593,7 @@ class OrchestrationNode {
               return;
             }
 
-            this.subtreeEventsQueue?.push(cloneValue(nextEvent.value));
+            this.publishSubtreeEvent(nextEvent.value);
           }
         } finally {
           if (this.childForwarders.get(child) === iterator) {
@@ -609,6 +608,56 @@ class OrchestrationNode {
     for (const child of this.children) {
       this.startChildForwarding(child);
     }
+  }
+
+  private closeSubtreeEventStreams(): void {
+    this.subtreeEventsQueue?.close();
+
+    for (const subscriber of [...this.subtreeEventSubscribers]) {
+      subscriber.close();
+    }
+  }
+
+  private publishSubtreeEvent(event: TuvrenStreamEvent): void {
+    this.subtreeEventsQueue?.push(cloneValue(event));
+
+    for (const subscriber of this.subtreeEventSubscribers) {
+      subscriber.push(cloneValue(event));
+    }
+  }
+
+  private startSubtreeConsumer(
+    queue: AsyncEventQueue<TuvrenStreamEvent>
+  ): void {
+    this.activeSubtreeStreams += 1;
+    this.startExecution();
+
+    if (this.subtreeSettled) {
+      queue.close();
+      return;
+    }
+
+    this.startChildForwardingForAllChildren();
+  }
+
+  private subscribeInternalSubtreeEvents(): AsyncIterator<TuvrenStreamEvent> {
+    let closed = false;
+    const close = async (): Promise<void> => {
+      if (closed) {
+        return;
+      }
+
+      closed = true;
+      this.subtreeEventSubscribers.delete(queue);
+      await this.closeSubtreeConsumer();
+    };
+    const queue = new AsyncEventQueue<TuvrenStreamEvent>(() => {
+      detachPromise(close());
+    });
+
+    this.subtreeEventSubscribers.add(queue);
+    this.startSubtreeConsumer(queue);
+    return queue[Symbol.asyncIterator]();
   }
 
   private async stopAllChildForwarders(): Promise<void> {
@@ -737,7 +786,7 @@ class OrchestrationNode {
         const decoratedEvent = this.decorateEvent(event, binding);
         this.trackVisibleResult(event, visibleState);
         this.selfEventsQueue?.push(cloneValue(decoratedEvent));
-        this.subtreeEventsQueue?.push(cloneValue(decoratedEvent));
+        this.publishSubtreeEvent(decoratedEvent);
       }
 
       this.selfVisibleResult = visibleState.lastVisible;
@@ -771,7 +820,7 @@ class OrchestrationNode {
         type: "error",
       };
       this.selfEventsQueue?.push(cloneValue(event));
-      this.subtreeEventsQueue?.push(cloneValue(event));
+      this.publishSubtreeEvent(event);
       this.selfEventsQueue?.close();
       this.selfPhase = "failed";
       this.settleResultFailure(normalizedError);

@@ -137,6 +137,7 @@ const readonlyDriverToolRegistryCache = new WeakMap<
   ToolRegistry,
   ToolRegistry
 >();
+const serializedByteLengthEncoder = new TextEncoder();
 
 export interface RuntimeCoreOptions {
   createId?: () => string;
@@ -264,7 +265,10 @@ class FinalizationFailure extends Error {
 }
 
 class RuntimeCore implements TuvrenRuntime {
-  private readonly manifestExtensionStateWarningKeys = new Set<string>();
+  private readonly manifestExtensionStateWarningKeys = new WeakMap<
+    RuntimeExecutionHandle,
+    Set<string>
+  >();
   private readonly options: ResolvedRuntimeCoreOptions;
 
   constructor(options: RuntimeCoreOptions) {
@@ -3811,24 +3815,31 @@ class RuntimeCore implements TuvrenRuntime {
       return;
     }
 
-    for (const [extensionName, extensionState] of Object.entries(
-      manifest.extensions
-    )) {
+    const extensionEntries = Object.entries(manifest.extensions);
+
+    if (extensionEntries.length === 0) {
+      return;
+    }
+
+    let warningKeys = this.manifestExtensionStateWarningKeys.get(handle);
+
+    if (warningKeys === undefined) {
+      warningKeys = new Set<string>();
+      this.manifestExtensionStateWarningKeys.set(handle, warningKeys);
+    }
+
+    for (const [extensionName, extensionState] of extensionEntries) {
+      if (warningKeys.has(extensionName)) {
+        continue;
+      }
+
       const observedBytes = approximateSerializedByteLength(extensionState);
 
       if (observedBytes === undefined || observedBytes <= budget) {
         continue;
       }
 
-      const warningKey = [handle.turnId, extensionName, String(budget)].join(
-        ":"
-      );
-
-      if (this.manifestExtensionStateWarningKeys.has(warningKey)) {
-        continue;
-      }
-
-      this.manifestExtensionStateWarningKeys.add(warningKey);
+      warningKeys.add(extensionName);
       this.emitWarning({
         activeAgent: loopState.activeConfig.name,
         budgetBytes: budget,
@@ -4280,7 +4291,7 @@ function approximateSerializedByteLength(value: unknown): number | undefined {
       return undefined;
     }
 
-    return new TextEncoder().encode(serialized).byteLength;
+    return serializedByteLengthEncoder.encode(serialized).byteLength;
   } catch {
     return undefined;
   }
@@ -4297,6 +4308,8 @@ function createReadonlyDriverToolRegistry(
 
   // Drivers only inspect a frozen tool snapshot here. Framework-owned execution
   // always goes through the live registry used by the shared tool executor.
+  // The WeakMap cache relies on the active tool registry being immutable for
+  // the execution segment after runtime-core builds it.
   const toolSnapshots = registry
     .list()
     .map((tool) =>
