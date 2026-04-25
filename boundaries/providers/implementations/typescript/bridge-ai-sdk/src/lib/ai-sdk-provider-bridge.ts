@@ -512,6 +512,7 @@ function handleToolCallStreamPart(
   state: StreamMappingState
 ): ProviderStreamChunk[] {
   rejectUnsupportedProviderOwnedToolPart(part, state.model);
+  assertToolCallCorrelation(part, state);
 
   const chunks = createToolCallPreludeChunks(part, state);
   const existingState = state.toolStates.get(part.toolCallId);
@@ -537,6 +538,52 @@ function handleToolCallStreamPart(
   });
 
   return chunks;
+}
+
+function assertToolCallCorrelation(
+  part: Extract<LanguageModelV3StreamPart, { type: "tool-call" }>,
+  state: StreamMappingState
+): void {
+  if (state.toolStates.has(part.toolCallId)) {
+    return;
+  }
+
+  const correlatedIds = [...state.toolStates.entries()]
+    .filter(
+      ([, toolState]) =>
+        toolState.inputBuffer === part.input && toolState.name === part.toolName
+    )
+    .map(([providerCallId]) => providerCallId);
+
+  if (correlatedIds.length === 0) {
+    return;
+  }
+
+  if (correlatedIds.length === 1) {
+    throw bridgeError(
+      "AI SDK stream emitted a complete tool-call with a mismatched incremental tool-input id",
+      "unsupported_ai_sdk_stream_part",
+      {
+        expectedProviderCallId: correlatedIds[0],
+        modelId: state.model.modelId,
+        provider: state.model.provider,
+        receivedToolCallId: part.toolCallId,
+        toolName: part.toolName,
+      }
+    );
+  }
+
+  throw bridgeError(
+    "AI SDK stream emitted an ambiguous complete tool-call correlation",
+    "unsupported_ai_sdk_stream_part",
+    {
+      candidateProviderCallIds: correlatedIds,
+      modelId: state.model.modelId,
+      provider: state.model.provider,
+      receivedToolCallId: part.toolCallId,
+      toolName: part.toolName,
+    }
+  );
 }
 
 function createToolCallPreludeChunks(
@@ -2034,16 +2081,35 @@ function bridgeError(
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === "object" && !Array.isArray(value);
+  if (value === null || typeof value !== "object" || Array.isArray(value)) {
+    return false;
+  }
+
+  const prototype = Object.getPrototypeOf(value);
+
+  if (prototype !== Object.prototype && prototype !== null) {
+    return false;
+  }
+
+  if (Object.getOwnPropertySymbols(value).length > 0) {
+    return false;
+  }
+
+  return Object.values(Object.getOwnPropertyDescriptors(value)).every(
+    (descriptor) => descriptor.enumerable === true && "value" in descriptor
+  );
 }
 
 function isJsonValue(value: unknown): value is JsonValue {
-  if (
-    value === null ||
-    typeof value === "string" ||
-    typeof value === "number" ||
-    typeof value === "boolean"
-  ) {
+  if (value === null || typeof value === "string") {
+    return true;
+  }
+
+  if (typeof value === "number") {
+    return Number.isFinite(value);
+  }
+
+  if (typeof value === "boolean") {
     return true;
   }
 

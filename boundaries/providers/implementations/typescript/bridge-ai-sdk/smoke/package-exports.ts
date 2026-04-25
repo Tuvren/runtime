@@ -19,7 +19,7 @@ import type { LanguageModelV3, ProviderV3 } from "@ai-sdk/provider";
 import {
   createAiSdkProviderBridge,
   createAiSdkProviderBridgeFromProvider,
-} from "../src/index.ts";
+} from "@tuvren/provider-bridge-ai-sdk";
 
 describe("provider-bridge-ai-sdk package exports", () => {
   test("exports both bridge factories", () => {

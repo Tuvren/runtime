@@ -21,6 +21,7 @@ import type {
   LanguageModelV3GenerateResult,
   LanguageModelV3StreamPart,
   ProviderV3,
+  SharedV3ProviderOptions,
 } from "@ai-sdk/provider";
 import { TuvrenProviderError } from "@tuvren/core-types";
 import { createReActDriver } from "@tuvren/driver-react";
@@ -540,6 +541,21 @@ describe("provider-bridge-ai-sdk", () => {
     ).rejects.toBeInstanceOf(TuvrenProviderError);
   });
 
+  test("rejects non-JSON default provider options", async () => {
+    expect(() =>
+      createAiSdkProviderBridge({
+        defaultProviderOptions: {
+          openai: {
+            requestedAt: new Date("2026-01-03T00:00:00.000Z"),
+          },
+        } as unknown as SharedV3ProviderOptions,
+        model: createMockModel(),
+      })
+    ).toThrow(
+      "AI SDK bridge JSON object values must be JSON-serializable"
+    );
+  });
+
   test("rejects mismatched prompt providers", async () => {
     const bridge = createAiSdkProviderBridge({
       model: createMockModel(),
@@ -559,6 +575,226 @@ describe("provider-bridge-ai-sdk", () => {
       })
     ).rejects.toThrow(
       "TuvrenPrompt.config.provider does not match the bound AI SDK provider"
+    );
+  });
+
+  test("rejects streamed file parts in the baseline bridge", async () => {
+    const bridge = createAiSdkProviderBridge({
+      model: createMockModel({
+        async doStream() {
+          await Promise.resolve();
+          return {
+            stream: streamFromParts([
+              {
+                data: "Zm9v",
+                mediaType: "text/plain",
+                type: "file",
+              },
+            ]),
+          };
+        },
+      }),
+    });
+
+    await expect(
+      collectAsyncIterable(
+        bridge.stream({
+          messages: [
+            {
+              parts: [{ text: "Hello", type: "text" }],
+              role: "user",
+            },
+          ],
+        })
+      )
+    ).rejects.toThrow('AI SDK stream part "file" is out of scope');
+  });
+
+  test("rejects streamed provider tool results in the baseline bridge", async () => {
+    const bridge = createAiSdkProviderBridge({
+      model: createMockModel({
+        async doStream() {
+          await Promise.resolve();
+          return {
+            stream: streamFromParts([
+              {
+                result: {
+                  ok: true,
+                },
+                toolCallId: "call-1",
+                toolName: "search",
+                type: "tool-result",
+              },
+            ]),
+          };
+        },
+      }),
+    });
+
+    await expect(
+      collectAsyncIterable(
+        bridge.stream({
+          messages: [
+            {
+              parts: [{ text: "Hello", type: "text" }],
+              role: "user",
+            },
+          ],
+        })
+      )
+    ).rejects.toThrow('AI SDK stream part "tool-result" is out of scope');
+  });
+
+  test("rejects streamed provider approval requests in the baseline bridge", async () => {
+    const bridge = createAiSdkProviderBridge({
+      model: createMockModel({
+        async doStream() {
+          await Promise.resolve();
+          return {
+            stream: streamFromParts([
+              {
+                approvalId: "approval-1",
+                toolCallId: "call-1",
+                type: "tool-approval-request",
+              },
+            ]),
+          };
+        },
+      }),
+    });
+
+    await expect(
+      collectAsyncIterable(
+        bridge.stream({
+          messages: [
+            {
+              parts: [{ text: "Hello", type: "text" }],
+              role: "user",
+            },
+          ],
+        })
+      )
+    ).rejects.toThrow(
+      'AI SDK stream part "tool-approval-request" is out of scope'
+    );
+  });
+
+  test("rejects provider-executed streamed tool inputs in the baseline bridge", async () => {
+    const bridge = createAiSdkProviderBridge({
+      model: createMockModel({
+        async doStream() {
+          await Promise.resolve();
+          return {
+            stream: streamFromParts([
+              {
+                id: "call-1",
+                providerExecuted: true,
+                toolName: "search",
+                type: "tool-input-start",
+              },
+            ]),
+          };
+        },
+      }),
+    });
+
+    await expect(
+      collectAsyncIterable(
+        bridge.stream({
+          messages: [
+            {
+              parts: [{ text: "Hello", type: "text" }],
+              role: "user",
+            },
+          ],
+        })
+      )
+    ).rejects.toThrow(
+      "provider-owned tool execution is out of scope for the baseline AI SDK bridge"
+    );
+  });
+
+  test("rejects dynamic streamed tool inputs in the baseline bridge", async () => {
+    const bridge = createAiSdkProviderBridge({
+      model: createMockModel({
+        async doStream() {
+          await Promise.resolve();
+          return {
+            stream: streamFromParts([
+              {
+                dynamic: true,
+                id: "call-1",
+                toolName: "search",
+                type: "tool-input-start",
+              },
+            ]),
+          };
+        },
+      }),
+    });
+
+    await expect(
+      collectAsyncIterable(
+        bridge.stream({
+          messages: [
+            {
+              parts: [{ text: "Hello", type: "text" }],
+              role: "user",
+            },
+          ],
+        })
+      )
+    ).rejects.toThrow(
+      "provider-owned tool execution is out of scope for the baseline AI SDK bridge"
+    );
+  });
+
+  test("rejects mismatched incremental and complete streamed tool call identifiers", async () => {
+    const bridge = createAiSdkProviderBridge({
+      model: createMockModel({
+        async doStream() {
+          await Promise.resolve();
+          return {
+            stream: streamFromParts([
+              {
+                id: "input-1",
+                toolName: "search",
+                type: "tool-input-start",
+              },
+              {
+                delta: '{"query":"docs"}',
+                id: "input-1",
+                type: "tool-input-delta",
+              },
+              {
+                id: "input-1",
+                type: "tool-input-end",
+              },
+              {
+                input: '{"query":"docs"}',
+                toolCallId: "call-1",
+                toolName: "search",
+                type: "tool-call",
+              },
+            ]),
+          };
+        },
+      }),
+    });
+
+    await expect(
+      collectAsyncIterable(
+        bridge.stream({
+          messages: [
+            {
+              parts: [{ text: "Hello", type: "text" }],
+              role: "user",
+            },
+          ],
+        })
+      )
+    ).rejects.toThrow(
+      "AI SDK stream emitted a complete tool-call with a mismatched incremental tool-input id"
     );
   });
 

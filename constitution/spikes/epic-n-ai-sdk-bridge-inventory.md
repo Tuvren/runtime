@@ -59,6 +59,9 @@ without rediscovering AI SDK provider behavior.
     canonical `tool_call_*` stream chunks, and `tool-input-end` may synthesize
     `tool_call_done` from buffered JSON input when the provider does not send a
     separate complete `tool-call` part
+  - when a provider emits both incremental `tool-input-*` parts and a complete
+    `tool-call`, the bridge expects the same provider call identity for both
+    surfaces; mismatches fail fast instead of duplicating a canonical tool call
   - `stream-start`, `response-metadata`, `source`, `raw`, and detailed usage are
     preserved under finish metadata
 
