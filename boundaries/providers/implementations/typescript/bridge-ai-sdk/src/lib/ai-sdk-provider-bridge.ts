@@ -1917,7 +1917,63 @@ function mapPromptProviderOptions(
 ): SharedV3ProviderOptions | undefined {
   const sanitized = sanitizeRecord(providerMetadata);
 
-  return sanitized === undefined ? undefined : cloneProviderOptions(sanitized);
+  if (sanitized === undefined) {
+    return undefined;
+  }
+
+  const normalized = normalizePromptProviderMetadata(sanitized);
+
+  return normalized === undefined
+    ? undefined
+    : cloneProviderOptions(normalized);
+}
+
+function normalizePromptProviderMetadata(
+  providerMetadata: Record<string, unknown>
+): Record<string, unknown> | undefined {
+  const normalized: Record<string, unknown> = {};
+  let hasProviderOptions = false;
+
+  for (const [providerName, providerValue] of Object.entries(
+    providerMetadata
+  )) {
+    if (!isPlainObject(providerValue)) {
+      continue;
+    }
+
+    normalized[providerName] = cloneMetadataValue(providerValue);
+    hasProviderOptions = true;
+  }
+
+  if (typeof providerMetadata.signature === "string") {
+    normalized.anthropic = mergePromptProviderNamespace(normalized.anthropic, {
+      signature: providerMetadata.signature,
+    });
+    hasProviderOptions = true;
+  }
+
+  return hasProviderOptions ? normalized : undefined;
+}
+
+function mergePromptProviderNamespace(
+  current: unknown,
+  additions: Record<string, unknown>
+): Record<string, unknown> {
+  const merged: Record<string, unknown> = {};
+
+  if (isPlainObject(current)) {
+    for (const [key, value] of Object.entries(current)) {
+      merged[key] = cloneMetadataValue(value);
+    }
+  }
+
+  for (const [key, value] of Object.entries(additions)) {
+    if (!(key in merged)) {
+      merged[key] = cloneMetadataValue(value);
+    }
+  }
+
+  return merged;
 }
 
 function sanitizeGenerateResponseMetadata(

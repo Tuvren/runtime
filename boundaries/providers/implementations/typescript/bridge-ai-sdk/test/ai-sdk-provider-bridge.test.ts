@@ -610,6 +610,62 @@ describe("provider-bridge-ai-sdk", () => {
     ]);
   });
 
+  test("normalizes flat durable reasoning signatures for assistant replay", async () => {
+    let capturedOptions: LanguageModelV3CallOptions | undefined;
+    const bridge = createAiSdkProviderBridge({
+      model: createMockModel({
+        async doGenerate(options) {
+          await Promise.resolve();
+          capturedOptions = options;
+          return createGenerateResult();
+        },
+      }),
+    });
+
+    await bridge.generate({
+      messages: [
+        {
+          parts: [
+            {
+              providerMetadata: {
+                signature: "sig-1",
+              },
+              redacted: false,
+              text: "Thinking",
+              type: "reasoning",
+            },
+          ],
+          role: "assistant",
+        },
+        {
+          parts: [{ text: "Continue", type: "text" }],
+          role: "user",
+        },
+      ],
+    });
+
+    expect(capturedOptions?.prompt).toEqual([
+      {
+        content: [
+          {
+            providerOptions: {
+              anthropic: {
+                signature: "sig-1",
+              },
+            },
+            text: "Thinking",
+            type: "reasoning",
+          },
+        ],
+        role: "assistant",
+      },
+      {
+        content: [{ text: "Continue", type: "text" }],
+        role: "user",
+      },
+    ]);
+  });
+
   test("rejects unsupported provider-owned tool results in the baseline bridge", async () => {
     const bridge = createAiSdkProviderBridge({
       model: createMockModel({

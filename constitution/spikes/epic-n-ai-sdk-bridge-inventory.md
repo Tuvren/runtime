@@ -40,10 +40,11 @@ without rediscovering AI SDK provider behavior.
   - assistant messages map from text, reasoning, file, and client-executed
     tool-call/tool-result parts
   - tool messages map from durable `tool_result` parts
-  - assistant message `providerMetadata` and supported content-part
-    `providerMetadata` replay through AI SDK `providerOptions` on the matching
-    prompt message or prompt part so provider continuity tokens survive prompt
-    history
+  - assistant message metadata and content-part metadata that already match AI
+    SDK `providerOptions` replay on the matching prompt message or prompt part
+  - flat durable reasoning `providerMetadata.signature` from the shared stream
+    seam is normalized back into Anthropic reasoning `providerOptions` on
+    replay so streamed continuity tokens survive prompt history
 - Structured output:
   - outbound structured requests use AI SDK JSON response format
   - inbound structured output is synthesized from returned JSON text and
