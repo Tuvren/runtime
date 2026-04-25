@@ -638,19 +638,17 @@ function resolveIterationDecision(
     );
   }
 
-  if (requestsTools) {
-    if (!decision.continue || !decision.executeTools) {
-      throw new TuvrenRuntimeError(
-        "tool-call responses require loopPolicy to continue and execute tools",
-        {
-          code: "invalid_loop_policy",
-          details: {
-            decision,
-            finishReason: response.finishReason,
-          },
-        }
-      );
-    }
+  if (requestsTools && !(decision.continue && decision.executeTools)) {
+    throw new TuvrenRuntimeError(
+      "tool-call responses require loopPolicy to continue and execute tools",
+      {
+        code: "invalid_loop_policy",
+        details: {
+          decision,
+          finishReason: response.finishReason,
+        },
+      }
+    );
   }
 
   return decision;

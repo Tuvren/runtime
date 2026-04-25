@@ -6429,7 +6429,9 @@ describe("framework-runtime-core", () => {
 
     const events = await collectEvents(handle.events());
     const turnEndEvent = events.find(
-      (event): event is Extract<(typeof events)[number], { type: "turn.end" }> =>
+      (
+        event
+      ): event is Extract<(typeof events)[number], { type: "turn.end" }> =>
         event.type === "turn.end"
     );
 
@@ -6437,9 +6439,9 @@ describe("framework-runtime-core", () => {
     expect(
       events.filter((event) => event.type === "iteration.start").length
     ).toBe(2);
-    expect(events.filter((event) => event.type === "iteration.end").length).toBe(
-      2
-    );
+    expect(
+      events.filter((event) => event.type === "iteration.end").length
+    ).toBe(2);
     expect(turnEndEvent?.status).toBe("completed");
     expect(handle.status().phase).toBe("completed");
     expect(await harness.readBranchRuntimeStatus(thread.branchId)).toEqual({

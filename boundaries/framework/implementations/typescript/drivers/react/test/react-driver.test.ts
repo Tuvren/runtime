@@ -265,10 +265,9 @@ describe("driver-react", () => {
           loopPolicy: {
             evaluate(response) {
               return {
-                continue:
-                  response.parts.some(
-                    (part) => part.type === "text" && part.text === "Keep going"
-                  ),
+                continue: response.parts.some(
+                  (part) => part.type === "text" && part.text === "Keep going"
+                ),
                 executeTools: false,
                 reason: "custom_continue",
               };
@@ -3019,9 +3018,9 @@ describe("driver-react", () => {
     const events = await collectEvents(handle.events());
 
     expect(generateCalls).toBe(2);
-    expect(events.filter((event) => event.type === "iteration.start")).toHaveLength(
-      2
-    );
+    expect(
+      events.filter((event) => event.type === "iteration.start")
+    ).toHaveLength(2);
     expect(handle.status().phase).toBe("completed");
     expect(await harness.readBranchMessages(thread.branchId)).toEqual([
       {
