@@ -848,6 +848,12 @@ interface SqliteTurnNodeLineageRootRow {
   turn_node_hash: string;
 }
 
+interface SqliteTurnNodeLineageProofRow {
+  depth: number;
+  hash: string;
+  previous_turn_node_hash: string | null;
+}
+
 interface SqliteThreadRow {
   created_at_ms: number;
   root_turn_node_hash: string;
@@ -2865,21 +2871,25 @@ function validateTurnNodeInDatabase(
 
 function validateTurnNodeLineageMetadataInDatabase(
   db: Database.Database,
-  turnNode: StoredTurnNode
-): void {
+  turnNode: StoredTurnNode,
+  label = "turnNode.hash"
+): TurnNodeLineageMetadata {
   const actualMetadata = ensureTurnNodeLineageMetadataInDatabase(
     db,
     turnNode.hash,
-    "turnNode.hash"
+    label
   );
-  const expectedMetadata = computeExpectedTurnNodeLineageMetadataInDatabase(
+  const lineageProof = selectBoundedTurnNodeLineageProofInDatabase(
     db,
-    turnNode
+    turnNode.hash,
+    actualMetadata.depth
   );
 
   if (
-    actualMetadata.rootTurnNodeHash !== expectedMetadata.rootTurnNodeHash ||
-    actualMetadata.depth !== expectedMetadata.depth
+    lineageProof === undefined ||
+    lineageProof.depth !== actualMetadata.depth ||
+    lineageProof.hash !== actualMetadata.rootTurnNodeHash ||
+    lineageProof.previous_turn_node_hash !== null
   ) {
     throw persistenceError(
       "turn node lineage metadata must match the parent-linked turn node chain",
@@ -2887,45 +2897,51 @@ function validateTurnNodeLineageMetadataInDatabase(
       {
         actualDepth: actualMetadata.depth,
         actualRootTurnNodeHash: actualMetadata.rootTurnNodeHash,
-        expectedDepth: expectedMetadata.depth,
-        expectedRootTurnNodeHash: expectedMetadata.rootTurnNodeHash,
+        expectedDepth: lineageProof?.depth ?? null,
+        expectedRootHasParent:
+          lineageProof === undefined
+            ? null
+            : lineageProof.previous_turn_node_hash !== null,
+        expectedRootTurnNodeHash: lineageProof?.hash ?? null,
         turnNodeHash: turnNode.hash,
       }
     );
   }
+
+  return actualMetadata;
 }
 
-function computeExpectedTurnNodeLineageMetadataInDatabase(
+function selectBoundedTurnNodeLineageProofInDatabase(
   db: Database.Database,
-  turnNode: StoredTurnNode
-): TurnNodeLineageMetadata {
-  const visitedTurnNodeHashes = new Set<string>();
-  let currentTurnNode = turnNode;
-  let depth = 0;
-
-  while (currentTurnNode.previousTurnNodeHash !== null) {
-    if (visitedTurnNodeHashes.has(currentTurnNode.hash)) {
-      throw persistenceError(
-        "turn node lineage must not contain cycles",
-        "sqlite_backend_turn_node_lineage_cycle",
-        { turnNodeHash: turnNode.hash }
-      );
-    }
-
-    visitedTurnNodeHashes.add(currentTurnNode.hash);
-    currentTurnNode = ensureTurnNodeExistsInDatabase(
-      db,
-      currentTurnNode.previousTurnNodeHash,
-      "turnNode.previousTurnNodeHash"
-    );
-    depth += 1;
-  }
-
-  return {
-    depth,
-    rootTurnNodeHash: currentTurnNode.hash,
-    turnNodeHash: turnNode.hash,
-  };
+  turnNodeHash: string,
+  depth: number
+): SqliteTurnNodeLineageProofRow | undefined {
+  return db
+    .prepare(
+      `
+        WITH RECURSIVE lineage(hash, previous_turn_node_hash, depth) AS (
+          SELECT
+            hash,
+            previous_turn_node_hash,
+            0 AS depth
+          FROM turn_nodes
+          WHERE hash = ?
+          UNION ALL
+          SELECT
+            parent.hash,
+            parent.previous_turn_node_hash,
+            lineage.depth + 1
+          FROM turn_nodes AS parent
+          JOIN lineage ON parent.hash = lineage.previous_turn_node_hash
+          WHERE lineage.depth < ?
+        )
+        SELECT hash, previous_turn_node_hash, depth
+        FROM lineage
+        ORDER BY depth DESC
+        LIMIT 1
+      `
+    )
+    .get(turnNodeHash, depth) as SqliteTurnNodeLineageProofRow | undefined;
 }
 
 function validateTurnInDatabase(db: Database.Database, turnId: string): void {
@@ -3881,17 +3897,20 @@ function getValidatedTurnNodeLineageMetadataInDatabase(
   db: Database.Database,
   turnNodeHash: string
 ): TurnNodeLineageMetadata {
-  const turnNode = ensureTurnNodeExistsInDatabase(
+  return ensureValidatedTurnNodeLineageMetadataInDatabase(
     db,
     turnNodeHash,
     "record.previousTurnNodeHash"
   );
-  validateTurnNodeLineageMetadataInDatabase(db, turnNode);
-  return ensureTurnNodeLineageMetadataInDatabase(
-    db,
-    turnNodeHash,
-    "record.previousTurnNodeHash"
-  );
+}
+
+function ensureValidatedTurnNodeLineageMetadataInDatabase(
+  db: Database.Database,
+  turnNodeHash: string,
+  label: string
+): TurnNodeLineageMetadata {
+  const turnNode = ensureTurnNodeExistsInDatabase(db, turnNodeHash, label);
+  return validateTurnNodeLineageMetadataInDatabase(db, turnNode, label);
 }
 
 function decodeObjectRow(row: SqliteObjectRow): StoredObject {
@@ -5706,7 +5725,7 @@ function assertTurnNodeBelongsToThreadInDatabase(
   thread: StoredThread,
   label: string
 ): void {
-  const metadata = ensureTurnNodeLineageMetadataInDatabase(
+  const metadata = ensureValidatedTurnNodeLineageMetadataInDatabase(
     db,
     turnNodeHash,
     label
@@ -6093,12 +6112,12 @@ function classifyTurnNodeRelationshipInDatabase(
     return "same";
   }
 
-  const sourceMetadata = ensureTurnNodeLineageMetadataInDatabase(
+  const sourceMetadata = ensureValidatedTurnNodeLineageMetadataInDatabase(
     db,
     sourceTurnNodeHash,
     "sourceTurnNodeHash"
   );
-  const targetMetadata = ensureTurnNodeLineageMetadataInDatabase(
+  const targetMetadata = ensureValidatedTurnNodeLineageMetadataInDatabase(
     db,
     targetTurnNodeHash,
     "targetTurnNodeHash"
@@ -6154,12 +6173,12 @@ function isTurnNodeDescendantOfInDatabase(
     return true;
   }
 
-  const descendantMetadata = ensureTurnNodeLineageMetadataInDatabase(
+  const descendantMetadata = ensureValidatedTurnNodeLineageMetadataInDatabase(
     db,
     descendantTurnNodeHash,
     "descendantTurnNodeHash"
   );
-  const ancestorMetadata = ensureTurnNodeLineageMetadataInDatabase(
+  const ancestorMetadata = ensureValidatedTurnNodeLineageMetadataInDatabase(
     db,
     ancestorTurnNodeHash,
     "ancestorTurnNodeHash"

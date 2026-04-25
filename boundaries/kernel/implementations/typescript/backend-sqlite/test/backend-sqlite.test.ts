@@ -130,6 +130,11 @@ interface CorruptionSeed {
   turnTreeHash: string;
 }
 
+interface LineageMembershipCorruptionSeed extends CorruptionSeed {
+  foreignBranchId: string;
+  foreignThreadId: string;
+}
+
 interface ExplainQueryPlanRow {
   detail: string;
 }
@@ -304,6 +309,82 @@ async function seedCorruptionDatabase(
     runId: run.runId,
     runStartTurnNodeHash: run.startTurnNodeHash,
     turnTreeHash: turnTree.hash,
+  };
+}
+
+async function seedLineageMembershipCorruptionDatabase(): Promise<LineageMembershipCorruptionSeed> {
+  const seeded = await seedCorruptionDatabase();
+  const backend = createSqliteBackend({ databasePath: seeded.databasePath });
+  const schema = createCanonicalKernelTestSchema();
+  const foreignTurnTree = await createStoredTurnTreeRecord(
+    schema,
+    {
+      "context.manifest": null,
+      messages: [createHashFromIndex(999)],
+    },
+    12
+  );
+  const foreignRootTurnNode = await createStoredTurnNodeRecord({
+    consumedStagedResults: [],
+    createdAtMs: 13,
+    eventHash: null,
+    previousTurnNodeHash: null,
+    schemaId: "schema_main",
+    turnTreeHash: foreignTurnTree.hash,
+  });
+  const foreignThreadId = "thread_lineage_membership";
+  const foreignBranchId = "branch_lineage_membership";
+
+  await backend.transact(async (tx) => {
+    await tx.turnTrees.put(foreignTurnTree);
+    await tx.turnTreePaths.putMany(
+      createCanonicalTurnTreePaths(foreignTurnTree, {
+        "context.manifest": null,
+        messages: [createHashFromIndex(999)],
+      })
+    );
+    await tx.turnNodes.put(foreignRootTurnNode);
+    await tx.threads.put({
+      createdAtMs: 14,
+      rootTurnNodeHash: foreignRootTurnNode.hash,
+      schemaId: "schema_main",
+      threadId: foreignThreadId,
+    });
+    await tx.branches.set({
+      branchId: foreignBranchId,
+      createdAtMs: 15,
+      headTurnNodeHash: foreignRootTurnNode.hash,
+      threadId: foreignThreadId,
+      updatedAtMs: 15,
+    });
+    await tx.turns.set({
+      branchId: foreignBranchId,
+      createdAtMs: 16,
+      headTurnNodeHash: foreignRootTurnNode.hash,
+      parentTurnId: null,
+      startTurnNodeHash: foreignRootTurnNode.hash,
+      threadId: foreignThreadId,
+      turnId: "turn_lineage_membership",
+      updatedAtMs: 16,
+    });
+  });
+
+  const probe = new Database(seeded.databasePath);
+  probe
+    .prepare(
+      `
+        UPDATE turn_node_lineage_roots
+        SET root_turn_node_hash = ?
+        WHERE turn_node_hash = ?
+      `
+    )
+    .run(foreignRootTurnNode.hash, seeded.runStartTurnNodeHash);
+  probe.close();
+
+  return {
+    ...seeded,
+    foreignBranchId,
+    foreignThreadId,
   };
 }
 
@@ -1019,6 +1100,156 @@ describe("@tuvren/backend-sqlite", () => {
           )
           .get(childTurnNode.hash),
         undefined
+      );
+    } finally {
+      readonlyProbe.close();
+    }
+  });
+
+  test("rejects existing-node thread membership checks backed by stale lineage metadata", async () => {
+    const seeded = await seedLineageMembershipCorruptionDatabase();
+    const backend = createSqliteBackend({ databasePath: seeded.databasePath });
+
+    await rejects(
+      backend.transact(async (tx) => {
+        await tx.branches.set({
+          branchId: "branch_stale_lineage_membership",
+          createdAtMs: 20,
+          headTurnNodeHash: seeded.runStartTurnNodeHash,
+          threadId: seeded.foreignThreadId,
+          updatedAtMs: 20,
+        });
+      }),
+      LINEAGE_METADATA_ERROR_PATTERN
+    );
+
+    await rejects(
+      backend.transact(async (tx) => {
+        await tx.turns.set({
+          branchId: seeded.foreignBranchId,
+          createdAtMs: 21,
+          headTurnNodeHash: seeded.runStartTurnNodeHash,
+          parentTurnId: null,
+          startTurnNodeHash: seeded.runStartTurnNodeHash,
+          threadId: seeded.foreignThreadId,
+          turnId: "turn_stale_lineage_membership",
+          updatedAtMs: 21,
+        });
+      }),
+      LINEAGE_METADATA_ERROR_PATTERN
+    );
+
+    const probe = new Database(seeded.databasePath);
+    probe
+      .prepare(
+        `
+          INSERT INTO turns (
+            turn_id,
+            thread_id,
+            branch_id,
+            parent_turn_id,
+            start_turn_node_hash,
+            head_turn_node_hash,
+            created_at_ms,
+            updated_at_ms
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        `
+      )
+      .run(
+        "turn_stale_lineage_membership_seed",
+        seeded.foreignThreadId,
+        seeded.foreignBranchId,
+        null,
+        seeded.runStartTurnNodeHash,
+        seeded.runStartTurnNodeHash,
+        22,
+        22
+      );
+    probe
+      .prepare(
+        `
+          INSERT INTO runs (
+            run_id,
+            turn_id,
+            branch_id,
+            schema_id,
+            start_turn_node_hash,
+            status,
+            current_step_index,
+            step_sequence_cbor,
+            created_turn_nodes_cbor,
+            created_at_ms,
+            updated_at_ms
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `
+      )
+      .run(
+        "run_stale_lineage_membership",
+        "turn_stale_lineage_membership_seed",
+        seeded.foreignBranchId,
+        "schema_main",
+        seeded.runStartTurnNodeHash,
+        "running",
+        0,
+        Buffer.from(
+          encodeDeterministicKernelRecord([
+            {
+              deterministic: false,
+              id: "model_call",
+              sideEffects: false,
+            },
+          ])
+        ),
+        Buffer.from(encodeDeterministicKernelRecord([])),
+        23,
+        23
+      );
+    probe.close();
+
+    await rejects(
+      backend.transact(async (tx) => {
+        await tx.runs.set({
+          branchId: seeded.foreignBranchId,
+          createdAtMs: 23,
+          createdTurnNodesCbor: encodeDeterministicKernelRecord([]),
+          currentStepIndex: 1,
+          runId: "run_stale_lineage_membership",
+          schemaId: "schema_main",
+          startTurnNodeHash: seeded.runStartTurnNodeHash,
+          status: "completed",
+          stepSequenceCbor: encodeDeterministicKernelRecord([
+            {
+              deterministic: false,
+              id: "model_call",
+              sideEffects: false,
+            },
+          ]),
+          turnId: "turn_stale_lineage_membership_seed",
+          updatedAtMs: 24,
+        });
+      }),
+      LINEAGE_METADATA_ERROR_PATTERN
+    );
+
+    const readonlyProbe = new Database(seeded.databasePath, { readonly: true });
+    try {
+      strictEqual(
+        readonlyProbe
+          .prepare("SELECT 1 FROM branches WHERE branch_id = ?")
+          .get("branch_stale_lineage_membership"),
+        undefined
+      );
+      strictEqual(
+        readonlyProbe
+          .prepare("SELECT 1 FROM turns WHERE turn_id = ?")
+          .get("turn_stale_lineage_membership"),
+        undefined
+      );
+      deepStrictEqual(
+        readonlyProbe
+          .prepare("SELECT status FROM runs WHERE run_id = ?")
+          .get("run_stale_lineage_membership"),
+        { status: "running" }
       );
     } finally {
       readonlyProbe.close();

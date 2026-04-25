@@ -42,20 +42,20 @@ landed.
 
 | Case | History | Baseline best per iter | After best per iter |
 | --- | ---: | ---: | ---: |
-| no-op transaction | 0 TurnNodes | 3.886ms | 9.711us |
-| single object write transaction | 0 TurnNodes | 5.671ms | 284.362us |
-| no-op transaction | 100 TurnNodes | 20.866ms | 10.925us |
-| single object write transaction | 100 TurnNodes | 21.767ms | 222.042us |
-| no-op transaction | 500 TurnNodes | 87.783ms | 7.397us |
-| single object write transaction | 500 TurnNodes | 83.864ms | 165.111us |
-| no-op transaction | 1000 TurnNodes | 164.985ms | 6.748us |
-| single object write transaction | 1000 TurnNodes | 161.297ms | 160.211us |
+| no-op transaction | 0 TurnNodes | 3.886ms | 8.538us |
+| single object write transaction | 0 TurnNodes | 5.671ms | 237.195us |
+| no-op transaction | 100 TurnNodes | 20.866ms | 8.509us |
+| single object write transaction | 100 TurnNodes | 21.767ms | 212.636us |
+| no-op transaction | 500 TurnNodes | 87.783ms | 6.728us |
+| single object write transaction | 500 TurnNodes | 83.864ms | 198.782us |
+| no-op transaction | 1000 TurnNodes | 164.985ms | 6.712us |
+| single object write transaction | 1000 TurnNodes | 161.297ms | 165.602us |
 
 The target claim is narrow: ordinary transactions no longer pay for a full
 database reload and full-state validation. Lineage-sensitive operations are
-still more expensive than no-op writes, but common membership and root-to-head
-proofs now use a backend-local lineage root/depth index rather than walking the
-full parent chain.
+still more expensive than no-op writes because normal writes validate the
+lineage metadata rows they trust against the canonical parent-linked chain.
+No-op and small object writes still do not scale with persisted history.
 
 ## Lineage Depth Results
 
@@ -64,33 +64,34 @@ path remains visible over time.
 
 | Case | History | After best per iter |
 | --- | ---: | ---: |
-| deep branch membership transaction | 0 TurnNodes | 322.913us |
-| deep branch forward transaction | 0 TurnNodes | 531.614us |
-| deep branch non-root forward transaction | 0 TurnNodes | 361.041us |
-| deep branch non-root rollback transaction | 0 TurnNodes | 234.651us |
-| deep branch membership transaction | 100 TurnNodes | 244.155us |
-| deep branch forward transaction | 100 TurnNodes | 411.370us |
-| deep branch non-root forward transaction | 100 TurnNodes | 576.838us |
-| deep branch non-root rollback transaction | 100 TurnNodes | 885.599us |
-| deep branch membership transaction | 500 TurnNodes | 230.202us |
-| deep branch forward transaction | 500 TurnNodes | 358.652us |
-| deep branch non-root forward transaction | 500 TurnNodes | 979.586us |
-| deep branch non-root rollback transaction | 500 TurnNodes | 1.532ms |
-| deep branch membership transaction | 1000 TurnNodes | 223.312us |
-| deep branch forward transaction | 1000 TurnNodes | 334.122us |
-| deep branch non-root forward transaction | 1000 TurnNodes | 1.270ms |
-| deep branch non-root rollback transaction | 1000 TurnNodes | 2.021ms |
+| deep branch membership transaction | 0 TurnNodes | 310.661us |
+| deep branch forward transaction | 0 TurnNodes | 426.735us |
+| deep branch non-root forward transaction | 0 TurnNodes | 391.742us |
+| deep branch non-root rollback transaction | 0 TurnNodes | 292.633us |
+| deep branch membership transaction | 100 TurnNodes | 374.701us |
+| deep branch forward transaction | 100 TurnNodes | 947.669us |
+| deep branch non-root forward transaction | 100 TurnNodes | 1.727ms |
+| deep branch non-root rollback transaction | 100 TurnNodes | 2.840ms |
+| deep branch membership transaction | 500 TurnNodes | 766.662us |
+| deep branch forward transaction | 500 TurnNodes | 2.113ms |
+| deep branch non-root forward transaction | 500 TurnNodes | 4.707ms |
+| deep branch non-root rollback transaction | 500 TurnNodes | 7.073ms |
+| deep branch membership transaction | 1000 TurnNodes | 1.239ms |
+| deep branch forward transaction | 1000 TurnNodes | 3.585ms |
+| deep branch non-root forward transaction | 1000 TurnNodes | 8.624ms |
+| deep branch non-root rollback transaction | 1000 TurnNodes | 12.811ms |
 
 The first recursive-CTE-only lineage run measured `2.891ms/iter` for 1000-depth
 membership and `8.154ms/iter` for 1000-depth forward Branch movement. The
-lineage root/depth index reduced those cases to `223.312us/iter` and
-`334.122us/iter`, respectively, in the latest run.
+lineage root/depth index plus bounded metadata proof measured `1.239ms/iter`
+and `3.585ms/iter`, respectively, in the latest run.
 
-Non-root ancestry checks can still require bounded parent-chain traversal. The
-benchmark now includes non-root forward and rollback cases so that bounded CTE
-path remains visible. The important boundary is that common Thread membership
-and root-to-head Branch movement no longer scale with total persisted history,
-and no-op/small object writes still do not pay lineage traversal costs.
+Lineage proofs now validate the referenced root/depth metadata row before using
+it, so membership and relationship checks scale with the referenced lineage
+depth. The benchmark includes membership, root-to-head forward movement,
+non-root forward movement, and rollback cases so that bounded CTE paths remain
+visible. The important boundary is that no-op and small object writes still do
+not pay lineage traversal costs.
 
 ## Localized Validation Design
 
@@ -132,7 +133,9 @@ the database.
 Lineage checks use backend-local `turn_node_lineage_roots` metadata for
 root/depth classification. Non-root ancestry checks fall back to a bounded
 recursive CTE over `turn_nodes(previous_turn_node_hash)` using `UNION ALL` with
-the known depth delta.
+the known depth delta. Normal write validation revalidates each lineage metadata
+row it uses against the canonical parent-linked TurnNode chain before trusting
+that row as a thread membership or relationship proof.
 
 Migration validation now runs before applying pending migrations, so a database
 that falsely records an applied migration without that migration's package
