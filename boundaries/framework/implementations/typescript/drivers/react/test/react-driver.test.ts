@@ -3171,6 +3171,320 @@ describe("driver-react", () => {
     );
   });
 
+  test("executes end to end through runtime-core with a generated response that preserves canonical metadata fields", async () => {
+    const harness = createFakeKernelHarness();
+    let capturedResponse: TuvrenModelResponse | undefined;
+    const fileData = new Uint8Array([1, 2, 3]);
+    const runtime = createTuvrenRuntimeCore({
+      defaultDriverId: REACT_DRIVER_ID,
+      driverRegistry: createDriverRegistry([
+        createReActDriver({
+          providerCallMode: "generate",
+        }),
+      ]),
+      kernel: harness.kernel,
+    });
+    const provider = {
+      async generate() {
+        return {
+          finishReason: "length",
+          parts: [
+            {
+              providerMetadata: {
+                source: "openai-output-text",
+              },
+              text: "Generated answer",
+              type: "text",
+            },
+            {
+              providerMetadata: {
+                signature: "sig-1",
+              },
+              redacted: false,
+              text: "internal reasoning",
+              type: "reasoning",
+            },
+            {
+              data: { answer: "ok" },
+              name: "answer",
+              providerMetadata: {
+                enforcement: "strict",
+              },
+              type: "structured",
+            },
+            {
+              data: fileData,
+              filename: "report.csv",
+              mediaType: "text/csv",
+              providerMetadata: {
+                uploadId: "file-1",
+              },
+              type: "file",
+            },
+          ],
+          providerMetadata: {
+            encrypted_content: "enc-123",
+            responseId: "resp-123",
+          },
+          usage: {
+            inputTokens: 10,
+            outputTokens: 7,
+          },
+        } satisfies TuvrenModelResponse;
+      },
+      id: "provider",
+      async *stream() {
+        yield* [];
+      },
+    } satisfies TuvrenProvider;
+    const thread = await runtime.createThread({});
+    const handle = runtime.executeTurn({
+      branchId: thread.branchId,
+      config: {
+        extensions: [
+          {
+            afterIteration(context) {
+              capturedResponse = context.response;
+              return undefined;
+            },
+            name: "capture",
+          },
+        ],
+        model: provider,
+        name: "primary",
+      },
+      signal: textSignal("Return the full generated payload"),
+      threadId: thread.threadId,
+    });
+
+    const events = await collectEvents(handle.events());
+    const messages = await harness.readBranchMessages(thread.branchId);
+    const messageDoneEvent = events.find(
+      (
+        event
+      ): event is Extract<TuvrenStreamEvent, { type: "message.done" }> =>
+        event.type === "message.done"
+    );
+
+    expect(handle.status().phase).toBe("completed");
+    expect(events.map((event) => event.type)).toEqual(
+      expect.arrayContaining([
+        "message.start",
+        "text.delta",
+        "text.done",
+        "reasoning.delta",
+        "reasoning.done",
+        "structured.delta",
+        "structured.done",
+        "file.done",
+        "message.done",
+      ])
+    );
+    expect(messageDoneEvent).toMatchObject({
+      finishReason: "length",
+      usage: {
+        inputTokens: 10,
+        outputTokens: 7,
+      },
+    });
+    expect(messages).toEqual(
+      expect.arrayContaining([
+        {
+          parts: [
+            {
+              providerMetadata: {
+                source: "openai-output-text",
+              },
+              text: "Generated answer",
+              type: "text",
+            },
+            {
+              providerMetadata: {
+                signature: "sig-1",
+              },
+              redacted: false,
+              text: "internal reasoning",
+              type: "reasoning",
+            },
+            {
+              data: { answer: "ok" },
+              name: "answer",
+              providerMetadata: {
+                enforcement: "strict",
+              },
+              type: "structured",
+            },
+            {
+              data: fileData,
+              filename: "report.csv",
+              mediaType: "text/csv",
+              providerMetadata: {
+                uploadId: "file-1",
+              },
+              type: "file",
+            },
+          ],
+          providerMetadata: {
+            encrypted_content: "enc-123",
+            responseId: "resp-123",
+          },
+          role: "assistant",
+        },
+      ])
+    );
+    expect(capturedResponse).toEqual({
+      finishReason: "length",
+      parts: [
+        {
+          providerMetadata: {
+            source: "openai-output-text",
+          },
+          text: "Generated answer",
+          type: "text",
+        },
+        {
+          providerMetadata: {
+            signature: "sig-1",
+          },
+          redacted: false,
+          text: "internal reasoning",
+          type: "reasoning",
+        },
+        {
+          data: { answer: "ok" },
+          name: "answer",
+          providerMetadata: {
+            enforcement: "strict",
+          },
+          type: "structured",
+        },
+        {
+          data: fileData,
+          filename: "report.csv",
+          mediaType: "text/csv",
+          providerMetadata: {
+            uploadId: "file-1",
+          },
+          type: "file",
+        },
+      ],
+      providerMetadata: {
+        encrypted_content: "enc-123",
+        responseId: "resp-123",
+      },
+      usage: {
+        inputTokens: 10,
+        outputTokens: 7,
+      },
+    });
+  });
+
+  test("executes end to end through runtime-core for generated tool calls with host-selected sequential mode", async () => {
+    const harness = createFakeKernelHarness();
+    let iteration = 0;
+    const provider = {
+      async generate() {
+        if (iteration === 0) {
+          iteration += 1;
+          return {
+            finishReason: "tool_call",
+            parts: [
+              {
+                callId: "call-search",
+                input: { query: "docs" },
+                name: "search",
+                providerMetadata: {
+                  providerCallId: "provider-call-1",
+                },
+                type: "tool_call",
+              },
+            ],
+            providerMetadata: {
+              responseId: "resp-tool-1",
+            },
+            usage: {
+              inputTokens: 8,
+              outputTokens: 3,
+            },
+          } satisfies TuvrenModelResponse;
+        }
+
+        return {
+          finishReason: "stop",
+          parts: [{ text: "Tool run complete", type: "text" }],
+        } satisfies TuvrenModelResponse;
+      },
+      id: "provider",
+      async *stream() {
+        yield* [];
+      },
+    } satisfies TuvrenProvider;
+    const runtime = createTuvrenRuntimeCore({
+      defaultDriverId: REACT_DRIVER_ID,
+      driverRegistry: createDriverRegistry([
+        createReActDriver({
+          providerCallMode: "generate",
+          toolExecutionMode: "sequential",
+        }),
+      ]),
+      kernel: harness.kernel,
+    });
+    const thread = await runtime.createThread({});
+    const handle = runtime.executeTurn({
+      branchId: thread.branchId,
+      config: {
+        model: provider,
+        name: "primary",
+      },
+      signal: textSignal("Use the search tool"),
+      threadId: thread.threadId,
+      tools: [createSearchTool()],
+    });
+
+    const events = await collectEvents(handle.events());
+    const messages = await harness.readBranchMessages(thread.branchId);
+
+    expect(handle.status().phase).toBe("completed");
+    expect(events.some((event) => event.type === "tool_call.args_delta")).toBe(
+      true
+    );
+    expect(
+      events.some(
+        (event) => event.type === "tool_call.done" && event.name === "search"
+      )
+    ).toBe(true);
+    expect(
+      events.some(
+        (event) => event.type === "tool.result" && event.name === "search"
+      )
+    ).toBe(true);
+    expect(messages).toEqual(
+      expect.arrayContaining([
+        {
+          parts: [
+            {
+              callId: "call-search",
+              input: { query: "docs" },
+              name: "search",
+              providerMetadata: {
+                providerCallId: "provider-call-1",
+              },
+              type: "tool_call",
+            },
+          ],
+          providerMetadata: {
+            responseId: "resp-tool-1",
+          },
+          role: "assistant",
+        },
+        {
+          parts: [{ text: "Tool run complete", type: "text" }],
+          role: "assistant",
+        },
+      ])
+    );
+  });
+
   test("does not publish generated assistant events before validation succeeds", async () => {
     const harness = createFakeKernelHarness();
     const provider = {

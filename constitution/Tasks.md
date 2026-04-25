@@ -1,6 +1,7 @@
 # Engineering Execution Plan
 
 ## 0. Version History & Changelog
+- v0.6.1 - Reframed Epic L as a brownfield closure and Epic M readiness pass, adding an explicit parity inventory artifact and handoff-focused acceptance criteria while preserving the existing epic IDs and dependency order.
 - v0.6.0 - Selected bounded active Epics K, L, and M for ReAct loop completion, streaming/provider semantics, and tool/approval integration while deferring AI SDK bridge and host protocol work as next-focus topics.
 - v0.5.1 - Closed Epic J with SQLite hot-path cleanup, localized validation coverage, Run liveness spec deltas, and retention topology proof.
 - v0.5.0 - Rebased active scope after Epic I completion and inserted Runtime Foundation Hardening before deeper ReAct/runtime expansion.
@@ -13,6 +14,7 @@
 
 ### Brownfield Continuity Note
 - The current codebase already contains the workspace scaffold, shared core types, kernel protocol package, memory backend, SQLite backend, kernel testkit, shared framework contract packages, provider contract package, `runtime-core`, and the ReAct Driver foundation package.
+- Current repository reality already includes broad ReAct streaming and runtime-core reconciliation coverage in `framework-driver-react` and `framework-runtime-core`; Epic L now closes, records, and hardens that behavior for a safe handoff into Epic M.
 - This revision activates the next ReAct implementation band as three bounded epics: loop correctness first, streaming/provider semantics second, and tool/approval integration third.
 - AI SDK bridge and host protocol/playground work remain intentionally deferred until K-M prove the canonical ReAct execution path.
 
@@ -27,7 +29,7 @@
 
 ### Current Active Scope
 - Epic K completes the ReAct loop over the existing provider-neutral contract and shared runtime-core execution shell.
-- Epic L hardens runtime/model streaming semantics in the ReAct driver and provider contract path.
+- Epic L closes and codifies runtime/model streaming semantics in the ReAct driver and provider contract path, including an explicit parity inventory and the handoff invariants Epic M will rely on.
 - Epic M completes ReAct tool continuation and approval integration through shared runtime-core services.
 
 ### Future / Deferred Scope
@@ -128,12 +130,12 @@ Then the runtime records the documented failed or partial status, preserves alre
 - **Effort:** 3
 - **Dependencies:** KRT-K003, KRT-K004
 - **Capability / Contract Mapping:** PRD `CAP-P0-012`, `CAP-P0-020`, `CAP-P0-030`; Architecture `§2`, `§5`; TechSpec `§4.4`, `§4.5`, `§5.4.1`; Framework Spec `§3`, `§6`
-- **Description:** Characterize the current generate and stream paths in the ReAct driver/provider contract, identify parity gaps for text, reasoning, structured output, live tool-call previews, finish reasons, usage, and metadata, and record current major-lab provider metadata shapes without turning them into a normalized Tuvren metadata schema.
+- **Description:** Record the current brownfield parity matrix in `constitution/spikes/epic-l-parity-inventory.md`, covering generate and stream equivalence for text, reasoning, structured output, file content, live tool-call previews, finish reasons, usage, and response-level or part-level opaque metadata, plus the provider-shaped continuity fields and Epic M handoff gates that must remain stable without inventing a normalized Tuvren metadata schema.
 - **Acceptance Criteria (Gherkin):**
 ```gherkin
 Given the ReAct driver supports both provider.generate and provider.stream modes
 When parity characterization is completed
-Then the repository records which canonical assistant events and durable response fields must match across generated and streamed provider responses, plus the OpenAI, Anthropic, and Google/Gemini metadata fields that should be preserved opaquely
+Then `constitution/spikes/epic-l-parity-inventory.md` records which canonical assistant events and durable response fields must match across generated and streamed provider responses, which OpenAI, Anthropic, and Google/Gemini metadata fields must be preserved opaquely, and which invariants Epic M may assume for durable tool-call identity, partial cancellation boundaries, and synthesized afterIteration responses
 ```
 
 **KRT-L002 Provider Stream Accumulator Hardening**
@@ -141,12 +143,12 @@ Then the repository records which canonical assistant events and durable respons
 - **Effort:** 5
 - **Dependencies:** KRT-L001
 - **Capability / Contract Mapping:** PRD `CAP-P0-012`, `CAP-P0-020`, `CAP-P1-021`; Architecture `§2`; TechSpec `§4.4`, `§4.5`; Framework Spec `§3.3`, `§3.5`, `§6.3`
-- **Description:** Harden the ReAct stream accumulator so normalized provider chunks produce valid canonical events and a matching durable `TuvrenModelResponse` across text, reasoning, structured output, file, and tool-call content.
+- **Description:** Close the remaining ReAct stream accumulator gaps so normalized provider chunks produce valid canonical events and a matching durable `TuvrenModelResponse` across text, reasoning, structured output, file, and tool-call content, including final-only structured or tool-call synthesis, finish-reason and usage preservation, and cancellation boundaries that avoid creating orphan executable tool work.
 - **Acceptance Criteria (Gherkin):**
 ```gherkin
 Given a provider stream yields normalized chunks for assistant content
 When the ReAct stream accumulator finalizes the stream
-Then the live event sequence and durable model response contain equivalent assistant content, live tool-call previews, finish reason, usage, and opaque provider metadata
+Then the live event sequence and durable model response contain equivalent assistant content, live tool-call previews, finish reason, usage, and opaque provider metadata, final-only structured or tool-call chunks synthesize the missing canonical delta events, and cancellation preserves only the documented safe partial assistant content
 ```
 
 **KRT-L003 Assistant Event Reconciliation and Structured Output Streaming**
@@ -154,12 +156,12 @@ Then the live event sequence and durable model response contain equivalent assis
 - **Effort:** 5
 - **Dependencies:** KRT-L002
 - **Capability / Contract Mapping:** PRD `CAP-P0-012`, `CAP-P0-020`, `CAP-P0-023`; Architecture `§2`, `§5`; TechSpec `§4.4`, `§4.5`, `§4.6`; Framework Spec `§3.5`, `§6.5`
-- **Description:** Complete streaming validation for assistant event reconciliation, including structured output delta/done behavior, generated-response event synthesis, aroundModel post-stream divergence, and invalid stream rejection.
+- **Description:** Close assistant-stream validation and generated-response parity for runtime-core, including structured output delta or done behavior, generated-response event synthesis, aroundModel post-stream divergence, and invalid or incomplete stream rejection, while keeping the `assistantEventReconciliation` exception narrow enough that Epic M can treat assistant tool calls as durable and unambiguous.
 - **Acceptance Criteria (Gherkin):**
 ```gherkin
 Given a ReAct provider call emits assistant content events before the durable assistant message is finalized
 When runtime-core validates the driver result
-Then matching streams are accepted, documented aroundModel divergence is accepted only in the allowed case, and invalid or incomplete assistant streams fail with a typed runtime error
+Then matching streams are accepted, generated responses synthesize the same canonical assistant event shapes expected from streaming, documented aroundModel divergence is accepted only in the allowed case, and invalid or incomplete assistant streams fail with a typed runtime error before Epic M-facing tool continuation can observe an ambiguous assistant message
 ```
 
 **KRT-L004 Provider Error and Opaque Metadata Preservation**
@@ -167,12 +169,12 @@ Then matching streams are accepted, documented aroundModel divergence is accepte
 - **Effort:** 3
 - **Dependencies:** KRT-L002
 - **Capability / Contract Mapping:** PRD `CAP-P0-005`, `CAP-P0-012`, `CAP-P0-020`, `CAP-P0-030`; Architecture `§1.3`, `§1.4`; TechSpec `§4.4`, `§4.6`; Framework Spec `§3`, `§6`
-- **Description:** Normalize provider stream errors, error finish reasons, and cancellation errors while preserving usage, provider metadata, and provider continuity artifacts opaquely across generate and stream modes.
+- **Description:** Close provider error, cancellation, and opaque metadata preservation semantics across generate and stream modes so provider-shaped usage, metadata, and continuity artifacts survive on canonical assistant responses and synthesized hook-visible responses without being normalized into shared runtime or approval contracts.
 - **Acceptance Criteria (Gherkin):**
 ```gherkin
 Given a provider returns usage, metadata, continuity artifacts, or an error in generate or stream mode
 When the ReAct driver maps the provider outcome
-Then successful outcomes preserve provider-shaped metadata on canonical responses without inventing a normalized metadata schema, and failure outcomes surface typed provider/runtime errors without committing invalid assistant content
+Then successful outcomes preserve provider-shaped metadata on canonical assistant messages, parts, and synthesized afterIteration responses without inventing a normalized metadata schema, and failure outcomes surface typed provider or runtime errors without committing invalid assistant content or hiding provider failures behind invalid stream validation noise
 ```
 
 ### Epic M — ReAct Tool and Approval Integration (RTG)
