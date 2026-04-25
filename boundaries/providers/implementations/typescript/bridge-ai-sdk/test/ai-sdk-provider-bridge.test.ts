@@ -54,10 +54,20 @@ describe("provider-bridge-ai-sdk", () => {
           return createGenerateResult({
             content: [
               {
+                providerMetadata: {
+                  anthropic: {
+                    signature: "sig-result",
+                  },
+                },
                 text: "thinking",
                 type: "reasoning",
               },
               {
+                providerMetadata: {
+                  openai: {
+                    encryptedContent: "enc-structured",
+                  },
+                },
                 text: '{"answer":"ready"}',
                 type: "text",
               },
@@ -121,8 +131,27 @@ describe("provider-bridge-ai-sdk", () => {
           role: "user",
         },
         {
+          providerMetadata: {
+            openai: {
+              responseId: "resp-history",
+            },
+          },
           parts: [
             {
+              providerMetadata: {
+                openai: {
+                  encryptedContent: "enc-history",
+                },
+              },
+              text: "Previously answered",
+              type: "text",
+            },
+            {
+              providerMetadata: {
+                anthropic: {
+                  signature: "sig-history",
+                },
+              },
               redacted: false,
               text: "considering options",
               type: "reasoning",
@@ -250,6 +279,20 @@ describe("provider-bridge-ai-sdk", () => {
       {
         content: [
           {
+            providerOptions: {
+              openai: {
+                encryptedContent: "enc-history",
+              },
+            },
+            text: "Previously answered",
+            type: "text",
+          },
+          {
+            providerOptions: {
+              anthropic: {
+                signature: "sig-history",
+              },
+            },
             text: "considering options",
             type: "reasoning",
           },
@@ -262,6 +305,11 @@ describe("provider-bridge-ai-sdk", () => {
             type: "tool-call",
           },
         ],
+        providerOptions: {
+          openai: {
+            responseId: "resp-history",
+          },
+        },
         role: "assistant",
       },
       {
@@ -285,6 +333,11 @@ describe("provider-bridge-ai-sdk", () => {
       finishReason: "stop",
       parts: [
         {
+          providerMetadata: {
+            anthropic: {
+              signature: "sig-result",
+            },
+          },
           redacted: false,
           text: "thinking",
           type: "reasoning",
@@ -294,6 +347,11 @@ describe("provider-bridge-ai-sdk", () => {
             answer: "ready",
           },
           name: "answer",
+          providerMetadata: {
+            openai: {
+              encryptedContent: "enc-structured",
+            },
+          },
           type: "structured",
         },
       ],
@@ -504,6 +562,50 @@ describe("provider-bridge-ai-sdk", () => {
           inputTokens: 7,
           outputTokens: 2,
         },
+      },
+    ]);
+  });
+
+  test("preserves generated text provider metadata on canonical text parts", async () => {
+    const bridge = createAiSdkProviderBridge({
+      model: createMockModel({
+        async doGenerate() {
+          await Promise.resolve();
+          return createGenerateResult({
+            content: [
+              {
+                providerMetadata: {
+                  openai: {
+                    encryptedContent: "enc-text",
+                  },
+                },
+                text: "hello",
+                type: "text",
+              },
+            ],
+          });
+        },
+      }),
+    });
+
+    const response = await bridge.generate({
+      messages: [
+        {
+          parts: [{ text: "Hello", type: "text" }],
+          role: "user",
+        },
+      ],
+    });
+
+    expect(response.parts).toEqual([
+      {
+        providerMetadata: {
+          openai: {
+            encryptedContent: "enc-text",
+          },
+        },
+        text: "hello",
+        type: "text",
       },
     ]);
   });
@@ -963,6 +1065,85 @@ describe("provider-bridge-ai-sdk", () => {
       expect.arrayContaining([
         expect.objectContaining({
           parts: [{ text: "Hello from bridge", type: "text" }],
+          role: "assistant",
+        }),
+      ])
+    );
+  });
+
+  test("preserves streamed reasoning signatures on canonical assistant history", async () => {
+    const harness = createFakeKernelHarness();
+    const bridge = createAiSdkProviderBridge({
+      model: createMockModel({
+        async doStream() {
+          await Promise.resolve();
+          return {
+            stream: streamFromParts([
+              {
+                id: "reasoning-1",
+                type: "reasoning-start",
+              },
+              {
+                delta: "Thinking",
+                id: "reasoning-1",
+                providerMetadata: {
+                  anthropic: {
+                    signature: "sig-stream",
+                  },
+                },
+                type: "reasoning-delta",
+              },
+              {
+                id: "reasoning-1",
+                type: "reasoning-end",
+              },
+              {
+                finishReason: {
+                  raw: "stop",
+                  unified: "stop",
+                },
+                type: "finish",
+                usage: createUsage(4, 3),
+              },
+            ]),
+          };
+        },
+      }),
+    });
+    const runtime = createTuvrenRuntimeCore({
+      defaultDriverId: "react",
+      driverRegistry: createDriverRegistry([createReActDriver()]),
+      kernel: harness.kernel,
+    });
+    const thread = await runtime.createThread({});
+    const handle = runtime.executeTurn({
+      branchId: thread.branchId,
+      config: {
+        model: bridge,
+        name: "primary",
+      },
+      signal: {
+        parts: [{ text: "Think", type: "text" }],
+      },
+      threadId: thread.threadId,
+    });
+
+    await collectAsyncIterable(handle.events());
+    const committedMessages = await harness.readBranchMessages(thread.branchId);
+
+    expect(committedMessages).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          parts: [
+            {
+              providerMetadata: {
+                signature: "sig-stream",
+              },
+              redacted: false,
+              text: "Thinking",
+              type: "reasoning",
+            },
+          ],
           role: "assistant",
         }),
       ])

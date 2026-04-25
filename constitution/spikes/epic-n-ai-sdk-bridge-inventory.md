@@ -40,6 +40,10 @@ without rediscovering AI SDK provider behavior.
   - assistant messages map from text, reasoning, file, and client-executed
     tool-call/tool-result parts
   - tool messages map from durable `tool_result` parts
+  - assistant message `providerMetadata` and supported content-part
+    `providerMetadata` replay through AI SDK `providerOptions` on the matching
+    prompt message or prompt part so provider continuity tokens survive prompt
+    history
 - Structured output:
   - outbound structured requests use AI SDK JSON response format
   - inbound structured output is synthesized from returned JSON text and
@@ -49,12 +53,18 @@ without rediscovering AI SDK provider behavior.
 - Non-stream output mapping:
   - supported AI SDK content: text, reasoning, file, and client-executed
     `tool-call`
+  - canonical generated text, reasoning, file, tool-call, and synthesized
+    structured parts preserve AI SDK `providerMetadata` where the shared
+    durable content seam exposes a matching field
   - response metadata, warnings, sources, and detailed usage stay under
     `providerMetadata.aiSdkBridge`
 - Stream mapping:
   - `text-*` maps to `text_delta`, or to synthesized `structured_delta` /
     `structured_done` when a structured response format is active
-  - `reasoning-*` maps to `reasoning_delta` / `reasoning_done`
+  - `reasoning-*` maps to `reasoning_delta` / `reasoning_done`, and
+    Anthropic-style streamed reasoning signatures cross the shared stream seam
+    through `reasoning_delta.signature` so ReAct can persist them on canonical
+    reasoning parts
   - `tool-input-*` plus client-executed complete `tool-call` map to the
     canonical `tool_call_*` stream chunks, and `tool-input-end` may synthesize
     `tool_call_done` from buffered JSON input when the provider does not send a
@@ -66,6 +76,9 @@ without rediscovering AI SDK provider behavior.
     of duplicating or mutating a canonical tool call
   - `stream-start`, `response-metadata`, `source`, `raw`, and detailed usage are
     preserved under finish metadata
+  - streamed non-signature part metadata that cannot cross the current shared
+    `ProviderStreamChunk` seam remains captured under finish
+    `providerMetadata.aiSdkBridge.streamPartMetadata`
 
 ## Explicit Unsupported Surfaces
 - Provider-executed tools remain out of scope in Epic N:

@@ -104,6 +104,7 @@ interface GenerateResultState {
   responseFormat?: StructuredOutputRequest;
   sources: unknown[];
   structuredChunks: string[];
+  structuredProviderMetadata?: Record<string, unknown>;
 }
 
 interface StreamMappingState {
@@ -397,12 +398,7 @@ function handleReasoningStreamPart(
     case "reasoning-start":
       return [];
     case "reasoning-delta":
-      return [
-        {
-          text: part.delta,
-          type: "reasoning_delta",
-        },
-      ];
+      return [createReasoningDeltaChunk(part)];
     case "reasoning-end":
       return [
         {
@@ -412,6 +408,22 @@ function handleReasoningStreamPart(
     default:
       return undefined;
   }
+}
+
+function createReasoningDeltaChunk(
+  part: Extract<LanguageModelV3StreamPart, { type: "reasoning-delta" }>
+): Extract<ProviderStreamChunk, { type: "reasoning_delta" }> {
+  const signature = readReasoningStreamSignature(part.providerMetadata);
+
+  return {
+    ...(signature === undefined
+      ? {}
+      : {
+          signature,
+        }),
+    text: part.delta,
+    type: "reasoning_delta",
+  };
 }
 
 function handleToolStreamPart(
@@ -951,8 +963,17 @@ function mapPromptMessage(message: TuvrenMessage): LanguageModelV3Message {
     }
 
     case "assistant": {
+      const providerOptions = mapPromptProviderOptions(
+        message.providerMetadata
+      );
+
       return {
         content: message.parts.map((part) => mapAssistantPart(part)),
+        ...(providerOptions === undefined
+          ? {}
+          : {
+              providerOptions,
+            }),
         role: "assistant",
       };
     }
@@ -979,13 +1000,25 @@ function mapPromptMessage(message: TuvrenMessage): LanguageModelV3Message {
 function mapUserPart(part: TuvrenPromptPart) {
   switch (part.type) {
     case "text": {
+      const providerOptions = mapPromptProviderOptions(part.providerMetadata);
+
       return {
+        ...(providerOptions === undefined
+          ? {}
+          : {
+              providerOptions,
+            }),
         text: part.text,
         type: "text",
-      } satisfies LanguageModelV3Message["content"][number];
+      } satisfies Extract<
+        LanguageModelV3Message["content"][number],
+        { type: "text" }
+      >;
     }
 
     case "file": {
+      const providerOptions = mapPromptProviderOptions(part.providerMetadata);
+
       return {
         data: cloneFileData(part.data),
         ...(typeof part.filename === "string"
@@ -994,15 +1027,33 @@ function mapUserPart(part: TuvrenPromptPart) {
             }
           : {}),
         mediaType: part.mediaType,
+        ...(providerOptions === undefined
+          ? {}
+          : {
+              providerOptions,
+            }),
         type: "file",
-      } satisfies LanguageModelV3Message["content"][number];
+      } satisfies Extract<
+        LanguageModelV3Message["content"][number],
+        { type: "file" }
+      >;
     }
 
     case "structured": {
+      const providerOptions = mapPromptProviderOptions(part.providerMetadata);
+
       return {
+        ...(providerOptions === undefined
+          ? {}
+          : {
+              providerOptions,
+            }),
         text: JSON.stringify(part.data),
         type: "text",
-      } satisfies LanguageModelV3Message["content"][number];
+      } satisfies Extract<
+        LanguageModelV3Message["content"][number],
+        { type: "text" }
+      >;
     }
 
     default: {
@@ -1021,20 +1072,42 @@ function mapUserPart(part: TuvrenPromptPart) {
 function mapAssistantPart(part: TuvrenPromptPart) {
   switch (part.type) {
     case "text": {
+      const providerOptions = mapPromptProviderOptions(part.providerMetadata);
+
       return {
+        ...(providerOptions === undefined
+          ? {}
+          : {
+              providerOptions,
+            }),
         text: part.text,
         type: "text",
-      } satisfies LanguageModelV3Message["content"][number];
+      } satisfies Extract<
+        LanguageModelV3Message["content"][number],
+        { type: "text" }
+      >;
     }
 
     case "reasoning": {
+      const providerOptions = mapPromptProviderOptions(part.providerMetadata);
+
       return {
+        ...(providerOptions === undefined
+          ? {}
+          : {
+              providerOptions,
+            }),
         text: part.text,
         type: "reasoning",
-      } satisfies LanguageModelV3Message["content"][number];
+      } satisfies Extract<
+        LanguageModelV3Message["content"][number],
+        { type: "reasoning" }
+      >;
     }
 
     case "file": {
+      const providerOptions = mapPromptProviderOptions(part.providerMetadata);
+
       return {
         data: cloneFileData(part.data),
         ...(typeof part.filename === "string"
@@ -1043,17 +1116,35 @@ function mapAssistantPart(part: TuvrenPromptPart) {
             }
           : {}),
         mediaType: part.mediaType,
+        ...(providerOptions === undefined
+          ? {}
+          : {
+              providerOptions,
+            }),
         type: "file",
-      } satisfies LanguageModelV3Message["content"][number];
+      } satisfies Extract<
+        LanguageModelV3Message["content"][number],
+        { type: "file" }
+      >;
     }
 
     case "tool_call": {
+      const providerOptions = mapPromptProviderOptions(part.providerMetadata);
+
       return {
         input: cloneMetadataValue(part.input),
+        ...(providerOptions === undefined
+          ? {}
+          : {
+              providerOptions,
+            }),
         toolCallId: part.callId,
         toolName: part.name,
         type: "tool-call",
-      } satisfies LanguageModelV3Message["content"][number];
+      } satisfies Extract<
+        LanguageModelV3Message["content"][number],
+        { type: "tool-call" }
+      >;
     }
 
     case "tool_result": {
@@ -1061,10 +1152,20 @@ function mapAssistantPart(part: TuvrenPromptPart) {
     }
 
     case "structured": {
+      const providerOptions = mapPromptProviderOptions(part.providerMetadata);
+
       return {
+        ...(providerOptions === undefined
+          ? {}
+          : {
+              providerOptions,
+            }),
         text: JSON.stringify(part.data),
         type: "text",
-      } satisfies LanguageModelV3Message["content"][number];
+      } satisfies Extract<
+        LanguageModelV3Message["content"][number],
+        { type: "text" }
+      >;
     }
 
     default: {
@@ -1082,12 +1183,22 @@ function mapAssistantPart(part: TuvrenPromptPart) {
 function mapToolResultPart(
   part: Extract<TuvrenPromptPart, { type: "tool_result" }>
 ) {
+  const providerOptions = mapPromptProviderOptions(part.providerMetadata);
+
   return {
     output: mapToolResultOutput(part),
+    ...(providerOptions === undefined
+      ? {}
+      : {
+          providerOptions,
+        }),
     toolCallId: part.callId,
     toolName: part.name,
     type: "tool-result",
-  } satisfies LanguageModelV3Message["content"][number];
+  } satisfies Extract<
+    LanguageModelV3Message["content"][number],
+    { type: "tool-result" }
+  >;
 }
 
 function mapToolResultOutput(
@@ -1136,6 +1247,7 @@ function mapGenerateResult(
     responseFormat,
     sources: [],
     structuredChunks: [],
+    structuredProviderMetadata: undefined,
   };
 
   for (const contentPart of result.content) {
@@ -1177,11 +1289,7 @@ function appendGenerateContentPart(
       appendGenerateTextPart(contentPart, state);
       return;
     case "reasoning":
-      state.parts.push({
-        redacted: false,
-        text: contentPart.text,
-        type: "reasoning",
-      });
+      state.parts.push(mapGeneratedReasoningPart(contentPart));
       return;
     case "file":
       state.parts.push(mapGeneratedFilePart(contentPart));
@@ -1225,14 +1333,15 @@ function appendGenerateTextPart(
   state: GenerateResultState
 ): void {
   if (state.responseFormat === undefined) {
-    state.parts.push({
-      text: contentPart.text,
-      type: "text",
-    });
+    state.parts.push(mapGeneratedTextPart(contentPart));
     return;
   }
 
   state.structuredChunks.push(contentPart.text);
+  state.structuredProviderMetadata = mergeProviderMetadataRecords(
+    state.structuredProviderMetadata,
+    sanitizeRecord(contentPart.providerMetadata)
+  );
 }
 
 function mapGeneratedToolCallPart(
@@ -1286,8 +1395,48 @@ function finalizeGenerateStructuredOutput(state: GenerateResultState): void {
       : {
           name: state.responseFormat.name,
         }),
+    ...(state.structuredProviderMetadata === undefined
+      ? {}
+      : {
+          providerMetadata: state.structuredProviderMetadata,
+        }),
     type: "structured",
   });
+}
+
+function mapGeneratedTextPart(
+  contentPart: Extract<
+    LanguageModelV3GenerateResult["content"][number],
+    { type: "text" }
+  >
+): Extract<TuvrenModelResponse["parts"][number], { type: "text" }> {
+  return {
+    ...(contentPart.providerMetadata === undefined
+      ? {}
+      : {
+          providerMetadata: sanitizeRecord(contentPart.providerMetadata),
+        }),
+    text: contentPart.text,
+    type: "text",
+  };
+}
+
+function mapGeneratedReasoningPart(
+  contentPart: Extract<
+    LanguageModelV3GenerateResult["content"][number],
+    { type: "reasoning" }
+  >
+): Extract<TuvrenModelResponse["parts"][number], { type: "reasoning" }> {
+  return {
+    ...(contentPart.providerMetadata === undefined
+      ? {}
+      : {
+          providerMetadata: sanitizeRecord(contentPart.providerMetadata),
+        }),
+    redacted: false,
+    text: contentPart.text,
+    type: "reasoning",
+  };
 }
 
 function buildGenerateProviderMetadata(
@@ -1763,6 +1912,14 @@ function captureStreamPartMetadata(
   );
 }
 
+function mapPromptProviderOptions(
+  providerMetadata: Record<string, unknown> | undefined
+): SharedV3ProviderOptions | undefined {
+  const sanitized = sanitizeRecord(providerMetadata);
+
+  return sanitized === undefined ? undefined : cloneProviderOptions(sanitized);
+}
+
 function sanitizeGenerateResponseMetadata(
   response: LanguageModelV3GenerateResult["response"]
 ) {
@@ -1821,6 +1978,61 @@ function buildProviderMetadata(input: {
   }
 
   return Object.keys(metadata).length === 0 ? undefined : metadata;
+}
+
+function mergeProviderMetadataRecords(
+  current: Record<string, unknown> | undefined,
+  next: Record<string, unknown> | undefined
+): Record<string, unknown> | undefined {
+  if (current === undefined) {
+    return next === undefined ? undefined : cloneMetadataValue(next);
+  }
+
+  if (next === undefined) {
+    return current;
+  }
+
+  const merged = cloneMetadataValue(current);
+
+  for (const [providerName, providerValue] of Object.entries(next)) {
+    const existingValue = merged[providerName];
+
+    if (isPlainObject(existingValue) && isPlainObject(providerValue)) {
+      const mergedProviderMetadata: Record<string, unknown> = {};
+
+      for (const [key, value] of Object.entries(existingValue)) {
+        mergedProviderMetadata[key] = cloneMetadataValue(value);
+      }
+
+      for (const [key, value] of Object.entries(providerValue)) {
+        mergedProviderMetadata[key] = cloneMetadataValue(value);
+      }
+
+      merged[providerName] = mergedProviderMetadata;
+      continue;
+    }
+
+    merged[providerName] = cloneMetadataValue(providerValue);
+  }
+
+  return merged;
+}
+
+function readReasoningStreamSignature(
+  providerMetadata: Record<string, unknown> | undefined
+): string | undefined {
+  const sanitized = sanitizeRecord(providerMetadata);
+
+  if (sanitized === undefined) {
+    return undefined;
+  }
+
+  const anthropicMetadata = sanitized.anthropic;
+
+  return isPlainObject(anthropicMetadata) &&
+    typeof anthropicMetadata.signature === "string"
+    ? anthropicMetadata.signature
+    : undefined;
 }
 
 function sanitizeRecord(
