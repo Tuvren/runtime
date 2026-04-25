@@ -14,6 +14,7 @@ Align behavior changes with `docs/` and implementation changes with `constitutio
 - Read `docs/KrakenKernelSpecification.md` before changing kernel behavior
 - Read `docs/KrakenFrameworkSpecification.md` before changing framework behavior
 - Use `constitution/TechSpec.md` and `constitution/Tasks.md` to keep implementation and active scope aligned
+- When a constitution-scoped epic is fully closed in repo reality, update the matching `constitution/Tasks.md` and `constitution/TechSpec.md` status language in the same change and add or refresh any closure inventory under `constitution/spikes/` that future epics depend on
 - When a shared contract adds a host-owned control or policy seam (for example `loopPolicy` or handoff helpers), either wire it through the baseline ReAct/runtime path in the same change or explicitly document the limitation in `docs/` and `constitution/`
 
 Do not invent behavior, contracts, or scope that conflict with those sources.
