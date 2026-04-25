@@ -1,22 +1,29 @@
 # Engineering Execution Plan
 
 ## 0. Version History & Changelog
+- v0.7.0 - Activated sequential Epics N-Q for the post-ReAct implementation line: `LanguageModelV3` AI SDK provider bridge, host stream protocol adapters, playground host harness, and testkit/release hardening.
 - v0.6.2 - Closed Epic M against brownfield repo reality, added the explicit tool-and-approval inventory artifact, and archived Epics K-M so the next planning pass can start from Epic N.
 - v0.6.1 - Reframed Epic L as a brownfield closure and Epic M readiness pass, adding an explicit parity inventory artifact and handoff-focused acceptance criteria while preserving the existing epic IDs and dependency order.
 - v0.6.0 - Selected bounded active Epics K, L, and M for ReAct loop completion, streaming/provider semantics, and tool/approval integration while deferring AI SDK bridge and host protocol work as next-focus topics.
 - ... [Older history truncated, refer to git logs]
 
 ## 1. Executive Summary & Active Critical Path
-- **Total Active Story Points:** 0
-- **Critical Path:** None. Epics K-M are closed in current repo reality; the next critical path begins only when a separate planning pass activates Epic N.
-- **Planning Assumptions:** Epics J-M are complete. The canonical ReAct driver/provider/runtime-core path is now implementation-proven, while AI SDK bridge and host protocol work remain intentionally deferred.
+- **Total Active Story Points:** 79
+- **Critical Path:** KRT-N001 -> KRT-N002 -> KRT-N003 -> KRT-N004 -> KRT-N005 -> KRT-N006 -> KRT-N007 -> KRT-O001 -> KRT-O002 -> KRT-O003 -> KRT-O004 -> KRT-O005 -> KRT-O006 -> KRT-P001 -> KRT-P002 -> KRT-P003 -> KRT-P004 -> KRT-P005 -> KRT-P006 -> KRT-Q001 -> KRT-Q002 -> KRT-Q003 -> KRT-Q004 -> KRT-Q005 -> KRT-Q006
+- **Planning Assumptions:** Epics A-M are closed in current repo reality. TechSpec v0.5.0 locks the baseline AI SDK bridge to `LanguageModelV3` / `ProviderV3` from `@ai-sdk/provider@3.0.8`. Epics N-Q are intentionally sequential: provider bridge first, stream adapters second, playground host third, hardening fourth.
 
 ### Brownfield Continuity Note
 - The current codebase already contains the workspace scaffold, shared core types, kernel protocol package, memory backend, SQLite backend, kernel testkit, shared framework contract packages, provider contract package, `runtime-core`, and the ReAct Driver foundation package.
-- Current repository reality now includes closed Epic K, L, and M behavior with explicit closure artifacts in `constitution/spikes/epic-k-react-loop-cancellation-inventory.md`, `constitution/spikes/epic-l-parity-inventory.md`, and `constitution/spikes/epic-m-tool-approval-gap-inventory.md`.
-- Shared runtime-core and ReAct driver validation now covers loop closure, streaming/provider semantics, tool continuation, approval pause/resume, edited/rejected decisions, and durable audit trace behavior for edited approvals.
-- The graph and ticket list below are retained as archived execution traceability for K-M; they no longer represent live active implementation scope.
-- AI SDK bridge and host protocol/playground work remain intentionally deferred until a new planning pass activates them.
+- Current repository reality includes closed Epic K, L, and M behavior with explicit closure artifacts in `constitution/spikes/epic-k-react-loop-cancellation-inventory.md`, `constitution/spikes/epic-l-parity-inventory.md`, and `constitution/spikes/epic-m-tool-approval-gap-inventory.md`.
+- The missing active target packages are `@tuvren/provider-bridge-ai-sdk`, `@tuvren/stream-core`, `@tuvren/stream-sse`, `@tuvren/stream-agui`, the testkit packages under `boundaries/framework/testkit` and `boundaries/providers/testkit`, the local playground host harness, and release/verification scripts named in TechSpec.
+- Planning verification confirmed `ai@6.0.142` and `@ai-sdk/provider@3.0.8` are available and that `@ai-sdk/provider@3.0.8` exports `LanguageModelV3`, `ProviderV3`, `LanguageModelV3CallOptions`, `LanguageModelV3GenerateResult`, and `LanguageModelV3StreamPart`.
+- `bun run typecheck` passed before this planning update; this plan changes constitution artifacts only.
+
+### Sequential Scope Rule
+- Epic O must not begin until Epic N closes.
+- Epic P must not begin until Epic O closes.
+- Epic Q must not begin until Epic P closes.
+- Inside each epic, ticket dependencies are linear unless a future planning revision explicitly changes this file and the TechSpec together.
 
 ### Planning Heuristic
 - Prefer epic slices that look likely to land comfortably below roughly `5,000` lines of new code and treat roughly `10,000` lines as a warning threshold.
@@ -28,13 +35,17 @@
 - This section uses "iteration strategy" only because the planning framework requires that heading; the content below is dependency phasing and scope partitioning, not a commitment to Scrum-style iterations.
 
 ### Current Active Scope
-- No active implementation epic is open in this plan revision.
-- Epics K-M are archived as complete and validated; the next active scope begins with Epic N when the repo is ready to activate provider-bridge work.
+- Epic N implements the AI SDK provider bridge baseline using `LanguageModelV3` / `ProviderV3` only.
+- Epic O implements host stream protocol adapters over canonical `TuvrenStreamEvent` output.
+- Epic P implements the local TypeScript playground host harness after the adapter path exists.
+- Epic Q extracts testkits and hardens release, package export, and Bun/Node portability checks.
 
 ### Future / Deferred Scope
-- Epic N will focus next on the AI SDK provider bridge baseline after K-M prove the canonical driver/provider path. It must begin with compatibility verification for the pinned `ai@6.0.142` and `@ai-sdk/provider@3.0.8` surface before bridge implementation.
-- Epic O will focus next on host stream protocol surfaces and playground/host experience after the provider bridge exists. Host protocol adapters translate canonical `TuvrenStreamEvent` output; they do not define model streaming semantics.
-- Future later epics may add additional concrete drivers beyond ReAct, peer official backends beyond memory and SQLite, and production-grade host surfaces beyond the first playground baseline.
+- `LanguageModelV2` / `ProviderV2` compatibility is deferred.
+- AI SDK agent loops, AI SDK UI message protocols, AI SDK transport helpers, LangChain bridges, provider-native tool support, and first-class Tuvren provider packages are deferred.
+- ACP or any additional host protocol beyond SSE and AG-UI is deferred until a future TechSpec revision names it.
+- Future concrete drivers beyond ReAct and official peer backends beyond memory/SQLite are deferred beyond Epic Q.
+- Deno portability checks are deferred until public package surfaces stabilize enough to avoid testing scaffolding churn.
 
 ### Archived or Already Completed Scope
 - Epic A delivered the root workspace scaffold and boundary-first monorepo structure.
@@ -54,194 +65,362 @@
 ## 3. Build Order (Mermaid)
 ```mermaid
 flowchart LR
-  KRTK001[KRT-K001 ReAct Loop and Cancellation Semantics Inventory] --> KRTK002[KRT-K002 ReAct Resolution Policy Completion]
-  KRTK002 --> KRTK003[KRT-K003 Runtime-Core Loop Integration Closure]
-  KRTK002 --> KRTK004[KRT-K004 Loop Cancellation and Partial Output Boundaries]
-  KRTK003 --> KRTL001[KRT-L001 Stream/Generate Parity Characterization]
-  KRTK004 --> KRTL001
-  KRTL001 --> KRTL002[KRT-L002 Provider Stream Accumulator Hardening]
-  KRTL002 --> KRTL003[KRT-L003 Assistant Event Reconciliation and Structured Output Streaming]
-  KRTL002 --> KRTL004[KRT-L004 Provider Error and Opaque Metadata Preservation]
-  KRTL003 --> KRTM001[KRT-M001 Tool and Approval Gap Inventory]
-  KRTL004 --> KRTM001
-  KRTM001 --> KRTM002[KRT-M002 Tool Result Continuation]
-  KRTM002 --> KRTM003[KRT-M003 Approval Pause and Exact Resume]
-  KRTM003 --> KRTM004[KRT-M004 Edit/Reject and Partial Batch Recovery]
-  KRTM004 --> KRTM005[KRT-M005 Tool Governance Integration Closure]
+  KRTN001[KRT-N001 LanguageModelV3 Bridge Contract Lock] --> KRTN002[KRT-N002 Bridge Package Scaffold and Dependency Wiring]
+  KRTN002 --> KRTN003[KRT-N003 Tuvren-to-LanguageModelV3 Prompt Mapping]
+  KRTN003 --> KRTN004[KRT-N004 LanguageModelV3 Generate Result Mapping]
+  KRTN004 --> KRTN005[KRT-N005 LanguageModelV3 Stream Mapping]
+  KRTN005 --> KRTN006[KRT-N006 ReAct Integration and Bridge Fixture Coverage]
+  KRTN006 --> KRTN007[KRT-N007 Provider Bridge Closure Inventory]
+  KRTN007 --> KRTO001[KRT-O001 Stream Adapter Protocol Inventory]
+  KRTO001 --> KRTO002[KRT-O002 Stream-Core Adapter Utilities]
+  KRTO002 --> KRTO003[KRT-O003 SSE Adapter Baseline]
+  KRTO003 --> KRTO004[KRT-O004 AG-UI Adapter Baseline]
+  KRTO004 --> KRTO005[KRT-O005 Runtime Stream Adapter Integration Coverage]
+  KRTO005 --> KRTO006[KRT-O006 Stream Adapter Closure Inventory]
+  KRTO006 --> KRTP001[KRT-P001 Playground Host Scope Inventory]
+  KRTP001 --> KRTP002[KRT-P002 Playground Package Scaffold]
+  KRTP002 --> KRTP003[KRT-P003 Thread Turn and Backend Host Flows]
+  KRTP003 --> KRTP004[KRT-P004 Streaming Controls and Approval Host Flows]
+  KRTP004 --> KRTP005[KRT-P005 Persistent Scenario Matrix]
+  KRTP005 --> KRTP006[KRT-P006 Playground Closure Inventory]
+  KRTP006 --> KRTQ001[KRT-Q001 Hardening Gap Inventory]
+  KRTQ001 --> KRTQ002[KRT-Q002 Provider Bridge Testkit Extraction]
+  KRTQ002 --> KRTQ003[KRT-Q003 Framework Adapter Testkit Extraction]
+  KRTQ003 --> KRTQ004[KRT-Q004 Release and Verify Tooling]
+  KRTQ004 --> KRTQ005[KRT-Q005 Bun and Node Portability Matrix]
+  KRTQ005 --> KRTQ006[KRT-Q006 Post-ReAct Implementation Line Closure]
 ```
 
 ## 4. Ticket List
-### Epic K — ReAct Loop Completion (RLC)
+### Epic N - AI SDK Provider Bridge Baseline (APB)
 
-**KRT-K001 ReAct Loop and Cancellation Semantics Inventory**
-- **Type:** Spike
-- **Effort:** 3
-- **Dependencies:** None
-- **Capability / Contract Mapping:** PRD `CAP-P0-004`, `CAP-P0-005`, `CAP-P0-019`, `CAP-P0-033`, `CAP-P1-034`; Architecture `§2`, `§4.1`; TechSpec `§4.6`, `§5.4.1`; Framework Spec `§4`, `§7`
-- **Description:** Inventory the current `runtime-core` and ReAct driver foundation against the normative ReAct loop semantics, verify current lab/runtime patterns for streaming cancellation and partial assistant continuation, and identify the smallest implementation surface needed for loop completion.
-- **Acceptance Criteria (Gherkin):**
-```gherkin
-Given the ReAct foundation slice already exists
-When the loop gap inventory is completed
-Then the repository records the missing loop behaviors, the external cancellation/partial-output patterns considered, the files or packages that own each behavior, and any behavior that must remain deferred outside Epic K
-```
-
-**KRT-K002 ReAct Resolution Policy Completion**
-- **Type:** Feature
-- **Effort:** 3
-- **Dependencies:** KRT-K001
-- **Capability / Contract Mapping:** PRD `CAP-P0-004`, `CAP-P0-008`, `CAP-P0-012`, `CAP-P0-033`; Architecture `§2`, `§4.1`; TechSpec `§4.6`, `§5.4.1`; Framework Spec `§4`
-- **Description:** Complete the ReAct driver's iteration resolution policy so assistant responses deterministically map to continue, end, fail, pause, or the existing handoff contract shape without expanding handoff policy, tool execution, or host adapter work into Epic K.
-- **Acceptance Criteria (Gherkin):**
-```gherkin
-Given a ReAct driver iteration returns a provider-normalized assistant response
-When the response contains terminal content, tool calls, handoff intent, or a provider failure
-Then the driver returns the documented RuntimeResolution and driver result shape required by the shared runtime-core contract without adding new handoff behavior beyond the approved contract
-```
-
-**KRT-K003 Runtime-Core Loop Integration Closure**
-- **Type:** Feature
-- **Effort:** 5
-- **Dependencies:** KRT-K002
-- **Capability / Contract Mapping:** PRD `CAP-P0-001`, `CAP-P0-004`, `CAP-P0-006`, `CAP-P0-019`, `CAP-P0-020`; Architecture `§4.1`; TechSpec `§4.2`, `§4.5`, `§4.6`; Framework Spec `§4`, `§7`
-- **Description:** Close the runtime-core integration path for ReAct loop execution, including iteration events, checkpoint advancement, state snapshots where configured, and durable status transitions for normal loop completion.
-- **Acceptance Criteria (Gherkin):**
-```gherkin
-Given a host executes a turn through runtime-core with the ReAct driver
-When the driver completes one or more iterations without tool approval pauses
-Then runtime-core emits canonical lifecycle events, commits the expected checkpoints, advances the Turn head, and reports the final durable runtime status
-```
-
-**KRT-K004 Loop Cancellation and Partial Output Boundaries**
-- **Type:** Feature
-- **Effort:** 3
-- **Dependencies:** KRT-K001, KRT-K002
-- **Capability / Contract Mapping:** PRD `CAP-P0-004`, `CAP-P0-005`, `CAP-P0-008`, `CAP-P0-019`; Architecture `§1.4`, `§4.1`; TechSpec `§4.5`, `§4.6`; Framework Spec `§7`
-- **Description:** Define and implement the cancellation and partial-output handling required for ReAct loop correctness, using the KRT-K001 cancellation findings and preserving already-accumulated assistant content as later model-visible durable context when it is safe to do so.
-- **Acceptance Criteria (Gherkin):**
-```gherkin
-Given a host cancels an active ReAct turn during loop execution
-When the driver has partial assistant output or no assistant output
-Then the runtime records the documented failed or partial status, preserves already-accumulated assistant content as durable model-visible context when present, emits the canonical error and turn-end events, and does not continue the loop after cancellation
-```
-
-### Epic L — ReAct Streaming and Provider Semantics (RSP)
-
-**KRT-L001 Stream/Generate Parity Characterization**
-- **Type:** Spike
-- **Effort:** 3
-- **Dependencies:** KRT-K003, KRT-K004
-- **Capability / Contract Mapping:** PRD `CAP-P0-012`, `CAP-P0-020`, `CAP-P0-030`; Architecture `§2`, `§5`; TechSpec `§4.4`, `§4.5`, `§5.4.1`; Framework Spec `§3`, `§6`
-- **Description:** Record the current brownfield parity matrix in `constitution/spikes/epic-l-parity-inventory.md`, covering generate and stream equivalence for text, reasoning, structured output, file content, live tool-call previews, finish reasons, usage, and response-level or part-level opaque metadata, plus the provider-shaped continuity fields and Epic M handoff gates that must remain stable without inventing a normalized Tuvren metadata schema.
-- **Acceptance Criteria (Gherkin):**
-```gherkin
-Given the ReAct driver supports both provider.generate and provider.stream modes
-When parity characterization is completed
-Then `constitution/spikes/epic-l-parity-inventory.md` records which canonical assistant events and durable response fields must match across generated and streamed provider responses, which OpenAI, Anthropic, and Google/Gemini metadata fields must be preserved opaquely, and which invariants Epic M may assume for durable tool-call identity, partial cancellation boundaries, and synthesized afterIteration responses
-```
-
-**KRT-L002 Provider Stream Accumulator Hardening**
-- **Type:** Feature
-- **Effort:** 5
-- **Dependencies:** KRT-L001
-- **Capability / Contract Mapping:** PRD `CAP-P0-012`, `CAP-P0-020`, `CAP-P1-021`; Architecture `§2`; TechSpec `§4.4`, `§4.5`; Framework Spec `§3.3`, `§3.5`, `§6.3`
-- **Description:** Close the remaining ReAct stream accumulator gaps so normalized provider chunks produce valid canonical events and a matching durable `TuvrenModelResponse` across text, reasoning, structured output, file, and tool-call content, including final-only structured or tool-call synthesis, finish-reason and usage preservation, and cancellation boundaries that avoid creating orphan executable tool work.
-- **Acceptance Criteria (Gherkin):**
-```gherkin
-Given a provider stream yields normalized chunks for assistant content
-When the ReAct stream accumulator finalizes the stream
-Then the live event sequence and durable model response contain equivalent assistant content, live tool-call previews, finish reason, usage, and opaque provider metadata, final-only structured or tool-call chunks synthesize the missing canonical delta events, and cancellation preserves only the documented safe partial assistant content
-```
-
-**KRT-L003 Assistant Event Reconciliation and Structured Output Streaming**
-- **Type:** Feature
-- **Effort:** 5
-- **Dependencies:** KRT-L002
-- **Capability / Contract Mapping:** PRD `CAP-P0-012`, `CAP-P0-020`, `CAP-P0-023`; Architecture `§2`, `§5`; TechSpec `§4.4`, `§4.5`, `§4.6`; Framework Spec `§3.5`, `§6.5`
-- **Description:** Close assistant-stream validation and generated-response parity for runtime-core, including structured output delta or done behavior, generated-response event synthesis, aroundModel post-stream divergence, and invalid or incomplete stream rejection, while keeping the `assistantEventReconciliation` exception narrow enough that Epic M can treat assistant tool calls as durable and unambiguous.
-- **Acceptance Criteria (Gherkin):**
-```gherkin
-Given a ReAct provider call emits assistant content events before the durable assistant message is finalized
-When runtime-core validates the driver result
-Then matching streams are accepted, generated responses synthesize the same canonical assistant event shapes expected from streaming, documented aroundModel divergence is accepted only in the allowed case, and invalid or incomplete assistant streams fail with a typed runtime error before Epic M-facing tool continuation can observe an ambiguous assistant message
-```
-
-**KRT-L004 Provider Error and Opaque Metadata Preservation**
-- **Type:** Feature
-- **Effort:** 3
-- **Dependencies:** KRT-L002
-- **Capability / Contract Mapping:** PRD `CAP-P0-005`, `CAP-P0-012`, `CAP-P0-020`, `CAP-P0-030`; Architecture `§1.3`, `§1.4`; TechSpec `§4.4`, `§4.6`; Framework Spec `§3`, `§6`
-- **Description:** Close provider error, cancellation, and opaque metadata preservation semantics across generate and stream modes so provider-shaped usage, metadata, and continuity artifacts survive on canonical assistant responses and synthesized hook-visible responses without being normalized into shared runtime or approval contracts.
-- **Acceptance Criteria (Gherkin):**
-```gherkin
-Given a provider returns usage, metadata, continuity artifacts, or an error in generate or stream mode
-When the ReAct driver maps the provider outcome
-Then successful outcomes preserve provider-shaped metadata on canonical assistant messages, parts, and synthesized afterIteration responses without inventing a normalized metadata schema, and failure outcomes surface typed provider or runtime errors without committing invalid assistant content or hiding provider failures behind invalid stream validation noise
-```
-
-### Epic M — ReAct Tool and Approval Integration (RTG)
-
-**KRT-M001 Host-Owned Tool Policy Gap Inventory**
+**KRT-N001 LanguageModelV3 Bridge Contract Lock**
 - **Type:** Spike
 - **Effort:** 2
-- **Dependencies:** KRT-L003, KRT-L004
-- **Capability / Contract Mapping:** PRD `CAP-P0-013`, `CAP-P0-014`, `CAP-P0-016`, `CAP-P0-017`, `CAP-P1-018`; Architecture `§4.2`; TechSpec `§4.3`, `§4.5`, `§4.6`, `§5.4.1`; Framework Spec `§6.4`, `§8`
-- **Description:** Inventory the current shared tool executor, approval context, ReAct tool-call result path, and resume behavior to identify the smallest implementation surface needed for durable tool/governance primitives while keeping approval continuation, execution-mode policy, and agent-facing explanation policy host-owned.
+- **Dependencies:** None
+- **Capability / Contract Mapping:** PRD `CAP-P0-012`, `CAP-P0-030`, `CAP-P1-021`; Architecture `2`, `5`; TechSpec `4.4`, `5.4`, `5.4.1`; Framework Spec `3`, `6`
+- **Description:** Lock the exact bridge surface around `LanguageModelV3` / `ProviderV3`, including accepted call settings, prompt/message mappings, stream-part mappings, finish/usage mappings, metadata preservation, and explicit exclusions for `LanguageModelV2`, provider-native tools, AI SDK loops, UI messages, and transport helpers.
 - **Acceptance Criteria (Gherkin):**
 ```gherkin
-Given runtime-core already owns shared tool execution and approval mechanics
-When the tool and approval inventory is completed
-Then the repository records which missing behaviors belong to ReAct continuation, shared runtime-core execution, approval resume primitives, host-owned policy choices, and deferred host UI or provider-native tool work
+Given TechSpec v0.5.0 selects the AI SDK provider bridge baseline
+When the bridge contract inventory is completed
+Then the repository records the public factory surface, LanguageModelV3 prompt and result mappings, supported settings, metadata preservation rules, error codes, fixture matrix, and all deferred AI SDK surfaces that must not leak into shared runtime packages
 ```
 
-**KRT-M002 Tool Result Continuation**
+**KRT-N002 Bridge Package Scaffold and Dependency Wiring**
+- **Type:** Chore
+- **Effort:** 3
+- **Dependencies:** KRT-N001
+- **Capability / Contract Mapping:** PRD `CAP-P0-012`, `CAP-P0-030`; Architecture `5`; TechSpec `1`, `4.4`, `5.1`, `5.4`
+- **Description:** Create `boundaries/providers/implementations/typescript/bridge-ai-sdk` as `@tuvren/provider-bridge-ai-sdk`, wire Nx/package/tsconfig/build/test exports, and declare the pinned `ai@6.0.142` and `@ai-sdk/provider@3.0.8` dependencies through the repository package-management workflow.
+- **Acceptance Criteria (Gherkin):**
+```gherkin
+Given the bridge contract is locked
+When the bridge package is scaffolded
+Then the workspace exposes a buildable and testable provider bridge package with explicit ESM exports, pinned AI SDK dependencies, no CommonJS entrypoints, and no AI SDK imports from shared runtime or provider contract packages
+```
+
+**KRT-N003 Tuvren-to-LanguageModelV3 Prompt Mapping**
 - **Type:** Feature
 - **Effort:** 5
-- **Dependencies:** KRT-M001
-- **Capability / Contract Mapping:** PRD `CAP-P0-013`, `CAP-P0-014`; Architecture `§4.2`; TechSpec `§4.3`, `§4.6`; Framework Spec `§6.4`
-- **Description:** Complete the ReAct continuation path after tool calls so executed tool results are durably staged, incorporated into message history, and fed into the next model iteration without duplicating completed work.
+- **Dependencies:** KRT-N002
+- **Capability / Contract Mapping:** PRD `CAP-P0-012`, `CAP-P0-013`, `CAP-P0-030`; Architecture `2`, `5`; TechSpec `4.3`, `4.4`; Framework Spec `3.2`, `3.3`
+- **Description:** Implement Tuvren prompt, message, tool, structured-output, and config translation into `LanguageModelV3CallOptions`, including validation for recognized settings and rejection of malformed bridge configuration as `invalid_ai_sdk_bridge_config`.
 - **Acceptance Criteria (Gherkin):**
 ```gherkin
-Given a ReAct assistant message requests executable tool calls
-When runtime-core executes the tool batch and continues the turn
-Then completed and failed tool results are staged durably per call, emitted as canonical tool events, included in the next iteration context when the host chooses continuation, and not re-executed after the checkpoint advances
+Given a Tuvren prompt contains system, user, assistant, tool, file, reasoning, tool-call, tool-result, structured-output, and model configuration inputs
+When the AI SDK bridge prepares a LanguageModelV3 call
+Then it emits valid LanguageModelV3CallOptions, maps only supported Tuvren tool definitions to LanguageModelV3FunctionTool, preserves providerOptions and headers, and rejects malformed or unsupported bridge settings with a typed provider error
 ```
 
-**KRT-M003 Approval Pause and Exact Resume**
+**KRT-N004 LanguageModelV3 Generate Result Mapping**
 - **Type:** Feature
 - **Effort:** 5
-- **Dependencies:** KRT-M002
-- **Capability / Contract Mapping:** PRD `CAP-P0-005`, `CAP-P0-016`, `CAP-P0-017`, `CAP-P1-018`; Architecture `§4.2`; TechSpec `§4.3`, `§4.5`, `§4.6`; Framework Spec `§8`, `§10`
-- **Description:** Complete approval-gated ReAct tool execution so partial batches pause with durable approval state and can resume from the pause checkpoint according to explicit host decisions.
+- **Dependencies:** KRT-N003
+- **Capability / Contract Mapping:** PRD `CAP-P0-012`, `CAP-P0-020`, `CAP-P0-030`; Architecture `2`, `5`; TechSpec `4.4`, `4.5`; Framework Spec `3.5`, `6`
+- **Description:** Implement non-streaming `doGenerate` result conversion into `TuvrenModelResponse`, including text, reasoning, file, tool-call, tool-result, finish reason, usage, warnings, response metadata, provider metadata, and normalized error behavior.
 - **Acceptance Criteria (Gherkin):**
 ```gherkin
-Given a ReAct tool batch contains auto-approved and approval-gated calls
-When the runtime pauses for approval and later receives approval decisions
-Then already completed calls are not repeated, pending approved calls resume from the pause checkpoint, rejected calls are represented as durable agent-visible tool results, and host-owned continuation or stop policy is preserved through canonical approval events
+Given a LanguageModelV3 model returns a generate result
+When the AI SDK bridge maps the result into the Tuvren provider contract
+Then canonical content parts, finish reason, usage totals, provider metadata, warnings, and response metadata are preserved according to TechSpec, while unmapped AI SDK-specific fields remain opaque metadata rather than new Tuvren content variants
 ```
 
-**KRT-M004 Edit/Reject and Partial Batch Recovery**
+**KRT-N005 LanguageModelV3 Stream Mapping**
 - **Type:** Feature
 - **Effort:** 5
-- **Dependencies:** KRT-M003
-- **Capability / Contract Mapping:** PRD `CAP-P0-005`, `CAP-P0-014`, `CAP-P0-017`; Architecture `§1.4`, `§4.2`; TechSpec `§4.3`, `§4.6`; Kernel Spec `§5.2`; Framework Spec `§8`, `§10`
-- **Description:** Complete edited and rejected approval decisions plus partial batch recovery behavior so sensitive tool work remains traceable and recoverable without inventing host UI, continuation, or agent-facing explanation policy.
+- **Dependencies:** KRT-N004
+- **Capability / Contract Mapping:** PRD `CAP-P0-012`, `CAP-P0-020`, `CAP-P0-030`; Architecture `2`, `5`; TechSpec `4.4`, `4.5`; Framework Spec `3.3`, `6.3`
+- **Description:** Implement `ReadableStream<LanguageModelV3StreamPart>` consumption and conversion into `ProviderStreamChunk`, covering text, reasoning, structured output, tool input, complete tool calls, tool results, files, finish, raw metadata, cancellation, and error propagation.
 - **Acceptance Criteria (Gherkin):**
 ```gherkin
-Given a paused ReAct tool batch receives edited or rejected approval decisions
-When the runtime resumes or cancels the pending batch
-Then edited calls execute as calls with the approved edited input while preserving separate audit trace of the original and edited values, rejected calls become durable agent-visible tool results, and failed or interrupted batches preserve completed staged results for recovery
+Given a LanguageModelV3 model streams text, reasoning, structured output, tool input, complete tool calls, tool results, files, metadata, finish, and errors
+When the AI SDK bridge exposes the stream as Tuvren provider chunks
+Then the stream preserves ordering, cancellation behavior, provider metadata, final usage, and typed error normalization while producing only the ProviderStreamChunk variants allowed by the Tuvren provider contract
 ```
 
-**KRT-M005 Tool Governance Integration Closure**
+**KRT-N006 ReAct Integration and Bridge Fixture Coverage**
 - **Type:** Feature
 - **Effort:** 3
-- **Dependencies:** KRT-M004
-- **Capability / Contract Mapping:** PRD `CAP-P0-013`, `CAP-P0-014`, `CAP-P0-016`, `CAP-P0-017`, `CAP-P1-018`; Architecture `§4.2`, `§5`; TechSpec `§4.3`, `§4.5`, `§5.2`; Framework Spec `§8`
-- **Description:** Close integration coverage across host-selected sequential and parallel tool batches, approval pause/resume, cancellation while paused, per-call failures, event ordering, and durable context updates.
+- **Dependencies:** KRT-N005
+- **Capability / Contract Mapping:** PRD `CAP-P0-004`, `CAP-P0-012`, `CAP-P0-013`, `CAP-P0-020`; Architecture `4.1`, `5`; TechSpec `4.4`, `4.6`; Framework Spec `4`, `6`
+- **Description:** Prove that the bridge behaves as a normal `TuvrenProvider` in the ReAct/runtime-core path for generated and streamed responses, structured output, tool calls, provider failures, metadata, and cancellation.
 - **Acceptance Criteria (Gherkin):**
 ```gherkin
-Given the ReAct driver and shared runtime-core tool executor support tool continuation and approval resolution
-When the integration suite exercises host-selected sequential, host-selected parallel, approved, edited, rejected, cancelled, and per-call failed tool paths
-Then all paths preserve canonical event ordering, durable staged results, host-owned continuation policy, Turn head advancement when continuation is chosen, and runtime status semantics
+Given runtime-core executes the ReAct driver with an AI SDK bridge provider
+When generated and streamed fixture turns cover text, reasoning, structured output, tools, metadata, cancellation, and provider errors
+Then the runtime emits canonical events, stores durable assistant/tool context, preserves provider metadata, and does not require ReAct or runtime-core to import AI SDK types
+```
+
+**KRT-N007 Provider Bridge Closure Inventory**
+- **Type:** Chore
+- **Effort:** 2
+- **Dependencies:** KRT-N006
+- **Capability / Contract Mapping:** PRD `CAP-P0-012`, `CAP-P0-030`; Architecture `5`; TechSpec `4.4`, `5.3`, `5.4.1`
+- **Description:** Record Epic N closure evidence, fixture coverage, public exports, dependency pins, known limitations, and downstream assumptions in `constitution/spikes/epic-n-ai-sdk-bridge-inventory.md`.
+- **Acceptance Criteria (Gherkin):**
+```gherkin
+Given the AI SDK provider bridge implementation and tests are complete
+When Epic N is closed
+Then the closure inventory records implemented mappings, test coverage, dependency versions, deferred surfaces, downstream assumptions for Epic O, and any required TechSpec or Tasks status updates
+```
+
+### Epic O - Host Stream Protocol Adapters (HSA)
+
+**KRT-O001 Stream Adapter Protocol Inventory**
+- **Type:** Spike
+- **Effort:** 2
+- **Dependencies:** KRT-N007
+- **Capability / Contract Mapping:** PRD `CAP-P0-020`, `CAP-P0-023`, `CAP-P1-024`; Architecture `5`; TechSpec `4.5`, `4.7`, `5.4.1`; Framework Spec `6`, `9`
+- **Description:** Inventory the canonical `TuvrenStreamEvent` surface against SSE and AG-UI translation needs, lock the exact AG-UI package or protocol revision, identify lossy mappings and warning cases, and confirm ACP remains out of scope for this plan.
+- **Acceptance Criteria (Gherkin):**
+```gherkin
+Given Epic N has proven canonical provider-backed runtime events
+When stream adapter protocol inventory is completed
+Then the repository records the selected AG-UI revision, SSE framing rules, event mapping matrix, lossy translation warnings, fixture coverage plan, and explicit exclusion of ACP or additional host protocols
+```
+
+**KRT-O002 Stream-Core Adapter Utilities**
+- **Type:** Feature
+- **Effort:** 3
+- **Dependencies:** KRT-O001
+- **Capability / Contract Mapping:** PRD `CAP-P0-020`, `CAP-P1-024`; Architecture `5`; TechSpec `4.5`, `4.7`, `5.1`; Framework Spec `6`
+- **Description:** Implement `@tuvren/stream-core` with shared adapter types, event cloning/projection helpers, warning callbacks, fixture helpers, and transform utilities that do not alter runtime semantics.
+- **Acceptance Criteria (Gherkin):**
+```gherkin
+Given canonical TuvrenStreamEvent fixtures
+When stream-core transforms or projects events for adapter packages
+Then it preserves event order and meaning, reports adapter-local warnings through the configured callback, avoids mutating source events, and remains free of protocol-specific output dependencies
+```
+
+**KRT-O003 SSE Adapter Baseline**
+- **Type:** Feature
+- **Effort:** 3
+- **Dependencies:** KRT-O002
+- **Capability / Contract Mapping:** PRD `CAP-P0-020`, `CAP-P1-024`; Architecture `5`; TechSpec `4.5`, `4.7`; Framework Spec `6`, `9`
+- **Description:** Implement `@tuvren/stream-sse` with EventSource-compatible frame generation and `Response` helper support over canonical `TuvrenStreamEvent` streams.
+- **Acceptance Criteria (Gherkin):**
+```gherkin
+Given a host passes canonical TuvrenStreamEvent output into the SSE adapter
+When the adapter emits SSE frames or a Response
+Then each frame uses the source event type as the event name, serializes the complete canonical event as JSON data, preserves ordering and terminal errors, and respects stream cancellation/backpressure behavior
+```
+
+**KRT-O004 AG-UI Adapter Baseline**
+- **Type:** Feature
+- **Effort:** 5
+- **Dependencies:** KRT-O003
+- **Capability / Contract Mapping:** PRD `CAP-P0-020`, `CAP-P0-023`, `CAP-P1-024`; Architecture `5`; TechSpec `4.5`, `4.7`; Framework Spec `6`, `9`
+- **Description:** Implement `@tuvren/stream-agui` using the selected AG-UI revision, mapping lifecycle, message, text, reasoning, structured output, tool call, tool result, approval, state, custom, and error events as far as the protocol allows.
+- **Acceptance Criteria (Gherkin):**
+```gherkin
+Given a canonical runtime event stream contains lifecycle, assistant, tool, approval, state, custom, and error events
+When the AG-UI adapter translates the stream
+Then it emits AG-UI-compatible events for supported cases, preserves Tuvren source attribution where possible, reports documented warnings for lossy or unsupported mappings, and never invents runtime state that was not present in the canonical event stream
+```
+
+**KRT-O005 Runtime Stream Adapter Integration Coverage**
+- **Type:** Feature
+- **Effort:** 3
+- **Dependencies:** KRT-O004
+- **Capability / Contract Mapping:** PRD `CAP-P0-005`, `CAP-P0-020`, `CAP-P1-024`; Architecture `4.1`, `5`; TechSpec `4.1`, `4.5`, `4.7`; Framework Spec `6`, `8`, `9`
+- **Description:** Prove stream adapters against real `ExecutionHandle.events()` flows, including single-consumer behavior, cancellation, approval pause/resume, steering incorporation, tool execution, and provider-backed completion.
+- **Acceptance Criteria (Gherkin):**
+```gherkin
+Given runtime-core produces ExecutionHandle event streams for normal, cancelled, paused, resumed, steered, and failed turns
+When those streams are consumed through SSE and AG-UI adapters
+Then adapter output remains ordered, terminal status is visible, cancellation propagates, approval and steering events are represented, and adapters do not consume or replay streams in a way that violates the runtime contract
+```
+
+**KRT-O006 Stream Adapter Closure Inventory**
+- **Type:** Chore
+- **Effort:** 2
+- **Dependencies:** KRT-O005
+- **Capability / Contract Mapping:** PRD `CAP-P0-020`, `CAP-P1-024`; Architecture `5`; TechSpec `4.7`, `5.3`, `5.4.1`
+- **Description:** Record Epic O closure evidence, selected AG-UI revision, mapping matrix, package exports, fixture coverage, limitations, and downstream assumptions in `constitution/spikes/epic-o-stream-adapter-inventory.md`.
+- **Acceptance Criteria (Gherkin):**
+```gherkin
+Given the stream adapter packages and integration coverage are complete
+When Epic O is closed
+Then the closure inventory records implemented mappings, lossy cases, warnings, selected protocol versions, test coverage, downstream assumptions for Epic P, and any required TechSpec or Tasks status updates
+```
+
+### Epic P - Playground Host Harness (PHH)
+
+**KRT-P001 Playground Host Scope Inventory**
+- **Type:** Spike
+- **Effort:** 2
+- **Dependencies:** KRT-O006
+- **Capability / Contract Mapping:** PRD `CAP-P0-001`, `CAP-P0-005`, `CAP-P0-020`, `CAP-P0-023`; Architecture `1.4`, `4.1`, `5`; TechSpec `4.1`, `4.7`, `5.1`; Framework Spec `7`, `8`, `9`
+- **Description:** Define the local playground host harness scope, scenarios, environment variables, provider bridge configuration, backend choices, stream adapters, controls, and fixture mode boundaries without turning the harness into a production web app.
+- **Acceptance Criteria (Gherkin):**
+```gherkin
+Given Epic O has proven stream adapters
+When playground host scope inventory is completed
+Then the repository records supported runtime flows, provider configuration modes, backend matrix, stream adapter outputs, controls, fixture scenarios, non-goals, and host-owned authentication assumptions
+```
+
+**KRT-P002 Playground Package Scaffold**
+- **Type:** Chore
+- **Effort:** 3
+- **Dependencies:** KRT-P001
+- **Capability / Contract Mapping:** PRD `CAP-P0-001`, `CAP-P0-020`; Architecture `1.4`, `5`; TechSpec `4.7`, `5.1`
+- **Description:** Create `boundaries/hosts/implementations/typescript/playground` with package/Nx/tsconfig wiring, local scripts, fixtures, environment handling, and imports through public package surfaces.
+- **Acceptance Criteria (Gherkin):**
+```gherkin
+Given the playground scope is documented
+When the playground host harness is scaffolded
+Then it builds and runs through workspace tooling, reads provider/backend configuration from host-owned environment inputs, imports only public package surfaces, and includes deterministic fixture mode for local validation without provider credentials
+```
+
+**KRT-P003 Thread Turn and Backend Host Flows**
+- **Type:** Feature
+- **Effort:** 5
+- **Dependencies:** KRT-P002
+- **Capability / Contract Mapping:** PRD `CAP-P0-001`, `CAP-P0-004`, `CAP-P0-006`, `CAP-P0-019`; Architecture `1.2`, `4.1`; TechSpec `4.1`, `4.2`, `4.7`; Framework Spec `7`
+- **Description:** Implement playground flows for creating/getting threads, creating branches, executing turns, selecting memory or SQLite backends, and inspecting durable status and branch/head state.
+- **Acceptance Criteria (Gherkin):**
+```gherkin
+Given a developer runs the playground host harness with memory or SQLite backend configuration
+When they create a thread, create a branch, execute a turn, and inspect status
+Then the host path uses public runtime APIs, durable branch/head state is visible, backend-specific configuration stays outside runtime contracts, and fixture mode produces deterministic output
+```
+
+**KRT-P004 Streaming Controls and Approval Host Flows**
+- **Type:** Feature
+- **Effort:** 5
+- **Dependencies:** KRT-P003
+- **Capability / Contract Mapping:** PRD `CAP-P0-005`, `CAP-P0-013`, `CAP-P0-016`, `CAP-P0-017`, `CAP-P0-020`; Architecture `4.1`, `4.2`, `5`; TechSpec `4.1`, `4.3`, `4.5`, `4.7`; Framework Spec `6`, `8`, `9`
+- **Description:** Add host flows for consuming SSE and AG-UI adapter output, cancelling active turns, steering input into a run, resolving approvals, inspecting paused/completed/failed status, and verifying tool execution continuity.
+- **Acceptance Criteria (Gherkin):**
+```gherkin
+Given a playground turn streams assistant output and reaches host-controlled states
+When the host cancels, steers, resolves approvals, or observes completion/failure
+Then the harness shows canonical status transitions, adapter output, approval decisions, tool results, and durable continuation behavior without embedding authentication or provider-specific policy in runtime packages
+```
+
+**KRT-P005 Persistent Scenario Matrix**
+- **Type:** Feature
+- **Effort:** 3
+- **Dependencies:** KRT-P004
+- **Capability / Contract Mapping:** PRD `CAP-P0-006`, `CAP-P0-019`, `CAP-P0-020`, `CAP-P0-023`; Architecture `1.2`, `4.1`, `5`; TechSpec `3.4`, `3.5`, `4.7`; Framework Spec `7`, `8`
+- **Description:** Add scenario coverage for structured output, tool calls, provider metadata, approval pause/resume, SQLite reload, branch inspection, and fixture-provider operation.
+- **Acceptance Criteria (Gherkin):**
+```gherkin
+Given the playground supports memory and SQLite backends
+When persistent scenarios run for structured output, tools, metadata, approval resume, reload, and branch inspection
+Then the same public runtime behavior is observable after SQLite reload, fixture-provider scenarios stay deterministic, and provider-backed scenarios remain optional host configuration
+```
+
+**KRT-P006 Playground Closure Inventory**
+- **Type:** Chore
+- **Effort:** 2
+- **Dependencies:** KRT-P005
+- **Capability / Contract Mapping:** PRD `CAP-P0-001`, `CAP-P0-005`, `CAP-P0-020`; Architecture `1.4`, `5`; TechSpec `4.7`, `5.3`, `5.4.1`
+- **Description:** Record Epic P closure evidence, host flows, scenario matrix, known limitations, provider/backend setup notes, and downstream assumptions in `constitution/spikes/epic-p-playground-host-inventory.md`.
+- **Acceptance Criteria (Gherkin):**
+```gherkin
+Given the playground host harness and scenarios are complete
+When Epic P is closed
+Then the closure inventory records implemented host flows, deterministic fixture paths, optional provider-backed paths, backend reload behavior, limitations, downstream assumptions for Epic Q, and any required TechSpec or Tasks status updates
+```
+
+### Epic Q - Testkit, Portability, and Release Hardening (TPR)
+
+**KRT-Q001 Hardening Gap Inventory**
+- **Type:** Spike
+- **Effort:** 2
+- **Dependencies:** KRT-P006
+- **Capability / Contract Mapping:** PRD `CAP-P0-012`, `CAP-P0-020`, `CAP-P0-030`, `CAP-P1-032`; Architecture `5`; TechSpec `5.1`, `5.2`, `5.3`, `5.4.1`
+- **Description:** Inventory provider bridge fixtures, stream adapter fixtures, playground scenarios, package export smoke tests, release checks, and runtime portability gaps that must be closed before the post-ReAct line can be treated as implementation-ready.
+- **Acceptance Criteria (Gherkin):**
+```gherkin
+Given Epics N, O, and P are closed
+When the hardening gap inventory is completed
+Then the repository records the testkit extraction targets, release-check targets, portability matrix, package export smoke tests, deferred Deno work, and any remaining gaps that must close inside Epic Q
+```
+
+**KRT-Q002 Provider Bridge Testkit Extraction**
+- **Type:** Feature
+- **Effort:** 3
+- **Dependencies:** KRT-Q001
+- **Capability / Contract Mapping:** PRD `CAP-P0-012`, `CAP-P0-030`; Architecture `5`; TechSpec `4.4`, `5.1`, `5.2`; Framework Spec `3`, `6`
+- **Description:** Extract reusable provider bridge fixtures and conformance helpers under `boundaries/providers/testkit`, focused on `LanguageModelV3` generate/stream behavior, mappings, errors, metadata, and cancellation.
+- **Acceptance Criteria (Gherkin):**
+```gherkin
+Given the AI SDK bridge has package-local fixture coverage
+When provider testkit extraction is complete
+Then reusable testkit helpers can verify LanguageModelV3 generate and stream mappings, metadata preservation, errors, cancellation, and tool/structured-output behavior without requiring runtime-core to know about AI SDK types
+```
+
+**KRT-Q003 Framework Adapter Testkit Extraction**
+- **Type:** Feature
+- **Effort:** 3
+- **Dependencies:** KRT-Q002
+- **Capability / Contract Mapping:** PRD `CAP-P0-020`, `CAP-P1-024`; Architecture `5`; TechSpec `4.5`, `4.7`, `5.1`, `5.2`; Framework Spec `6`, `9`
+- **Description:** Extract reusable framework adapter and host-flow fixtures under `boundaries/framework/testkit`, covering canonical event streams, stream adapters, runtime controls, approvals, and playground scenario reuse.
+- **Acceptance Criteria (Gherkin):**
+```gherkin
+Given stream adapters and the playground have local scenario coverage
+When framework testkit extraction is complete
+Then reusable fixtures can verify canonical event ordering, SSE output, AG-UI output, cancellation, steering, approval, error, and terminal-status behavior without depending on playground internals
+```
+
+**KRT-Q004 Release and Verify Tooling**
+- **Type:** Chore
+- **Effort:** 3
+- **Dependencies:** KRT-Q003
+- **Capability / Contract Mapping:** PRD `CAP-P1-032`; Architecture `5`; TechSpec `5.1`, `5.2`, `5.3`
+- **Description:** Add or refresh release/verification tooling under `tools/scripts`, including workspace verification, package export smoke tests, build/typecheck/test orchestration, and release-check reporting.
+- **Acceptance Criteria (Gherkin):**
+```gherkin
+Given provider, framework, stream, and playground packages are present
+When the release and verification scripts run
+Then they build and typecheck the relevant packages, run package export smoke tests, execute targeted test suites, report failures clearly, and avoid relying on untracked local state or provider credentials
+```
+
+**KRT-Q005 Bun and Node Portability Matrix**
+- **Type:** Chore
+- **Effort:** 3
+- **Dependencies:** KRT-Q004
+- **Capability / Contract Mapping:** PRD `CAP-P0-030`, `CAP-P1-032`; Architecture `5`; TechSpec `1`, `3.5`, `5.2`
+- **Description:** Validate the core non-native packages across Bun and Node.js, explicitly documenting narrower runtime support for native or dependency-constrained packages such as SQLite and provider bridges.
+- **Acceptance Criteria (Gherkin):**
+```gherkin
+Given the post-ReAct packages are wired into verification tooling
+When Bun and Node portability checks run
+Then portable core packages pass in both runtimes, narrower packages document their supported runtime constraints, native SQLite behavior is not misrepresented as edge/serverless support, and Deno remains explicitly deferred
+```
+
+**KRT-Q006 Post-ReAct Implementation Line Closure**
+- **Type:** Chore
+- **Effort:** 2
+- **Dependencies:** KRT-Q005
+- **Capability / Contract Mapping:** PRD `CAP-P0-001`, `CAP-P0-012`, `CAP-P0-020`, `CAP-P0-030`, `CAP-P1-032`; Architecture `5`; TechSpec `5.3`, `5.4.1`
+- **Description:** Record Epic Q closure evidence, package matrix, verification commands, portability status, residual risks, and release-readiness conclusions in `constitution/spikes/epic-q-release-hardening-inventory.md`.
+- **Acceptance Criteria (Gherkin):**
+```gherkin
+Given Epics N-Q are complete and verified
+When the post-ReAct implementation line is closed
+Then the closure inventory records implemented packages, testkits, release tooling, portability results, residual risks, deferred scopes, and the TechSpec and Tasks status language needed for the next planning pass
 ```

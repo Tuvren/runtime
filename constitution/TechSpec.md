@@ -1,14 +1,14 @@
 # Technical Specification
 
 ## 0. Version History & Changelog
+- v0.5.0 - Activated the post-ReAct implementation line, locking the AI SDK bridge baseline to `LanguageModelV3` and defining sequential Epics N-Q for provider bridge, stream adapters, playground host, and release hardening.
 - v0.4.5 - Closed Epic M in current repo reality, recording shared runtime-core tool and approval integration as implementation-proven and preserving a durable audit trace for edited approvals.
 - v0.4.4 - Closed the remaining Epic K loop-policy gap: baseline ReAct now honors `AgentConfig.loopPolicy` for iterative continuation while rejecting unsupported tool-call policy combinations as `invalid_loop_policy`, and clarified the handoff seam against the current provider-neutral content contract.
-- v0.4.3 - Clarified the Epic K handoff seam: the current provider-neutral content contract does not define a dedicated handoff part, so baseline ReAct handoff preservation remains on `RuntimeResolution.handoff` plus `DriverHandoffPort` without widening `TuvrenModelResponse`.
 - ... [Older history truncated, refer to git logs]
 
 ## 1. Stack Specification (Bill of Materials)
 - **Primary Language / Runtime:** TypeScript `6.0.2` is the first authoritative implementation language for the framework and kernel protocol implementation. The kernel protocol remains language-neutral by contract. Core TypeScript packages target portable ESM across Bun, Node.js, and Deno. Bun remains the preferred local development runtime and package manager.
-- **Primary Frameworks / Libraries:** `ai@6.0.142` and `@ai-sdk/provider@3.0.8` for the baseline AI SDK Providers bridge; `ajv@8.18.0` for JSON Schema validation; `cbor-x@1.6.4` for deterministic CBOR encoding and decoding in the TypeScript implementation; `@biomejs/biome@2.4.10` for formatting and linting; `tsup@8.5.1` for package builds.
+- **Primary Frameworks / Libraries:** `ai@6.0.142` and `@ai-sdk/provider@3.0.8` for the baseline AI SDK Providers bridge, using the `LanguageModelV3` / `ProviderV3` surface only in the baseline bridge; `ajv@8.18.0` for JSON Schema validation; `cbor-x@1.6.4` for deterministic CBOR encoding and decoding in the TypeScript implementation; `@biomejs/biome@2.4.10` for formatting and linting; `tsup@8.5.1` for package builds.
 - **State Stores / Persistence:** Tuvren Runtime uses a Kraken-owned backend contract first. `@tuvren/backend-memory` is the reference development and semantic test backend. `@tuvren/backend-sqlite` is the first officially supported persistent backend adapter. Future backends such as PostgreSQL, MySQL/MariaDB, and MongoDB are peer adapters against the same kernel contract, not SQLite-shaped variants.
 - **Infrastructure / Tooling:** `devenv` for reproducible development environments, `nx@22.6.3` plus aligned `@nx/*` packages for TypeScript project orchestration, Bun workspaces, root TypeScript project references, `tsup` package builds, structured JSON logging, exact dependency pinning in `package.json` plus `bun.lock`, and environment-variable-based provider credentials at bridge boundaries.
 - **Testing / Quality Tooling:** `bun test`, `tsc --noEmit`, Biome, deterministic CBOR golden-byte tests, hash identity fixtures, shared backend conformance suites, checkpoint/recovery scenario tests, and AI SDK bridge contract fixtures.
@@ -24,7 +24,7 @@
 - **Backend posture:** All official backends implement one strict kernel-visible contract. Backend-specific optimizations may exist internally, but they must not change kernel semantics or require capability negotiation at the kernel layer in v0.1.
 
 ### 1.2 Current-State vs Target-State
-- **Current repository reality:** The repository already contains the workspace scaffold, `@tuvren/core-types`, `@tuvren/kernel-protocol`, `@tuvren/backend-memory`, `@tuvren/backend-sqlite`, `@tuvren/kernel-testkit`, `@tuvren/runtime-api`, `@tuvren/driver-api`, `@tuvren/event-stream`, `@tuvren/tool-contracts`, `@tuvren/provider-api`, `@tuvren/runtime-core`, and the ReAct Driver baseline with implementation-proven loop completion, streaming/provider semantics, and shared runtime-core tool/approval integration. Provider bridges, stream adapters, and host surfaces remain target-state work.
+- **Current repository reality:** The repository already contains the workspace scaffold, `@tuvren/core-types`, `@tuvren/kernel-protocol`, `@tuvren/backend-memory`, `@tuvren/backend-sqlite`, `@tuvren/kernel-testkit`, `@tuvren/runtime-api`, `@tuvren/driver-api`, `@tuvren/event-stream`, `@tuvren/tool-contracts`, `@tuvren/provider-api`, `@tuvren/runtime-core`, and the ReAct Driver baseline with implementation-proven loop completion, streaming/provider semantics, and shared runtime-core tool/approval integration. The next target-state packages are the `LanguageModelV3` AI SDK bridge, host stream adapters, playground host harness, and test/release hardening packages and scripts.
 - **Target implementation state:** The package layout and interfaces defined below are the intended implementation target for the first authoritative code line.
 - **Drift rule:** The future codebase must conform to this TechSpec. The TechSpec must not be treated as a loose commentary on whatever structure happens to emerge.
 
@@ -56,8 +56,8 @@
 ### ADR-005 The Baseline Provider Strategy Is Tuvren Provider Contract Plus AI SDK Providers Bridge
 - **Status:** accepted
 - **Context:** The framework owns the canonical provider contract. Supporting multiple bridge ecosystems before the core runtime is proven would add translation surface and semantic drift for little value.
-- **Decision:** The baseline provider integration package is `@tuvren/provider-bridge-ai-sdk`, built on `ai@6.0.142` and `@ai-sdk/provider@3.0.8`. LangChain is not part of the baseline implementation. First-class Tuvren-scoped provider packages are deferred but expected.
-- **Consequences:** The initial provider surface stays narrow and Tuvren-scoped while preserving Kraken engine semantics internally. Future packages such as `@tuvren/provider-openai`, `@tuvren/provider-anthropic`, and `@tuvren/provider-google` can be added later without redefining the framework contract.
+- **Decision:** The baseline provider integration package is `@tuvren/provider-bridge-ai-sdk`, built on `ai@6.0.142` and `@ai-sdk/provider@3.0.8`. The baseline bridge adapts `LanguageModelV3` and `ProviderV3` only. `LanguageModelV2` compatibility, AI SDK agent loops, AI SDK UI message protocols, LangChain bridges, and first-class Tuvren-scoped provider packages are deferred.
+- **Consequences:** The initial provider surface stays narrow and Tuvren-scoped while preserving Kraken engine semantics internally. The bridge treats AI SDK as a provider/model source, not as the runtime loop, tool governance layer, host protocol, or durable state owner. Future packages such as `@tuvren/provider-openai`, `@tuvren/provider-anthropic`, and `@tuvren/provider-google` can be added later without redefining the framework contract.
 
 ### ADR-006 Official Backends Use One Strict Uniform Kernel Contract
 - **Status:** accepted
@@ -118,7 +118,7 @@
 - **Framework public API compatibility:** Breaking changes to exported TypeScript library contracts require a semver-major release.
 - **Driver compatibility:** Changes to shared driver-selection semantics or driver-neutral framework contracts are semver-major; adding a new driver is semver-minor unless it changes existing shared contracts.
 - **Backend compatibility:** All official backends must preserve the same kernel semantics. Physical schemas may differ by backend.
-- **Provider compatibility:** AI SDK bridge upgrades may happen in minor releases only if the Tuvren-owned provider contract remains unchanged and contract fixtures still pass.
+- **Provider compatibility:** AI SDK bridge upgrades may happen in minor releases only if the Tuvren-owned provider contract remains unchanged and contract fixtures still pass. Baseline AI SDK bridge compatibility is anchored to `LanguageModelV3`; adding `LanguageModelV2` compatibility later is additive only if it does not widen or weaken the Tuvren-owned provider contract.
 
 ## 3. State & Data Modeling
 ### 3.1 Canonical Kernel Record Profile
@@ -773,13 +773,47 @@ export declare function createMemoryBackend(
 - **Compatibility Strategy:** Tuvren Runtime owns the provider contract; the AI SDK bridge adapts to external package changes behind it
 - **Error model:** Provider and bridge failures normalize into Tuvren provider errors with bridge-specific diagnostics
 - **Structured-output dialects:** `StructuredOutputRequest.schema` defaults to JSON Schema draft-07 when `$schema` is absent. Draft-2019-09 and draft-2020-12 schemas are supported when the schema declares the matching `$schema` URI. Dynamic request schemas compile in isolated validator contexts so repeated `$id` values from different host requests do not collide across turns. Unsupported dialects, schema compilation failures, and data mismatches fail with `structured_output_validation`.
+- **AI SDK baseline:** `@tuvren/provider-bridge-ai-sdk` adapts `LanguageModelV3` and `ProviderV3` from `@ai-sdk/provider@3.0.8`. The baseline bridge does not accept `LanguageModelV2`, AI SDK `ToolLoopAgent`, AI SDK UI messages, or AI SDK transport helpers as runtime inputs.
+- **Bridge package ownership:** The bridge package owns all AI SDK imports, version-sensitive type guards, finish-reason conversion, usage conversion, prompt conversion, stream-part accumulation, and AI-SDK-specific error normalization. `@tuvren/runtime-api`, `@tuvren/provider-api`, ReAct, and `runtime-core` must not import AI SDK types.
+- **Configuration mapping:** The bridge may read recognized call settings from `TuvrenPrompt.config.settings`: `maxOutputTokens`, `temperature`, `topP`, `topK`, `stopSequences`, `presencePenalty`, `frequencyPenalty`, `seed`, `toolChoice`, `headers`, and `providerOptions`. Unsupported or malformed bridge settings fail with a `TuvrenProviderError` using code `invalid_ai_sdk_bridge_config`; unknown provider-native options must travel through the namespaced `providerOptions` object.
+- **Prompt mapping:** Tuvren system, user, assistant, and tool messages map to `LanguageModelV3Prompt` messages. Tuvren `TextPart`, `ReasoningPart`, `FilePart`, `ToolCallPart`, and `ToolResultPart` map to the closest `LanguageModelV3*Part` shape without changing Tuvren durable content. Tuvren tool definitions map only to `LanguageModelV3FunctionTool`; provider-native `LanguageModelV3ProviderTool` support is deferred until a future contract explicitly represents provider-owned tools.
+- **Output mapping:** `LanguageModelV3` text, reasoning, file, tool-call, and tool-result content map into Tuvren content parts. AI SDK `tool-approval-request`, provider-executed tool calls, dynamic tool flags, sources, response metadata, warnings, raw chunks, and raw usage must be preserved under `providerMetadata` when they cannot be represented by the canonical Tuvren content contract. They must not become new Tuvren content-part variants in this implementation line.
+- **Finish and usage mapping:** AI SDK finish reasons map as follows: `stop -> stop`, `tool-calls -> tool_call`, `length -> length`, `content-filter -> content_filter`, and `error | other -> error`. `LanguageModelV3Usage.inputTokens.total` maps to `ProviderUsage.inputTokens` and `LanguageModelV3Usage.outputTokens.total` maps to `ProviderUsage.outputTokens`; detailed usage such as cached, text, reasoning, raw, or provider-specific token counts is preserved under `providerMetadata`.
+- **Streaming mapping:** `LanguageModelV3StreamResult.stream` is consumed as a `ReadableStream<LanguageModelV3StreamPart>` and exposed as Tuvren `ProviderStreamChunk` values. `text-start/text-delta/text-end`, `reasoning-start/reasoning-delta/reasoning-end`, `tool-input-start/tool-input-delta/tool-input-end`, complete `tool-call`, complete `tool-result`, `file`, `finish`, and `error` parts are the baseline stream inputs. AI SDK `raw`, `stream-start`, `response-metadata`, `source`, and provider-executed approval parts are metadata-bearing inputs unless a later contract promotes them.
 
 ```ts
+import type {
+  LanguageModelV3,
+  ProviderV3,
+  SharedV3ProviderOptions,
+} from "@ai-sdk/provider";
+
 export interface TuvrenProvider {
   readonly id: string;
   generate(prompt: TuvrenPrompt): Promise<TuvrenModelResponse>;
   stream(prompt: TuvrenPrompt): AsyncIterable<ProviderStreamChunk>;
 }
+
+export interface AiSdkProviderBridgeOptions {
+  id?: string;
+  model: LanguageModelV3;
+  defaultHeaders?: Record<string, string | undefined>;
+  defaultProviderOptions?: SharedV3ProviderOptions;
+}
+
+export interface AiSdkProviderBridgeFromProviderOptions
+  extends Omit<AiSdkProviderBridgeOptions, "model"> {
+  provider: ProviderV3;
+  modelId: string;
+}
+
+export declare function createAiSdkProviderBridge(
+  options: AiSdkProviderBridgeOptions
+): TuvrenProvider;
+
+export declare function createAiSdkProviderBridgeFromProvider(
+  options: AiSdkProviderBridgeFromProviderOptions
+): TuvrenProvider;
 
 export interface StructuredOutputRequest {
   schema: JSONSchema;
@@ -951,6 +985,56 @@ rejected as `invalid_loop_policy` rather than producing a partial or
 terminal-with-tools driver result shape that the shared core does not support.
 
 `runtime.emit(...)` is limited to driver-owned stream content and custom events. Framework-owned lifecycle events such as `turn.*`, `iteration.*`, `tool.*`, `approval.*`, `state.*`, and `error` remain shared-core responsibilities and are rejected if a driver tries to emit them directly. Shared core publishes driver-emitted content and custom events as they occur, while still retaining them for post-call validation and response synthesis. Because publication is live, already-forwarded driver events are not retracted if a later validation step fails, including post-stream structured-output validation; instead the turn terminates with the relevant contract error. If a driver emits assistant content events for a successful durable assistant response, that emitted assistant sequence must normally reconcile to the durable assistant message in `DriverExecutionResult.messages`, including incremental delta payloads such as `text.delta`, `reasoning.delta`, `structured.delta`, and `tool_call.args_delta`, stable event identity (`messageId`, `callId`), canonical message-start/message-done ordering, and the final `finishReason`; otherwise runtime-core rejects it as an invalid stream event. The one intentional exception is `aroundModel` post-stream response replacement: when an `aroundModel` wrapper has already allowed a live assistant sequence to stream via `next()` and then returns a different final durable response, the driver must return `assistantEventReconciliation: "allow_final_sequence_divergence"` so shared core validates the emitted assistant sequences as complete standalone assistant messages instead of requiring equality with the checkpointed durable assistant message. Shared core honors that exception only when the active agent config includes at least one `aroundModel` handler, assistant content events were actually emitted, the final emitted assistant sequence actually diverges from the durable assistant message, and neither side requests tools. In that divergence case, shared core still synthesizes the `AfterIterationContext.response` value from the durable assistant checkpoint so hook-visible `TuvrenModelResponse` values remain internally coherent even when the live stream differed. On terminal `fail` paths before a durable assistant message exists, emitted assistant content may remain as an interrupted partial sequence; shared core validates that sequence for allowed event shapes and ordering, but does not require durable-message equality in that failure case. When a driver returns a durable assistant message without emitting matching assistant content events, runtime-core synthesizes those missing assistant stream events from the durable message so the public stream and persisted history stay aligned.
+
+### 4.7 Host Stream Adapter, Playground, and Hardening Contracts
+- **Style:** library adapters plus local host harness
+- **Authentication / Authorization:** Stream adapters and the playground do not implement product authentication. Hosts remain responsible for authenticating external callers before exposing runtime operations, provider credentials, or approval controls.
+- **Compatibility Strategy:** `TuvrenStreamEvent` remains the canonical internal event vocabulary. Adapter packages translate it outward and may add adapter-local metadata, but they must not change runtime event meaning, event order, stream single-consumer behavior, cancellation semantics, approval semantics, or durable state.
+- **Error model:** Adapter failures normalize to typed adapter/runtime errors at the adapter boundary. They do not create kernel Runs, staged results, or synthetic provider events.
+
+```ts
+export type StreamProtocolAdapter<T> = (
+  events: AsyncIterable<TuvrenStreamEvent>
+) => AsyncIterable<T>;
+
+export interface StreamAdapterWarning {
+  code: string;
+  message: string;
+  details?: unknown;
+}
+
+export interface StreamAdapterOptions {
+  onWarning?: (warning: StreamAdapterWarning) => void;
+}
+
+export interface TuvrenSseFrame {
+  event?: string;
+  id?: string;
+  data: string;
+  retry?: number;
+}
+
+export declare function toSseFrames(
+  events: AsyncIterable<TuvrenStreamEvent>,
+  options?: StreamAdapterOptions
+): AsyncIterable<TuvrenSseFrame>;
+
+export declare function toSseResponse(
+  events: AsyncIterable<TuvrenStreamEvent>,
+  options?: StreamAdapterOptions & ResponseInit
+): Response;
+
+export declare function toAgUiEvents(
+  events: AsyncIterable<TuvrenStreamEvent>,
+  options?: StreamAdapterOptions
+): AsyncIterable<unknown>;
+```
+
+- `@tuvren/stream-core` owns shared adapter helpers: event cloning, adapter-local warning projection, stream transform utilities, fixture helpers, and no-op pass-through transforms used by tests.
+- `@tuvren/stream-sse` owns EventSource-compatible Server-Sent Events framing. Each SSE frame must preserve the original `TuvrenStreamEvent.type` as the default event name and serialize the complete canonical event as JSON in `data`.
+- `@tuvren/stream-agui` owns AG-UI protocol translation. Epic O must lock the exact AG-UI package or protocol version before implementation. If the chosen AG-UI package exposes a stable TypeScript event union, the adapter must use it; otherwise `stream-agui` owns a local typed event union grounded in the selected protocol revision.
+- The initial playground lives under `boundaries/hosts/implementations/typescript/playground`. It is a local TypeScript host harness for exercising runtime embedding, provider bridge configuration, stream adapter output, cancellation, steering, approval resolution, status inspection, and persistent backend reloads. It is not a production web application or authentication boundary.
+- The hardening line owns testkit extraction, release-check tooling, package export smoke tests, and portability validation for core non-native packages across Bun and Node. Deno checks remain deferred until package surfaces stabilize enough to avoid testing scaffolding churn.
 
 ## 5. Implementation Guidelines
 ### 5.1 Project Structure
@@ -1158,14 +1242,19 @@ Target implementation layout after code generation begins:
 10. Complete the ReAct loop behavior in `boundaries/framework/implementations/typescript/drivers/react` and `boundaries/framework/implementations/typescript/runtime-core` without widening provider bridge or host adapter scope.
 11. Harden ReAct provider streaming and non-streaming semantics in the driver/provider contract path, including live assistant event publication, durable response reconciliation, structured output validation, cancellation partials, usage/metadata preservation, and provider error normalization.
 12. Complete ReAct tool and approval integration through shared runtime-core services: tool result continuation, sequential/parallel batch execution, approval pause/resume, edit/reject decisions, and partial batch durability.
-13. Next-focus topic only: implement `boundaries/providers/implementations/typescript/bridge-ai-sdk` as the baseline provider bridge after ReAct loop, streaming, and tool/approval behavior are implementation-proven against the provider-neutral contract.
-14. Next-focus topic only: implement host-facing stream protocol surfaces and playground/host work after the core ReAct path and provider bridge are proven. Runtime/model streaming semantics belong to the driver/provider implementation path above; adapter packages only translate canonical `TuvrenStreamEvent` output for hosts.
-15. Add future concrete drivers beyond ReAct only after the first driver, provider bridge, and host-facing adapter path are proven.
-16. Add backend conformance suites for future peer adapters such as PostgreSQL and MySQL/MariaDB before expanding the official backend set.
+13. Implement `boundaries/providers/implementations/typescript/bridge-ai-sdk` as the baseline provider bridge on `LanguageModelV3` / `ProviderV3`, with `LanguageModelV2`, provider-native tools, AI SDK agent loops, AI SDK UI message transports, LangChain, and first-class Tuvren provider packages deferred.
+14. Implement host-facing stream protocol adapters after the provider bridge is proven: `boundaries/framework/implementations/typescript/stream-core`, `stream-sse`, and `stream-agui`. Runtime/model streaming semantics belong to the driver/provider implementation path above; adapter packages only translate canonical `TuvrenStreamEvent` output for hosts.
+15. Implement the local playground host harness under `boundaries/hosts/implementations/typescript/playground` after stream adapters exist, covering embedded runtime flows, provider bridge configuration, stream adapter output, cancellation, steering, approval resolution, status inspection, and persistent backend reloads.
+16. Extract provider/framework testkits and add release/portability hardening after the playground harness proves the public host path: reusable fixtures, package export smoke tests, release checks, and Bun/Node portability coverage for core non-native packages.
+17. Add future concrete drivers beyond ReAct only after the first driver, provider bridge, host-facing adapter path, playground host harness, and hardening line are proven.
+18. Add backend conformance suites for future peer adapters such as PostgreSQL and MySQL/MariaDB before expanding the official backend set.
 
 ### 5.4.1 ReAct Epic Partition Status
 - **Epic K — ReAct Loop Completion:** Closed in current repo reality. Loop correctness, cancellation boundaries, partial assistant durability, and the current handoff seam are implemented and recorded in `constitution/spikes/epic-k-react-loop-cancellation-inventory.md`.
 - **Epic L — ReAct Streaming and Provider Semantics:** Closed in current repo reality. Streaming parity, assistant event reconciliation, structured output streaming, and opaque provider metadata preservation are implemented and recorded in `constitution/spikes/epic-l-parity-inventory.md`.
 - **Epic M — ReAct Tool and Approval Integration:** Closed in current repo reality. Shared runtime-core now owns durable tool-result feedback, approval pause/resume primitives, edited/rejected decision recording, partial batch durability, and recovery-oriented coverage. Edited approvals execute with the approved edited input while preserving a durable audit trace of the original and edited values on the resulting tool result. Closure evidence is recorded in `constitution/spikes/epic-m-tool-approval-gap-inventory.md`.
-- **Epic N — AI SDK Provider Bridge Baseline:** Deferred next-focus topic. Before implementation, verify the pinned `ai@6.0.142` and `@ai-sdk/provider@3.0.8` surface against current official AI SDK documentation and lock the exact bridge contract in this TechSpec if the dependency surface has shifted.
-- **Epic O — Host Stream Protocol and Playground Surface:** Deferred next-focus topic. This covers protocol translation and host experience work only after K-M and the provider bridge have made canonical runtime events trustworthy.
+- **Epic N — AI SDK Provider Bridge Baseline:** Active next implementation epic. The bridge is locked to `LanguageModelV3` / `ProviderV3` from `@ai-sdk/provider@3.0.8`, and it must keep AI SDK-specific imports, guards, mappings, errors, and compatibility drift inside `@tuvren/provider-bridge-ai-sdk`.
+- **Epic O — Host Stream Protocol Adapters:** Sequentially after Epic N. This covers `@tuvren/stream-core`, `@tuvren/stream-sse`, and `@tuvren/stream-agui` translation over canonical `TuvrenStreamEvent` output. ACP or any additional host protocol is out of scope until a future TechSpec update names it.
+- **Epic P — Playground Host Harness:** Sequentially after Epic O. This covers the local TypeScript host harness only; it exercises embedding, stream adapters, provider configuration, runtime controls, approval flow, and backend reload behavior without becoming a production web application or authentication boundary.
+- **Epic Q — Testkit, Portability, and Release Hardening:** Sequentially after Epic P. This covers provider/framework testkit extraction, release-check tooling, package export smoke tests, and Bun/Node portability validation. Deno checks remain deferred until package surfaces stabilize enough to avoid scaffolding churn.
+- **Later driver, backend, provider, and host protocol expansion:** Deferred beyond Epic Q unless the TechSpec is revised. This includes `LanguageModelV2` compatibility, provider-native tools, AI SDK agent loops/UI transports, LangChain bridge work, first-class Tuvren provider packages, ACP, future non-ReAct drivers, and future official backends.
