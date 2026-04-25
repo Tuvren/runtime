@@ -1,0 +1,33 @@
+{
+  "name": "providers-bridge-ai-sdk",
+  "$schema": "../../../../../node_modules/nx/schemas/project-schema.json",
+  "root": "boundaries/providers/implementations/typescript/bridge-ai-sdk",
+  "sourceRoot": "boundaries/providers/implementations/typescript/bridge-ai-sdk/src",
+  "projectType": "library",
+  "tags": ["boundary:providers", "layer:implementation"],
+  "targets": {
+    "build": {
+      "executor": "nx:run-commands",
+      "dependsOn": ["^build"],
+      "options": {
+        "cwd": "boundaries/providers/implementations/typescript/bridge-ai-sdk",
+        "command": "bunx --bun tsup --config tsup.config.ts && bunx --bun tsc --project tsconfig.dts.json --pretty false"
+      }
+    },
+    "test": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "boundaries/providers/implementations/typescript/bridge-ai-sdk",
+        "command": "bun test"
+      }
+    },
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "dependsOn": ["^build"],
+      "options": {
+        "cwd": "boundaries/providers/implementations/typescript/bridge-ai-sdk",
+        "command": "bunx --bun tsc --project tsconfig.lib.json --noEmit --pretty false && bunx --bun tsc --project tsconfig.typecheck.json --noEmit --pretty false && bunx --bun tsc --project tsconfig.dts.json --noEmit --pretty false"
+      }
+    }
+  }
+}

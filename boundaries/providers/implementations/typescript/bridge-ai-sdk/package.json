@@ -1,0 +1,28 @@
+{
+  "name": "@tuvren/provider-bridge-ai-sdk",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "dependencies": {
+    "@ai-sdk/provider": "3.0.8",
+    "@tuvren/core-types": "workspace:*",
+    "@tuvren/provider-api": "workspace:*",
+    "@tuvren/runtime-api": "workspace:*",
+    "ai": "6.0.142",
+    "ajv": "8.18.0"
+  },
+  "devDependencies": {
+    "@tuvren/driver-react": "workspace:*",
+    "@tuvren/runtime-core": "workspace:*",
+    "@types/json-schema": "^7.0.15"
+  }
+}
