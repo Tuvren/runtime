@@ -1,9 +1,9 @@
 # Technical Specification
 
 ## 0. Version History & Changelog
+- v0.4.2 - Split the post-foundation ReAct roadmap into bounded ReAct loop, streaming/provider semantics, and tool/approval integration epics, with AI SDK bridge and host protocol work deferred as next-focus topics.
 - v0.4.1 - Extended the shared driver result seam with explicit extension state updates plus `assistantEventReconciliation`, and documented the corresponding live-publication validation contract so concrete drivers can preserve `aroundModel` state and intentionally signal post-stream durable divergence through the shared-core checkpoint path.
 - v0.4.0 - Advanced the post-runtime-core roadmap into narrower deferred epics by splitting the old ReAct/bridge/adapter/host path into smaller slices beginning with a focused ReAct Driver foundation epic.
-- v0.3.3 - Realigned the shared framework contract layer to the docs-first minimal core model: lineage path, minimal runtime status, handle/tree orchestration, and a reduced driver result seam.
 - ... [Older history truncated, refer to git logs]
 
 ## 1. Stack Specification (Bill of Materials)
@@ -24,7 +24,7 @@
 - **Backend posture:** All official backends implement one strict kernel-visible contract. Backend-specific optimizations may exist internally, but they must not change kernel semantics or require capability negotiation at the kernel layer in v0.1.
 
 ### 1.2 Current-State vs Target-State
-- **Current repository reality:** The repository already contains the workspace scaffold, `@tuvren/core-types`, `@tuvren/kernel-protocol`, `@tuvren/backend-memory`, `@tuvren/backend-sqlite`, `@tuvren/kernel-testkit`, `@tuvren/runtime-api`, `@tuvren/driver-api`, `@tuvren/event-stream`, `@tuvren/tool-contracts`, `@tuvren/provider-api`, and `@tuvren/runtime-core`. The first concrete driver, provider bridges, stream adapters, and hosts remain target-state work.
+- **Current repository reality:** The repository already contains the workspace scaffold, `@tuvren/core-types`, `@tuvren/kernel-protocol`, `@tuvren/backend-memory`, `@tuvren/backend-sqlite`, `@tuvren/kernel-testkit`, `@tuvren/runtime-api`, `@tuvren/driver-api`, `@tuvren/event-stream`, `@tuvren/tool-contracts`, `@tuvren/provider-api`, `@tuvren/runtime-core`, and the focused ReAct Driver foundation slice. Full ReAct loop completion, production-grade provider streaming semantics, tool/approval integration, provider bridges, stream adapters, and hosts remain target-state work.
 - **Target implementation state:** The package layout and interfaces defined below are the intended implementation target for the first authoritative code line.
 - **Drift rule:** The future codebase must conform to this TechSpec. The TechSpec must not be treated as a loose commentary on whatever structure happens to emerge.
 
@@ -1137,9 +1137,17 @@ Target implementation layout after code generation begins:
 7. Implement `boundaries/providers/contracts/provider-api` as the canonical provider-neutral model contract.
 8. Implement `boundaries/framework/implementations/typescript/runtime-core` as the shared framework-services layer above the kernel and below concrete drivers.
 9. Implement `boundaries/framework/implementations/typescript/drivers/react` as a focused ReAct Driver foundation slice: package scaffold, canonical prompt rendering, provider-call shell, and response/result mapping against the shared runtime and provider/tool contracts.
-10. Extend `boundaries/framework/implementations/typescript/drivers/react` through the deeper ReAct loop and tool-integration behaviors that remain outside the initial foundation slice.
-11. Implement `boundaries/providers/implementations/typescript/bridge-ai-sdk` as the baseline provider bridge.
-12. Implement stream adapter packages under their architectural boundary once the first concrete driver and baseline provider bridge are in place.
-13. Implement the playground host after the stream adapters and baseline provider bridge exist.
-14. Add future concrete drivers beyond ReAct only after the first driver, provider bridge, and host-facing adapter path are proven.
-15. Add backend conformance suites for future peer adapters such as PostgreSQL and MySQL/MariaDB before expanding the official backend set.
+10. Complete the ReAct loop behavior in `boundaries/framework/implementations/typescript/drivers/react` and `boundaries/framework/implementations/typescript/runtime-core` without widening provider bridge or host adapter scope.
+11. Harden ReAct provider streaming and non-streaming semantics in the driver/provider contract path, including live assistant event publication, durable response reconciliation, structured output validation, cancellation partials, usage/metadata preservation, and provider error normalization.
+12. Complete ReAct tool and approval integration through shared runtime-core services: tool result continuation, sequential/parallel batch execution, approval pause/resume, edit/reject decisions, and partial batch durability.
+13. Next-focus topic only: implement `boundaries/providers/implementations/typescript/bridge-ai-sdk` as the baseline provider bridge after ReAct loop, streaming, and tool/approval behavior are implementation-proven against the provider-neutral contract.
+14. Next-focus topic only: implement host-facing stream protocol surfaces and playground/host work after the core ReAct path and provider bridge are proven. Runtime/model streaming semantics belong to the driver/provider implementation path above; adapter packages only translate canonical `TuvrenStreamEvent` output for hosts.
+15. Add future concrete drivers beyond ReAct only after the first driver, provider bridge, and host-facing adapter path are proven.
+16. Add backend conformance suites for future peer adapters such as PostgreSQL and MySQL/MariaDB before expanding the official backend set.
+
+### 5.4.1 Active ReAct Epic Partition
+- **Epic K — ReAct Loop Completion:** Bound to existing `runtime-core`, `driver-api`, `provider-api`, and `drivers/react` contracts. This epic completes loop correctness: iteration continuation, terminal resolution, prompt/response closure, minimal handoff contract preservation, cancellation behavior that keeps already-generated assistant content visible to later model context when safely accumulated, and integration coverage through `framework-runtime-core` plus `framework-driver-react`. It must not introduce AI SDK bridge code, host protocol adapters, or expanded handoff policy.
+- **Epic L — ReAct Streaming and Provider Semantics:** Bound to the existing `TuvrenProvider` contract and ReAct driver stream accumulator. This epic owns model/runtime streaming semantics, strict stream validation, generated-response parity, streamed structured output, live tool-call previews, assistant event reconciliation, provider error normalization, and opaque usage/provider metadata preservation. Provider metadata remains provider-shaped rather than normalized, but implementation must be informed by current major-lab shapes such as OpenAI response IDs, `call_id`, usage details, and encrypted reasoning content; Anthropic message IDs, stop reasons, cumulative usage, tool-use IDs, partial JSON deltas, and thinking signatures; and Google/Gemini usage metadata, function-call IDs, thought signatures, and grounding/session metadata. These are not stream adapter responsibilities.
+- **Epic M — ReAct Tool and Approval Integration:** Bound to shared runtime-core tool execution and approval semantics plus ReAct driver continuation policy. This epic owns durable tool-result feedback, approval pause/resume primitives, edited/rejected decision recording, partial batch durability, and recovery-oriented coverage. Host developers own approval continuation policy, rejection-and-stop versus same-Turn continuation, sequential versus parallel execution selection, and any context engineering that tells the agent how a human edited a call. Edited approvals execute as the edited tool call while preserving separate audit trace of the human intervention. Provider-native tools stay deferred as provider-specific configuration and bridge behavior unless they are already normalized into ordinary Tuvren tool calls.
+- **Epic N — AI SDK Provider Bridge Baseline:** Deferred next-focus topic. Before implementation, verify the pinned `ai@6.0.142` and `@ai-sdk/provider@3.0.8` surface against current official AI SDK documentation and lock the exact bridge contract in this TechSpec if the dependency surface has shifted.
+- **Epic O — Host Stream Protocol and Playground Surface:** Deferred next-focus topic. This covers protocol translation and host experience work only after K-M and the provider bridge have made canonical runtime events trustworthy.
