@@ -79,6 +79,7 @@ const RUN_SHAPE_ERROR_PATTERN = /currentStepIndex/u;
 const STAGED_RESULT_ROW_ERROR_PATTERN =
   /valid staged result status|interrupt_payload_cbor/u;
 const TURN_TREE_PATH_ROW_ERROR_PATTERN = /valid ordered or single variant/u;
+const LINEAGE_METADATA_ERROR_PATTERN = /lineage metadata/u;
 const ORDERED_CARDINALITY_ERROR_PATTERN =
   /orderedCount aligned|item_count aligned|decoded item count/u;
 const OBJECT_ROW_ERROR_PATTERN = /byteLength|SHA-256 digest/u;
@@ -121,6 +122,10 @@ interface CorruptionSeed {
   turnTreeHash: string;
 }
 
+interface ExplainQueryPlanRow {
+  detail: string;
+}
+
 function getCompiledSqliteRuntimePath(): string {
   return join(
     process.cwd(),
@@ -140,6 +145,44 @@ function getBaselineMigrationSql(): string {
   return readFileSync(
     join(process.cwd(), "migrations", "0001_initial_schema.sql"),
     "utf8"
+  );
+}
+
+function copyCurrentPackageMigrations(targetDirectory: string): void {
+  for (const fileName of [
+    "0001_initial_schema.sql",
+    "0002_targeted_validation_indexes.sql",
+  ]) {
+    copyFileSync(
+      join(process.cwd(), "migrations", fileName),
+      join(targetDirectory, fileName)
+    );
+  }
+}
+
+function explainQueryPlanDetails(
+  db: Database.Database,
+  sql: string,
+  parameters: readonly unknown[] = []
+): string[] {
+  return (
+    db
+      .prepare(`EXPLAIN QUERY PLAN ${sql}`)
+      .all(...parameters) as ExplainQueryPlanRow[]
+  ).map((row) => row.detail);
+}
+
+function assertPlanUsesIndex(
+  db: Database.Database,
+  sql: string,
+  indexName: string,
+  parameters: readonly unknown[] = []
+): void {
+  const details = explainQueryPlanDetails(db, sql, parameters);
+  strictEqual(
+    details.some((detail) => detail.includes(indexName)),
+    true,
+    details.join("\n")
   );
 }
 
@@ -251,10 +294,12 @@ async function expectCorruptedStateRejection(
   pattern: RegExp
 ): Promise<void> {
   const backend = createSqliteBackend({ databasePath });
-  await rejects(
-    backend.transact(async () => undefined),
-    pattern
-  );
+  const health = await backend.health();
+  deepStrictEqual(health.ok, false);
+  if (health.ok) {
+    throw new Error("expected unhealthy status");
+  }
+  strictEqual(pattern.test(health.reason), true);
 }
 
 after(() => {
@@ -309,7 +354,10 @@ describe("@tuvren/backend-sqlite", () => {
     probe.close();
 
     strictEqual(journalMode.toLowerCase(), "wal");
-    deepStrictEqual(migrationRows, [{ name: "0001_initial_schema.sql" }]);
+    deepStrictEqual(migrationRows, [
+      { name: "0001_initial_schema.sql" },
+      { name: "0002_targeted_validation_indexes.sql" },
+    ]);
     deepStrictEqual(objectsTable, { name: "objects" });
 
     createSqliteBackend({ databasePath, now: createNowClock(20) });
@@ -319,7 +367,10 @@ describe("@tuvren/backend-sqlite", () => {
       .all() as Array<{ name: string }>;
     secondProbe.close();
 
-    deepStrictEqual(reappliedRows, [{ name: "0001_initial_schema.sql" }]);
+    deepStrictEqual(reappliedRows, [
+      { name: "0001_initial_schema.sql" },
+      { name: "0002_targeted_validation_indexes.sql" },
+    ]);
   });
 
   test("rejects non-persistent in-memory database paths", () => {
@@ -397,7 +448,10 @@ describe("@tuvren/backend-sqlite", () => {
       .get() as { name: string } | undefined;
     probe.close();
 
-    deepStrictEqual(migrationRows, [{ name: "0001_initial_schema.sql" }]);
+    deepStrictEqual(migrationRows, [
+      { name: "0001_initial_schema.sql" },
+      { name: "0002_targeted_validation_indexes.sql" },
+    ]);
     deepStrictEqual(objectsTable, { name: "objects" });
   });
 
@@ -476,10 +530,7 @@ describe("@tuvren/backend-sqlite", () => {
     mkdirSync(fakeMigrationsDirectory, { recursive: true });
     linkWorkspaceNodeModules(tempDirectory);
     copyFileSync(getCompiledSqliteRuntimePath(), runtimePath);
-    copyFileSync(
-      join(process.cwd(), "migrations", "0001_initial_schema.sql"),
-      join(fakeMigrationsDirectory, "0001_initial_schema.sql")
-    );
+    copyCurrentPackageMigrations(fakeMigrationsDirectory);
 
     const runtimeModule = (await import(pathToFileURL(runtimePath).href)) as {
       createSqliteBackend: typeof createSqliteBackend;
@@ -508,12 +559,9 @@ describe("@tuvren/backend-sqlite", () => {
     mkdirSync(fakeMigrationsDirectory, { recursive: true });
     linkWorkspaceNodeModules(tempDirectory);
     copyFileSync(getCompiledSqliteRuntimePath(), runtimePath);
-    copyFileSync(
-      join(process.cwd(), "migrations", "0001_initial_schema.sql"),
-      join(fakeMigrationsDirectory, "0001_initial_schema.sql")
-    );
+    copyCurrentPackageMigrations(fakeMigrationsDirectory);
     writeFileSync(
-      join(fakeMigrationsDirectory, "0002_add_objects_extra.sql"),
+      join(fakeMigrationsDirectory, "0003_add_objects_extra.sql"),
       "ALTER TABLE objects ADD COLUMN extra TEXT;\n",
       "utf8"
     );
@@ -540,7 +588,8 @@ describe("@tuvren/backend-sqlite", () => {
     );
     deepStrictEqual(migrationRows, [
       { name: "0001_initial_schema.sql" },
-      { name: "0002_add_objects_extra.sql" },
+      { name: "0002_targeted_validation_indexes.sql" },
+      { name: "0003_add_objects_extra.sql" },
     ]);
   });
 
@@ -556,12 +605,9 @@ describe("@tuvren/backend-sqlite", () => {
     mkdirSync(fakeMigrationsDirectory, { recursive: true });
     linkWorkspaceNodeModules(tempDirectory);
     copyFileSync(getCompiledSqliteRuntimePath(), runtimePath);
-    copyFileSync(
-      join(process.cwd(), "migrations", "0001_initial_schema.sql"),
-      join(fakeMigrationsDirectory, "0001_initial_schema.sql")
-    );
+    copyCurrentPackageMigrations(fakeMigrationsDirectory);
     writeFileSync(
-      join(fakeMigrationsDirectory, "0002_rebuild_runs_index.sql"),
+      join(fakeMigrationsDirectory, "0003_rebuild_runs_index.sql"),
       [
         "DROP INDEX idx_runs_branch_id_status;",
         "CREATE INDEX idx_runs_branch_id_status ON runs(branch_id, status, updated_at_ms);",
@@ -642,7 +688,7 @@ describe("@tuvren/backend-sqlite", () => {
     strictEqual(MULTIPLE_ACTIVE_RUNS_ERROR_PATTERN.test(health.reason), true);
   });
 
-  test("rejects invariant-broken persisted state before running the user callback", async () => {
+  test("keeps invariant-broken persisted state out of the transaction hot path", async () => {
     const seeded = await seedCorruptionDatabase();
     const backend = createSqliteBackend({ databasePath: seeded.databasePath });
     const probe = new Database(seeded.databasePath);
@@ -688,14 +734,18 @@ describe("@tuvren/backend-sqlite", () => {
     probe.close();
 
     let callbackRan = false;
-    await rejects(
-      backend.transact(() => {
-        callbackRan = true;
-        return Promise.resolve(undefined);
-      }),
-      MULTIPLE_ACTIVE_RUNS_ERROR_PATTERN
-    );
-    strictEqual(callbackRan, false);
+    await backend.transact(() => {
+      callbackRan = true;
+      return Promise.resolve(undefined);
+    });
+    strictEqual(callbackRan, true);
+
+    const health = await backend.health();
+    deepStrictEqual(health.ok, false);
+    if (health.ok) {
+      throw new Error("expected unhealthy status");
+    }
+    strictEqual(MULTIPLE_ACTIVE_RUNS_ERROR_PATTERN.test(health.reason), true);
   });
 
   test("reports unhealthy status when required schema tables are missing", async () => {
@@ -713,7 +763,7 @@ describe("@tuvren/backend-sqlite", () => {
     strictEqual(MISSING_SCHEMA_ERROR_PATTERN.test(health.reason), true);
   });
 
-  test("rolls back and normalizes preflight failures before the user callback runs", async () => {
+  test("leaves committed corruption detection on the explicit health path", async () => {
     const seeded = await seedCorruptionDatabase();
     const backend = createSqliteBackend({ databasePath: seeded.databasePath });
     const probe = new Database(seeded.databasePath);
@@ -722,28 +772,36 @@ describe("@tuvren/backend-sqlite", () => {
       .run(createHashFromIndex(999), seeded.objectHash);
     probe.close();
 
-    await rejects(
-      backend.transact(async () => undefined),
-      OBJECT_ROW_ERROR_PATTERN
-    );
+    let callbackRan = false;
+    await backend.transact(() => {
+      callbackRan = true;
+      return Promise.resolve(undefined);
+    });
+    strictEqual(callbackRan, true);
 
-    await rejects(
-      backend.transact(async () => undefined),
-      OBJECT_ROW_ERROR_PATTERN
-    );
+    const health = await backend.health();
+    deepStrictEqual(health.ok, false);
+    if (health.ok) {
+      throw new Error("expected unhealthy status");
+    }
+    strictEqual(OBJECT_ROW_ERROR_PATTERN.test(health.reason), true);
   });
 
-  test("normalizes missing-table preflight failures into backend errors", async () => {
+  test("reports missing tables through health instead of transaction preflight", async () => {
     const databasePath = createTempDatabasePath();
     const backend = createSqliteBackend({ databasePath });
     const probe = new Database(databasePath);
     probe.exec("DROP TABLE objects");
     probe.close();
 
-    await rejects(
-      backend.transact(async () => undefined),
-      NORMALIZED_SQLITE_ERROR_PATTERN
-    );
+    await backend.transact(async () => undefined);
+
+    const health = await backend.health();
+    deepStrictEqual(health.ok, false);
+    if (health.ok) {
+      throw new Error("expected unhealthy status");
+    }
+    strictEqual(NORMALIZED_SQLITE_ERROR_PATTERN.test(health.reason), true);
   });
 
   test("normalizes SQLite engine write failures into backend persistence errors", async () => {
@@ -898,6 +956,69 @@ describe("@tuvren/backend-sqlite", () => {
     strictEqual(MISSING_INDEX_ERROR_PATTERN.test(health.reason), true);
   });
 
+  test("uses targeted indexes for localized validation query plans", async () => {
+    const seeded = await seedCorruptionDatabase();
+    const probe = new Database(seeded.databasePath, { readonly: true });
+
+    try {
+      assertPlanUsesIndex(
+        probe,
+        `
+          SELECT turn_node_hash
+          FROM turn_node_lineage_roots
+          WHERE root_turn_node_hash = ? AND depth >= ?
+        `,
+        "idx_turn_node_lineage_roots_root_depth",
+        [seeded.runStartTurnNodeHash, 0]
+      );
+      assertPlanUsesIndex(
+        probe,
+        `
+          SELECT *
+          FROM runs
+          WHERE branch_id = ? AND status IN ('running', 'paused')
+          ORDER BY created_at_ms, run_id
+        `,
+        "idx_runs_branch_id_status",
+        ["branch_corruption"]
+      );
+      assertPlanUsesIndex(
+        probe,
+        `
+          SELECT *
+          FROM branches
+          WHERE archived_from_branch_id = ?
+            AND branch_id <> ?
+            AND head_turn_node_hash = ?
+          LIMIT 1
+        `,
+        "idx_branches_archived_from_branch_id",
+        ["branch_corruption", "branch_corruption", seeded.runStartTurnNodeHash]
+      );
+      assertPlanUsesIndex(
+        probe,
+        `
+          SELECT *
+          FROM turns
+          WHERE thread_id = ?
+            AND branch_id = ?
+            AND head_turn_node_hash = ?
+            AND turn_id <> ?
+          ORDER BY created_at_ms, turn_id
+        `,
+        "idx_turns_thread_branch_head_turn_node",
+        [
+          "thread_corruption",
+          "branch_corruption",
+          seeded.runStartTurnNodeHash,
+          "turn_corruption",
+        ]
+      );
+    } finally {
+      probe.close();
+    }
+  });
+
   test("rejects stored run rows with invalid status values", async () => {
     const seeded = await seedCorruptionDatabase();
     const probe = new Database(seeded.databasePath);
@@ -1006,6 +1127,26 @@ describe("@tuvren/backend-sqlite", () => {
     await expectCorruptedStateRejection(
       seeded.databasePath,
       TURN_NODE_ROW_ERROR_PATTERN
+    );
+  });
+
+  test("rejects corrupted turn node lineage metadata", async () => {
+    const seeded = await seedCorruptionDatabase();
+    const probe = new Database(seeded.databasePath);
+    probe
+      .prepare(
+        `
+          UPDATE turn_node_lineage_roots
+          SET depth = depth + 1
+          WHERE turn_node_hash = ?
+        `
+      )
+      .run(seeded.runStartTurnNodeHash);
+    probe.close();
+
+    await expectCorruptedStateRejection(
+      seeded.databasePath,
+      LINEAGE_METADATA_ERROR_PATTERN
     );
   });
 
