@@ -12,6 +12,6 @@
     },
     {
       "path": "../../../contracts/provider-api/tsconfig.lib.json"
-    },
+    }
   ]
 }
