@@ -36,9 +36,11 @@ without rediscovering AI SDK provider behavior.
     `invalid_ai_sdk_bridge_config`
 - Prompt/message mapping:
   - system messages map only from text parts
-  - user messages map from text and file parts
+  - user messages map from text and file parts, and replay historical
+    `structured` parts by serializing their data back into JSON text
   - assistant messages map from text, reasoning, file, and client-executed
-    tool-call/tool-result parts
+    tool-call/tool-result parts, and replay historical `structured` parts by
+    serializing their data back into JSON text
   - tool messages map from durable `tool_result` parts
   - the baseline bridge replays only continuity-safe assistant content metadata
     back into AI SDK `providerOptions`: Anthropic reasoning `signature` /
