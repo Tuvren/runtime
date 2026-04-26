@@ -1,0 +1,54 @@
+{
+  "extends": "./tsconfig.lib.json",
+  "compilerOptions": {
+    "composite": false,
+    "rootDir": "../../../../../",
+    "allowImportingTsExtensions": true,
+    "paths": {
+      "@tuvren/core-types": [
+        "../../../../shared/contracts/core-types/src/index.ts"
+      ],
+      "@tuvren/driver-api": [
+        "../../../../framework/contracts/driver-api/src/index.ts"
+      ],
+      "@tuvren/driver-react": [
+        "../../../../framework/implementations/typescript/drivers/react/src/index.ts"
+      ],
+      "@tuvren/kernel-protocol": [
+        "../../../../kernel/contracts/protocol/src/index.ts"
+      ],
+      "@tuvren/provider-api": ["../../../contracts/provider-api/src/index.ts"],
+      "@tuvren/runtime-api": [
+        "../../../../framework/contracts/runtime-api/src/index.ts"
+      ],
+      "@tuvren/runtime-api/events": [
+        "../../../../framework/contracts/runtime-api/src/events.ts"
+      ],
+      "@tuvren/runtime-api/execution": [
+        "../../../../framework/contracts/runtime-api/src/execution.ts"
+      ],
+      "@tuvren/runtime-api/provider": [
+        "../../../../framework/contracts/runtime-api/src/provider.ts"
+      ],
+      "@tuvren/runtime-api/tools": [
+        "../../../../framework/contracts/runtime-api/src/tools.ts"
+      ],
+      "@tuvren/runtime-core": [
+        "../../../../framework/implementations/typescript/runtime-core/src/index.ts"
+      ]
+    },
+    "types": ["bun"]
+  },
+  "include": [
+    "src/**/*.ts",
+    "test/**/*.ts",
+    "../../../contracts/provider-api/src/**/*.ts",
+    "../../../../framework/contracts/driver-api/src/**/*.ts",
+    "../../../../framework/contracts/runtime-api/src/**/*.ts",
+    "../../../../framework/implementations/typescript/drivers/react/src/**/*.ts",
+    "../../../../framework/implementations/typescript/runtime-core/src/**/*.ts",
+    "../../../../framework/implementations/typescript/runtime-core/test/**/*.ts",
+    "../../../../kernel/contracts/protocol/src/**/*.ts",
+    "../../../../shared/contracts/core-types/src/**/*.ts"
+  ]
+}

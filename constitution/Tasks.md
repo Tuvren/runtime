@@ -1,26 +1,24 @@
 # Engineering Execution Plan
 
 ## 0. Version History & Changelog
+- v0.7.1 - Closed Epic N in repo reality, corrected the AI SDK bridge plan to the stable shared stream seam, added the Epic N closure inventory, and advanced the active critical path to Epic O.
 - v0.7.0 - Activated sequential Epics N-Q for the post-ReAct implementation line: `LanguageModelV3` AI SDK provider bridge, host stream protocol adapters, playground host harness, and testkit/release hardening.
 - v0.6.2 - Closed Epic M against brownfield repo reality, added the explicit tool-and-approval inventory artifact, and archived Epics K-M so the next planning pass can start from Epic N.
-- v0.6.1 - Reframed Epic L as a brownfield closure and Epic M readiness pass, adding an explicit parity inventory artifact and handoff-focused acceptance criteria while preserving the existing epic IDs and dependency order.
-- v0.6.0 - Selected bounded active Epics K, L, and M for ReAct loop completion, streaming/provider semantics, and tool/approval integration while deferring AI SDK bridge and host protocol work as next-focus topics.
 - ... [Older history truncated, refer to git logs]
 
 ## 1. Executive Summary & Active Critical Path
-- **Total Active Story Points:** 79
-- **Critical Path:** KRT-N001 -> KRT-N002 -> KRT-N003 -> KRT-N004 -> KRT-N005 -> KRT-N006 -> KRT-N007 -> KRT-O001 -> KRT-O002 -> KRT-O003 -> KRT-O004 -> KRT-O005 -> KRT-O006 -> KRT-P001 -> KRT-P002 -> KRT-P003 -> KRT-P004 -> KRT-P005 -> KRT-P006 -> KRT-Q001 -> KRT-Q002 -> KRT-Q003 -> KRT-Q004 -> KRT-Q005 -> KRT-Q006
-- **Planning Assumptions:** Epics A-M are closed in current repo reality. TechSpec v0.5.0 locks the baseline AI SDK bridge to `LanguageModelV3` / `ProviderV3` from `@ai-sdk/provider@3.0.8`. Epics N-Q are intentionally sequential: provider bridge first, stream adapters second, playground host third, hardening fourth.
+- **Total Active Story Points:** 54
+- **Critical Path:** KRT-O001 -> KRT-O002 -> KRT-O003 -> KRT-O004 -> KRT-O005 -> KRT-O006 -> KRT-P001 -> KRT-P002 -> KRT-P003 -> KRT-P004 -> KRT-P005 -> KRT-P006 -> KRT-Q001 -> KRT-Q002 -> KRT-Q003 -> KRT-Q004 -> KRT-Q005 -> KRT-Q006
+- **Planning Assumptions:** Epics A-N are closed in current repo reality. TechSpec v0.5.1 keeps the baseline AI SDK bridge on `LanguageModelV3` / `ProviderV3` from `@ai-sdk/provider@3.0.8` while preserving the existing `ProviderStreamChunk` seam. Epics O-Q remain intentionally sequential: stream adapters first, playground host second, hardening third.
 
 ### Brownfield Continuity Note
 - The current codebase already contains the workspace scaffold, shared core types, kernel protocol package, memory backend, SQLite backend, kernel testkit, shared framework contract packages, provider contract package, `runtime-core`, and the ReAct Driver foundation package.
-- Current repository reality includes closed Epic K, L, and M behavior with explicit closure artifacts in `constitution/spikes/epic-k-react-loop-cancellation-inventory.md`, `constitution/spikes/epic-l-parity-inventory.md`, and `constitution/spikes/epic-m-tool-approval-gap-inventory.md`.
-- The missing active target packages are `@tuvren/provider-bridge-ai-sdk`, `@tuvren/stream-core`, `@tuvren/stream-sse`, `@tuvren/stream-agui`, the testkit packages under `boundaries/framework/testkit` and `boundaries/providers/testkit`, the local playground host harness, and release/verification scripts named in TechSpec.
+- Current repository reality includes closed Epic K, L, M, and N behavior with explicit closure artifacts in `constitution/spikes/epic-k-react-loop-cancellation-inventory.md`, `constitution/spikes/epic-l-parity-inventory.md`, `constitution/spikes/epic-m-tool-approval-gap-inventory.md`, and `constitution/spikes/epic-n-ai-sdk-bridge-inventory.md`.
+- The remaining active target packages are `@tuvren/stream-core`, `@tuvren/stream-sse`, `@tuvren/stream-agui`, the testkit packages under `boundaries/framework/testkit` and `boundaries/providers/testkit`, the local playground host harness, and release/verification scripts named in TechSpec.
 - Planning verification confirmed `ai@6.0.142` and `@ai-sdk/provider@3.0.8` are available and that `@ai-sdk/provider@3.0.8` exports `LanguageModelV3`, `ProviderV3`, `LanguageModelV3CallOptions`, `LanguageModelV3GenerateResult`, and `LanguageModelV3StreamPart`.
-- `bun run typecheck` passed before this planning update; this plan changes constitution artifacts only.
+- Epic N now extends repo reality beyond those planning notes: the bridge package exists and the closure artifact above is the authoritative handoff surface for Epic O.
 
 ### Sequential Scope Rule
-- Epic O must not begin until Epic N closes.
 - Epic P must not begin until Epic O closes.
 - Epic Q must not begin until Epic P closes.
 - Inside each epic, ticket dependencies are linear unless a future planning revision explicitly changes this file and the TechSpec together.
@@ -35,7 +33,6 @@
 - This section uses "iteration strategy" only because the planning framework requires that heading; the content below is dependency phasing and scope partitioning, not a commitment to Scrum-style iterations.
 
 ### Current Active Scope
-- Epic N implements the AI SDK provider bridge baseline using `LanguageModelV3` / `ProviderV3` only.
 - Epic O implements host stream protocol adapters over canonical `TuvrenStreamEvent` output.
 - Epic P implements the local TypeScript playground host harness after the adapter path exists.
 - Epic Q extracts testkits and hardens release, package export, and Bun/Node portability checks.
@@ -61,18 +58,12 @@
 - Epic K delivered ReAct loop completion, cancellation boundaries, and the loop-closure inventory artifact.
 - Epic L delivered streaming/provider parity closure and the parity inventory artifact.
 - Epic M delivered ReAct tool continuation, approval pause/resume, edited and rejected approval handling, partial batch durability, and the tool-and-approval inventory artifact.
+- Epic N delivered the baseline AI SDK provider bridge on `LanguageModelV3` / `ProviderV3`, preserved the shared `ProviderStreamChunk` seam, synthesized structured output from JSON text, and recorded the unsupported provider-owned tool/file surfaces in the Epic N bridge inventory artifact.
 
 ## 3. Build Order (Mermaid)
 ```mermaid
 flowchart LR
-  KRTN001[KRT-N001 LanguageModelV3 Bridge Contract Lock] --> KRTN002[KRT-N002 Bridge Package Scaffold and Dependency Wiring]
-  KRTN002 --> KRTN003[KRT-N003 Tuvren-to-LanguageModelV3 Prompt Mapping]
-  KRTN003 --> KRTN004[KRT-N004 LanguageModelV3 Generate Result Mapping]
-  KRTN004 --> KRTN005[KRT-N005 LanguageModelV3 Stream Mapping]
-  KRTN005 --> KRTN006[KRT-N006 ReAct Integration and Bridge Fixture Coverage]
-  KRTN006 --> KRTN007[KRT-N007 Provider Bridge Closure Inventory]
-  KRTN007 --> KRTO001[KRT-O001 Stream Adapter Protocol Inventory]
-  KRTO001 --> KRTO002[KRT-O002 Stream-Core Adapter Utilities]
+  KRTO001[KRT-O001 Stream Adapter Protocol Inventory] --> KRTO002[KRT-O002 Stream-Core Adapter Utilities]
   KRTO002 --> KRTO003[KRT-O003 SSE Adapter Baseline]
   KRTO003 --> KRTO004[KRT-O004 AG-UI Adapter Baseline]
   KRTO004 --> KRTO005[KRT-O005 Runtime Stream Adapter Integration Coverage]
@@ -93,104 +84,19 @@ flowchart LR
 
 ## 4. Ticket List
 ### Epic N - AI SDK Provider Bridge Baseline (APB)
-
-**KRT-N001 LanguageModelV3 Bridge Contract Lock**
-- **Type:** Spike
-- **Effort:** 2
-- **Dependencies:** None
-- **Capability / Contract Mapping:** PRD `CAP-P0-012`, `CAP-P0-030`, `CAP-P1-021`; Architecture `2`, `5`; TechSpec `4.4`, `5.4`, `5.4.1`; Framework Spec `3`, `6`
-- **Description:** Lock the exact bridge surface around `LanguageModelV3` / `ProviderV3`, including accepted call settings, prompt/message mappings, stream-part mappings, finish/usage mappings, metadata preservation, and explicit exclusions for `LanguageModelV2`, provider-native tools, AI SDK loops, UI messages, and transport helpers.
-- **Acceptance Criteria (Gherkin):**
-```gherkin
-Given TechSpec v0.5.0 selects the AI SDK provider bridge baseline
-When the bridge contract inventory is completed
-Then the repository records the public factory surface, LanguageModelV3 prompt and result mappings, supported settings, metadata preservation rules, error codes, fixture matrix, and all deferred AI SDK surfaces that must not leak into shared runtime packages
-```
-
-**KRT-N002 Bridge Package Scaffold and Dependency Wiring**
-- **Type:** Chore
-- **Effort:** 3
-- **Dependencies:** KRT-N001
-- **Capability / Contract Mapping:** PRD `CAP-P0-012`, `CAP-P0-030`; Architecture `5`; TechSpec `1`, `4.4`, `5.1`, `5.4`
-- **Description:** Create `boundaries/providers/implementations/typescript/bridge-ai-sdk` as `@tuvren/provider-bridge-ai-sdk`, wire Nx/package/tsconfig/build/test exports, and declare the pinned `ai@6.0.142` and `@ai-sdk/provider@3.0.8` dependencies through the repository package-management workflow.
-- **Acceptance Criteria (Gherkin):**
-```gherkin
-Given the bridge contract is locked
-When the bridge package is scaffolded
-Then the workspace exposes a buildable and testable provider bridge package with explicit ESM exports, pinned AI SDK dependencies, no CommonJS entrypoints, and no AI SDK imports from shared runtime or provider contract packages
-```
-
-**KRT-N003 Tuvren-to-LanguageModelV3 Prompt Mapping**
-- **Type:** Feature
-- **Effort:** 5
-- **Dependencies:** KRT-N002
-- **Capability / Contract Mapping:** PRD `CAP-P0-012`, `CAP-P0-013`, `CAP-P0-030`; Architecture `2`, `5`; TechSpec `4.3`, `4.4`; Framework Spec `3.2`, `3.3`
-- **Description:** Implement Tuvren prompt, message, tool, structured-output, and config translation into `LanguageModelV3CallOptions`, including validation for recognized settings and rejection of malformed bridge configuration as `invalid_ai_sdk_bridge_config`.
-- **Acceptance Criteria (Gherkin):**
-```gherkin
-Given a Tuvren prompt contains system, user, assistant, tool, file, reasoning, tool-call, tool-result, structured-output, and model configuration inputs
-When the AI SDK bridge prepares a LanguageModelV3 call
-Then it emits valid LanguageModelV3CallOptions, maps only supported Tuvren tool definitions to LanguageModelV3FunctionTool, preserves providerOptions and headers, and rejects malformed or unsupported bridge settings with a typed provider error
-```
-
-**KRT-N004 LanguageModelV3 Generate Result Mapping**
-- **Type:** Feature
-- **Effort:** 5
-- **Dependencies:** KRT-N003
-- **Capability / Contract Mapping:** PRD `CAP-P0-012`, `CAP-P0-020`, `CAP-P0-030`; Architecture `2`, `5`; TechSpec `4.4`, `4.5`; Framework Spec `3.5`, `6`
-- **Description:** Implement non-streaming `doGenerate` result conversion into `TuvrenModelResponse`, including text, reasoning, file, tool-call, tool-result, finish reason, usage, warnings, response metadata, provider metadata, and normalized error behavior.
-- **Acceptance Criteria (Gherkin):**
-```gherkin
-Given a LanguageModelV3 model returns a generate result
-When the AI SDK bridge maps the result into the Tuvren provider contract
-Then canonical content parts, finish reason, usage totals, provider metadata, warnings, and response metadata are preserved according to TechSpec, while unmapped AI SDK-specific fields remain opaque metadata rather than new Tuvren content variants
-```
-
-**KRT-N005 LanguageModelV3 Stream Mapping**
-- **Type:** Feature
-- **Effort:** 5
-- **Dependencies:** KRT-N004
-- **Capability / Contract Mapping:** PRD `CAP-P0-012`, `CAP-P0-020`, `CAP-P0-030`; Architecture `2`, `5`; TechSpec `4.4`, `4.5`; Framework Spec `3.3`, `6.3`
-- **Description:** Implement `ReadableStream<LanguageModelV3StreamPart>` consumption and conversion into `ProviderStreamChunk`, covering text, reasoning, structured output, tool input, complete tool calls, tool results, files, finish, raw metadata, cancellation, and error propagation.
-- **Acceptance Criteria (Gherkin):**
-```gherkin
-Given a LanguageModelV3 model streams text, reasoning, structured output, tool input, complete tool calls, tool results, files, metadata, finish, and errors
-When the AI SDK bridge exposes the stream as Tuvren provider chunks
-Then the stream preserves ordering, cancellation behavior, provider metadata, final usage, and typed error normalization while producing only the ProviderStreamChunk variants allowed by the Tuvren provider contract
-```
-
-**KRT-N006 ReAct Integration and Bridge Fixture Coverage**
-- **Type:** Feature
-- **Effort:** 3
-- **Dependencies:** KRT-N005
-- **Capability / Contract Mapping:** PRD `CAP-P0-004`, `CAP-P0-012`, `CAP-P0-013`, `CAP-P0-020`; Architecture `4.1`, `5`; TechSpec `4.4`, `4.6`; Framework Spec `4`, `6`
-- **Description:** Prove that the bridge behaves as a normal `TuvrenProvider` in the ReAct/runtime-core path for generated and streamed responses, structured output, tool calls, provider failures, metadata, and cancellation.
-- **Acceptance Criteria (Gherkin):**
-```gherkin
-Given runtime-core executes the ReAct driver with an AI SDK bridge provider
-When generated and streamed fixture turns cover text, reasoning, structured output, tools, metadata, cancellation, and provider errors
-Then the runtime emits canonical events, stores durable assistant/tool context, preserves provider metadata, and does not require ReAct or runtime-core to import AI SDK types
-```
-
-**KRT-N007 Provider Bridge Closure Inventory**
-- **Type:** Chore
-- **Effort:** 2
-- **Dependencies:** KRT-N006
-- **Capability / Contract Mapping:** PRD `CAP-P0-012`, `CAP-P0-030`; Architecture `5`; TechSpec `4.4`, `5.3`, `5.4.1`
-- **Description:** Record Epic N closure evidence, fixture coverage, public exports, dependency pins, known limitations, and downstream assumptions in `constitution/spikes/epic-n-ai-sdk-bridge-inventory.md`.
-- **Acceptance Criteria (Gherkin):**
-```gherkin
-Given the AI SDK provider bridge implementation and tests are complete
-When Epic N is closed
-Then the closure inventory records implemented mappings, test coverage, dependency versions, deferred surfaces, downstream assumptions for Epic O, and any required TechSpec or Tasks status updates
-```
+- Closed in current repo reality.
+- Closure artifact: `constitution/spikes/epic-n-ai-sdk-bridge-inventory.md`
+- Durable outcome:
+  - `@tuvren/provider-bridge-ai-sdk` now owns the `LanguageModelV3` / `ProviderV3` bridge.
+  - shared runtime contracts stayed stable for Epic O: `ProviderStreamChunk` and `TuvrenStreamEvent` were not widened.
+  - streamed AI SDK files, provider-executed tool results, and provider-owned approvals remain explicitly deferred and must not leak into Epic O as implicit adapter debt.
 
 ### Epic O - Host Stream Protocol Adapters (HSA)
 
 **KRT-O001 Stream Adapter Protocol Inventory**
 - **Type:** Spike
 - **Effort:** 2
-- **Dependencies:** KRT-N007
+- **Dependencies:** None
 - **Capability / Contract Mapping:** PRD `CAP-P0-020`, `CAP-P0-023`, `CAP-P1-024`; Architecture `5`; TechSpec `4.5`, `4.7`, `5.4.1`; Framework Spec `6`, `9`
 - **Description:** Inventory the canonical `TuvrenStreamEvent` surface against SSE and AG-UI translation needs, lock the exact AG-UI package or protocol revision, identify lossy mappings and warning cases, and confirm ACP remains out of scope for this plan.
 - **Acceptance Criteria (Gherkin):**

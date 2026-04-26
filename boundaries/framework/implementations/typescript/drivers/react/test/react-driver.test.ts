@@ -2780,6 +2780,57 @@ describe("driver-react", () => {
     ).toHaveLength(1);
   });
 
+  test("treats cancelled redacted reasoning streams as cancellation instead of provider failure", async () => {
+    const emittedEvents: TuvrenStreamEvent[] = [];
+    const controller = new AbortController();
+    const provider = {
+      async generate() {
+        throw new Error("generate should not be called");
+      },
+      id: "provider",
+      async *stream() {
+        yield {
+          text: "",
+          type: "reasoning_delta",
+        };
+        controller.abort(new Error("cancelled during stream"));
+        await wait(1000);
+      },
+    } satisfies TuvrenProvider;
+    const driver = createReActDriver({
+      providerCallMode: "stream",
+    }).create();
+
+    const result = await Promise.race([
+      driver.execute(
+        createDriverExecutionContext({
+          config: {
+            model: provider,
+            name: "primary",
+          },
+          emittedEvents,
+          signal: controller.signal,
+        })
+      ),
+      wait(100).then(() => "timed_out"),
+    ]);
+
+    if (typeof result === "string") {
+      throw new Error("driver did not stop waiting after stream abort");
+    }
+
+    expect(() => assertDriverExecutionResult(result)).not.toThrow();
+    expect(result.partial).toBe(false);
+    expect(result.messages).toBeUndefined();
+    expect(result.resolution.type).toBe("fail");
+    expect(result.resolution.error.message).toBe("execution cancelled");
+    expect(emittedEvents.map((event) => event.type)).toEqual([
+      "message.start",
+      "reasoning.done",
+      "message.done",
+    ]);
+  });
+
   test("runtime-core cancellation stops a pending provider stream and checkpoints partial output", async () => {
     const harness = createFakeKernelHarness();
     const provider = {
