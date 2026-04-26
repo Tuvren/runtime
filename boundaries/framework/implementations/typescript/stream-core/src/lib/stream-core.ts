@@ -57,6 +57,7 @@ class AsyncBroadcastQueue<T> implements AsyncIterable<T> {
   private closed = false;
   private failure?: unknown;
   private readonly items: T[] = [];
+  private readonly producerWaiters: Array<() => void> = [];
   private readonly waiters: AsyncQueueWaiter<T>[] = [];
 
   close(): void {
@@ -65,6 +66,7 @@ class AsyncBroadcastQueue<T> implements AsyncIterable<T> {
     }
 
     this.closed = true;
+    this.releaseProducerWaiters();
 
     while (this.waiters.length > 0) {
       this.waiters.shift()?.resolve({
@@ -80,15 +82,33 @@ class AsyncBroadcastQueue<T> implements AsyncIterable<T> {
     }
 
     this.failure = error;
+    this.releaseProducerWaiters();
 
     while (this.waiters.length > 0) {
       this.waiters.shift()?.reject(error);
     }
   }
 
+  canAcceptValue(): boolean {
+    // Each branch intentionally keeps at most one unread buffered event. That
+    // gives claimed-but-not-yet-polled branches a consistent replay point
+    // without letting tee fanout drain the upstream handle into an unbounded
+    // queue.
+    return this.waiters.length > 0 || this.items.length === 0;
+  }
+
   push(value: T): void {
     if (this.closed || this.failure !== undefined) {
       return;
+    }
+
+    if (!this.canAcceptValue()) {
+      throw new TuvrenRuntimeError(
+        "async broadcast queue received a value without downstream capacity",
+        {
+          code: "invalid_stream_adapter_state",
+        }
+      );
     }
 
     const waiter = this.waiters.shift();
@@ -109,6 +129,7 @@ class AsyncBroadcastQueue<T> implements AsyncIterable<T> {
       next: async (): Promise<IteratorResult<T>> => {
         if (this.items.length > 0) {
           const value = this.items.shift();
+          this.releaseProducerWaiter();
 
           if (value === undefined) {
             return {
@@ -122,6 +143,8 @@ class AsyncBroadcastQueue<T> implements AsyncIterable<T> {
             value,
           };
         }
+
+        this.releaseProducerWaiter();
 
         if (this.failure !== undefined) {
           throw this.failure;
@@ -149,6 +172,28 @@ class AsyncBroadcastQueue<T> implements AsyncIterable<T> {
         });
       },
     };
+  }
+
+  async waitForCapacity(): Promise<void> {
+    while (
+      !this.closed &&
+      this.failure === undefined &&
+      !this.canAcceptValue()
+    ) {
+      await new Promise<void>((resolve) => {
+        this.producerWaiters.push(resolve);
+      });
+    }
+  }
+
+  private releaseProducerWaiter(): void {
+    this.producerWaiters.shift()?.();
+  }
+
+  private releaseProducerWaiters(): void {
+    while (this.producerWaiters.length > 0) {
+      this.producerWaiters.shift()?.();
+    }
   }
 }
 
@@ -228,12 +273,14 @@ export function teeTuvrenStreamEvents(
   const sourceIterator = events[Symbol.asyncIterator]();
   // Fanout belongs above the canonical handle stream. Each tee branch still
   // keeps single-consumer semantics so hosts cannot accidentally replay one
-  // branch while the source stream remains strictly one-pass.
+  // branch while the source stream remains strictly one-pass. Source reads also
+  // follow claimed branch capacity so tee fanout does not silently drain the
+  // canonical stream into an unbounded unread buffer.
   const branches: TeeBranchState[] = Array.from(
     { length: branchCount },
     () => ({
       claimed: false,
-      open: true,
+      open: false,
       queue: new AsyncBroadcastQueue<TuvrenStreamEvent>(),
     })
   );
@@ -243,6 +290,7 @@ export function teeTuvrenStreamEvents(
 
   const closeBranches = () => {
     for (const branch of branches) {
+      branch.open = false;
       branch.queue.close();
     }
   };
@@ -253,11 +301,11 @@ export function teeTuvrenStreamEvents(
     }
   };
 
-  const countOpenBranches = (): number => {
+  const countClaimedOpenBranches = (): number => {
     let openBranchCount = 0;
 
     for (const branch of branches) {
-      if (branch.open) {
+      if (branch.claimed && branch.open) {
         openBranchCount += 1;
       }
     }
@@ -265,9 +313,41 @@ export function teeTuvrenStreamEvents(
     return openBranchCount;
   };
 
+  const waitForClaimedBranchCapacity = async (): Promise<void> => {
+    for (;;) {
+      const openBranches = branches.filter(
+        (branch) => branch.claimed && branch.open
+      );
+
+      if (openBranches.length === 0) {
+        return;
+      }
+
+      const saturatedBranches = openBranches.filter(
+        (branch) => !branch.queue.canAcceptValue()
+      );
+
+      if (saturatedBranches.length === 0) {
+        return;
+      }
+
+      await Promise.race(
+        saturatedBranches.map(async (branch) => {
+          await branch.queue.waitForCapacity();
+        })
+      );
+    }
+  };
+
   const pumpSource = async (): Promise<void> => {
     try {
       for (;;) {
+        await waitForClaimedBranchCapacity();
+
+        if (sourceReturning || countClaimedOpenBranches() === 0) {
+          return;
+        }
+
         const nextEvent = await sourceIterator.next();
 
         if (nextEvent.done) {
@@ -279,7 +359,7 @@ export function teeTuvrenStreamEvents(
         assertTuvrenStreamEvent(nextEvent.value, "tee source event");
 
         for (const branch of branches) {
-          if (!branch.open) {
+          if (!(branch.claimed && branch.open)) {
             continue;
           }
 
@@ -302,7 +382,7 @@ export function teeTuvrenStreamEvents(
   };
 
   const stopSourceIfNeeded = async (): Promise<void> => {
-    if (sourceClosed || sourceReturning || countOpenBranches() > 0) {
+    if (sourceClosed || sourceReturning || countClaimedOpenBranches() > 0) {
       return;
     }
 
@@ -330,6 +410,7 @@ export function teeTuvrenStreamEvents(
       }
 
       branch.claimed = true;
+      branch.open = true;
 
       const iterator = branch.queue[Symbol.asyncIterator]();
       let startedConsumption = false;
@@ -345,16 +426,17 @@ export function teeTuvrenStreamEvents(
         },
         return: async (): Promise<IteratorResult<TuvrenStreamEvent>> => {
           branch.open = false;
+          const closedResult: IteratorResult<TuvrenStreamEvent> = {
+            done: true,
+            value: undefined,
+          };
+          const result: IteratorResult<TuvrenStreamEvent> =
+            iterator.return === undefined
+              ? closedResult
+              : await iterator.return();
+
           await stopSourceIfNeeded();
-
-          if (iterator.return === undefined) {
-            return {
-              done: true,
-              value: undefined,
-            };
-          }
-
-          return await iterator.return();
+          return result;
         },
       };
     },

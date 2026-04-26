@@ -98,6 +98,9 @@ describe("stream-agui", () => {
     );
 
     expect(pausedTurnEvent?.value).toEqual(streamAdapterFixtures.pausedTurn[2]);
+    expect(pausedTurnEvent?.rawEvent).toEqual(
+      streamAdapterFixtures.pausedTurn[2]
+    );
   });
 
   test("uses the last fatal canonical error to emit RUN_ERROR on failed turns", async () => {
@@ -194,6 +197,79 @@ describe("stream-agui", () => {
     expect(events[2]).toMatchObject({
       delta: "Final only",
       type: EventType.TEXT_MESSAGE_CONTENT,
+    });
+  });
+
+  test("flushes open text, reasoning, and tool-call streams before RUN_ERROR", async () => {
+    const events = await collectEvents(
+      toAgUiEvents(
+        createFixtureStream([
+          {
+            threadId: "thread-failed",
+            timestamp: 1,
+            turnId: "turn-failed",
+            type: "turn.start",
+          },
+          {
+            delta: "Partial",
+            messageId: "message-failed",
+            timestamp: 2,
+            type: "text.delta",
+          },
+          {
+            delta: "Thinking",
+            messageId: "message-failed",
+            timestamp: 3,
+            type: "reasoning.delta",
+          },
+          {
+            callId: "call-failed",
+            messageId: "message-failed",
+            name: "search",
+            timestamp: 4,
+            type: "tool_call.start",
+          },
+          {
+            error: {
+              code: "provider_failure",
+              message: "provider failed",
+            },
+            fatal: true,
+            timestamp: 5,
+            type: "error",
+          },
+          {
+            status: "failed",
+            timestamp: 6,
+            turnId: "turn-failed",
+            type: "turn.end",
+          },
+        ] satisfies readonly TuvrenStreamEvent[])
+      )
+    );
+
+    expect(events.map((event) => event.type)).toEqual([
+      EventType.RUN_STARTED,
+      EventType.TEXT_MESSAGE_START,
+      EventType.TEXT_MESSAGE_CONTENT,
+      EventType.REASONING_START,
+      EventType.REASONING_MESSAGE_START,
+      EventType.REASONING_MESSAGE_CONTENT,
+      EventType.TOOL_CALL_START,
+      EventType.TEXT_MESSAGE_END,
+      EventType.REASONING_MESSAGE_END,
+      EventType.REASONING_END,
+      EventType.TOOL_CALL_END,
+      EventType.RUN_ERROR,
+    ]);
+    expect(events[7]?.rawEvent).toMatchObject({
+      status: "failed",
+      type: "turn.end",
+    });
+    expect(events[11]).toMatchObject({
+      code: "provider_failure",
+      message: "provider failed",
+      type: EventType.RUN_ERROR,
     });
   });
 });

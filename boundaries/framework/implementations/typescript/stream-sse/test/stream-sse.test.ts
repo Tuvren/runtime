@@ -47,6 +47,7 @@ describe("stream-sse", () => {
       {
         headers: {
           "cache-control": "private, no-store",
+          "content-type": "text/plain",
         },
       }
     );

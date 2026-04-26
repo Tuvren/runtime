@@ -24,18 +24,21 @@ import {
 } from "@tuvren/stream-core";
 
 interface PendingReasoningState {
+  messageId: string;
   messageStarted: boolean;
   started: boolean;
 }
 
 interface PendingTextState {
   ended: boolean;
+  messageId: string;
   sawContent: boolean;
   started: boolean;
 }
 
 interface PendingToolCallState {
   argsEmitted: boolean;
+  callId: string;
   name?: string;
   parentMessageId?: string;
   started: boolean;
@@ -91,6 +94,15 @@ export async function* toAgUiEvents(
         break;
       }
       case "turn.end": {
+        for (const pendingEvent of flushPendingAgUiSubstreams(
+          reasoningStates,
+          textStates,
+          toolCallStates,
+          event
+        )) {
+          yield pendingEvent;
+        }
+
         if (event.status === "failed") {
           yield validateAgUiEvent({
             code: latestFatalError?.error.code,
@@ -120,7 +132,8 @@ export async function* toAgUiEvents(
             yield createCustomAgUiEvent(
               "tuvren.runtime.turn.paused",
               event,
-              event.timestamp
+              event.timestamp,
+              event
             );
           }
 
@@ -161,6 +174,7 @@ export async function* toAgUiEvents(
         if (!textStates.has(event.messageId)) {
           textStates.set(event.messageId, {
             ended: false,
+            messageId: event.messageId,
             sawContent: false,
             started: false,
           });
@@ -226,6 +240,8 @@ export async function* toAgUiEvents(
             type: EventType.TEXT_MESSAGE_END,
           });
         }
+
+        textStates.delete(event.messageId);
         break;
       }
       case "reasoning.delta": {
@@ -299,6 +315,7 @@ export async function* toAgUiEvents(
           timestamp: event.timestamp,
           type: EventType.REASONING_END,
         });
+        reasoningStates.delete(reasoningId);
         break;
       }
       case "tool_call.start": {
@@ -306,6 +323,7 @@ export async function* toAgUiEvents(
 
         toolCallStates.set(event.callId, {
           argsEmitted: toolCallState?.argsEmitted ?? false,
+          callId: event.callId,
           name: event.name,
           parentMessageId: event.messageId,
           started: true,
@@ -350,7 +368,9 @@ export async function* toAgUiEvents(
       case "tool_call.done": {
         const toolCallState = toolCallStates.get(event.callId) ?? {
           argsEmitted: false,
+          callId: event.callId,
           name: event.name,
+          parentMessageId: undefined,
           started: false,
         };
 
@@ -388,6 +408,7 @@ export async function* toAgUiEvents(
           toolCallId: event.callId,
           type: EventType.TOOL_CALL_END,
         });
+        toolCallStates.delete(event.callId);
         break;
       }
       case "tool.result":
@@ -572,6 +593,7 @@ function ensureReasoningState(
 
   const nextState: PendingReasoningState = {
     messageStarted: false,
+    messageId: reasoningId,
     started: false,
   };
   states.set(reasoningId, nextState);
@@ -590,11 +612,88 @@ function ensureTextState(
 
   const nextState: PendingTextState = {
     ended: false,
+    messageId,
     sawContent: false,
     started: false,
   };
   states.set(messageId, nextState);
   return nextState;
+}
+
+function flushPendingAgUiSubstreams(
+  reasoningStates: Map<string, PendingReasoningState>,
+  textStates: Map<string, PendingTextState>,
+  toolCallStates: Map<string, PendingToolCallState>,
+  terminalEvent: Extract<TuvrenStreamEvent, { type: "turn.end" }>
+): readonly AGUIEvent[] {
+  const flushedEvents: AGUIEvent[] = [];
+  const createTerminalRawEvent = (): TuvrenStreamEvent =>
+    cloneTuvrenStreamEvent(terminalEvent);
+
+  // AG-UI child streams should never remain open after the enclosing turn ends,
+  // even on failure paths where the canonical stream terminates before an
+  // explicit *.done event arrives. We anchor the synthesized closes to turn.end
+  // so host debuggers can distinguish adapter cleanup from canonical events.
+  for (const textState of textStates.values()) {
+    if (!textState.started || textState.ended) {
+      continue;
+    }
+
+    flushedEvents.push(
+      validateAgUiEvent({
+        messageId: textState.messageId,
+        rawEvent: createTerminalRawEvent(),
+        timestamp: terminalEvent.timestamp,
+        type: EventType.TEXT_MESSAGE_END,
+      })
+    );
+  }
+  textStates.clear();
+
+  for (const reasoningState of reasoningStates.values()) {
+    if (!reasoningState.started) {
+      continue;
+    }
+
+    if (reasoningState.messageStarted) {
+      flushedEvents.push(
+        validateAgUiEvent({
+          messageId: reasoningState.messageId,
+          rawEvent: createTerminalRawEvent(),
+          timestamp: terminalEvent.timestamp,
+          type: EventType.REASONING_MESSAGE_END,
+        })
+      );
+    }
+
+    flushedEvents.push(
+      validateAgUiEvent({
+        messageId: reasoningState.messageId,
+        rawEvent: createTerminalRawEvent(),
+        timestamp: terminalEvent.timestamp,
+        type: EventType.REASONING_END,
+      })
+    );
+  }
+  reasoningStates.clear();
+
+  for (const toolCallState of toolCallStates.values()) {
+    if (!toolCallState.started) {
+      continue;
+    }
+
+    flushedEvents.push(
+      validateAgUiEvent({
+        rawEvent: createTerminalRawEvent(),
+        timestamp: terminalEvent.timestamp,
+        toolCallId: toolCallState.callId,
+        type: EventType.TOOL_CALL_END,
+      })
+    );
+  }
+  toolCallStates.clear();
+
+  return flushedEvents;
 }
 
 function serializeAgUiTextValue(value: unknown): string {

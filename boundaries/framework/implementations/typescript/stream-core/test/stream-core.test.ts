@@ -128,6 +128,53 @@ describe("stream-core", () => {
       type: "file.done",
     });
   });
+
+  test("stops the source when the only active branch returns and siblings were never claimed", async () => {
+    const source = createInstrumentedSource(
+      streamAdapterFixtures.completedTurn
+    );
+    const [activeBranch] = teeTuvrenStreamEvents(source.events, 2);
+    const iterator = activeBranch[Symbol.asyncIterator]();
+
+    expect(await iterator.next()).toMatchObject({
+      done: false,
+      value: streamAdapterFixtures.completedTurn[0],
+    });
+
+    await iterator.return?.();
+    await waitForAsyncTurn();
+
+    expect(source.returned).toBe(1);
+    expect(source.produced).toBeLessThanOrEqual(2);
+  });
+
+  test("applies backpressure to claimed branches that have not started polling yet", async () => {
+    const source = createInstrumentedSource(
+      streamAdapterFixtures.completedTurn
+    );
+    const [leftBranch, rightBranch] = teeTuvrenStreamEvents(source.events, 2);
+    const leftIterator = leftBranch[Symbol.asyncIterator]();
+    const rightIterator = rightBranch[Symbol.asyncIterator]();
+
+    expect(await leftIterator.next()).toMatchObject({
+      done: false,
+      value: streamAdapterFixtures.completedTurn[0],
+    });
+    await waitForAsyncTurn();
+
+    // The idle claimed branch is allowed to hold one unread event, but it must
+    // also hold upstream progress there until it either polls or closes.
+    expect(source.produced).toBe(1);
+
+    expect(await rightIterator.next()).toMatchObject({
+      done: false,
+      value: streamAdapterFixtures.completedTurn[0],
+    });
+
+    await Promise.all([leftIterator.return?.(), rightIterator.return?.()]);
+    await waitForAsyncTurn();
+    expect(source.returned).toBe(1);
+  });
 });
 
 async function collectEvents<T>(events: AsyncIterable<T>): Promise<T[]> {
@@ -138,4 +185,62 @@ async function collectEvents<T>(events: AsyncIterable<T>): Promise<T[]> {
   }
 
   return collected;
+}
+
+function createInstrumentedSource(events: readonly TuvrenStreamEvent[]): {
+  events: AsyncIterable<TuvrenStreamEvent>;
+  produced: number;
+  returned: number;
+} {
+  let index = 0;
+  let produced = 0;
+  let returned = 0;
+
+  return {
+    get events(): AsyncIterable<TuvrenStreamEvent> {
+      return {
+        [Symbol.asyncIterator](): AsyncIterator<TuvrenStreamEvent> {
+          return {
+            next(): Promise<IteratorResult<TuvrenStreamEvent>> {
+              const event = events[index];
+
+              if (event === undefined) {
+                return Promise.resolve({
+                  done: true,
+                  value: undefined,
+                });
+              }
+
+              index += 1;
+              produced += 1;
+
+              return Promise.resolve({
+                done: false,
+                value: cloneTuvrenStreamEvent(event),
+              });
+            },
+            return(): Promise<IteratorResult<TuvrenStreamEvent>> {
+              returned += 1;
+              return Promise.resolve({
+                done: true,
+                value: undefined,
+              });
+            },
+          };
+        },
+      };
+    },
+    get produced(): number {
+      return produced;
+    },
+    get returned(): number {
+      return returned;
+    },
+  };
+}
+
+async function waitForAsyncTurn(): Promise<void> {
+  await new Promise<void>((resolve) => {
+    setTimeout(resolve, 0);
+  });
 }

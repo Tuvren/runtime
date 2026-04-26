@@ -134,6 +134,9 @@ function mergeSseHeaders(headersInit: HeadersInit | undefined): Headers {
     headers.set(key, value);
   }
 
+  // Callers may tune cache or transfer headers, but this helper must always
+  // remain EventSource-compatible.
+  headers.set("content-type", SSE_RESPONSE_HEADERS["content-type"]);
   return headers;
 }
 
