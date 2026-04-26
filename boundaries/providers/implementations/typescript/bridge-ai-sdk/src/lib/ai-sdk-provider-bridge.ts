@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+import { randomUUID } from "node:crypto";
 import type {
   JSONSchema7,
   LanguageModelV3,
@@ -1455,20 +1456,20 @@ function mapGeneratedToolCallPart(
     modelId: result.response?.modelId ?? "unknown",
     provider: "unknown",
   });
+  const providerMetadata = sanitizeRecord(contentPart.providerMetadata);
 
   return {
-    callId: contentPart.toolCallId,
+    callId: randomUUID(),
     input: parseJsonInput(
       contentPart.input,
       "tool call input",
       "invalid_ai_sdk_tool_call_input"
     ),
     name: contentPart.toolName,
-    ...(contentPart.providerMetadata === undefined
-      ? {}
-      : {
-          providerMetadata: sanitizeRecord(contentPart.providerMetadata),
-        }),
+    providerMetadata: {
+      ...(providerMetadata === undefined ? {} : providerMetadata),
+      providerCallId: contentPart.toolCallId,
+    },
     type: "tool_call",
   };
 }

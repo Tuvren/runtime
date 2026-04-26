@@ -44,10 +44,12 @@ without rediscovering AI SDK provider behavior.
     back into AI SDK `providerOptions`: Anthropic reasoning `signature` /
     `redactedData`, Google or Vertex `thoughtSignature` on text or reasoning
     parts, and OpenAI/Azure `reasoningEncryptedContent`
-  - flat durable streamed reasoning `providerMetadata.signature` from the
-    shared stream seam is normalized back into Anthropic `signature` or
-    Google/Vertex `thoughtSignature` based on the active bridge provider so
-    streamed continuity tokens survive prompt history
+  - streamed reasoning continuity may still land as flat durable
+    `providerMetadata.signature` because the shared stream seam only exposes a
+    generic signature token
+  - replay therefore uses active-provider heuristics for Anthropic or
+    Google/Vertex ids; arbitrary wrapper ids must persist namespaced metadata
+    to avoid ambiguity
   - assistant response-level metadata, synthetic `aiSdkBridge` metadata,
     request IDs, and other output-only namespaces are not replayed as prompt
     options
@@ -66,6 +68,9 @@ without rediscovering AI SDK provider behavior.
   - canonical generated text, reasoning, file, tool-call, and synthesized
     structured parts preserve AI SDK `providerMetadata` where the shared
     durable content seam exposes a matching field
+  - generate-mode tool calls synthesize framework-owned `callId` values and
+    preserve the native AI SDK `toolCallId` under
+    `providerMetadata.providerCallId`, matching the stream path’s durable shape
   - structured-output turns may legitimately return only `tool_call` parts when
     the provider finishes with `tool-calls`; the bridge does not require JSON
     output until the final structured answer turn
@@ -130,4 +135,5 @@ without rediscovering AI SDK provider behavior.
 - `bun run nx run providers-bridge-ai-sdk:typecheck`
 - `bun run nx run providers-bridge-ai-sdk:test`
 - `bun run nx run providers-bridge-ai-sdk:exports-smoke`
+- `bun run nx run framework-driver-react:test`
 - `bun run nx run framework-runtime-core:test`

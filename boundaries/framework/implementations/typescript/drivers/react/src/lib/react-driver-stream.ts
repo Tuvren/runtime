@@ -441,7 +441,7 @@ class StreamAccumulator {
   }): TuvrenModelResponse {
     const parts: TuvrenModelResponse["parts"] = [];
     const partial = options?.partial === true;
-    const pendingRedactedReasoningMetadata = collectRedactedReasoningMetadata(
+    const pendingReasoningProviderMetadata = collectReasoningProviderMetadata(
       this.finishChunk?.providerMetadata
     );
 
@@ -453,7 +453,7 @@ class StreamAccumulator {
       const finalizedPart = finalizeAccumulatedPart({
         part,
         partial,
-        pendingRedactedReasoningMetadata,
+        pendingReasoningProviderMetadata,
       });
 
       if (finalizedPart !== undefined) {
@@ -882,7 +882,7 @@ class StreamAccumulator {
 function finalizeAccumulatedPart(input: {
   part: AccumulatedPart;
   partial: boolean;
-  pendingRedactedReasoningMetadata: Record<string, unknown>[];
+  pendingReasoningProviderMetadata: Record<string, unknown>[];
 }): TuvrenModelResponse["parts"][number] | undefined {
   switch (input.part.kind) {
     case "text":
@@ -893,7 +893,8 @@ function finalizeAccumulatedPart(input: {
     case "reasoning":
       return finalizeReasoningPart(
         input.part,
-        input.pendingRedactedReasoningMetadata
+        input.partial,
+        input.pendingReasoningProviderMetadata
       );
     case "structured":
       return finalizeStructuredPart(input.part, input.partial);
@@ -908,18 +909,25 @@ function finalizeAccumulatedPart(input: {
 
 function finalizeReasoningPart(
   part: Extract<AccumulatedPart, { kind: "reasoning" }>,
-  pendingRedactedReasoningMetadata: Record<string, unknown>[]
-): Extract<TuvrenModelResponse["parts"][number], { type: "reasoning" }> {
-  const redactedReasoningMetadata =
-    part.text.length === 0 && part.signature === undefined
-      ? pendingRedactedReasoningMetadata.shift()
+  partial: boolean,
+  pendingReasoningProviderMetadata: Record<string, unknown>[]
+):
+  | Extract<TuvrenModelResponse["parts"][number], { type: "reasoning" }>
+  | undefined {
+  const providerMetadata =
+    part.signature !== undefined || part.text.length === 0
+      ? pendingReasoningProviderMetadata.shift()
       : undefined;
 
   if (
     part.text.length === 0 &&
     part.signature === undefined &&
-    redactedReasoningMetadata === undefined
+    providerMetadata === undefined
   ) {
+    if (partial) {
+      return undefined;
+    }
+
     throw new TuvrenProviderError(
       "provider stream produced empty reasoning without redacted metadata",
       {
@@ -930,13 +938,13 @@ function finalizeReasoningPart(
 
   return {
     providerMetadata:
-      redactedReasoningMetadata ??
+      providerMetadata ??
       (part.signature === undefined
         ? undefined
         : {
             signature: part.signature,
           }),
-    redacted: redactedReasoningMetadata !== undefined,
+    redacted: hasAnthropicRedactedData(providerMetadata),
     text: part.text,
     type: "reasoning",
   };
@@ -980,7 +988,7 @@ function finalizeToolCallPart(
       };
 }
 
-function collectRedactedReasoningMetadata(
+function collectReasoningProviderMetadata(
   providerMetadata: Record<string, unknown> | undefined
 ): Record<string, unknown>[] {
   const aiSdkBridge = isPlainObject(providerMetadata?.aiSdkBridge)
@@ -989,32 +997,59 @@ function collectRedactedReasoningMetadata(
   const streamPartMetadata = Array.isArray(aiSdkBridge?.streamPartMetadata)
     ? aiSdkBridge.streamPartMetadata
     : [];
-  const redactedMetadata: Record<string, unknown>[] = [];
+  const reasoningMetadataById = new Map<string, Record<string, unknown>>();
+  const reasoningMetadataInOrder: Record<string, unknown>[] = [];
 
   for (const entry of streamPartMetadata) {
-    if (!isPlainObject(entry) || entry.type !== "reasoning-start") {
+    if (
+      !isPlainObject(entry) ||
+      (entry.type !== "reasoning-start" &&
+        entry.type !== "reasoning-delta" &&
+        entry.type !== "reasoning-end") ||
+      typeof entry.id !== "string"
+    ) {
       continue;
     }
 
     const entryProviderMetadata = isPlainObject(entry.providerMetadata)
       ? entry.providerMetadata
       : undefined;
-    const anthropicMetadata = isPlainObject(entryProviderMetadata?.anthropic)
-      ? entryProviderMetadata.anthropic
-      : undefined;
 
-    if (typeof anthropicMetadata?.redactedData !== "string") {
+    if (entryProviderMetadata === undefined) {
       continue;
     }
 
-    redactedMetadata.push({
-      anthropic: {
-        redactedData: anthropicMetadata.redactedData,
-      },
-    });
+    let reasoningMetadata = reasoningMetadataById.get(entry.id);
+
+    if (reasoningMetadata === undefined) {
+      reasoningMetadata = {};
+      reasoningMetadataById.set(entry.id, reasoningMetadata);
+      reasoningMetadataInOrder.push(reasoningMetadata);
+    }
+
+    for (const [providerName, providerValue] of Object.entries(
+      entryProviderMetadata
+    )) {
+      reasoningMetadata[providerName] = cloneValue(providerValue);
+    }
   }
 
-  return redactedMetadata;
+  return reasoningMetadataInOrder;
+}
+
+function hasAnthropicRedactedData(
+  providerMetadata: Record<string, unknown> | undefined
+): boolean {
+  if (!isPlainObject(providerMetadata)) {
+    return false;
+  }
+
+  const anthropicMetadata = providerMetadata.anthropic;
+
+  return (
+    isPlainObject(anthropicMetadata) &&
+    typeof anthropicMetadata.redactedData === "string"
+  );
 }
 
 function closeProviderIterator(

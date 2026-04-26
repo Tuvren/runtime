@@ -661,6 +661,65 @@ describe("provider-bridge-ai-sdk", () => {
     ]);
   });
 
+  test("replays OpenAI reasoning encrypted content on assistant reasoning parts", async () => {
+    let capturedOptions: LanguageModelV3CallOptions | undefined;
+    const bridge = createAiSdkProviderBridge({
+      model: createMockModel({
+        async doGenerate(options) {
+          await Promise.resolve();
+          capturedOptions = options;
+          return createGenerateResult();
+        },
+        provider: "openai",
+      }),
+    });
+
+    await bridge.generate({
+      messages: [
+        {
+          parts: [
+            {
+              providerMetadata: {
+                openai: {
+                  reasoningEncryptedContent: "enc-1",
+                },
+              },
+              redacted: false,
+              text: "Thinking",
+              type: "reasoning",
+            },
+          ],
+          role: "assistant",
+        },
+        {
+          parts: [{ text: "Continue", type: "text" }],
+          role: "user",
+        },
+      ],
+    });
+
+    expect(capturedOptions?.prompt).toEqual([
+      {
+        content: [
+          {
+            providerOptions: {
+              openai: {
+                reasoningEncryptedContent: "enc-1",
+              },
+            },
+            text: "Thinking",
+            type: "reasoning",
+          },
+        ],
+        role: "assistant",
+      },
+      {
+        content: [{ text: "Continue", type: "text" }],
+        role: "user",
+      },
+    ]);
+  });
+
   test("replays Google reasoning thought signatures on assistant reasoning parts", async () => {
     let capturedOptions: LanguageModelV3CallOptions | undefined;
     const bridge = createAiSdkProviderBridge({
@@ -847,14 +906,17 @@ describe("provider-bridge-ai-sdk", () => {
       expect.objectContaining({
         finishReason: "tool_call",
         parts: [
-          {
-            callId: "call-1",
+          expect.objectContaining({
+            callId: expect.any(String),
             input: {
               query: "docs",
             },
             name: "search",
+            providerMetadata: {
+              providerCallId: "call-1",
+            },
             type: "tool_call",
-          },
+          }),
         ],
       })
     );
@@ -1741,14 +1803,16 @@ describe("provider-bridge-ai-sdk", () => {
       expect.arrayContaining([
         expect.objectContaining({
           parts: [
-            {
+            expect.objectContaining({
               providerMetadata: {
-                signature: "sig-stream",
+                anthropic: {
+                  signature: "sig-stream",
+                },
               },
               redacted: false,
               text: "Thinking",
               type: "reasoning",
-            },
+            }),
           ],
           role: "assistant",
         }),
