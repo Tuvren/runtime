@@ -2,7 +2,7 @@
 
 ## 0. Version History & Changelog
 
-- v0.7.3 - Closed Epic P in repo reality, added the playground host closure inventory, advanced the active critical path to Epic Q, and recorded the Node-backed SQLite scenario validation path.
+- v0.7.3 - Closed Epic P in repo reality, added the playground host closure inventory, advanced the active critical path to Epic Q, recorded the Node-backed SQLite scenario validation path, and aligned forked-branch parent validation across runtime, memory, and SQLite backends.
 - v0.7.2 - Closed Epic O in repo reality, added the stream adapter closure inventory, advanced the active critical path to Epic P, and archived the host stream adapter line as implementation-proven.
 - v0.7.1 - Closed Epic N in repo reality, corrected the AI SDK bridge plan to the stable shared stream seam, added the Epic N closure inventory, and advanced the active critical path to Epic O.
 - v0.7.0 - Activated sequential Epics N-Q for the post-ReAct implementation line: `LanguageModelV3` AI SDK provider bridge, host stream protocol adapters, playground host harness, and testkit/release hardening.
@@ -23,7 +23,7 @@
 - Planning verification confirmed `ai@6.0.142` and `@ai-sdk/provider@3.0.8` are available and that `@ai-sdk/provider@3.0.8` exports `LanguageModelV3`, `ProviderV3`, `LanguageModelV3CallOptions`, `LanguageModelV3GenerateResult`, and `LanguageModelV3StreamPart`.
 - Epic N now extends repo reality beyond those planning notes: the bridge package exists and the closure artifact above is the authoritative upstream seam for Epic O.
 - Epic O now extends repo reality beyond those planning notes: `@tuvren/stream-core`, `@tuvren/stream-sse`, and `@tuvren/stream-agui` exist, `constitution/spikes/epic-o-stream-adapter-inventory.md` is the authoritative adapter mapping record, and Epic P must treat tee-based fanout plus the documented `tuvren.runtime.*` AG-UI custom namespace as the handoff surface rather than rediscovering protocol gaps or resubscription hazards.
-- Epic P now extends repo reality beyond those planning notes: `@tuvren/playground-host` exists under `boundaries/hosts/implementations/typescript/playground`, `constitution/spikes/epic-p-playground-host-inventory.md` is the authoritative playground handoff, full-turn streams cover canonical/SSE/AG-UI fanout, approval resume continuation is projected to canonical/SSE only, and SQLite reload is validated through the built Node CLI path.
+- Epic P now extends repo reality beyond those planning notes: `@tuvren/playground-host` exists under `boundaries/hosts/implementations/typescript/playground`, `constitution/spikes/epic-p-playground-host-inventory.md` is the authoritative playground handoff, full-turn streams cover canonical/SSE/AG-UI fanout, approval resume continuation is projected to canonical/SSE only, non-reload memory scenarios run under Bun tests, branching is validated from a completed source head, and SQLite reload is validated through the built Node CLI path.
 
 ### Sequential Scope Rule
 
@@ -71,7 +71,7 @@
 - Epic M delivered ReAct tool continuation, approval pause/resume, edited and rejected approval handling, partial batch durability, and the tool-and-approval inventory artifact.
 - Epic N delivered the baseline AI SDK provider bridge on `LanguageModelV3` / `ProviderV3`, preserved the shared `ProviderStreamChunk` seam, synthesized structured output from JSON text, and recorded the unsupported provider-owned tool/file surfaces in the Epic N bridge inventory artifact.
 - Epic O delivered `@tuvren/stream-core`, `@tuvren/stream-sse`, and `@tuvren/stream-agui`, proved tee-based host fanout over canonical `ExecutionHandle.events()` streams, pinned AG-UI to `@ag-ui/core@0.0.52`, and recorded the lossy/custom fallback matrix in the Epic O stream adapter inventory artifact.
-- Epic P delivered `@tuvren/playground-host`, proved local host embedding across memory and Node-backed SQLite reload, exercised canonical/SSE/AG-UI stream projection, approval pause/resume, branching, cancellation, deterministic fixture provider mode, AI SDK mock provider mode, and recorded downstream hardening assumptions in the Epic P playground host inventory artifact.
+- Epic P delivered `@tuvren/playground-host`, proved local host embedding across memory and Node-backed SQLite reload, exercised canonical/SSE/AG-UI stream projection, structured output, tool calls, provider metadata, approval pause/resume, steering, branching from a completed source head, cancellation, deterministic fixture provider mode, AI SDK mock provider mode, and recorded downstream hardening assumptions in the Epic P playground host inventory artifact.
 
 ## 3. Build Order (Mermaid)
 
@@ -116,9 +116,11 @@ flowchart LR
 - Closure artifact: `constitution/spikes/epic-p-playground-host-inventory.md`
 - Durable outcome:
   - `@tuvren/playground-host` now owns the private local host harness under `boundaries/hosts/implementations/typescript/playground`.
-  - full-turn playground streams prove tee-based canonical, SSE, and AG-UI projection over public runtime handles.
-  - approval resume continuation remains canonical/SSE-projected because AG-UI requires a complete turn lifecycle.
-  - SQLite reload is validated through the built Node CLI target, matching the Node-first `better-sqlite3` backend dependency.
+  - the scenario matrix covers streaming, structured output, tools, approval pause/resume, cancellation, metadata, branching, steering, and SQLite reload with explicit report checks that fail the CLI when false.
+  - non-reload memory scenarios run under Bun tests; SQLite reload runs through the built Node CLI target, matching the Node-first `better-sqlite3` backend dependency.
+  - full-turn playground streams prove tee-based canonical, SSE, and AG-UI projection over public runtime handles; approval resume continuation remains canonical/SSE-projected because AG-UI requires a complete turn lifecycle.
+  - branching is validated from the completed source head with durable branch-message inspection, and forked-branch parent validation is aligned across runtime-core, memory, SQLite, and the shared backend invariant suite.
+  - provider metadata and steering are asserted against durable/runtime evidence rather than only generic turn completion.
 
 **KRT-P001 Playground Host Scope Inventory**
 

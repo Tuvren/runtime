@@ -51,3 +51,11 @@ Tests use Bun (`bun test`) and, for some Node-bound targets, package-specific Nx
 ## Pull Request Follow-Up
 
 When review feedback changes behavior, validation scope, docs, or follow-up context, update the PR body before merge so it reflects the final branch rather than the initial submission.
+
+## Review-Learned Guardrails
+
+- When an epic claims a scenario matrix, every named scenario needs an automated check path that asserts all report checks, not just a few representative examples.
+- For reload, branching, approval resume, steering, and metadata claims, validate the specific public behavior and durable state being claimed; do not treat object existence or generic turn completion as sufficient evidence.
+- If review exposes a mismatch between specs, framework tests, backend invariants, and package behavior, step back and align the contract, implementation, tests, docs, and constitution together instead of patching only the visible symptom.
+- When a smoke target persists state, prefer disposable inputs or explicit cleanup so repeated validation cannot inherit stale state.
+- Keep review-fix comments short and intentional: explain non-obvious validation boundaries, such as why memory reload checks intentionally fail or why a scenario is Node-backed.
