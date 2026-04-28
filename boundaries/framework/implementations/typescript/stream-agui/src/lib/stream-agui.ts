@@ -74,17 +74,15 @@ export async function* toAgUiEvents(
   for await (const event of events) {
     switch (event.type) {
       case "turn.start": {
-        // Tuvren exposes turn ids, not AG-UI-native run ids. Resumed executions
-        // therefore derive a stable adapter-local run id instead of inventing a
-        // new canonical runtime field.
-        activeRunId =
-          event.resumedFrom === undefined
-            ? event.turnId
-            : `${event.turnId}:resume:${event.resumedFrom}`;
+        // AG-UI already models resumed lineage with parentRunId, so resumed
+        // turns keep the canonical turn id as runId instead of encoding lineage
+        // into a synthetic identifier that hosts would have to parse back out.
+        activeRunId = event.turnId;
         activeThreadId = event.threadId;
         latestFatalError = undefined;
 
         yield validateAgUiEvent({
+          parentRunId: event.resumedFrom,
           rawEvent: cloneTuvrenStreamEvent(event),
           runId: activeRunId,
           threadId: activeThreadId,
@@ -103,23 +101,25 @@ export async function* toAgUiEvents(
           yield pendingEvent;
         }
 
+        // All terminal paths must still prove that the canonical run lifecycle
+        // started correctly before the adapter projects a terminal AG-UI event.
+        const activeRunState = requireActiveRunState(
+          activeRunId,
+          activeThreadId,
+          event
+        );
+
         if (event.status === "failed") {
           yield validateAgUiEvent({
             code: latestFatalError?.error.code,
             message:
               latestFatalError?.error.message ??
               `Turn "${event.turnId}" failed without a fatal error event.`,
-            rawEvent: cloneTuvrenStreamEvent(event),
+            rawEvent: cloneTuvrenStreamEvent(latestFatalError ?? event),
             timestamp: event.timestamp,
             type: EventType.RUN_ERROR,
           });
         } else {
-          const activeRunState = requireActiveRunState(
-            activeRunId,
-            activeThreadId,
-            event
-          );
-
           if (event.status === "paused") {
             reportWarning({
               code: CUSTOM_FALLBACK_WARNING_CODES.pausedTurn,

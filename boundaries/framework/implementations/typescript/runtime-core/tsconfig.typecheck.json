@@ -22,7 +22,6 @@
         "../../../contracts/runtime-api/src/tools.ts"
       ],
       "@tuvren/driver-api": ["../../../contracts/driver-api/src/index.ts"],
-      "@tuvren/driver-react": ["../drivers/react/src/index.ts"],
       "@tuvren/kernel-protocol": [
         "../../../../kernel/contracts/protocol/src/index.ts"
       ],
@@ -39,7 +38,6 @@
     "test/**/*.ts",
     "../../../contracts/runtime-api/src/**/*.ts",
     "../../../contracts/driver-api/src/**/*.ts",
-    "../drivers/react/src/**/*.ts",
     "../../../../kernel/contracts/protocol/src/**/*.ts",
     "../../../../shared/contracts/core-types/src/**/*.ts",
     "../stream-core/src/**/*.ts",

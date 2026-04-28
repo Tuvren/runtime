@@ -54,9 +54,10 @@ assumptions that Epic P inherits.
 ### AG-UI direct mappings
 - `turn.start` -> `RUN_STARTED`
   - `runId = turnId`
-  - resumed streams use `runId = ${turnId}:resume:${resumedFrom}`
+  - resumed streams preserve `parentRunId = resumedFrom`
 - `turn.end` completed -> `RUN_FINISHED`
 - `turn.end` failed -> `RUN_ERROR` using the latest fatal canonical `error`
+  as `rawEvent` when present
 - `iteration.start` / `iteration.end` -> `STEP_STARTED` / `STEP_FINISHED`
   - `stepName = iteration-${iterationCount}`
 - `text.delta` / `text.done` -> `TEXT_MESSAGE_*`
@@ -121,14 +122,18 @@ cannot fail adapter execution by throwing inside `onWarning`.
 - Package-local tests:
   - `stream-core`: tee fanout, warning dedupe, JSON-safe binary serialization
   - `stream-sse`: frame mapping, response headers, binary warning path
-  - `stream-agui`: direct mappings, paused coercion, fatal error mapping,
-    synthesized tool-call args, synthesized text content
+  - `stream-agui`: direct mappings, resumed lineage projection, paused
+    coercion, fatal error mapping, failed-lifecycle validation, synthesized
+    tool-call args, synthesized text content, and terminal failure flushes
 - Smoke coverage:
   - package export smoke tests exist for all three packages
 - Runtime integration coverage:
   - `runtime-core/test/stream-adapters.test.ts` proves tee-based adapter use on
     real `ExecutionHandle.events()` flows for completed, paused/resumed,
     structured-output, steered, and cancelled turns
+  - `drivers/react/test/react-driver.test.ts` proves provider-streamed success
+    and provider-streamed failure flows through tee fanout into canonical, SSE,
+    and AG-UI adapter consumers
 
 ## Downstream Assumptions For Epic P
 - Hosts must call `handle.events()` once and fan out with
@@ -146,12 +151,9 @@ cannot fail adapter execution by throwing inside `onWarning`.
   or live provider file streaming exist in canonical runtime output.
 
 ## Validation Performed
-- `bun run nx run-many -t typecheck -p framework-stream-core,framework-stream-sse,framework-stream-agui`
+- `bun run nx run framework-runtime-core:build`
 - `bun run nx run framework-runtime-core:typecheck`
-- `bun test boundaries/framework/implementations/typescript/stream-core/test/stream-core.test.ts`
-- `bun test boundaries/framework/implementations/typescript/stream-core/smoke/package-exports.ts`
-- `bun test boundaries/framework/implementations/typescript/stream-sse/test/stream-sse.test.ts`
-- `bun test boundaries/framework/implementations/typescript/stream-sse/smoke/package-exports.ts`
-- `bun test boundaries/framework/implementations/typescript/stream-agui/test/stream-agui.test.ts`
-- `bun test boundaries/framework/implementations/typescript/stream-agui/smoke/package-exports.ts`
-- `bun test boundaries/framework/implementations/typescript/runtime-core/test/stream-adapters.test.ts`
+- `bun run typecheck`
+- `bun run nx run framework-stream-agui:test`
+- `bun run nx run framework-runtime-core:test`
+- `bun run nx run framework-driver-react:test`

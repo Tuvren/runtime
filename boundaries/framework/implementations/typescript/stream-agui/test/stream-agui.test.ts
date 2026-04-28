@@ -104,6 +104,15 @@ describe("stream-agui", () => {
   });
 
   test("uses the last fatal canonical error to emit RUN_ERROR on failed turns", async () => {
+    const failureEvent = streamAdapterFixtures.failedTurn.find(
+      (event): event is Extract<TuvrenStreamEvent, { type: "error" }> =>
+        event.type === "error"
+    );
+
+    if (failureEvent === undefined) {
+      throw new Error("expected failed-turn fixture to include a fatal error");
+    }
+
     const events = await collectEvents(
       toAgUiEvents(createFixtureStream(streamAdapterFixtures.failedTurn))
     );
@@ -117,6 +126,7 @@ describe("stream-agui", () => {
       message: "execution cancelled",
       type: EventType.RUN_ERROR,
     });
+    expect(events[1]?.rawEvent).toEqual(failureEvent);
   });
 
   test("synthesizes missing tool-call args from tool_call.done input", async () => {
@@ -271,6 +281,59 @@ describe("stream-agui", () => {
       message: "provider failed",
       type: EventType.RUN_ERROR,
     });
+  });
+
+  test("uses parentRunId for resumed RUN_STARTED events", async () => {
+    const events = await collectEvents(
+      toAgUiEvents(
+        createFixtureStream([
+          {
+            resumedFrom: "1".repeat(64),
+            threadId: "thread-resumed",
+            timestamp: 1,
+            turnId: "turn-resumed",
+            type: "turn.start",
+          },
+          {
+            status: "completed",
+            timestamp: 2,
+            turnId: "turn-resumed",
+            type: "turn.end",
+          },
+        ] satisfies readonly TuvrenStreamEvent[])
+      )
+    );
+
+    expect(events[0]).toMatchObject({
+      parentRunId: "1".repeat(64),
+      runId: "turn-resumed",
+      type: EventType.RUN_STARTED,
+    });
+  });
+
+  test("rejects failed turns that never emitted turn.start", async () => {
+    try {
+      await collectEvents(
+        toAgUiEvents(
+          createFixtureStream([
+            {
+              status: "failed",
+              timestamp: 1,
+              turnId: "turn-missing-start",
+              type: "turn.end",
+            },
+          ] satisfies readonly TuvrenStreamEvent[])
+        )
+      );
+      throw new Error(
+        "expected a failed turn without turn.start to be rejected"
+      );
+    } catch (error: unknown) {
+      expect(error).toBeInstanceOf(Error);
+      expect((error as { code?: string }).code).toBe(
+        "invalid_stream_adapter_state"
+      );
+    }
   });
 });
 
