@@ -19,7 +19,7 @@ import {
   collectProviderStream,
   createStaticTuvrenProvider,
   providerTestkitFixtures,
-} from "../src/index.ts";
+} from "@tuvren/provider-testkit";
 
 describe("@tuvren/provider-testkit package exports", () => {
   test("exposes provider testkit helpers", async () => {

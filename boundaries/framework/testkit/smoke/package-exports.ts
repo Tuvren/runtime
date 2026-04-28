@@ -19,7 +19,7 @@ import {
   collectTuvrenStreamEvents,
   createFixtureEventStream,
   frameworkStreamTestFixtures,
-} from "../src/index.ts";
+} from "@tuvren/framework-testkit";
 
 describe("@tuvren/framework-testkit package exports", () => {
   test("exposes framework stream test helpers", async () => {
