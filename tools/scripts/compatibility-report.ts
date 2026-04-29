@@ -58,7 +58,6 @@ interface CompatibilitySuite {
 interface ConformanceRunner {
   implementationId: string;
   manifestPath: string;
-  packageJsonPath: string;
   project: string;
 }
 
@@ -79,26 +78,24 @@ const COMPATIBILITY_SCHEMA_PATH = resolve(
 );
 const EVIDENCE_DIRECTORY = resolve(REPO_ROOT, "reports/compatibility/evidence");
 const ajv = new Ajv2020({ allErrors: true, strict: false });
+const TRANSITION_IMPLEMENTATION_VERSION = "unreleased-workspace";
 
 const CONFORMANCE_RUNNERS: readonly ConformanceRunner[] = [
   {
     implementationId: "typescript-framework",
     manifestPath:
       "boundaries/framework/conformance/scenarios/suite-manifest.json",
-    packageJsonPath: "boundaries/framework/testkit/package.json",
     project: "framework-testkit",
   },
   {
     implementationId: "typescript-kernel",
     manifestPath: "boundaries/kernel/conformance/scenarios/suite-manifest.json",
-    packageJsonPath: "boundaries/kernel/testkit/package.json",
     project: "kernel-testkit",
   },
   {
     implementationId: "typescript-providers",
     manifestPath:
       "boundaries/providers/conformance/scenarios/suite-manifest.json",
-    packageJsonPath: "boundaries/providers/testkit/package.json",
     project: "providers-testkit",
   },
 ];
@@ -112,22 +109,23 @@ async function main(): Promise<void> {
   await rm(EVIDENCE_DIRECTORY, { force: true, recursive: true });
   await mkdir(EVIDENCE_DIRECTORY, { recursive: true });
 
+  const seenSuiteIds = new Set<string>();
   const suites: CompatibilitySuite[] = [];
   const implementations: CompatibilityImplementation[] = [];
   let hasFailure = false;
 
   for (const runner of CONFORMANCE_RUNNERS) {
     const suiteManifest = await readSuiteManifest(runner.manifestPath);
-    const implementationVersion = await readPackageVersion(
-      runner.packageJsonPath
-    );
     const result = await runConformanceTarget(runner, suiteManifest);
 
-    suites.push({
-      boundary: suiteManifest.boundary,
-      suiteId: suiteManifest.suiteId,
-      suiteVersion: suiteManifest.suiteVersion,
-    });
+    if (!seenSuiteIds.has(suiteManifest.suiteId)) {
+      suites.push({
+        boundary: suiteManifest.boundary,
+        suiteId: suiteManifest.suiteId,
+        suiteVersion: suiteManifest.suiteVersion,
+      });
+      seenSuiteIds.add(suiteManifest.suiteId);
+    }
     // Epic R establishes the first measured TypeScript baseline only. Later
     // language lines append peer implementation evidence here rather than
     // treating TypeScript as the semantic root.
@@ -135,7 +133,10 @@ async function main(): Promise<void> {
       implementationId: runner.implementationId,
       language: "typescript",
       results: [result.matrixResult],
-      version: implementationVersion,
+      // The current TypeScript line is still an unreleased workspace
+      // implementation, so the matrix records that explicitly instead of
+      // echoing the private testkit packages' placeholder 0.0.0 versions.
+      version: TRANSITION_IMPLEMENTATION_VERSION,
     });
 
     if (result.matrixResult.status === "fail") {
@@ -189,20 +190,6 @@ async function readSuiteManifest(manifestPath: string): Promise<SuiteManifest> {
   };
 }
 
-async function readPackageVersion(packageJsonPath: string): Promise<string> {
-  const packageJsonText = await readFile(
-    resolve(REPO_ROOT, packageJsonPath),
-    "utf8"
-  );
-  const packageJson = JSON.parse(packageJsonText);
-
-  if (!isRecord(packageJson) || typeof packageJson.version !== "string") {
-    throw new Error(`invalid package.json version at ${packageJsonPath}`);
-  }
-
-  return packageJson.version;
-}
-
 async function runConformanceTarget(
   runner: ConformanceRunner,
   suiteManifest: SuiteManifest
@@ -225,7 +212,7 @@ async function runConformanceTarget(
   });
   const evidenceFilePath = resolve(
     EVIDENCE_DIRECTORY,
-    `${suiteManifest.suiteId}.json`
+    `${suiteManifest.suiteId}.${runner.implementationId}.json`
   );
   const relativeEvidencePath = relative(REPO_ROOT, evidenceFilePath);
   const status: "fail" | "pass" = commandResult.code === 0 ? "pass" : "fail";

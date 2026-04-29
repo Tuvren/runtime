@@ -27,7 +27,10 @@
         "default",
         "^production",
         "{workspaceRoot}/tests/**/*",
-        "{workspaceRoot}/boundaries/*/conformance/**/*"
+        "{workspaceRoot}/boundaries/*/conformance/**/*",
+        "{workspaceRoot}/boundaries/*/testkit/src/**/*",
+        "{workspaceRoot}/boundaries/*/testkit/test/**/*",
+        "{workspaceRoot}/boundaries/*/testkit/package.json"
       ]
     },
     "lint": {

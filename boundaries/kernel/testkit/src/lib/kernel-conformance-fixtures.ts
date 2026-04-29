@@ -19,6 +19,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   assertRecoveryState,
+  assertStagedResult,
   assertTurnTreeChangeSet,
   assertTurnTreeSchema,
   type RecoveryState,
@@ -295,24 +296,30 @@ function assertTurnNodeIdentityRecord(
     throw new Error(`${label}.consumedStagedResults must be an array`);
   }
 
-  if (typeof value.eventHash !== "string") {
-    throw new Error(`${label}.eventHash must be a string`);
+  for (const [index, stagedResult] of value.consumedStagedResults.entries()) {
+    assertStagedResult(
+      stagedResult,
+      `${label}.consumedStagedResults[${index}]`
+    );
   }
+
+  assertHashString(value.eventHash, `${label}.eventHash`);
 
   if (
     value.previousTurnNodeHash !== null &&
-    typeof value.previousTurnNodeHash !== "string"
+    value.previousTurnNodeHash !== null
   ) {
-    throw new Error(`${label}.previousTurnNodeHash must be a string or null`);
+    assertHashString(
+      value.previousTurnNodeHash,
+      `${label}.previousTurnNodeHash`
+    );
   }
 
   if (typeof value.schemaId !== "string") {
     throw new Error(`${label}.schemaId must be a string`);
   }
 
-  if (typeof value.turnTreeHash !== "string") {
-    throw new Error(`${label}.turnTreeHash must be a string`);
-  }
+  assertHashString(value.turnTreeHash, `${label}.turnTreeHash`);
 }
 
 function assertNumberArray(
