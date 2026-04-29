@@ -77,6 +77,20 @@ async function runSingleTurnScenario(
     branchId: thread.branchId,
     config: {
       name: "primary",
+      responseFormat:
+        config.scenario === "structured"
+          ? {
+              name: "playground_summary",
+              schema: {
+                properties: {
+                  scenario: { type: "string" },
+                  status: { type: "string" },
+                },
+                required: ["scenario", "status"],
+                type: "object",
+              },
+            }
+          : undefined,
       tools: createPlaygroundTools(),
     },
     signal: textSignal(`Run ${config.scenario}`),
@@ -92,7 +106,9 @@ async function runSingleTurnScenario(
       completed: handle.status().phase === "completed",
       metadataObserved:
         config.scenario !== "metadata" ||
-        messages.some(hasProviderMetadataEvidence),
+        (config.providerMode === "aimock-openai"
+          ? messages.some(hasAimockResponseMetadataEvidence)
+          : messages.some(hasProviderMetadataEvidence)),
       sseObserved: projection.sse.length > 0,
       structuredObserved:
         config.scenario !== "structured" ||
@@ -169,6 +185,9 @@ async function runApprovalScenario(
       ),
       approvalResolved: projection.canonical.some(
         (event) => event.type === "approval.resolved"
+      ),
+      editedEmailInputExecuted: resumedProjection.canonical.some(
+        isEditedEmailToolStart
       ),
       pausedFirst: pausedHandle.status().phase === "paused",
       resumedCompleted: resumedHandle.status().phase === "completed",
@@ -488,6 +507,59 @@ function hasProviderMetadataEvidence(value: unknown): boolean {
 
     return hasProviderMetadataEvidence(entry);
   });
+}
+
+function hasAimockResponseMetadataEvidence(value: unknown): boolean {
+  if (!isPlainRecord(value)) {
+    return false;
+  }
+
+  const providerMetadata = value.providerMetadata;
+
+  if (isPlainRecord(providerMetadata)) {
+    const bridgeMetadata = providerMetadata.aiSdkBridge;
+
+    if (isPlainRecord(bridgeMetadata)) {
+      const response = bridgeMetadata.response;
+
+      if (isPlainRecord(response)) {
+        const metadata = response.metadata;
+
+        // The aimock metadata scenario uses a fixture-specific response id and
+        // model so the report proves provider response metadata survived the
+        // HTTP boundary, bridge mapping, and durable message persistence.
+        if (
+          isPlainRecord(metadata) &&
+          metadata.id === "aimock-metadata-response" &&
+          metadata.modelId === "gpt-4o-mini"
+        ) {
+          return true;
+        }
+      }
+    }
+  }
+
+  return Object.values(value).some((entry) => {
+    if (Array.isArray(entry)) {
+      return entry.some(hasAimockResponseMetadataEvidence);
+    }
+
+    return hasAimockResponseMetadataEvidence(entry);
+  });
+}
+
+function isEditedEmailToolStart(event: TuvrenStreamEvent): boolean {
+  if (event.type !== "tool.start" || event.name !== "email") {
+    return false;
+  }
+
+  const input = event.input;
+
+  return (
+    isPlainRecord(input) &&
+    input.subject === "Edited status update" &&
+    input.to === "ops@example.com"
+  );
 }
 
 function hasInjectedSteeringMessage(value: unknown): boolean {

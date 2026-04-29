@@ -53,6 +53,9 @@ export function loadPlaygroundConfig(
   const providerMode = parseProviderMode(
     options.provider ?? env.TUVREN_PLAYGROUND_PROVIDER_MODE
   );
+  const aimockBaseUrl = normalizeAimockBaseUrl(
+    options.aimockBaseUrl ?? env.TUVREN_PLAYGROUND_AIMOCK_BASE_URL
+  );
   const sqlitePath = normalizeSqlitePath(
     options.sqlitePath ?? env.TUVREN_PLAYGROUND_SQLITE_PATH
   );
@@ -66,12 +69,32 @@ export function loadPlaygroundConfig(
     );
   }
 
+  if (providerMode === "aimock-openai" && aimockBaseUrl === undefined) {
+    throw new TuvrenRuntimeError(
+      "aimock-openai playground provider requires --aimock-base-url or TUVREN_PLAYGROUND_AIMOCK_BASE_URL",
+      {
+        code: "invalid_playground_config",
+      }
+    );
+  }
+
   return {
+    aimockBaseUrl,
     backend,
     providerMode,
     scenario,
     sqlitePath,
   };
+}
+
+function normalizeAimockBaseUrl(value: string | undefined): string | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  const normalized = value.trim();
+
+  return normalized.length === 0 ? undefined : normalized;
 }
 
 function normalizeSqlitePath(value: string | undefined): string | undefined {
@@ -131,6 +154,7 @@ function parseProviderMode(value: string | undefined): PlaygroundProviderMode {
   const normalized = value ?? "fixture";
 
   switch (normalized) {
+    case "aimock-openai":
     case "ai-sdk-mock":
     case "fixture":
       return normalized;
