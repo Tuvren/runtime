@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tuvren.dev/schemas/framework/tool-contracts/CompletedToolResultBatch.json",
+  "type": "object",
+  "properties": {
+    "results": {
+      "type": "array",
+      "items": {
+        "$ref": "https://tuvren.dev/schemas/framework/tool-contracts/ToolResultPart.json"
+      }
+    },
+    "state": {
+      "$ref": "https://tuvren.dev/schemas/framework/tool-contracts/Metadata.json"
+    }
+  },
+  "required": ["results"],
+  "unevaluatedProperties": {
+    "not": {}
+  }
+}

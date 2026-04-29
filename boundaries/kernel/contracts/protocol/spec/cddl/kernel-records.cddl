@@ -1,0 +1,293 @@
+; Tuvren / Kraken kernel protocol record grammar.
+;
+; This CDDL describes serializable record families only. Behavioral semantics
+; remain governed by docs/KrakenKernelSpecification.md and the constitution.
+
+hash-string = tstr .regexp "^[0-9a-f]{64}$"
+non-empty-tstr = tstr .regexp ".+"
+js-safe-int = -9007199254740991..9007199254740991
+non-negative-safe-int = 0..9007199254740991
+; EpochMs follows the shared runtime scalar: any JavaScript-safe integer is
+; valid so deterministic tests can model pre-epoch values when needed.
+epoch-ms = js-safe-int
+
+; CBOR has no distinct -0 integer encoding; the TypeScript boundary still
+; rejects JavaScript -0 before values enter this canonical record profile.
+kernel-record = null / bool / js-safe-int / tstr / bytes / kernel-array / kernel-map
+kernel-array = [* kernel-record]
+kernel-map = { * tstr => kernel-record }
+kernel-object-record = { * tstr => kernel-record }
+kernel-object = {
+  hash: hash-string,
+  mediaType: non-empty-tstr,
+  bytes: bytes,
+}
+
+path-collection-kind = "ordered" / "single"
+path-value = hash-string / [* hash-string] / null
+turn-tree-manifest = { * non-empty-tstr => path-value }
+turn-tree-change-set = { * non-empty-tstr => path-value }
+
+path-definition = {
+  path: non-empty-tstr,
+  collection: path-collection-kind,
+  ? metadata: kernel-record,
+}
+
+incorporation-rule = {
+  objectType: non-empty-tstr,
+  targetPath: non-empty-tstr,
+}
+
+turn-tree-schema = {
+  schemaId: non-empty-tstr,
+  paths: [* path-definition],
+  incorporationRules: [* incorporation-rule],
+}
+
+step-declaration = {
+  id: non-empty-tstr,
+  deterministic: bool,
+  sideEffects: bool,
+  ? metadata: kernel-record,
+}
+
+observe-result = {
+  ; Observe annotations are arbitrary KernelObject records. Opaque stored
+  ; objects use the separate kernel-object shape above.
+  annotations: [* kernel-object-record],
+  signals: [* kernel-record],
+}
+
+verdict-disposition = "HardFail" / "SoftFail" / "EndTurn"
+proceed-verdict = { kind: "proceed" }
+abort-verdict = {
+  kind: "abort",
+  disposition: verdict-disposition,
+  reason: non-empty-tstr,
+}
+modify-verdict = {
+  kind: "modify",
+  transform: kernel-record,
+}
+pause-verdict = {
+  kind: "pause",
+  reason: non-empty-tstr,
+  resumptionSchema: kernel-record,
+}
+retry-verdict = {
+  kind: "retry",
+  adjustment: kernel-record,
+}
+verdict = proceed-verdict / abort-verdict / modify-verdict / pause-verdict / retry-verdict
+
+staged-result-status = "completed" / "failed" / "interrupted"
+base-staged-result = (
+  taskId: non-empty-tstr,
+  objectHash: hash-string,
+  objectType: non-empty-tstr,
+  timestamp: epoch-ms,
+)
+interrupted-staged-result = {
+  base-staged-result,
+  status: "interrupted",
+  interruptPayload: kernel-record,
+}
+settled-staged-result = {
+  base-staged-result,
+  status: "completed" / "failed",
+}
+staged-result = interrupted-staged-result / settled-staged-result
+
+turn-node = {
+  hash: hash-string,
+  schemaId: non-empty-tstr,
+  turnTreeHash: hash-string,
+  previousTurnNodeHash: hash-string / null,
+  eventHash: hash-string / null,
+  consumedStagedResults: [* staged-result],
+}
+
+thread-record = {
+  threadId: non-empty-tstr,
+  schemaId: non-empty-tstr,
+  rootTurnNodeHash: hash-string,
+}
+
+branch-record = {
+  branchId: non-empty-tstr,
+  threadId: non-empty-tstr,
+  headTurnNodeHash: hash-string,
+}
+
+turn-record = {
+  turnId: non-empty-tstr,
+  threadId: non-empty-tstr,
+  branchId: non-empty-tstr,
+  parentTurnId: non-empty-tstr / null,
+  startTurnNodeHash: hash-string,
+  headTurnNodeHash: hash-string,
+}
+
+run-status = "running" / "paused" / "completed" / "failed"
+run-record = {
+  runId: non-empty-tstr,
+  turnId: non-empty-tstr,
+  branchId: non-empty-tstr,
+  schemaId: non-empty-tstr,
+  startTurnNodeHash: hash-string,
+  status: run-status,
+  currentStepIndex: non-negative-safe-int,
+  stepSequence: [* step-declaration],
+  createdTurnNodes: [* hash-string],
+}
+
+step-context = {
+  step: step-declaration,
+  schema: turn-tree-schema,
+  signals: [* kernel-record],
+  currentTurnNodeHash: hash-string,
+}
+
+recovery-state = {
+  lastTurnNodeHash: hash-string,
+  lastCompletedStepId: non-empty-tstr / null,
+  stepSequence: [* step-declaration],
+  consumedStagedResults: [* staged-result],
+  uncommittedStagedResults: [* staged-result],
+}
+
+thread-create-result = {
+  branchId: non-empty-tstr,
+  rootTurnNodeHash: hash-string,
+  rootTurnTreeHash: hash-string,
+  threadId: non-empty-tstr,
+}
+
+; Tuple order is part of the public TypeScript protocol type and is preserved
+; here instead of expanding it into a named object that would redefine shape.
+branch-head-list-entry = [branchId: non-empty-tstr, headTurnNodeHash: hash-string]
+
+set-head-result = {
+  branch: branch-record,
+  ? archiveBranch: branch-record,
+}
+
+stored-object = {
+  hash: hash-string,
+  mediaType: non-empty-tstr,
+  bytes: bytes,
+  byteLength: non-negative-safe-int,
+  createdAtMs: epoch-ms,
+}
+
+stored-schema = {
+  schemaId: non-empty-tstr,
+  schemaCbor: bytes,
+  createdAtMs: epoch-ms,
+}
+
+stored-turn-tree = {
+  hash: hash-string,
+  schemaId: non-empty-tstr,
+  manifestCbor: bytes,
+  createdAtMs: epoch-ms,
+}
+
+stored-single-turn-tree-path = {
+  turnTreeHash: hash-string,
+  path: non-empty-tstr,
+  collectionKind: "single",
+  singleHash: hash-string / null,
+}
+
+stored-flat-ordered-turn-tree-path = {
+  turnTreeHash: hash-string,
+  path: non-empty-tstr,
+  collectionKind: "ordered",
+  orderedEncoding: "flat",
+  orderedCount: non-negative-safe-int,
+  orderedInlineCbor: bytes,
+}
+
+stored-chunked-ordered-turn-tree-path = {
+  turnTreeHash: hash-string,
+  path: non-empty-tstr,
+  collectionKind: "ordered",
+  orderedEncoding: "chunked",
+  orderedCount: non-negative-safe-int,
+  orderedChunkListCbor: bytes,
+}
+
+stored-turn-tree-path =
+  stored-single-turn-tree-path /
+  stored-flat-ordered-turn-tree-path /
+  stored-chunked-ordered-turn-tree-path
+
+stored-ordered-path-chunk = {
+  chunkHash: hash-string,
+  itemCount: non-negative-safe-int,
+  itemsCbor: bytes,
+  createdAtMs: epoch-ms,
+}
+
+stored-turn-node = {
+  hash: hash-string,
+  schemaId: non-empty-tstr,
+  turnTreeHash: hash-string,
+  previousTurnNodeHash: hash-string / null,
+  eventHash: hash-string / null,
+  consumedStagedResultsCbor: bytes,
+  createdAtMs: epoch-ms,
+}
+
+stored-thread = {
+  threadId: non-empty-tstr,
+  schemaId: non-empty-tstr,
+  rootTurnNodeHash: hash-string,
+  createdAtMs: epoch-ms,
+}
+
+stored-branch = {
+  branchId: non-empty-tstr,
+  threadId: non-empty-tstr,
+  headTurnNodeHash: hash-string,
+  ? archivedFromBranchId: non-empty-tstr,
+  createdAtMs: epoch-ms,
+  updatedAtMs: epoch-ms,
+}
+
+stored-turn = {
+  turnId: non-empty-tstr,
+  threadId: non-empty-tstr,
+  branchId: non-empty-tstr,
+  parentTurnId: non-empty-tstr / null,
+  startTurnNodeHash: hash-string,
+  headTurnNodeHash: hash-string,
+  createdAtMs: epoch-ms,
+  updatedAtMs: epoch-ms,
+}
+
+stored-run = {
+  runId: non-empty-tstr,
+  turnId: non-empty-tstr,
+  branchId: non-empty-tstr,
+  schemaId: non-empty-tstr,
+  startTurnNodeHash: hash-string,
+  status: run-status,
+  currentStepIndex: non-negative-safe-int,
+  stepSequenceCbor: bytes,
+  createdTurnNodesCbor: bytes,
+  createdAtMs: epoch-ms,
+  updatedAtMs: epoch-ms,
+}
+
+stored-staged-result = {
+  runId: non-empty-tstr,
+  taskId: non-empty-tstr,
+  objectHash: hash-string,
+  objectType: non-empty-tstr,
+  status: staged-result-status,
+  ? interruptPayloadCbor: bytes,
+  createdAtMs: epoch-ms,
+}

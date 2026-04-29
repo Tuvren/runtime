@@ -2,19 +2,16 @@
 
 ## 0. Version History & Changelog
 
+- v0.8.5 - Closed Epic S in current repo reality with TypeSpec-authored tool/provider contract artifacts, kernel CDDL grammar, implementation-scoped TypeScript conformance runners, and compatibility evidence sourced from those runners.
 - v0.8.4 - Closed Epic R in current repo reality with boundary-owned conformance and contract scaffold, canonical `lint` / `conformance` / `codegen` target vocabulary, a weaver-backed telemetry semantic-convention source and generated helper path, and the first measured TypeScript-only compatibility baseline.
 - v0.8.3 - Recorded the expanded automated aimock provider matrix across OpenAI, Anthropic, and Gemini, the opt-in manual Gemini validation lane on `host-playground:scenario-gemini`, and the provider-shape-aware bridge/playground continuity fixes so the current transition plan reflects the real post-Epic-Q validation surface.
-- v0.8.2 - Aligned the critical-path summary with the actual dependency graph, corrected the deferred-scope gate to stay beyond Epic W, and trimmed a duplicate active-scope bullet.
-- v0.8.1 - Tightened the transition execution line with pre-Rust telemetry semantic-convention work, strict Buf `FILE` governance, stronger peer-runner conformance language, and a near-public compatibility-matrix posture.
-- v0.8.0 - Activated the multi-language transition line after Epic Q, closed `KRT-R001` in current repo reality, and defined Epics R-V plus deferred Epic W for artifact foundation, kernel interop, Rust kernel work, and cross-language stabilization.
-- v0.7.6 - Recorded the user-directed playground-owned aimock/OpenAI E2E validation lane for streamed text, structured output, tool continuation, approval pause/resume, provider metadata, cancellation, provider failure, malformed responses, and unmatched fixtures as post-Epic-Q repository reality without reopening the closed Epic Q implementation scope.
 - ... [Older history truncated, refer to git logs]
 
 ## 1. Executive Summary & Active Critical Path
 
-- **Total Active Story Points:** 58
-- **Critical Path:** `KRT-S001 -> (KRT-S002 and KRT-S003) -> KRT-S004 -> KRT-T001 -> KRT-T002 -> (KRT-U001 -> KRT-U002 -> KRT-U004 -> KRT-V001) and (KRT-U002 -> KRT-U003) -> KRT-V002 -> KRT-V003 -> KRT-V004`
-- **Planning Assumptions:** Epics A-R are closed in current repo reality. Epic R closure evidence now lives in `constitution/spikes/epic-r-multilanguage-transition-guide.md` and `constitution/spikes/epic-r-multilanguage-transition-foundation-inventory.md`. TechSpec v0.6.3 keeps the baseline AI SDK bridge on `LanguageModelV3` / `ProviderV3` from `@ai-sdk/provider@3.0.8`, pins the AG-UI adapter to `@ag-ui/core@0.0.52`, preserves the existing `ProviderStreamChunk` seam while documenting the current tool-call metadata continuity requirements, treats tee-based fanout above `ExecutionHandle.events()` as the sanctioned multi-consumer host path when every required tee branch subscribes before the first pull, records SQLite playground validation as a Node-backed path because `@tuvren/backend-sqlite` uses `better-sqlite3`, keeps the playground-owned automated aimock provider lanes across OpenAI, Anthropic, and Gemini as local validation rather than a public provider contract, records the manual Gemini lane as an opt-in local proof rather than default automation, requires a formal telemetry semantic-convention source before Rust implementation work begins, treats Buf `FILE` compatibility as the default interop gate from the first `.proto` merge, and treats the compatibility matrix as a conservative near-public readiness signal rather than a private scratch report.
+- **Total Active Story Points:** 43
+- **Critical Path:** `KRT-T001 -> KRT-T002 -> (KRT-U001 -> KRT-U002 -> KRT-U004 -> KRT-V001) and (KRT-U002 -> KRT-U003) -> KRT-V002 -> KRT-V003 -> KRT-V004`
+- **Planning Assumptions:** Epics A-S are closed in current repo reality. Epic S closure evidence now lives in `constitution/spikes/epic-s-boundary-contract-conformance-artifactization-inventory.md`. TechSpec v0.6.4 keeps the baseline AI SDK bridge on `LanguageModelV3` / `ProviderV3` from `@ai-sdk/provider@3.0.8`, pins the AG-UI adapter to `@ag-ui/core@0.0.52`, preserves the existing `ProviderStreamChunk` seam while documenting the current tool-call metadata continuity requirements, treats tee-based fanout above `ExecutionHandle.events()` as the sanctioned multi-consumer host path when every required tee branch subscribes before the first pull, records SQLite playground validation as a Node-backed path because `@tuvren/backend-sqlite` uses `better-sqlite3`, keeps the playground-owned automated aimock provider lanes across OpenAI, Anthropic, and Gemini as local validation rather than a public provider contract, records the manual Gemini lane as an opt-in local proof rather than default automation, requires a formal telemetry semantic-convention source before Rust implementation work begins, treats Buf `FILE` compatibility as the default interop gate from the first `.proto` merge, and treats the compatibility matrix as a conservative near-public readiness signal rather than a private scratch report.
 
 ### Brownfield Continuity Note
 
@@ -24,16 +21,16 @@
 - The Epic Q target packages now exist under `boundaries/framework/testkit` and `boundaries/providers/testkit`, with release/verification scripts under `tools/scripts`.
 - The private playground host now also owns automated aimock E2E validation lanes that exercise `@tuvren/provider-bridge-ai-sdk` through local OpenAI-, Anthropic-, and Gemini-compatible HTTP mock provider boundaries without provider credentials, covering streamed text, structured output, tool continuation, approval pause/resume, provider metadata, cancellation, provider failure, malformed responses, and unmatched fixtures.
 - The private playground host now also exposes an opt-in `host-playground:scenario-gemini` lane that exercises the same bridge through `@ai-sdk/google@3.0.64` and real Gemini credentials for streaming, metadata, structured output, multi-step streamed tool continuity, and approval resume behavior without moving live-provider cost and flake into default verification.
-- Those Epic Q testkit packages are now explicitly transitional and must be demoted from implicit authority into shared boundary-owned conformance assets plus peer implementation runners.
+- Those Epic Q testkit packages are now helper/facade packages; compatibility evidence flows through implementation-scoped TypeScript conformance runners over shared boundary-owned assets.
 - Planning verification confirmed `ai@6.0.142` and `@ai-sdk/provider@3.0.8` are available and that `@ai-sdk/provider@3.0.8` exports `LanguageModelV3`, `ProviderV3`, `LanguageModelV3CallOptions`, `LanguageModelV3GenerateResult`, and `LanguageModelV3StreamPart`.
 - Epic N now extends repo reality beyond those planning notes: the bridge package exists and the closure artifact above is the authoritative upstream seam for Epic O.
 - Epic O now extends repo reality beyond those planning notes: `@tuvren/stream-core`, `@tuvren/stream-sse`, and `@tuvren/stream-agui` exist, `constitution/spikes/epic-o-stream-adapter-inventory.md` is the authoritative adapter mapping record, and Epic P must treat tee-based fanout plus the documented `tuvren.runtime.*` AG-UI custom namespace as the handoff surface rather than rediscovering protocol gaps or resubscription hazards.
 - Epic P now extends repo reality beyond those planning notes: `@tuvren/playground-host` exists under `boundaries/hosts/implementations/typescript/playground`, `constitution/spikes/epic-p-playground-host-inventory.md` is the authoritative playground handoff, full-turn streams cover canonical/SSE/AG-UI fanout, approval resume continuation is projected to canonical/SSE only, non-reload memory scenarios run under Bun tests, branching is validated from a completed source head, and SQLite reload is validated through the built Node CLI path.
-- Epic R now extends repo reality beyond those planning notes: the repository has the explicit multi-language transition guide plus the closure inventory in `constitution/spikes/epic-r-multilanguage-transition-foundation-inventory.md`, and the next active scope begins with Epic S artifact promotion rather than ad hoc Rust experimentation.
+- Epic R now extends repo reality beyond those planning notes: the repository has the explicit multi-language transition guide plus the closure inventory in `constitution/spikes/epic-r-multilanguage-transition-foundation-inventory.md`, and Epic S has since closed the artifact promotion line before kernel interop work begins.
 
 ### Sequential Scope Rule
 
-- Epic R is closed. The next implementation line begins with Epic S boundary contract and conformance artifactization work and must not skip directly to Rust implementation work before the contract, conformance, interop, telemetry, and compatibility foundations remain authoritative in repo reality.
+- Epic S is closed. The next implementation line begins with Epic T kernel interop governance work and must not skip directly to Rust implementation work before the transport, Buf governance, interop-smoke, telemetry, and compatibility foundations remain authoritative in repo reality.
 
 ### Planning Heuristic
 
@@ -49,7 +46,6 @@
 
 ### Current Active Scope
 
-- Epic S promotes selected framework/provider contracts plus kernel record grammar into explicit machine-readable authored sources and splits the transitional TypeScript testkits into shared conformance assets plus TypeScript runners.
 - Epic T defines the narrow kernel-only interop transport, Buf-governed `.proto` ownership, and interop-smoke/codegen orchestration.
 - Epic U introduces the root Cargo workspace and the first Rust implementation only inside the kernel boundary.
 - Epic V stabilizes real TypeScript framework to Rust kernel interoperability, compatibility-ledger generation, and cross-language telemetry/CI posture.
@@ -70,6 +66,7 @@
 - Epics K-M closed the first production-depth ReAct loop, streaming/provider parity, and tool/approval integration; authoritative closure evidence lives in `constitution/spikes/epic-k-react-loop-cancellation-inventory.md`, `constitution/spikes/epic-l-parity-inventory.md`, and `constitution/spikes/epic-m-tool-approval-gap-inventory.md`.
 - Epics N-Q closed the post-ReAct TypeScript expansion line for the AI SDK bridge, host stream adapters, playground host harness, and release/portability hardening; authoritative closure evidence lives in `constitution/spikes/epic-n-ai-sdk-bridge-inventory.md`, `constitution/spikes/epic-o-stream-adapter-inventory.md`, `constitution/spikes/epic-p-playground-host-inventory.md`, and `constitution/spikes/epic-q-release-hardening-inventory.md`. That closure line now includes automated aimock provider-boundary coverage across OpenAI, Anthropic, and Gemini plus an opt-in real Gemini playground lane without reactivating the closed Epic Q backlog.
 - Epic R closed the multi-language transition foundation through `constitution/spikes/epic-r-multilanguage-transition-guide.md` and `constitution/spikes/epic-r-multilanguage-transition-foundation-inventory.md`, delivering boundary-owned conformance and contract scaffold, canonical target vocabulary, telemetry codegen authority, and the first measured TypeScript-only compatibility baseline.
+- Epic S closed boundary contract and conformance artifactization through `constitution/spikes/epic-s-boundary-contract-conformance-artifactization-inventory.md`, delivering TypeSpec-authored tool/provider artifacts, kernel CDDL grammar, implementation-scoped TypeScript conformance runners, and compatibility evidence sourced from those runners.
 
 ## 3. Build Order (Mermaid)
 
@@ -114,8 +111,8 @@ flowchart TD
 - Durable outcome:
   - the constitution now records the authority stack, target repo shape, migration phases, and Rust-kernel-first transition rule
   - the repo now contains boundary-owned conformance roots, future contract-authority homes, the kernel interop home, canonical `lint` / `conformance` / `codegen` targets, a formal telemetry semantic-convention source plus generated outputs, and a measured TypeScript-only compatibility baseline
-  - the TypeScript testkits remain transitional runners over language-agnostic assets rather than the root authority for those assets
-  - the next active work begins with Epic S artifact promotion rather than language-specific implementation drift
+  - the TypeScript testkits remain helper/facade packages over language-agnostic assets rather than compatibility-evidence authority
+  - Epic S has closed the artifact promotion work that follows this foundation
 
 **KRT-R001 Multilanguage Transition Guide**
 
@@ -188,12 +185,13 @@ And no hand-authored pass or fail claims are recorded in place of measured suite
 
 ### Epic S - Boundary Contract and Conformance Artifactization (BCA)
 
-- Planned. This epic promotes machine-readable authored sources and shared conformance assets before any Rust implementation becomes authoritative.
+- Closed in current repo reality. Closure evidence lives in `constitution/spikes/epic-s-boundary-contract-conformance-artifactization-inventory.md`.
 
 **KRT-S001 Contract Promotion Inventory**
 
 - **Type:** Spike
 - **Effort:** 2
+- **Status:** Closed in current repo reality.
 - **Dependencies:** KRT-R003
 - **Capability / Contract Mapping:** PRD `CAP-P1-035`, `CAP-P1-036`; Architecture `2`, `4.5`; TechSpec `3.6`, `4.8`, `5.1`
 - **Description:** Inventory which framework and provider contract packages should promote TypeSpec now, which should remain unchanged for now, and how current testkit responsibilities map onto future boundary-owned conformance assets.
@@ -209,6 +207,7 @@ Then the repository records which contract packages adopt TypeSpec now, which st
 
 - **Type:** Feature
 - **Effort:** 5
+- **Status:** Closed in current repo reality.
 - **Dependencies:** KRT-S001
 - **Capability / Contract Mapping:** PRD `CAP-P0-019`, `CAP-P0-020`, `CAP-P1-035`; Architecture `2`, `5`; TechSpec `3.6`, `4.8`, `5.2`
 - **Description:** Promote the selected framework and provider contract packages to authored TypeSpec sources and emit reviewed JSON Schema/OpenAPI artifacts without changing the shared semantic meaning of their public contracts.
@@ -225,6 +224,7 @@ And the public contract meaning stays aligned with the existing runtime semantic
 
 - **Type:** Feature
 - **Effort:** 3
+- **Status:** Closed in current repo reality.
 - **Dependencies:** KRT-S001
 - **Capability / Contract Mapping:** PRD `CAP-P0-001`, `CAP-P0-004`, `CAP-P1-035`; Architecture `2`, `4.5`; TechSpec `3.1`, `3.6`, `4.8`
 - **Description:** Add CDDL-authored kernel record grammar for the canonical protocol records, manifests, runs, and recovery-shaped payloads without treating grammar as semantic authority over behavior.
@@ -241,6 +241,7 @@ And the grammar aligns with current protocol shapes without redefining recovery 
 
 - **Type:** Feature
 - **Effort:** 5
+- **Status:** Closed in current repo reality.
 - **Dependencies:** KRT-S002, KRT-S003
 - **Capability / Contract Mapping:** PRD `CAP-P0-005`, `CAP-P1-036`; Architecture `2`, `4.5`; TechSpec `3.6`, `4.8`, `5.2`
 - **Description:** Split the current TypeScript-first testkit responsibilities into boundary-owned conformance schemas, fixtures, and scenarios plus TypeScript-specific runners that consume those suites as one peer implementation path among many.

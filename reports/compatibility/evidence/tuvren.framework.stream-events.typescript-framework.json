@@ -5,12 +5,12 @@
     "run",
     "nx",
     "run",
-    "framework-testkit:conformance",
+    "framework-typescript-conformance-runner:conformance",
     "--skipNxCache"
   ],
   "exitCode": 0,
   "implementationId": "typescript-framework",
-  "project": "framework-testkit",
+  "project": "framework-typescript-conformance-runner",
   "status": "pass",
   "suiteId": "tuvren.framework.stream-events",
   "suiteVersion": "0.1.0"

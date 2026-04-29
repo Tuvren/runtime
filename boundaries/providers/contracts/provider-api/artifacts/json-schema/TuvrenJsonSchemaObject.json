@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tuvren.dev/schemas/providers/provider-api/TuvrenJsonSchemaObject.json",
+  "type": "object",
+  "properties": {},
+  "unevaluatedProperties": {},
+  "allOf": [
+    {
+      "if": {
+        "required": ["type"]
+      },
+      "then": {
+        "properties": {
+          "type": {
+            "anyOf": [
+              {
+                "enum": [
+                  "null",
+                  "boolean",
+                  "object",
+                  "array",
+                  "number",
+                  "integer",
+                  "string"
+                ]
+              },
+              {
+                "type": "array",
+                "minItems": 1,
+                "uniqueItems": true,
+                "items": {
+                  "enum": [
+                    "null",
+                    "boolean",
+                    "object",
+                    "array",
+                    "number",
+                    "integer",
+                    "string"
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "$comment": "Opaque JSON Schema carrier. This artifact validates portable container shape and selected runtime keyword guards, but it is not a full JSON Schema metaschema replacement."
+}

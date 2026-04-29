@@ -1,0 +1,311 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Tuvren Tool Contracts",
+    "version": "0.0.0"
+  },
+  "tags": [],
+  "paths": {},
+  "components": {
+    "schemas": {
+      "ApprovalDecision": {
+        "type": "object",
+        "required": ["callId", "type"],
+        "properties": {
+          "callId": {
+            "$ref": "#/components/schemas/NonEmptyString"
+          },
+          "type": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ApprovalDecisionType"
+              },
+              {
+                "type": "string"
+              }
+            ]
+          },
+          "editedInput": {},
+          "message": {
+            "$ref": "#/components/schemas/NonEmptyString"
+          }
+        },
+        "unevaluatedProperties": {
+          "not": {}
+        },
+        "description": "A host decision for one pending tool call."
+      },
+      "ApprovalDecisionType": {
+        "type": "string",
+        "enum": ["approve", "edit", "reject"]
+      },
+      "ApprovalRequest": {
+        "type": "object",
+        "required": ["completedResults", "toolCalls"],
+        "properties": {
+          "completedResults": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ToolResultPart"
+            }
+          },
+          "toolCalls": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PendingToolCall"
+            },
+            "minItems": 1
+          }
+        },
+        "unevaluatedProperties": {
+          "not": {}
+        },
+        "description": "Approval request surfaced to a host while a tool batch is paused."
+      },
+      "ApprovalResponse": {
+        "type": "object",
+        "required": ["decisions"],
+        "properties": {
+          "decisions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ApprovalDecision"
+            },
+            "minItems": 1
+          }
+        },
+        "unevaluatedProperties": {
+          "not": {}
+        },
+        "description": "A host response covering pending approval decisions."
+      },
+      "ApprovalToolResultBatch": {
+        "type": "object",
+        "required": ["approval", "results"],
+        "properties": {
+          "approval": {
+            "$ref": "#/components/schemas/ApprovalRequest"
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ToolResultPart"
+            }
+          },
+          "state": {
+            "$ref": "#/components/schemas/Metadata"
+          }
+        },
+        "unevaluatedProperties": {
+          "not": {}
+        }
+      },
+      "CompletedToolResultBatch": {
+        "type": "object",
+        "required": ["results"],
+        "properties": {
+          "results": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ToolResultPart"
+            }
+          },
+          "state": {
+            "$ref": "#/components/schemas/Metadata"
+          }
+        },
+        "unevaluatedProperties": {
+          "not": {}
+        }
+      },
+      "InvalidValidationResult": {
+        "type": "object",
+        "required": ["valid", "error"],
+        "properties": {
+          "valid": {
+            "type": "boolean",
+            "enum": [false]
+          },
+          "error": {
+            "$ref": "#/components/schemas/ValidationErrorPayload"
+          }
+        },
+        "unevaluatedProperties": {
+          "not": {}
+        }
+      },
+      "Metadata": {
+        "type": "object",
+        "unevaluatedProperties": {},
+        "description": "Opaque serializable metadata projected across framework tool boundaries."
+      },
+      "NonEmptyString": {
+        "type": "string",
+        "minLength": 1,
+        "pattern": ".*\\S.*"
+      },
+      "PendingToolCall": {
+        "type": "object",
+        "required": ["callId", "name", "input", "decisions", "message"],
+        "properties": {
+          "callId": {
+            "$ref": "#/components/schemas/NonEmptyString"
+          },
+          "name": {
+            "$ref": "#/components/schemas/NonEmptyString"
+          },
+          "input": {},
+          "decisions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NonEmptyString"
+            },
+            "minItems": 1
+          },
+          "message": {
+            "$ref": "#/components/schemas/NonEmptyString"
+          }
+        },
+        "unevaluatedProperties": {
+          "not": {}
+        },
+        "description": "A tool call waiting for host approval."
+      },
+      "RenderedToolDefinition": {
+        "type": "object",
+        "required": ["name", "description", "inputSchema"],
+        "properties": {
+          "name": {
+            "$ref": "#/components/schemas/NonEmptyString"
+          },
+          "description": {
+            "type": "string"
+          },
+          "inputSchema": {
+            "$ref": "#/components/schemas/TuvrenJsonSchema"
+          }
+        },
+        "unevaluatedProperties": {
+          "not": {}
+        },
+        "description": "Provider-facing projection of an executable runtime tool."
+      },
+      "ToolCallPart": {
+        "type": "object",
+        "required": ["type", "callId", "name", "input"],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["tool_call"]
+          },
+          "callId": {
+            "$ref": "#/components/schemas/NonEmptyString"
+          },
+          "name": {
+            "$ref": "#/components/schemas/NonEmptyString"
+          },
+          "input": {},
+          "providerMetadata": {
+            "$ref": "#/components/schemas/Metadata"
+          }
+        },
+        "unevaluatedProperties": {
+          "not": {}
+        },
+        "description": "Tool call content emitted by the provider-facing model contract."
+      },
+      "ToolResultPart": {
+        "type": "object",
+        "required": ["type", "callId", "name", "output"],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["tool_result"]
+          },
+          "callId": {
+            "$ref": "#/components/schemas/NonEmptyString"
+          },
+          "name": {
+            "$ref": "#/components/schemas/NonEmptyString"
+          },
+          "output": {},
+          "isError": {
+            "type": "boolean"
+          },
+          "providerMetadata": {
+            "$ref": "#/components/schemas/Metadata"
+          }
+        },
+        "unevaluatedProperties": {
+          "not": {}
+        },
+        "description": "Tool result content staged by the framework after tool execution."
+      },
+      "TuvrenJsonSchema": {
+        "anyOf": [
+          {
+            "$ref": "#/components/schemas/TuvrenJsonSchemaObject"
+          },
+          {
+            "type": "boolean"
+          }
+        ]
+      },
+      "TuvrenJsonSchemaObject": {
+        "type": "object",
+        "unevaluatedProperties": {},
+        "description": "Opaque JSON Schema accepted by the Tuvren tool contract surface."
+      },
+      "TuvrenToolResultBatch": {
+        "anyOf": [
+          {
+            "$ref": "#/components/schemas/CompletedToolResultBatch"
+          },
+          {
+            "$ref": "#/components/schemas/ApprovalToolResultBatch"
+          }
+        ],
+        "description": "Shared serializable tool execution result batch shape."
+      },
+      "ValidValidationResult": {
+        "type": "object",
+        "required": ["valid", "value"],
+        "properties": {
+          "valid": {
+            "type": "boolean",
+            "enum": [true]
+          },
+          "value": {}
+        },
+        "unevaluatedProperties": {
+          "not": {}
+        }
+      },
+      "ValidationErrorPayload": {
+        "type": "object",
+        "required": ["message"],
+        "properties": {
+          "message": {
+            "type": "string"
+          },
+          "details": {}
+        },
+        "unevaluatedProperties": {
+          "not": {}
+        },
+        "description": "Serializable validation error payload used by tool schema validation."
+      },
+      "ValidationResult": {
+        "anyOf": [
+          {
+            "$ref": "#/components/schemas/ValidValidationResult"
+          },
+          {
+            "$ref": "#/components/schemas/InvalidValidationResult"
+          }
+        ],
+        "description": "Result of validating candidate tool input."
+      }
+    }
+  }
+}

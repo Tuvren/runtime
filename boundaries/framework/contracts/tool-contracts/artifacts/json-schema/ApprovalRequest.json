@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tuvren.dev/schemas/framework/tool-contracts/ApprovalRequest.json",
+  "type": "object",
+  "properties": {
+    "completedResults": {
+      "type": "array",
+      "items": {
+        "$ref": "https://tuvren.dev/schemas/framework/tool-contracts/ToolResultPart.json"
+      }
+    },
+    "toolCalls": {
+      "type": "array",
+      "items": {
+        "$ref": "https://tuvren.dev/schemas/framework/tool-contracts/PendingToolCall.json"
+      },
+      "minItems": 1
+    }
+  },
+  "required": ["completedResults", "toolCalls"],
+  "unevaluatedProperties": {
+    "not": {}
+  },
+  "description": "Approval request surfaced to a host while a tool batch is paused."
+}

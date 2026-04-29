@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tuvren.dev/schemas/providers/provider-api/ProviderStreamChunk.json",
+  "anyOf": [
+    {
+      "$ref": "https://tuvren.dev/schemas/providers/provider-api/TextDeltaChunk.json"
+    },
+    {
+      "$ref": "https://tuvren.dev/schemas/providers/provider-api/ReasoningDeltaChunk.json"
+    },
+    {
+      "$ref": "https://tuvren.dev/schemas/providers/provider-api/ReasoningDoneChunk.json"
+    },
+    {
+      "$ref": "https://tuvren.dev/schemas/providers/provider-api/StructuredDeltaChunk.json"
+    },
+    {
+      "$ref": "https://tuvren.dev/schemas/providers/provider-api/StructuredDoneChunk.json"
+    },
+    {
+      "$ref": "https://tuvren.dev/schemas/providers/provider-api/ToolCallStartChunk.json"
+    },
+    {
+      "$ref": "https://tuvren.dev/schemas/providers/provider-api/ToolCallArgsDeltaChunk.json"
+    },
+    {
+      "$ref": "https://tuvren.dev/schemas/providers/provider-api/ToolCallDoneChunk.json"
+    },
+    {
+      "$ref": "https://tuvren.dev/schemas/providers/provider-api/FinishChunk.json"
+    },
+    {
+      "$ref": "https://tuvren.dev/schemas/providers/provider-api/ErrorChunk.json"
+    }
+  ]
+}
