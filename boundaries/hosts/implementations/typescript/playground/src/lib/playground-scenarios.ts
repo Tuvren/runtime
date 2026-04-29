@@ -113,17 +113,28 @@ async function runSingleTurnScenario(
     countToolCallThoughtSignatureEvents(projection);
   const durableToolCallThoughtSignatureCount =
     countDurableToolCallThoughtSignatures(messages);
+  const toolCallProviderCallIdCount =
+    countToolCallProviderCallIdEvents(projection);
+  const durableToolCallProviderCallIdCount =
+    countDurableToolCallProviderCallIds(messages);
+  const metadataObserved = readMetadataObserved(config, messages);
+  const toolHistoryPreserved = readToolHistoryPreserved(
+    config,
+    durableToolCallProviderCallIdCount,
+    durableToolCallThoughtSignatureCount
+  );
+  const toolTraceObserved = readToolTraceObserved(
+    config,
+    toolCallProviderCallIdCount,
+    toolCallThoughtSignatureCount
+  );
 
   return createReport({
     checks: {
       aguiObserved: projection.agui.length > 0,
       canonicalObserved: projection.canonical.length > 0,
       completed: handle.status().phase === "completed",
-      metadataObserved:
-        config.scenario !== "metadata" ||
-        (isAimockProviderMode(config.providerMode)
-          ? messages.some(hasAimockResponseMetadataEvidence)
-          : messages.some(hasProviderMetadataEvidence)),
+      metadataObserved,
       sseObserved: projection.sse.length > 0,
       structuredObserved:
         config.scenario !== "structured" ||
@@ -133,16 +144,8 @@ async function runSingleTurnScenario(
         (config.providerMode === "ai-sdk-google"
           ? toolResultCount >= 2
           : toolResultCount > 0),
-      toolHistoryPreserved:
-        config.scenario !== "tools" ||
-        (config.providerMode === "ai-sdk-google"
-          ? durableToolCallThoughtSignatureCount >= 2
-          : true),
-      toolTraceObserved:
-        config.scenario !== "tools" ||
-        (config.providerMode === "ai-sdk-google"
-          ? toolCallThoughtSignatureCount >= 2
-          : true),
+      toolHistoryPreserved,
+      toolTraceObserved,
     },
     config,
     error: readProjectionError(projection),
@@ -469,6 +472,65 @@ async function runReloadScenario(
     projection: projectionAfterReload,
     thread: continuedThread,
   });
+}
+
+function readMetadataObserved(
+  config: PlaygroundConfig,
+  messages: unknown[]
+): boolean {
+  if (config.scenario !== "metadata") {
+    return true;
+  }
+
+  if (config.providerMode === "ai-sdk-google") {
+    return messages.some(hasGoogleProviderMetadataEvidence);
+  }
+
+  if (isAimockProviderMode(config.providerMode)) {
+    return messages.some(hasAimockResponseMetadataEvidence);
+  }
+
+  return messages.some(hasProviderMetadataEvidence);
+}
+
+function readToolHistoryPreserved(
+  config: PlaygroundConfig,
+  durableToolCallProviderCallIdCount: number,
+  durableToolCallThoughtSignatureCount: number
+): boolean {
+  if (config.scenario !== "tools") {
+    return true;
+  }
+
+  if (config.providerMode === "ai-sdk-google") {
+    return durableToolCallThoughtSignatureCount >= 2;
+  }
+
+  if (config.providerMode === "aimock-google") {
+    return durableToolCallProviderCallIdCount >= 1;
+  }
+
+  return true;
+}
+
+function readToolTraceObserved(
+  config: PlaygroundConfig,
+  toolCallProviderCallIdCount: number,
+  toolCallThoughtSignatureCount: number
+): boolean {
+  if (config.scenario !== "tools") {
+    return true;
+  }
+
+  if (config.providerMode === "ai-sdk-google") {
+    return toolCallThoughtSignatureCount >= 2;
+  }
+
+  if (config.providerMode === "aimock-google") {
+    return toolCallProviderCallIdCount >= 1;
+  }
+
+  return true;
 }
 
 function createReport(input: {
@@ -801,15 +863,8 @@ function hasAimockResponseMetadataEvidence(value: unknown): boolean {
           return true;
         }
 
-        const rawParts = bridgeMetadata.rawParts;
-
-        if (
-          Array.isArray(rawParts) &&
-          rawParts.length > 0 &&
-          isPlainRecord(response.headers) &&
-          isPlainRecord(providerMetadata.google)
-        ) {
-          return true;
+        if (hasGoogleProviderNamespace(providerMetadata)) {
+          return hasGoogleProviderMetadataEvidence(value);
         }
       }
     }
@@ -821,6 +876,48 @@ function hasAimockResponseMetadataEvidence(value: unknown): boolean {
     }
 
     return hasAimockResponseMetadataEvidence(entry);
+  });
+}
+
+function hasGoogleProviderMetadataEvidence(value: unknown): boolean {
+  if (!isPlainRecord(value)) {
+    return false;
+  }
+
+  const providerMetadata = value.providerMetadata;
+
+  if (isPlainRecord(providerMetadata)) {
+    const bridgeMetadata = providerMetadata.aiSdkBridge;
+
+    if (isPlainRecord(bridgeMetadata)) {
+      const response = bridgeMetadata.response;
+      const streamPartMetadata = bridgeMetadata.streamPartMetadata;
+      const responseHeaders = isPlainRecord(response)
+        ? response.headers
+        : undefined;
+
+      // Google adapters do not consistently surface response-level ids/model
+      // metadata, so this proof keys off provider-native `google` / `vertex`
+      // metadata surviving both the finish part capture and the durable
+      // assistant message rather than on OpenAI-shaped response ids.
+      if (
+        (hasGoogleThoughtSignature(providerMetadata) ||
+          hasGoogleProviderNamespace(providerMetadata)) &&
+        isPlainRecord(responseHeaders) &&
+        Array.isArray(streamPartMetadata) &&
+        streamPartMetadata.some(hasGoogleFinishPartMetadataEvidence)
+      ) {
+        return true;
+      }
+    }
+  }
+
+  return Object.values(value).some((entry) => {
+    if (Array.isArray(entry)) {
+      return entry.some(hasGoogleProviderMetadataEvidence);
+    }
+
+    return hasGoogleProviderMetadataEvidence(entry);
   });
 }
 
@@ -862,6 +959,44 @@ function countDurableToolCallThoughtSignatures(messages: unknown[]): number {
   return count;
 }
 
+function countToolCallProviderCallIdEvents(
+  projection: PlaygroundStreamProjection
+): number {
+  return projection.canonical.filter((event) => {
+    if (event.type !== "tool_call.done") {
+      return false;
+    }
+
+    return hasProviderCallId(event.providerMetadata);
+  }).length;
+}
+
+function countDurableToolCallProviderCallIds(messages: unknown[]): number {
+  let count = 0;
+
+  for (const message of messages) {
+    if (
+      !isPlainRecord(message) ||
+      message.role !== "assistant" ||
+      !Array.isArray(message.parts)
+    ) {
+      continue;
+    }
+
+    for (const part of message.parts) {
+      if (
+        isPlainRecord(part) &&
+        part.type === "tool_call" &&
+        hasProviderCallId(readProviderMetadata(part))
+      ) {
+        count += 1;
+      }
+    }
+  }
+
+  return count;
+}
+
 function hasGoogleThoughtSignature(
   providerMetadata: Record<string, unknown> | undefined
 ): boolean {
@@ -883,6 +1018,37 @@ function hasGoogleThoughtSignature(
   return (
     isPlainRecord(vertexMetadata) &&
     typeof vertexMetadata.thoughtSignature === "string"
+  );
+}
+
+function hasGoogleProviderNamespace(
+  providerMetadata: Record<string, unknown> | undefined
+): boolean {
+  if (!isPlainRecord(providerMetadata)) {
+    return false;
+  }
+
+  return (
+    isPlainRecord(providerMetadata.google) ||
+    isPlainRecord(providerMetadata.vertex)
+  );
+}
+
+function hasGoogleFinishPartMetadataEvidence(value: unknown): boolean {
+  if (!isPlainRecord(value) || value.type !== "finish") {
+    return false;
+  }
+
+  return hasGoogleProviderNamespace(readProviderMetadata(value));
+}
+
+function hasProviderCallId(
+  providerMetadata: Record<string, unknown> | undefined
+): boolean {
+  return (
+    isPlainRecord(providerMetadata) &&
+    typeof providerMetadata.providerCallId === "string" &&
+    providerMetadata.providerCallId.length > 0
   );
 }
 
