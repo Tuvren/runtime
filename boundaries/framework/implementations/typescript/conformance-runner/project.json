@@ -1,0 +1,34 @@
+{
+  "name": "framework-typescript-conformance-runner",
+  "$schema": "../../../../../node_modules/nx/schemas/project-schema.json",
+  "root": "boundaries/framework/implementations/typescript/conformance-runner",
+  "projectType": "library",
+  "tags": [
+    "boundary:framework",
+    "language:typescript",
+    "layer:conformance-runner"
+  ],
+  "targets": {
+    "conformance": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "boundaries/framework/implementations/typescript/conformance-runner",
+        "command": "bun test ./test/framework-typescript-conformance.test.ts"
+      }
+    },
+    "lint": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": ".",
+        "command": "bunx --bun @biomejs/biome check boundaries/framework/implementations/typescript/conformance-runner"
+      }
+    },
+    "test": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "boundaries/framework/implementations/typescript/conformance-runner",
+        "command": "bun test"
+      }
+    }
+  }
+}

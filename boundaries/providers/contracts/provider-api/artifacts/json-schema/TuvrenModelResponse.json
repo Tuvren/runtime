@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tuvren.dev/schemas/providers/provider-api/TuvrenModelResponse.json",
+  "type": "object",
+  "properties": {
+    "finishReason": {
+      "$ref": "https://tuvren.dev/schemas/providers/provider-api/FinishReason.json"
+    },
+    "parts": {
+      "type": "array",
+      "items": {
+        "$ref": "https://tuvren.dev/schemas/providers/provider-api/ContentPart.json"
+      }
+    },
+    "usage": {
+      "$ref": "https://tuvren.dev/schemas/providers/provider-api/ProviderUsage.json"
+    },
+    "providerMetadata": {
+      "$ref": "https://tuvren.dev/schemas/providers/provider-api/Metadata.json"
+    }
+  },
+  "required": ["finishReason", "parts"],
+  "unevaluatedProperties": {
+    "not": {}
+  }
+}

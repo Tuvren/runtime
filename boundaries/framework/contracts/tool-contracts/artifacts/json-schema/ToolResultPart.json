@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tuvren.dev/schemas/framework/tool-contracts/ToolResultPart.json",
+  "type": "object",
+  "properties": {
+    "type": {
+      "type": "string",
+      "const": "tool_result"
+    },
+    "callId": {
+      "$ref": "https://tuvren.dev/schemas/framework/tool-contracts/NonEmptyString.json"
+    },
+    "name": {
+      "$ref": "https://tuvren.dev/schemas/framework/tool-contracts/NonEmptyString.json"
+    },
+    "output": {},
+    "isError": {
+      "type": "boolean"
+    },
+    "providerMetadata": {
+      "$ref": "https://tuvren.dev/schemas/framework/tool-contracts/Metadata.json"
+    }
+  },
+  "required": ["type", "callId", "name", "output"],
+  "unevaluatedProperties": {
+    "not": {}
+  },
+  "description": "Tool result content staged by the framework after tool execution."
+}

@@ -85,18 +85,18 @@ const CONFORMANCE_RUNNERS: readonly ConformanceRunner[] = [
     implementationId: "typescript-framework",
     manifestPath:
       "boundaries/framework/conformance/scenarios/suite-manifest.json",
-    project: "framework-testkit",
+    project: "framework-typescript-conformance-runner",
   },
   {
     implementationId: "typescript-kernel",
     manifestPath: "boundaries/kernel/conformance/scenarios/suite-manifest.json",
-    project: "kernel-testkit",
+    project: "kernel-typescript-conformance-runner",
   },
   {
     implementationId: "typescript-providers",
     manifestPath:
       "boundaries/providers/conformance/scenarios/suite-manifest.json",
-    project: "providers-testkit",
+    project: "providers-typescript-conformance-runner",
   },
 ];
 

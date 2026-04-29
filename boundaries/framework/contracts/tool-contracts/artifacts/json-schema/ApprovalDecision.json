@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tuvren.dev/schemas/framework/tool-contracts/ApprovalDecision.json",
+  "type": "object",
+  "properties": {
+    "callId": {
+      "$ref": "https://tuvren.dev/schemas/framework/tool-contracts/NonEmptyString.json"
+    },
+    "type": {
+      "anyOf": [
+        {
+          "$ref": "https://tuvren.dev/schemas/framework/tool-contracts/ApprovalDecisionType.json"
+        },
+        {
+          "type": "string"
+        }
+      ]
+    },
+    "editedInput": {},
+    "message": {
+      "$ref": "https://tuvren.dev/schemas/framework/tool-contracts/NonEmptyString.json"
+    }
+  },
+  "required": ["callId", "type"],
+  "unevaluatedProperties": {
+    "not": {}
+  },
+  "description": "A host decision for one pending tool call."
+}

@@ -1,0 +1,635 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Tuvren Provider API",
+    "version": "0.0.0"
+  },
+  "tags": [],
+  "paths": {},
+  "components": {
+    "schemas": {
+      "AssistantMessage": {
+        "type": "object",
+        "required": ["role", "parts"],
+        "properties": {
+          "role": {
+            "type": "string",
+            "enum": ["assistant"]
+          },
+          "parts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ContentPart"
+            },
+            "minItems": 1
+          },
+          "providerMetadata": {
+            "$ref": "#/components/schemas/Metadata"
+          }
+        },
+        "unevaluatedProperties": {
+          "not": {}
+        }
+      },
+      "ContentPart": {
+        "anyOf": [
+          {
+            "$ref": "#/components/schemas/TextPart"
+          },
+          {
+            "$ref": "#/components/schemas/ReasoningPart"
+          },
+          {
+            "$ref": "#/components/schemas/ToolCallPart"
+          },
+          {
+            "$ref": "#/components/schemas/ToolResultPart"
+          },
+          {
+            "$ref": "#/components/schemas/FilePart"
+          },
+          {
+            "$ref": "#/components/schemas/StructuredPart"
+          }
+        ]
+      },
+      "ErrorChunk": {
+        "type": "object",
+        "required": ["type", "error"],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["error"]
+          },
+          "error": {}
+        },
+        "unevaluatedProperties": {
+          "not": {}
+        }
+      },
+      "FilePart": {
+        "type": "object",
+        "required": ["type", "data", "mediaType"],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["file"]
+          },
+          "data": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "format": "uint8"
+                }
+              }
+            ]
+          },
+          "mediaType": {
+            "$ref": "#/components/schemas/NonEmptyString"
+          },
+          "filename": {
+            "type": "string"
+          },
+          "providerMetadata": {
+            "$ref": "#/components/schemas/Metadata"
+          }
+        },
+        "unevaluatedProperties": {
+          "not": {}
+        }
+      },
+      "FinishChunk": {
+        "type": "object",
+        "required": ["type", "finishReason"],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["finish"]
+          },
+          "finishReason": {
+            "$ref": "#/components/schemas/FinishReason"
+          },
+          "usage": {
+            "$ref": "#/components/schemas/ProviderUsage"
+          },
+          "providerMetadata": {
+            "$ref": "#/components/schemas/Metadata"
+          }
+        },
+        "unevaluatedProperties": {
+          "not": {}
+        }
+      },
+      "FinishReason": {
+        "type": "string",
+        "enum": ["stop", "tool_call", "length", "error", "content_filter"]
+      },
+      "Metadata": {
+        "type": "object",
+        "unevaluatedProperties": {}
+      },
+      "NonEmptyString": {
+        "type": "string",
+        "minLength": 1
+      },
+      "ProviderStreamChunk": {
+        "anyOf": [
+          {
+            "$ref": "#/components/schemas/TextDeltaChunk"
+          },
+          {
+            "$ref": "#/components/schemas/ReasoningDeltaChunk"
+          },
+          {
+            "$ref": "#/components/schemas/ReasoningDoneChunk"
+          },
+          {
+            "$ref": "#/components/schemas/StructuredDeltaChunk"
+          },
+          {
+            "$ref": "#/components/schemas/StructuredDoneChunk"
+          },
+          {
+            "$ref": "#/components/schemas/ToolCallStartChunk"
+          },
+          {
+            "$ref": "#/components/schemas/ToolCallArgsDeltaChunk"
+          },
+          {
+            "$ref": "#/components/schemas/ToolCallDoneChunk"
+          },
+          {
+            "$ref": "#/components/schemas/FinishChunk"
+          },
+          {
+            "$ref": "#/components/schemas/ErrorChunk"
+          }
+        ]
+      },
+      "ProviderUsage": {
+        "type": "object",
+        "required": ["inputTokens", "outputTokens"],
+        "properties": {
+          "inputTokens": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "outputTokens": {
+            "type": "integer",
+            "format": "int64"
+          }
+        },
+        "unevaluatedProperties": {
+          "not": {}
+        }
+      },
+      "ReasoningDeltaChunk": {
+        "type": "object",
+        "required": ["type", "text"],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["reasoning_delta"]
+          },
+          "text": {
+            "type": "string"
+          },
+          "signature": {
+            "type": "string"
+          }
+        },
+        "unevaluatedProperties": {
+          "not": {}
+        }
+      },
+      "ReasoningDoneChunk": {
+        "type": "object",
+        "required": ["type"],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["reasoning_done"]
+          }
+        },
+        "unevaluatedProperties": {
+          "not": {}
+        }
+      },
+      "ReasoningPart": {
+        "type": "object",
+        "required": ["type", "text", "redacted"],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["reasoning"]
+          },
+          "text": {
+            "type": "string"
+          },
+          "redacted": {
+            "type": "boolean"
+          },
+          "providerMetadata": {
+            "$ref": "#/components/schemas/Metadata"
+          }
+        },
+        "unevaluatedProperties": {
+          "not": {}
+        }
+      },
+      "RenderedToolDefinition": {
+        "type": "object",
+        "required": ["name", "description", "inputSchema"],
+        "properties": {
+          "name": {
+            "$ref": "#/components/schemas/NonEmptyString"
+          },
+          "description": {
+            "type": "string"
+          },
+          "inputSchema": {
+            "$ref": "#/components/schemas/TuvrenJsonSchema"
+          }
+        },
+        "unevaluatedProperties": {
+          "not": {}
+        }
+      },
+      "StructuredDeltaChunk": {
+        "type": "object",
+        "required": ["type", "delta"],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["structured_delta"]
+          },
+          "delta": {
+            "type": "string"
+          }
+        },
+        "unevaluatedProperties": {
+          "not": {}
+        }
+      },
+      "StructuredDoneChunk": {
+        "type": "object",
+        "required": ["type", "data"],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["structured_done"]
+          },
+          "data": {},
+          "name": {
+            "type": "string"
+          }
+        },
+        "unevaluatedProperties": {
+          "not": {}
+        }
+      },
+      "StructuredOutputRequest": {
+        "type": "object",
+        "required": ["schema"],
+        "properties": {
+          "schema": {
+            "$ref": "#/components/schemas/TuvrenJsonSchema"
+          },
+          "name": {
+            "$ref": "#/components/schemas/NonEmptyString"
+          },
+          "strict": {
+            "type": "boolean"
+          }
+        },
+        "unevaluatedProperties": {
+          "not": {}
+        }
+      },
+      "StructuredPart": {
+        "type": "object",
+        "required": ["type", "data"],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["structured"]
+          },
+          "data": {},
+          "name": {
+            "$ref": "#/components/schemas/NonEmptyString"
+          },
+          "providerMetadata": {
+            "$ref": "#/components/schemas/Metadata"
+          }
+        },
+        "unevaluatedProperties": {
+          "not": {}
+        }
+      },
+      "SystemMessage": {
+        "type": "object",
+        "required": ["role", "content"],
+        "properties": {
+          "role": {
+            "type": "string",
+            "enum": ["system"]
+          },
+          "content": {
+            "$ref": "#/components/schemas/NonEmptyString"
+          }
+        },
+        "unevaluatedProperties": {
+          "not": {}
+        }
+      },
+      "TextDeltaChunk": {
+        "type": "object",
+        "required": ["type", "text"],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["text_delta"]
+          },
+          "text": {
+            "type": "string"
+          }
+        },
+        "unevaluatedProperties": {
+          "not": {}
+        }
+      },
+      "TextPart": {
+        "type": "object",
+        "required": ["type", "text"],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["text"]
+          },
+          "text": {
+            "type": "string"
+          },
+          "providerMetadata": {
+            "$ref": "#/components/schemas/Metadata"
+          }
+        },
+        "unevaluatedProperties": {
+          "not": {}
+        }
+      },
+      "ToolCallArgsDeltaChunk": {
+        "type": "object",
+        "required": ["type", "providerCallId", "delta"],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["tool_call_args_delta"]
+          },
+          "providerCallId": {
+            "$ref": "#/components/schemas/NonEmptyString"
+          },
+          "delta": {
+            "type": "string"
+          }
+        },
+        "unevaluatedProperties": {
+          "not": {}
+        }
+      },
+      "ToolCallDoneChunk": {
+        "type": "object",
+        "required": ["type", "providerCallId", "name", "input"],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["tool_call_done"]
+          },
+          "providerCallId": {
+            "$ref": "#/components/schemas/NonEmptyString"
+          },
+          "name": {
+            "$ref": "#/components/schemas/NonEmptyString"
+          },
+          "input": {},
+          "providerMetadata": {
+            "$ref": "#/components/schemas/Metadata"
+          }
+        },
+        "unevaluatedProperties": {
+          "not": {}
+        }
+      },
+      "ToolCallPart": {
+        "type": "object",
+        "required": ["type", "callId", "name", "input"],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["tool_call"]
+          },
+          "callId": {
+            "$ref": "#/components/schemas/NonEmptyString"
+          },
+          "name": {
+            "$ref": "#/components/schemas/NonEmptyString"
+          },
+          "input": {},
+          "providerMetadata": {
+            "$ref": "#/components/schemas/Metadata"
+          }
+        },
+        "unevaluatedProperties": {
+          "not": {}
+        }
+      },
+      "ToolCallStartChunk": {
+        "type": "object",
+        "required": ["type", "providerCallId", "name"],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["tool_call_start"]
+          },
+          "providerCallId": {
+            "$ref": "#/components/schemas/NonEmptyString"
+          },
+          "name": {
+            "$ref": "#/components/schemas/NonEmptyString"
+          }
+        },
+        "unevaluatedProperties": {
+          "not": {}
+        }
+      },
+      "ToolMessage": {
+        "type": "object",
+        "required": ["role", "parts"],
+        "properties": {
+          "role": {
+            "type": "string",
+            "enum": ["tool"]
+          },
+          "parts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ToolResultPart"
+            },
+            "minItems": 1
+          }
+        },
+        "unevaluatedProperties": {
+          "not": {}
+        }
+      },
+      "ToolResultPart": {
+        "type": "object",
+        "required": ["type", "callId", "name", "output"],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["tool_result"]
+          },
+          "callId": {
+            "$ref": "#/components/schemas/NonEmptyString"
+          },
+          "name": {
+            "$ref": "#/components/schemas/NonEmptyString"
+          },
+          "output": {},
+          "isError": {
+            "type": "boolean"
+          },
+          "providerMetadata": {
+            "$ref": "#/components/schemas/Metadata"
+          }
+        },
+        "unevaluatedProperties": {
+          "not": {}
+        }
+      },
+      "TuvrenJsonSchema": {
+        "anyOf": [
+          {
+            "$ref": "#/components/schemas/TuvrenJsonSchemaObject"
+          },
+          {
+            "type": "boolean"
+          }
+        ]
+      },
+      "TuvrenJsonSchemaObject": {
+        "type": "object",
+        "unevaluatedProperties": {}
+      },
+      "TuvrenMessage": {
+        "anyOf": [
+          {
+            "$ref": "#/components/schemas/SystemMessage"
+          },
+          {
+            "$ref": "#/components/schemas/UserMessage"
+          },
+          {
+            "$ref": "#/components/schemas/AssistantMessage"
+          },
+          {
+            "$ref": "#/components/schemas/ToolMessage"
+          }
+        ]
+      },
+      "TuvrenModelConfig": {
+        "type": "object",
+        "properties": {
+          "model": {
+            "$ref": "#/components/schemas/NonEmptyString"
+          },
+          "provider": {
+            "$ref": "#/components/schemas/NonEmptyString"
+          },
+          "settings": {
+            "$ref": "#/components/schemas/Metadata"
+          }
+        },
+        "unevaluatedProperties": {
+          "not": {}
+        }
+      },
+      "TuvrenModelResponse": {
+        "type": "object",
+        "required": ["finishReason", "parts"],
+        "properties": {
+          "finishReason": {
+            "$ref": "#/components/schemas/FinishReason"
+          },
+          "parts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ContentPart"
+            }
+          },
+          "usage": {
+            "$ref": "#/components/schemas/ProviderUsage"
+          },
+          "providerMetadata": {
+            "$ref": "#/components/schemas/Metadata"
+          }
+        },
+        "unevaluatedProperties": {
+          "not": {}
+        }
+      },
+      "TuvrenPrompt": {
+        "type": "object",
+        "required": ["messages"],
+        "properties": {
+          "messages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TuvrenMessage"
+            }
+          },
+          "tools": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RenderedToolDefinition"
+            }
+          },
+          "config": {
+            "$ref": "#/components/schemas/TuvrenModelConfig"
+          },
+          "responseFormat": {
+            "$ref": "#/components/schemas/StructuredOutputRequest"
+          }
+        },
+        "unevaluatedProperties": {
+          "not": {}
+        }
+      },
+      "UserMessage": {
+        "type": "object",
+        "required": ["role", "parts"],
+        "properties": {
+          "role": {
+            "type": "string",
+            "enum": ["user"]
+          },
+          "parts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ContentPart"
+            },
+            "minItems": 1
+          }
+        },
+        "unevaluatedProperties": {
+          "not": {}
+        }
+      }
+    }
+  }
+}

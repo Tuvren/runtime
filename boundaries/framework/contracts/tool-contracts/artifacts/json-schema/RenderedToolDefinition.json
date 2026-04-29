@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tuvren.dev/schemas/framework/tool-contracts/RenderedToolDefinition.json",
+  "type": "object",
+  "properties": {
+    "name": {
+      "$ref": "https://tuvren.dev/schemas/framework/tool-contracts/NonEmptyString.json"
+    },
+    "description": {
+      "type": "string"
+    },
+    "inputSchema": {
+      "$ref": "https://tuvren.dev/schemas/framework/tool-contracts/TuvrenJsonSchema.json"
+    }
+  },
+  "required": ["name", "description", "inputSchema"],
+  "unevaluatedProperties": {
+    "not": {}
+  },
+  "description": "Provider-facing projection of an executable runtime tool."
+}

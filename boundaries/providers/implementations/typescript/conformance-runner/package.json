@@ -1,0 +1,9 @@
+{
+  "name": "@tuvren/providers-typescript-conformance-runner",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "dependencies": {
+    "@tuvren/provider-testkit": "workspace:*"
+  }
+}

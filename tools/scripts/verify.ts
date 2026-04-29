@@ -34,6 +34,9 @@ export const WORKSPACE_TEST_PROJECTS: readonly string[] = [
   "framework-runtime-api",
   "framework-driver-api",
   "framework-tool-contracts",
+  "kernel-typescript-conformance-runner",
+  "framework-typescript-conformance-runner",
+  "providers-typescript-conformance-runner",
   "providers-testkit",
   "framework-testkit",
   "providers-bridge-ai-sdk",
@@ -98,7 +101,7 @@ export const DEFAULT_VERIFICATION_STEPS: readonly VerificationStep[] = [
       "-t",
       "codegen",
       "-p",
-      "telemetry-semconv,compatibility-reporting",
+      "framework-tool-contracts,provider-api,telemetry-semconv,compatibility-reporting",
       // Compatibility codegen shells out to the conformance runners to produce
       // measured evidence, so verify forces a fresh execution here instead of
       // accepting cached artifacts from another workspace state.

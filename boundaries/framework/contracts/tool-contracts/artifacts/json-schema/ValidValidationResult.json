@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tuvren.dev/schemas/framework/tool-contracts/ValidValidationResult.json",
+  "type": "object",
+  "properties": {
+    "valid": {
+      "type": "boolean",
+      "const": true
+    },
+    "value": {}
+  },
+  "required": ["valid", "value"],
+  "unevaluatedProperties": {
+    "not": {}
+  }
+}

@@ -5,12 +5,12 @@
     "run",
     "nx",
     "run",
-    "kernel-testkit:conformance",
+    "kernel-typescript-conformance-runner:conformance",
     "--skipNxCache"
   ],
   "exitCode": 0,
   "implementationId": "typescript-kernel",
-  "project": "kernel-testkit",
+  "project": "kernel-typescript-conformance-runner",
   "status": "pass",
   "suiteId": "tuvren.kernel.protocol-seed",
   "suiteVersion": "0.1.0"

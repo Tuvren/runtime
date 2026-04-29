@@ -5,12 +5,12 @@
     "run",
     "nx",
     "run",
-    "providers-testkit:conformance",
+    "providers-typescript-conformance-runner:conformance",
     "--skipNxCache"
   ],
   "exitCode": 0,
   "implementationId": "typescript-providers",
-  "project": "providers-testkit",
+  "project": "providers-typescript-conformance-runner",
   "status": "pass",
   "suiteId": "tuvren.providers.api-fixtures",
   "suiteVersion": "0.1.0"

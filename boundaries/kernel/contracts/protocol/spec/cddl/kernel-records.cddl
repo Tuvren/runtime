@@ -1,0 +1,283 @@
+; Tuvren / Kraken kernel protocol record grammar.
+;
+; This CDDL describes serializable record families only. Behavioral semantics
+; remain governed by docs/KrakenKernelSpecification.md and the constitution.
+
+hash-string = tstr
+epoch-ms = int
+
+kernel-record = null / bool / int / tstr / bytes / kernel-array / kernel-map
+kernel-array = [* kernel-record]
+kernel-map = { * tstr => kernel-record }
+kernel-object = {
+  hash: hash-string,
+  mediaType: tstr,
+  bytes: bytes,
+}
+
+path-collection-kind = "ordered" / "single"
+path-value = hash-string / [* hash-string] / null
+turn-tree-manifest = { * tstr => path-value }
+turn-tree-change-set = { * tstr => path-value }
+
+path-definition = {
+  path: tstr,
+  collection: path-collection-kind,
+  ? metadata: kernel-record,
+}
+
+incorporation-rule = {
+  objectType: tstr,
+  targetPath: tstr,
+}
+
+turn-tree-schema = {
+  schemaId: tstr,
+  paths: [* path-definition],
+  incorporationRules: [* incorporation-rule],
+}
+
+step-declaration = {
+  id: tstr,
+  deterministic: bool,
+  sideEffects: bool,
+  ? metadata: kernel-record,
+}
+
+observe-result = {
+  annotations: [* kernel-object],
+  signals: [* kernel-record],
+}
+
+verdict-disposition = "HardFail" / "SoftFail" / "EndTurn"
+proceed-verdict = { kind: "proceed" }
+abort-verdict = {
+  kind: "abort",
+  disposition: verdict-disposition,
+  reason: tstr,
+}
+modify-verdict = {
+  kind: "modify",
+  transform: kernel-record,
+}
+pause-verdict = {
+  kind: "pause",
+  reason: tstr,
+  resumptionSchema: kernel-record,
+}
+retry-verdict = {
+  kind: "retry",
+  adjustment: kernel-record,
+}
+verdict = proceed-verdict / abort-verdict / modify-verdict / pause-verdict / retry-verdict
+
+staged-result-status = "completed" / "failed" / "interrupted"
+base-staged-result = (
+  taskId: tstr,
+  objectHash: hash-string,
+  objectType: tstr,
+  timestamp: epoch-ms,
+)
+interrupted-staged-result = {
+  base-staged-result,
+  status: "interrupted",
+  interruptPayload: kernel-record,
+}
+settled-staged-result = {
+  base-staged-result,
+  status: "completed" / "failed",
+}
+staged-result = interrupted-staged-result / settled-staged-result
+
+turn-node = {
+  hash: hash-string,
+  schemaId: tstr,
+  turnTreeHash: hash-string,
+  previousTurnNodeHash: hash-string / null,
+  eventHash: hash-string / null,
+  consumedStagedResults: [* staged-result],
+}
+
+thread-record = {
+  threadId: tstr,
+  schemaId: tstr,
+  rootTurnNodeHash: hash-string,
+}
+
+branch-record = {
+  branchId: tstr,
+  threadId: tstr,
+  headTurnNodeHash: hash-string,
+}
+
+turn-record = {
+  turnId: tstr,
+  threadId: tstr,
+  branchId: tstr,
+  parentTurnId: tstr / null,
+  startTurnNodeHash: hash-string,
+  headTurnNodeHash: hash-string,
+}
+
+run-status = "running" / "paused" / "completed" / "failed"
+run-record = {
+  runId: tstr,
+  turnId: tstr,
+  branchId: tstr,
+  schemaId: tstr,
+  startTurnNodeHash: hash-string,
+  status: run-status,
+  currentStepIndex: int,
+  stepSequence: [* step-declaration],
+  createdTurnNodes: [* hash-string],
+}
+
+step-context = {
+  step: step-declaration,
+  schema: turn-tree-schema,
+  signals: [* kernel-record],
+  currentTurnNodeHash: hash-string,
+}
+
+recovery-state = {
+  lastTurnNodeHash: hash-string,
+  lastCompletedStepId: tstr / null,
+  stepSequence: [* step-declaration],
+  consumedStagedResults: [* staged-result],
+  uncommittedStagedResults: [* staged-result],
+}
+
+thread-create-result = {
+  branchId: tstr,
+  rootTurnNodeHash: hash-string,
+  rootTurnTreeHash: hash-string,
+  threadId: tstr,
+}
+
+; Tuple order is part of the public TypeScript protocol type and is preserved
+; here instead of expanding it into a named object that would redefine shape.
+branch-head-list-entry = [branchId: tstr, headTurnNodeHash: hash-string]
+
+set-head-result = {
+  branch: branch-record,
+  ? archiveBranch: branch-record,
+}
+
+stored-object = {
+  hash: hash-string,
+  mediaType: tstr,
+  bytes: bytes,
+  byteLength: uint,
+  createdAtMs: epoch-ms,
+}
+
+stored-schema = {
+  schemaId: tstr,
+  schemaCbor: bytes,
+  createdAtMs: epoch-ms,
+}
+
+stored-turn-tree = {
+  hash: hash-string,
+  schemaId: tstr,
+  manifestCbor: bytes,
+  createdAtMs: epoch-ms,
+}
+
+stored-single-turn-tree-path = {
+  turnTreeHash: hash-string,
+  path: tstr,
+  collectionKind: "single",
+  singleHash: hash-string / null,
+}
+
+stored-flat-ordered-turn-tree-path = {
+  turnTreeHash: hash-string,
+  path: tstr,
+  collectionKind: "ordered",
+  orderedEncoding: "flat",
+  orderedCount: uint,
+  orderedInlineCbor: bytes,
+}
+
+stored-chunked-ordered-turn-tree-path = {
+  turnTreeHash: hash-string,
+  path: tstr,
+  collectionKind: "ordered",
+  orderedEncoding: "chunked",
+  orderedCount: uint,
+  orderedChunkListCbor: bytes,
+}
+
+stored-turn-tree-path =
+  stored-single-turn-tree-path /
+  stored-flat-ordered-turn-tree-path /
+  stored-chunked-ordered-turn-tree-path
+
+stored-ordered-path-chunk = {
+  chunkHash: hash-string,
+  itemCount: uint,
+  itemsCbor: bytes,
+  createdAtMs: epoch-ms,
+}
+
+stored-turn-node = {
+  hash: hash-string,
+  schemaId: tstr,
+  turnTreeHash: hash-string,
+  previousTurnNodeHash: hash-string / null,
+  eventHash: hash-string / null,
+  consumedStagedResultsCbor: bytes,
+  createdAtMs: epoch-ms,
+}
+
+stored-thread = {
+  threadId: tstr,
+  schemaId: tstr,
+  rootTurnNodeHash: hash-string,
+  createdAtMs: epoch-ms,
+}
+
+stored-branch = {
+  branchId: tstr,
+  threadId: tstr,
+  headTurnNodeHash: hash-string,
+  ? archivedFromBranchId: tstr,
+  createdAtMs: epoch-ms,
+  updatedAtMs: epoch-ms,
+}
+
+stored-turn = {
+  turnId: tstr,
+  threadId: tstr,
+  branchId: tstr,
+  parentTurnId: tstr / null,
+  startTurnNodeHash: hash-string,
+  headTurnNodeHash: hash-string,
+  createdAtMs: epoch-ms,
+  updatedAtMs: epoch-ms,
+}
+
+stored-run = {
+  runId: tstr,
+  turnId: tstr,
+  branchId: tstr,
+  schemaId: tstr,
+  startTurnNodeHash: hash-string,
+  status: run-status,
+  currentStepIndex: int,
+  stepSequenceCbor: bytes,
+  createdTurnNodesCbor: bytes,
+  createdAtMs: epoch-ms,
+  updatedAtMs: epoch-ms,
+}
+
+stored-staged-result = {
+  runId: tstr,
+  taskId: tstr,
+  objectHash: hash-string,
+  objectType: tstr,
+  status: staged-result-status,
+  ? interruptPayloadCbor: bytes,
+  createdAtMs: epoch-ms,
+}

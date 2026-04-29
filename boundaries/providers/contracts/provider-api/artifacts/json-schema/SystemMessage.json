@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tuvren.dev/schemas/providers/provider-api/SystemMessage.json",
+  "type": "object",
+  "properties": {
+    "role": {
+      "type": "string",
+      "const": "system"
+    },
+    "content": {
+      "$ref": "https://tuvren.dev/schemas/providers/provider-api/NonEmptyString.json"
+    }
+  },
+  "required": ["role", "content"],
+  "unevaluatedProperties": {
+    "not": {}
+  }
+}
