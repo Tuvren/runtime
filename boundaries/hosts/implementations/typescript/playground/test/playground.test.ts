@@ -959,6 +959,10 @@ describe("playground host scenarios", () => {
 
         expect(report.status.phase).toBe("completed");
         expectScenarioChecksPassed(report.checks);
+        if (provider.mode === "aimock-google") {
+          expect(report.checks.toolHistoryPreserved).toBe(true);
+          expect(report.checks.toolTraceObserved).toBe(true);
+        }
         expect(requests.length).toBe(2);
         expect(
           requests.every((request) =>
@@ -1034,6 +1038,10 @@ describe("playground host scenarios", () => {
 
         expect(report.status.phase).toBe("completed");
         expectScenarioChecksPassed(report.checks);
+        if (provider.mode === "aimock-google") {
+          expect(report.checks.toolMetadataHistoryPreserved).toBe(true);
+          expect(report.checks.toolMetadataObserved).toBe(true);
+        }
         expect(requests.length).toBe(2);
         expect(
           requests.every((request) =>

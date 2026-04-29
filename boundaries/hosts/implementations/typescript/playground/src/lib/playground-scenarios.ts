@@ -175,6 +175,19 @@ async function runApprovalScenario(
   });
   const pausedProjection = await host.project(pausedHandle);
   const approval = pausedHandle.status().approval;
+  const pausedMessages = await host.readBranchMessages(thread.branchId);
+  const pausedToolCallProviderCallIdCount =
+    countDurableToolCallProviderCallIds(pausedMessages);
+  const pausedToolMetadataObserved = readApprovalToolMetadataObserved(
+    config,
+    pausedProjection,
+    pausedMessages
+  );
+  const pausedToolMetadataHistoryPreserved = readApprovalToolMetadataHistory(
+    config,
+    pausedMessages,
+    pausedToolCallProviderCallIdCount
+  );
 
   if (approval === undefined) {
     return createReport({
@@ -184,6 +197,8 @@ async function runApprovalScenario(
         editedEmailInputExecuted: false,
         pausedFirst: pausedHandle.status().phase === "paused",
         resumedCompleted: false,
+        toolMetadataHistoryPreserved: pausedToolMetadataHistoryPreserved,
+        toolMetadataObserved: pausedToolMetadataObserved,
         toolResultAfterResume: false,
       },
       config,
@@ -211,6 +226,8 @@ async function runApprovalScenario(
         editedEmailInputExecuted: false,
         pausedFirst: pausedHandle.status().phase === "paused",
         resumedCompleted: false,
+        toolMetadataHistoryPreserved: pausedToolMetadataHistoryPreserved,
+        toolMetadataObserved: pausedToolMetadataObserved,
         toolResultAfterResume: false,
       },
       config,
@@ -269,6 +286,16 @@ async function runApprovalScenario(
         config.providerMode === "ai-sdk-google"
           ? countToolCallThoughtSignatureEvents(projection) >= 1
           : true,
+      toolMetadataHistoryPreserved: readApprovalToolMetadataHistory(
+        config,
+        resumedMessages,
+        countDurableToolCallProviderCallIds(resumedMessages)
+      ),
+      toolMetadataObserved: readApprovalToolMetadataObserved(
+        config,
+        projection,
+        resumedMessages
+      ),
       toolResultAfterResume: resumedProjection.canonical.some(
         (event) =>
           event.type === "tool.result" && event.callId === emailApproval.callId
@@ -533,6 +560,41 @@ function readToolTraceObserved(
   return true;
 }
 
+function readApprovalToolMetadataObserved(
+  config: PlaygroundConfig,
+  projection: PlaygroundStreamProjection,
+  messages: unknown[]
+): boolean {
+  if (config.providerMode === "ai-sdk-google") {
+    return (
+      countToolCallThoughtSignatureEvents(projection) >= 1 &&
+      countDurableToolCallThoughtSignatures(messages) >= 1
+    );
+  }
+
+  if (config.providerMode === "aimock-google") {
+    return countToolCallProviderCallIdEvents(projection) >= 2;
+  }
+
+  return true;
+}
+
+function readApprovalToolMetadataHistory(
+  config: PlaygroundConfig,
+  messages: unknown[],
+  durableToolCallProviderCallIdCount: number
+): boolean {
+  if (config.providerMode === "ai-sdk-google") {
+    return countDurableToolCallThoughtSignatures(messages) >= 1;
+  }
+
+  if (config.providerMode === "aimock-google") {
+    return durableToolCallProviderCallIdCount >= 2;
+  }
+
+  return true;
+}
+
 function createReport(input: {
   checks: Record<string, boolean>;
   config: PlaygroundConfig;
@@ -665,9 +727,7 @@ function mergePromptSettings(
   const mergedSettings = {
     ...(prompt.config?.settings ?? {}),
   };
-  const toolResultCount = prompt.messages.filter(
-    (message) => message.role === "tool"
-  ).length;
+  const toolResultCount = countPromptToolResults(prompt.messages);
   const releaseAfter = settings.requiredToolResultsBeforeRelease ?? 0;
 
   if (toolResultCount < releaseAfter && settings.toolChoice !== undefined) {
@@ -688,6 +748,22 @@ function mergePromptSettings(
           }),
     },
   };
+}
+
+function countPromptToolResults(messages: TuvrenPrompt["messages"]): number {
+  let count = 0;
+
+  for (const message of messages) {
+    if (message.role !== "tool") {
+      continue;
+    }
+
+    // Count concrete tool results, not tool-message envelopes, so batched tool
+    // result messages cannot release Gemini tool-choice steering early.
+    count += message.parts.length;
+  }
+
+  return count;
 }
 
 function findToolDefinition(name: "email" | "search") {
