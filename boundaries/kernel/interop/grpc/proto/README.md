@@ -10,5 +10,6 @@ process-boundary transport.
   and are not authored authority.
 - Framework-owned execution controls, provider semantics, host stream adapters,
   and driver-loop behavior stay outside this kernel transport.
-- Run Buf-backed targets from a Devenv shell. `buf` and `protoc-gen-es` are
-  native Devenv tools by policy, not npm package scripts.
+- The Nx targets enter `devenv shell --` before invoking Buf-backed scripts.
+  `buf` and `protoc-gen-es` remain native Devenv tools by policy, not npm
+  package scripts.

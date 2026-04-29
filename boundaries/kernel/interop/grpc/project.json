@@ -25,7 +25,7 @@
       ],
       "options": {
         "cwd": ".",
-        "command": "bun tools/scripts/kernel-interop-governance.ts codegen"
+        "command": "devenv shell -- bun tools/scripts/kernel-interop-governance.ts codegen"
       }
     },
     "breaking": {
@@ -33,14 +33,14 @@
       "cache": false,
       "options": {
         "cwd": ".",
-        "command": "bun tools/scripts/kernel-interop-governance.ts breaking"
+        "command": "devenv shell -- bun tools/scripts/kernel-interop-governance.ts breaking"
       }
     },
     "interop-smoke": {
       "executor": "nx:run-commands",
       "options": {
         "cwd": ".",
-        "command": "bun tools/scripts/kernel-interop-governance.ts interop-smoke"
+        "command": "devenv shell -- bun tools/scripts/kernel-interop-governance.ts interop-smoke"
       }
     },
     "lint": {
@@ -54,7 +54,7 @@
       ],
       "options": {
         "cwd": ".",
-        "command": "bun tools/scripts/kernel-interop-governance.ts lint && bunx --bun @biomejs/biome check boundaries/kernel/interop/grpc tools/scripts/kernel-interop-governance.ts"
+        "command": "devenv shell -- bun tools/scripts/kernel-interop-governance.ts lint && bunx --bun @biomejs/biome check boundaries/kernel/interop/grpc tools/scripts/kernel-interop-governance.ts"
       }
     }
   }

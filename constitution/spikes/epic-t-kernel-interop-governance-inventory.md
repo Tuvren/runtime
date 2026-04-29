@@ -54,13 +54,17 @@ implement a Rust kernel or a TypeScript remote-kernel client.
 
 - `kernel-interop-grpc` now exposes `lint`, `breaking`, `codegen`, and
   `interop-smoke` targets.
+- The Buf-backed Nx targets enter `devenv shell --` themselves, keeping root
+  `bun run codegen`, `bun run interop-smoke`, and verify usable from a normal
+  checkout while still declaring Buf and `protoc-gen-es` through Devenv.
 - Root `bun run codegen` and `bun run interop-smoke` now include
   `kernel-interop-grpc`.
 - `tools/scripts/verify.ts` now includes interop code generation plus the
   governance smoke lane.
-- The first breaking check skips only when the against branch has no prior
-  `.proto` baseline; once this change lands, later proto changes compare
-  against the existing baseline through Buf `FILE` compatibility.
+- The first breaking check refreshes `origin/master` before deciding whether
+  the against branch has no prior `.proto` baseline; once this change lands,
+  later proto changes compare against the existing baseline through Buf `FILE`
+  compatibility instead of relying on stale local refs.
 
 ## Validation Evidence
 

@@ -73,6 +73,8 @@ async function runCodegen(): Promise<void> {
 }
 
 async function runBreakingCheck(): Promise<void> {
+  await refreshRemoteBreakingBaseline();
+
   const againstBranchSearch = await findAgainstBranchWithProtoBaseline();
 
   if (againstBranchSearch.branch === undefined) {
@@ -99,6 +101,37 @@ async function runBreakingCheck(): Promise<void> {
     "--against-config",
     "buf.yaml",
   ]);
+}
+
+async function refreshRemoteBreakingBaseline(): Promise<void> {
+  const hasOriginMaster = await branchExists("origin/master");
+
+  if (!hasOriginMaster) {
+    return;
+  }
+
+  const result = await runCommand(
+    ["git", "fetch", "--quiet", "origin", "master:refs/remotes/origin/master"],
+    { captureOutput: true, cwd: REPO_ROOT }
+  );
+
+  if (result.code !== 0) {
+    // Breaking checks must compare against a fresh remote baseline. Otherwise a
+    // stale local origin/master could keep taking the first-Epic skip after
+    // the proto authority has already landed on the real default branch.
+    throw new Error(
+      `unable to refresh kernel interop breaking-check baseline from origin/master: ${result.stderr.trim()}`
+    );
+  }
+}
+
+async function branchExists(branch: string): Promise<boolean> {
+  const result = await runCommand(["git", "rev-parse", "--verify", branch], {
+    captureOutput: true,
+    cwd: REPO_ROOT,
+  });
+
+  return result.code === 0;
 }
 
 interface AgainstBranchSearch {
