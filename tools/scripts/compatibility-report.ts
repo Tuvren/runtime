@@ -14,14 +14,14 @@
  * limitations under the License.
  */
 
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { runCommand } from "./lib/command-runner.js";
 
 interface CompatibilityMatrix {
   implementations: CompatibilityImplementation[];
-  interop: [];
+  interop: CompatibilityInteropResult[];
   suites: CompatibilitySuite[];
 }
 
@@ -34,6 +34,14 @@ interface CompatibilityImplementation {
 
 interface CompatibilityImplementationResult {
   evidencePath: string;
+  status: "fail" | "pass";
+  suiteId: string;
+  suiteVersion: string;
+}
+
+interface CompatibilityInteropResult {
+  evidencePath: string;
+  pairId: string;
   status: "fail" | "pass";
   suiteId: string;
   suiteVersion: string;
@@ -91,6 +99,10 @@ const CONFORMANCE_RUNNERS: readonly ConformanceRunner[] = [
 await main();
 
 async function main(): Promise<void> {
+  // Checked-in evidence must describe only the currently measured suite set,
+  // so codegen clears the directory before regenerating the authoritative
+  // suite-specific artifacts.
+  await rm(EVIDENCE_DIRECTORY, { force: true, recursive: true });
   await mkdir(EVIDENCE_DIRECTORY, { recursive: true });
 
   const suites: CompatibilitySuite[] = [];
@@ -128,6 +140,8 @@ async function main(): Promise<void> {
     implementations,
     // Real interop evidence does not exist until later epics wire an actual
     // cross-process lane, so Epic R records no placeholder pass claims here.
+    // The typed shape still matches the checked-in schema so later epics can
+    // add measured interop entries without first widening this generator.
     interop: [],
     suites,
   };
@@ -207,24 +221,34 @@ async function runConformanceTarget(
   );
   const relativeEvidencePath = relative(REPO_ROOT, evidenceFilePath);
   const status: "fail" | "pass" = commandResult.code === 0 ? "pass" : "fail";
+  const evidence: {
+    boundary: string;
+    command: string[];
+    exitCode: number;
+    implementationId: string;
+    project: string;
+    status: "fail" | "pass";
+    stderr?: string;
+    stdout?: string;
+    suiteId: string;
+    suiteVersion: string;
+  } = {
+    boundary: suiteManifest.boundary,
+    command,
+    exitCode: commandResult.code,
+    implementationId: runner.implementationId,
+    project: runner.project,
+    status,
+    suiteId: suiteManifest.suiteId,
+    suiteVersion: suiteManifest.suiteVersion,
+  };
 
-  await writeFile(
-    evidenceFilePath,
-    `${JSON.stringify(
-      {
-        boundary: suiteManifest.boundary,
-        command,
-        exitCode: commandResult.code,
-        implementationId: runner.implementationId,
-        project: runner.project,
-        status,
-        suiteId: suiteManifest.suiteId,
-        suiteVersion: suiteManifest.suiteVersion,
-      },
-      null,
-      2
-    )}\n`
-  );
+  if (status === "fail") {
+    evidence.stderr = commandResult.stderr;
+    evidence.stdout = commandResult.stdout;
+  }
+
+  await writeFile(evidenceFilePath, `${JSON.stringify(evidence, null, 2)}\n`);
 
   return {
     matrixResult: {
@@ -298,6 +322,19 @@ function assertCompatibilityMatrix(
           "compatibility matrix implementation results must contain non-empty fields"
         );
       }
+    }
+  }
+
+  for (const interopResult of value.interop) {
+    if (
+      interopResult.evidencePath.length === 0 ||
+      interopResult.pairId.length === 0 ||
+      interopResult.suiteId.length === 0 ||
+      interopResult.suiteVersion.length === 0
+    ) {
+      throw new Error(
+        "compatibility matrix interop results must contain non-empty fields"
+      );
     }
   }
 }

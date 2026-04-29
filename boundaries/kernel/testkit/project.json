@@ -18,7 +18,7 @@
       "executor": "nx:run-commands",
       "options": {
         "cwd": "boundaries/kernel/testkit",
-        "command": "bun test"
+        "command": "bun test ./test/kernel-conformance.test.ts"
       }
     },
     "exports-smoke": {

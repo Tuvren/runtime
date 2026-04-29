@@ -18,7 +18,7 @@
       "executor": "nx:run-commands",
       "options": {
         "cwd": "boundaries/providers/testkit",
-        "command": "bun test"
+        "command": "bun test ./test/provider-conformance.test.ts"
       }
     },
     "exports-smoke": {

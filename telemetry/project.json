@@ -14,7 +14,7 @@
       ],
       "options": {
         "cwd": ".",
-        "command": "bun tools/scripts/telemetry-codegen.ts"
+        "command": "devenv shell -- bun tools/scripts/telemetry-codegen.ts"
       }
     },
     "lint": {
