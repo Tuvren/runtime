@@ -125,6 +125,7 @@ const PROVIDER_TOOL_CALL_DONE_KEYS = new Set([
   "providerCallId",
   "name",
   "input",
+  "providerMetadata",
 ]);
 const PROVIDER_FINISH_KEYS = new Set([
   "type",
@@ -289,6 +290,7 @@ export type ProviderStreamChunk =
       providerCallId: string;
       name: string;
       input: unknown;
+      providerMetadata?: Record<string, unknown>;
     }
   | {
       type: "finish";
@@ -584,6 +586,7 @@ export interface ToolCallDoneEvent {
   callId: string;
   input: unknown;
   name: string;
+  providerMetadata?: Record<string, unknown>;
   source?: EventSource;
   timestamp: EpochMs;
   type: "tool_call.done";
@@ -1153,7 +1156,8 @@ export function isProviderStreamChunk(
           isNonEmptyStringProperty(value, "providerCallId") &&
           isNonEmptyStringProperty(value, "name") &&
           "input" in value &&
-          isSerializableContractValue(value.input)
+          isSerializableContractValue(value.input) &&
+          isOptionalSerializableRecordProperty(value, "providerMetadata")
         );
       case "finish":
         return (
@@ -1320,12 +1324,13 @@ function hasValidStreamEventPayload(
     case "tool_call.done":
       return matchesStreamEventVariant(
         value,
-        ["callId", "name", "input"],
+        ["callId", "name", "input", "providerMetadata"],
         () =>
           isNonEmptyStringProperty(value, "callId") &&
           isNonEmptyStringProperty(value, "name") &&
           "input" in value &&
-          isSerializableContractValue(value.input)
+          isSerializableContractValue(value.input) &&
+          isOptionalSerializableRecordProperty(value, "providerMetadata")
       );
     case "message.done":
       return matchesStreamEventVariant(

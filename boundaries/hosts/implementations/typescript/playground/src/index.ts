@@ -16,16 +16,26 @@
 
 // biome-ignore lint/performance/noBarrelFile: This package entrypoint is the intentional private playground surface.
 export {
+  AIMOCK_PLAYGROUND_PROVIDER_MODES,
+  DEFAULT_GEMINI_PLAYGROUND_MODEL_ID,
+  DEFAULT_GEMINI_PLAYGROUND_SCENARIOS,
   DEFAULT_PLAYGROUND_SCENARIOS,
+  isAimockProviderMode,
   loadPlaygroundConfig,
+  resolveGoogleApiKey,
 } from "./lib/playground-config.js";
 export { createPlaygroundHost } from "./lib/playground-host.js";
+export {
+  haveAllChecksPassed,
+  runPlaygroundScenarioMatrix,
+} from "./lib/playground-matrix.js";
 export { runPlaygroundScenario } from "./lib/playground-scenarios.js";
 export type {
   PlaygroundBackendMode,
   PlaygroundConfig,
   PlaygroundHost,
   PlaygroundProviderMode,
+  PlaygroundScenarioMatrixReport,
   PlaygroundScenarioName,
   PlaygroundScenarioReport,
 } from "./lib/playground-types.js";

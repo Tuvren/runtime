@@ -41,12 +41,17 @@ export function createPlaygroundHost(config: PlaygroundConfig): PlaygroundHost {
   const harness = createPlaygroundKernel({ backend });
   const provider = createPlaygroundProvider({
     aimockBaseUrl: config.aimockBaseUrl,
+    modelId: config.modelId,
     mode: config.providerMode,
     scenario: config.scenario,
   });
   const runtime = createTuvrenRuntimeCore({
     defaultDriverId: REACT_DRIVER_ID,
-    driverRegistry: createDriverRegistry([createReActDriver()]),
+    driverRegistry: createDriverRegistry([
+      createReActDriver({
+        providerCallMode: "stream",
+      }),
+    ]),
     kernel: harness.kernel,
   });
 

@@ -14,13 +14,17 @@
  * limitations under the License.
  */
 
-import { loadPlaygroundConfig, runPlaygroundScenario } from "./index.js";
+import {
+  haveAllChecksPassed,
+  loadPlaygroundConfig,
+  runPlaygroundScenario,
+} from "./index.js";
 
 const config = loadPlaygroundConfig(process.env, process.argv.slice(2));
 const report = await runPlaygroundScenario(config);
 
 process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
 
-if (Object.values(report.checks).some((value) => value === false)) {
+if (!haveAllChecksPassed(report.checks)) {
   process.exitCode = 1;
 }

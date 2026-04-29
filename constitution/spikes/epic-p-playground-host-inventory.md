@@ -11,7 +11,9 @@
 
 - Embedded runtime host creation over `createTuvrenRuntimeCore`, the ReAct Driver, memory backend, SQLite backend, and deterministic playground providers.
 - Public host operations for thread creation, branch creation from a head turn node, turn execution, approval resolution, cancellation, steering, runtime access, durable branch message/status inspection, and stream projection.
-- CLI scenario runner through `src/cli.ts`, with environment and argument parsing for backend, provider mode, scenario, and SQLite path. The CLI exits non-zero when any boolean scenario check reports `false`.
+- CLI scenario runner through `src/cli.ts`, with environment and argument parsing for backend, provider mode, scenario, SQLite path, and optional model id. The CLI exits non-zero when any boolean scenario check reports `false`.
+- Manual Gemini matrix runner through `src/gemini-cli.ts`, bound to `host-playground:scenario-gemini` and the private `ai-sdk-google` provider mode.
+- Automated aimock provider modes for OpenAI, Anthropic, and Gemini, each exercised through the same public playground host and AI SDK bridge rather than provider-specific bypass code.
 - Package export smoke coverage for the private package entrypoint.
 
 ## Scenario Matrix
@@ -25,6 +27,17 @@
 - `cancel`: active turn cancellation and failed terminal stream observation.
 - `steering`: host `steer` control path, durable steering message incorporation, and provider response to the injected steering signal.
 - `reload`: SQLite reload through a fresh host instance after a completed turn, durable message visibility after reload, branch-head advancement, root preservation, and successful follow-up execution from the reloaded host.
+- Automated aimock provider matrix: `streaming`, `structured`, `tools`, `approval`, `metadata`, `cancel`, provider errors, malformed responses, and unmatched fixtures across OpenAI, Anthropic, and Gemini-compatible HTTP boundaries.
+- Manual Gemini provider matrix: `streaming`, `metadata`, `structured`, `tools`, and `approval` through `@ai-sdk/google`, using the same streamed host/runtime path, forced first-step tool choice where needed, a two-step `tools` proof for tool-call history replay, and approval resume validation on a real provider.
+
+## Provider Notes
+
+- `aimock-openai`, `aimock-anthropic`, and `aimock-google` are the deterministic local HTTP lanes for automated provider-boundary tests.
+- The Anthropic structured-output lane proves the bridge’s compatibility path where structured output is emitted through the provider’s synthetic `json` tool contract rather than plain response text.
+- The Gemini aimock lane appends `?alt=sse` on streamed requests and may rewrite synthetic tool-call ids between assistant replay and tool-result replay, so automated continuation checks intentionally match the semantic tool payload rather than assuming transport-level id parity across providers.
+- `ai-sdk-google` is a manual local lane only. It reads `GOOGLE_GENERATIVE_AI_API_KEY` first and falls back to `GEMINI_API_KEY`.
+- `TUVREN_PLAYGROUND_MODEL_ID` or `--model-id` can override the live Gemini model; the default is `gemini-2.5-flash`.
+- The Gemini matrix is intentionally excluded from default `test`, `verify`, and release-check flows because natural live-provider behavior can vary and incurs cost.
 
 ## Backend Notes
 

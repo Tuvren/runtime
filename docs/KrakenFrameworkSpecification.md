@@ -325,7 +325,8 @@ StructuredDeltaEvent   { type: "structured.delta", messageId, delta: string, tim
 StructuredDoneEvent    { type: "structured.done", messageId, data: unknown, name?: string, timestamp }
 ToolCallStartEvent     { type: "tool_call.start", messageId, callId, name, timestamp }
 ToolCallArgsDeltaEvent { type: "tool_call.args_delta", callId, delta: string, timestamp }
-ToolCallDoneEvent      { type: "tool_call.done", callId, name, input: unknown, timestamp }
+ToolCallDoneEvent      { type: "tool_call.done", callId, name, input: unknown,
+                         providerMetadata?: Record<string, unknown>, timestamp }
 MessageDoneEvent       { type: "message.done", messageId, finishReason, usage?, timestamp }
 
 ToolExecutionStartEvent  { type: "tool.start", callId, name, input: unknown, timestamp }
@@ -453,7 +454,8 @@ ProviderStreamChunk =
   | { type: "reasoning_done" }
   | { type: "tool_call_start", providerCallId: string, name: string }
   | { type: "tool_call_args_delta", providerCallId: string, delta: string }
-  | { type: "tool_call_done", providerCallId: string, name: string, input: unknown }
+  | { type: "tool_call_done", providerCallId: string, name: string, input: unknown,
+      providerMetadata?: Record<string, unknown> }
   | { type: "structured_delta", delta: string }
   | { type: "structured_done", data: unknown, name?: string }
   | { type: "finish", finishReason: string, usage?: { inputTokens: number, outputTokens: number },
@@ -462,6 +464,11 @@ ProviderStreamChunk =
 ```
 
 `providerCallId` is the provider’s native tool call ID (Anthropic’s `toolu_...`, OpenAI’s `call_...`, Google’s optional `id`). The driver maps this to a framework-generated `callId` and preserves the provider ID in `providerMetadata` on the resulting `ToolCallPart`.
+
+When a provider needs additional tool-call continuity metadata during streaming
+(for example Google or Vertex `thoughtSignature` on function calls), the
+driver carries it on `tool_call_done.providerMetadata` and persists it on the
+resulting `ToolCallPart`.
 
 `signature` on `reasoning_delta` carries Anthropic’s thinking continuity token. The driver preserves it in `providerMetadata` on the resulting `ReasoningPart`.
 

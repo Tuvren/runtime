@@ -18,11 +18,52 @@ import { describe, expect, test } from "bun:test";
 import { tmpdir } from "node:os";
 import { type ChatCompletionRequest, LLMock } from "@copilotkit/aimock";
 import {
+  AIMOCK_PLAYGROUND_PROVIDER_MODES,
+  createPlaygroundHost,
+  DEFAULT_GEMINI_PLAYGROUND_SCENARIOS,
   DEFAULT_PLAYGROUND_SCENARIOS,
+  haveAllChecksPassed,
   loadPlaygroundConfig,
+  type PlaygroundProviderMode,
   type PlaygroundScenarioReport,
   runPlaygroundScenario,
+  runPlaygroundScenarioMatrix,
 } from "@tuvren/playground-host";
+
+const AIMOCK_PROVIDER_CASES: readonly AimockProviderCase[] = [
+  {
+    expectedCompletionPath: "/v1/chat/completions",
+    id: "openai",
+    metadataModelId: "gpt-4o-mini",
+    mode: "aimock-openai",
+    modelId: "gpt-4o-mini",
+  },
+  {
+    expectedCompletionPath: "/v1/messages",
+    id: "anthropic",
+    metadataModelId: "claude-3-5-haiku-latest",
+    mode: "aimock-anthropic",
+    modelId: "claude-3-5-haiku-latest",
+  },
+  {
+    expectedCompletionPath:
+      "/v1beta/models/gemini-2.5-flash:streamGenerateContent",
+    expectedQuerySuffix: "?alt=sse",
+    id: "google",
+    metadataModelId: "gemini-2.5-flash",
+    mode: "aimock-google",
+    modelId: "gemini-2.5-flash",
+  },
+];
+
+interface AimockProviderCase {
+  expectedCompletionPath: string;
+  expectedQuerySuffix?: string;
+  id: "anthropic" | "google" | "openai";
+  metadataModelId: string;
+  mode: Extract<PlaygroundProviderMode, `aimock-${string}`>;
+  modelId: string;
+}
 
 describe("playground host scenarios", () => {
   test("loads deterministic default configuration", () => {
@@ -31,51 +72,106 @@ describe("playground host scenarios", () => {
     expect(config).toEqual({
       aimockBaseUrl: undefined,
       backend: "memory",
+      modelId: undefined,
       providerMode: "fixture",
       scenario: "streaming",
       sqlitePath: undefined,
     });
   });
 
-  test("loads aimock-openai configuration from argv and env", () => {
-    const argvConfig = loadPlaygroundConfig({}, [
-      "--provider",
+  test("loads aimock provider configuration from argv and env", () => {
+    expect(AIMOCK_PLAYGROUND_PROVIDER_MODES).toEqual([
       "aimock-openai",
-      "--aimock-base-url",
-      " http://127.0.0.1:4010/v1 ",
+      "aimock-anthropic",
+      "aimock-google",
     ]);
 
-    expect(argvConfig.providerMode).toBe("aimock-openai");
-    expect(argvConfig.aimockBaseUrl).toBe("http://127.0.0.1:4010/v1");
+    for (const providerMode of AIMOCK_PLAYGROUND_PROVIDER_MODES) {
+      const argvConfig = loadPlaygroundConfig({}, [
+        "--provider",
+        providerMode,
+        "--aimock-base-url",
+        " http://127.0.0.1:4010/v1 ",
+      ]);
+
+      expect(argvConfig.providerMode).toBe(providerMode);
+      expect(argvConfig.aimockBaseUrl).toBe("http://127.0.0.1:4010/v1");
+
+      const envConfig = loadPlaygroundConfig(
+        {
+          TUVREN_PLAYGROUND_AIMOCK_BASE_URL: "http://127.0.0.1:4011/v1",
+          TUVREN_PLAYGROUND_PROVIDER_MODE: providerMode,
+        },
+        []
+      );
+
+      expect(envConfig.providerMode).toBe(providerMode);
+      expect(envConfig.aimockBaseUrl).toBe("http://127.0.0.1:4011/v1");
+    }
+  });
+
+  test("loads ai-sdk-google configuration from argv and env", () => {
+    const argvConfig = loadPlaygroundConfig(
+      {
+        GOOGLE_GENERATIVE_AI_API_KEY: "google-key",
+      },
+      ["--provider", "ai-sdk-google", "--model-id", " gemini-2.5-pro "]
+    );
+
+    expect(argvConfig.providerMode).toBe("ai-sdk-google");
+    expect(argvConfig.modelId).toBe("gemini-2.5-pro");
 
     const envConfig = loadPlaygroundConfig(
       {
-        TUVREN_PLAYGROUND_AIMOCK_BASE_URL: "http://127.0.0.1:4011/v1",
-        TUVREN_PLAYGROUND_PROVIDER_MODE: "aimock-openai",
+        GEMINI_API_KEY: "gemini-key",
+        TUVREN_PLAYGROUND_MODEL_ID: "gemini-2.5-flash-lite",
+        TUVREN_PLAYGROUND_PROVIDER_MODE: "ai-sdk-google",
       },
       []
     );
 
-    expect(envConfig.providerMode).toBe("aimock-openai");
-    expect(envConfig.aimockBaseUrl).toBe("http://127.0.0.1:4011/v1");
+    expect(envConfig.providerMode).toBe("ai-sdk-google");
+    expect(envConfig.modelId).toBe("gemini-2.5-flash-lite");
   });
 
-  test("rejects aimock-openai configuration without a usable base URL", () => {
+  test("rejects aimock provider configuration without a usable base URL", () => {
+    for (const providerMode of AIMOCK_PLAYGROUND_PROVIDER_MODES) {
+      expectPlaygroundConfigError(
+        () => loadPlaygroundConfig({}, ["--provider", providerMode]),
+        `${providerMode} playground provider requires --aimock-base-url or TUVREN_PLAYGROUND_AIMOCK_BASE_URL`
+      );
+
+      expectPlaygroundConfigError(
+        () =>
+          loadPlaygroundConfig(
+            {
+              TUVREN_PLAYGROUND_AIMOCK_BASE_URL: "   ",
+              TUVREN_PLAYGROUND_PROVIDER_MODE: providerMode,
+            },
+            []
+          ),
+        `${providerMode} playground provider requires --aimock-base-url or TUVREN_PLAYGROUND_AIMOCK_BASE_URL`
+      );
+    }
+  });
+
+  test("rejects ai-sdk-google configuration without a usable API key", () => {
     expectPlaygroundConfigError(
-      () => loadPlaygroundConfig({}, ["--provider", "aimock-openai"]),
-      "aimock-openai playground provider requires --aimock-base-url or TUVREN_PLAYGROUND_AIMOCK_BASE_URL"
+      () => loadPlaygroundConfig({}, ["--provider", "ai-sdk-google"]),
+      "ai-sdk-google playground provider requires GOOGLE_GENERATIVE_AI_API_KEY or GEMINI_API_KEY"
     );
 
     expectPlaygroundConfigError(
       () =>
         loadPlaygroundConfig(
           {
-            TUVREN_PLAYGROUND_AIMOCK_BASE_URL: "   ",
-            TUVREN_PLAYGROUND_PROVIDER_MODE: "aimock-openai",
+            GEMINI_API_KEY: "   ",
+            GOOGLE_GENERATIVE_AI_API_KEY: "",
+            TUVREN_PLAYGROUND_PROVIDER_MODE: "ai-sdk-google",
           },
           []
         ),
-      "aimock-openai playground provider requires --aimock-base-url or TUVREN_PLAYGROUND_AIMOCK_BASE_URL"
+      "ai-sdk-google playground provider requires GOOGLE_GENERATIVE_AI_API_KEY or GEMINI_API_KEY"
     );
   });
 
@@ -153,6 +249,59 @@ describe("playground host scenarios", () => {
     expectScenarioChecksPassed(report.checks);
     expect(report.providerMode).toBe("ai-sdk-mock");
     expect(report.events.canonicalTypes).toContain("message.done");
+  });
+
+  test("creates the Gemini playground host when a key is present", () => {
+    withTemporaryEnv(
+      {
+        GEMINI_API_KEY: "test-gemini-key",
+        GOOGLE_GENERATIVE_AI_API_KEY: undefined,
+      },
+      () => {
+        let thrownError: unknown;
+
+        try {
+          createPlaygroundHost({
+            backend: "memory",
+            modelId: "gemini-2.5-flash",
+            providerMode: "ai-sdk-google",
+            scenario: "streaming",
+          });
+        } catch (error: unknown) {
+          thrownError = error;
+        }
+
+        expect(thrownError === undefined).toBe(true);
+      }
+    );
+  });
+
+  test("rejects the Gemini playground host when no key is present", async () => {
+    await withTemporaryEnvAsync(
+      {
+        GEMINI_API_KEY: undefined,
+        GOOGLE_GENERATIVE_AI_API_KEY: undefined,
+      },
+      async () => {
+        let actualMessage: string | undefined;
+
+        try {
+          await runPlaygroundScenario({
+            backend: "memory",
+            modelId: "gemini-2.5-flash",
+            providerMode: "ai-sdk-google",
+            scenario: "streaming",
+          });
+        } catch (error: unknown) {
+          actualMessage =
+            error instanceof Error ? error.message : String(error);
+        }
+
+        expect(actualMessage).toBe(
+          "ai-sdk-google playground provider requires GOOGLE_GENERATIVE_AI_API_KEY or GEMINI_API_KEY"
+        );
+      }
+    );
   });
 
   test("runs streamed text through aimock over the AI SDK OpenAI provider boundary", async () => {
@@ -620,6 +769,411 @@ describe("playground host scenarios", () => {
     }
   });
 
+  test("runs streamed text through aimock over Anthropic and Gemini provider boundaries", async () => {
+    for (const provider of AIMOCK_PROVIDER_CASES.filter(
+      (entry) => entry.mode !== "aimock-openai"
+    )) {
+      const mock = new LLMock({
+        logLevel: "silent",
+        port: 0,
+      });
+      mock.onMessage("Run streaming", {
+        content: `${provider.id} aimock streaming complete`,
+        id: "aimock-chat-response",
+        model: provider.metadataModelId,
+        usage: {
+          completion_tokens: 3,
+          prompt_tokens: 7,
+          total_tokens: 10,
+        },
+      });
+
+      await mock.start();
+
+      try {
+        const report = await runPlaygroundScenario({
+          aimockBaseUrl: createAimockBaseUrl(mock.url, provider.mode),
+          backend: "memory",
+          providerMode: provider.mode,
+          scenario: "streaming",
+        });
+        const request = mock.getLastRequest();
+
+        expect(report.status.phase).toBe("completed");
+        expectScenarioChecksPassed(report.checks);
+        expect(report.providerMode).toBe(provider.mode);
+        expectAimockRequestPath(request?.path, provider);
+        expect(request?.response.status).toBe(200);
+      } finally {
+        await mock.stop();
+      }
+    }
+  });
+
+  test("runs structured output through aimock across Anthropic and Gemini provider boundaries", async () => {
+    for (const provider of AIMOCK_PROVIDER_CASES.filter(
+      (entry) => entry.mode !== "aimock-openai"
+    )) {
+      const mock = new LLMock({
+        logLevel: "silent",
+        port: 0,
+      });
+      registerStructuredFixture(mock, provider);
+
+      await mock.start();
+
+      try {
+        const report = await runPlaygroundScenario({
+          aimockBaseUrl: createAimockBaseUrl(mock.url, provider.mode),
+          backend: "memory",
+          providerMode: provider.mode,
+          scenario: "structured",
+        });
+        const request = mock.getLastRequest();
+
+        expect(report.status.phase).toBe("completed");
+        expectScenarioChecksPassed(report.checks);
+        expect(report.events.canonicalTypes).toContain("structured.done");
+        expectAimockRequestPath(request?.path, provider);
+        expect(request?.response.status).toBe(200);
+      } finally {
+        await mock.stop();
+      }
+    }
+  });
+
+  test("runs tool continuation through aimock across all provider families", async () => {
+    for (const provider of AIMOCK_PROVIDER_CASES) {
+      const mock = new LLMock({
+        logLevel: "silent",
+        port: 0,
+      });
+      mock.on(
+        {
+          sequenceIndex: 0,
+          userMessage: "Run tools",
+        },
+        {
+          model: provider.metadataModelId,
+          toolCalls: [
+            {
+              arguments: {
+                query: "docs",
+              },
+              id: "aimock-call-search",
+              name: "search",
+            },
+          ],
+        }
+      );
+      mock.on(
+        {
+          predicate(request) {
+            return hasSearchToolContinuation(request);
+          },
+        },
+        {
+          content: `${provider.id} aimock observed host tool result`,
+          model: provider.metadataModelId,
+        }
+      );
+
+      await mock.start();
+
+      try {
+        const report = await runPlaygroundScenario({
+          aimockBaseUrl: createAimockBaseUrl(mock.url, provider.mode),
+          backend: "memory",
+          providerMode: provider.mode,
+          scenario: "tools",
+        });
+        const requests = mock.getRequests();
+
+        expect(report.status.phase).toBe("completed");
+        expectScenarioChecksPassed(report.checks);
+        expect(requests.length).toBe(2);
+        expect(
+          requests.every((request) =>
+            doesAimockRequestPathMatch(request.path, provider)
+          )
+        ).toBe(true);
+        expect(
+          requests.some(
+            (request) =>
+              request.body !== null && hasSearchToolContinuation(request.body)
+          )
+        ).toBe(true);
+      } finally {
+        await mock.stop();
+      }
+    }
+  });
+
+  test("runs approval pause and edited approval resume through aimock across all provider families", async () => {
+    for (const provider of AIMOCK_PROVIDER_CASES) {
+      const mock = new LLMock({
+        logLevel: "silent",
+        port: 0,
+      });
+      mock.on(
+        {
+          sequenceIndex: 0,
+          userMessage: "Run approval",
+        },
+        {
+          model: provider.metadataModelId,
+          toolCalls: [
+            {
+              arguments: {
+                query: "latest status",
+              },
+              id: "aimock-call-search",
+              name: "search",
+            },
+            {
+              arguments: {
+                subject: "Status update",
+                to: "ops@example.com",
+              },
+              id: "aimock-call-email",
+              name: "email",
+            },
+          ],
+        }
+      );
+      mock.on(
+        {
+          predicate(request) {
+            return hasApprovalToolContinuation(request);
+          },
+        },
+        {
+          content: `${provider.id} aimock approval continuation complete`,
+          model: provider.metadataModelId,
+        }
+      );
+
+      await mock.start();
+
+      try {
+        const report = await runPlaygroundScenario({
+          aimockBaseUrl: createAimockBaseUrl(mock.url, provider.mode),
+          backend: "memory",
+          providerMode: provider.mode,
+          scenario: "approval",
+        });
+        const requests = mock.getRequests();
+
+        expect(report.status.phase).toBe("completed");
+        expectScenarioChecksPassed(report.checks);
+        expect(requests.length).toBe(2);
+        expect(
+          requests.every((request) =>
+            doesAimockRequestPathMatch(request.path, provider)
+          )
+        ).toBe(true);
+        expect(
+          requests.some(
+            (request) =>
+              request.body !== null && hasApprovalToolContinuation(request.body)
+          )
+        ).toBe(true);
+      } finally {
+        await mock.stop();
+      }
+    }
+  });
+
+  test("preserves aimock response metadata across all provider families", async () => {
+    for (const provider of AIMOCK_PROVIDER_CASES) {
+      const mock = new LLMock({
+        logLevel: "silent",
+        port: 0,
+      });
+      mock.onMessage("Run metadata", {
+        content: `${provider.id} aimock metadata preserved`,
+        id: "aimock-metadata-response",
+        model: provider.metadataModelId,
+        usage: {
+          completion_tokens: 2,
+          prompt_tokens: 4,
+          total_tokens: 6,
+        },
+      });
+
+      await mock.start();
+
+      try {
+        const report = await runPlaygroundScenario({
+          aimockBaseUrl: createAimockBaseUrl(mock.url, provider.mode),
+          backend: "memory",
+          providerMode: provider.mode,
+          scenario: "metadata",
+        });
+        const request = mock.getLastRequest();
+
+        expect(report.status.phase).toBe("completed");
+        expectScenarioChecksPassed(report.checks);
+        expect(report.checks.metadataObserved).toBe(true);
+        expectAimockRequestPath(request?.path, provider);
+      } finally {
+        await mock.stop();
+      }
+    }
+  });
+
+  test("cancels an aimock-backed multi-iteration turn across all provider families", async () => {
+    for (const provider of AIMOCK_PROVIDER_CASES) {
+      const mock = new LLMock({
+        logLevel: "silent",
+        port: 0,
+      });
+      mock.on(
+        {
+          sequenceIndex: 0,
+          userMessage: "Run cancellation",
+        },
+        {
+          content: `${provider.id} first cancellation iteration`,
+          model: provider.metadataModelId,
+        }
+      );
+      mock.on(
+        {
+          sequenceIndex: 1,
+          userMessage: "Run cancellation",
+        },
+        {
+          content: `${provider.id} second cancellation iteration`,
+          model: provider.metadataModelId,
+        },
+        {
+          latency: 200,
+        }
+      );
+
+      await mock.start();
+
+      try {
+        const report = await runPlaygroundScenario({
+          aimockBaseUrl: createAimockBaseUrl(mock.url, provider.mode),
+          backend: "memory",
+          providerMode: provider.mode,
+          scenario: "cancel",
+        });
+        const requests = mock.getRequests();
+
+        expect(report.status.phase).toBe("failed");
+        expectScenarioChecksPassed(report.checks);
+        expect(requests.length).toBe(2);
+        expect(
+          requests.every((request) =>
+            doesAimockRequestPathMatch(request.path, provider)
+          )
+        ).toBe(true);
+      } finally {
+        await mock.stop();
+      }
+    }
+  });
+
+  test("surfaces aimock provider errors across all provider families", async () => {
+    for (const provider of AIMOCK_PROVIDER_CASES) {
+      const mock = new LLMock({
+        logLevel: "silent",
+        port: 0,
+      });
+      mock.nextRequestError(500, {
+        code: "aimock_failure",
+        message: "forced aimock provider failure",
+        type: "server_error",
+      });
+
+      await mock.start();
+
+      try {
+        const report = await runPlaygroundScenario({
+          aimockBaseUrl: createAimockBaseUrl(mock.url, provider.mode),
+          backend: "memory",
+          providerMode: provider.mode,
+          scenario: "streaming",
+        });
+        const request = mock.getLastRequest();
+
+        expect(report.status.phase).toBe("failed");
+        expect(report.checks.completed).toBe(false);
+        expectAimockRequestPath(request?.path, provider);
+        expect(request?.response.status).toBe(500);
+      } finally {
+        await mock.stop();
+      }
+    }
+  });
+
+  test("surfaces malformed aimock responses across all provider families", async () => {
+    for (const provider of AIMOCK_PROVIDER_CASES) {
+      const mock = new LLMock({
+        chaos: {
+          malformedRate: 1,
+        },
+        logLevel: "silent",
+        port: 0,
+      });
+      mock.onMessage("Run streaming", {
+        content: `${provider.id} malformed response replacement`,
+        model: provider.metadataModelId,
+      });
+
+      await mock.start();
+
+      try {
+        const report = await runPlaygroundScenario({
+          aimockBaseUrl: createAimockBaseUrl(mock.url, provider.mode),
+          backend: "memory",
+          providerMode: provider.mode,
+          scenario: "streaming",
+        });
+        const request = mock.getLastRequest();
+
+        expect(report.status.phase).toBe("failed");
+        expect(report.checks.completed).toBe(false);
+        expectAimockRequestPath(request?.path, provider);
+        expect(request?.response.chaosAction).toBe("malformed");
+      } finally {
+        await mock.stop();
+      }
+    }
+  });
+
+  test("surfaces unmatched aimock fixtures across all provider families", async () => {
+    for (const provider of AIMOCK_PROVIDER_CASES) {
+      const mock = new LLMock({
+        logLevel: "silent",
+        port: 0,
+      });
+
+      await mock.start();
+
+      try {
+        const report = await runPlaygroundScenario({
+          aimockBaseUrl: createAimockBaseUrl(mock.url, provider.mode),
+          backend: "memory",
+          providerMode: provider.mode,
+          scenario: "streaming",
+        });
+        const request = mock.getLastRequest();
+
+        expect(report.status.phase).toBe("failed");
+        expect(report.checks.completed).toBe(false);
+        expectAimockRequestPath(request?.path, provider);
+        expect(request?.response.status).toBe(404);
+        expect(request?.response.fixture === null).toBe(true);
+      } finally {
+        await mock.stop();
+      }
+    }
+  });
+
   test("runs steering through the host control path", async () => {
     const report = await runPlaygroundScenario({
       backend: "memory",
@@ -631,6 +1185,42 @@ describe("playground host scenarios", () => {
     expectScenarioChecksPassed(report.checks);
     expect(report.events.canonicalTypes).toContain("steering.incorporated");
   });
+
+  test("aggregates matrix success for deterministic scenarios", async () => {
+    const report = await runPlaygroundScenarioMatrix({
+      config: {
+        backend: "memory",
+        modelId: undefined,
+        providerMode: "fixture",
+        sqlitePath: undefined,
+      },
+      scenarios: ["streaming", "structured"],
+    });
+
+    expect(report.summary.allChecksPassed).toBe(true);
+    expect(report.summary.failedScenarios).toEqual([]);
+    expect(report.summary.passedScenarioCount).toBe(2);
+    expect(report.reports.length).toBe(2);
+    expect(report.scenarios).toEqual(["streaming", "structured"]);
+    expect(haveAllChecksPassed(report.reports[0]?.checks ?? {})).toBe(true);
+  });
+
+  test("aggregates matrix failures for reload on memory", async () => {
+    const report = await runPlaygroundScenarioMatrix({
+      config: {
+        backend: "memory",
+        modelId: undefined,
+        providerMode: "fixture",
+        sqlitePath: undefined,
+      },
+      scenarios: ["reload"],
+    });
+
+    expect(DEFAULT_GEMINI_PLAYGROUND_SCENARIOS).toContain("approval");
+    expect(report.summary.allChecksPassed).toBe(false);
+    expect(report.summary.failedScenarioCount).toBe(1);
+    expect(report.summary.failedScenarios).toEqual(["reload"]);
+  });
 });
 
 function expectScenarioChecksPassed(
@@ -639,6 +1229,85 @@ function expectScenarioChecksPassed(
   for (const [name, value] of Object.entries(checks)) {
     expect(`${name}:${String(value === false)}`).toBe(`${name}:false`);
   }
+}
+
+function createAimockBaseUrl(
+  mockUrl: string,
+  providerMode: AimockProviderCase["mode"]
+): string {
+  switch (providerMode) {
+    case "aimock-openai":
+    case "aimock-anthropic":
+      return `${mockUrl}/v1`;
+    case "aimock-google":
+      return `${mockUrl}/v1beta`;
+    default:
+      throw new Error(`unsupported aimock provider mode "${providerMode}"`);
+  }
+}
+
+function registerStructuredFixture(
+  mock: LLMock,
+  provider: AimockProviderCase
+): void {
+  if (provider.mode === "aimock-anthropic") {
+    mock.on(
+      {
+        userMessage: "Run structured",
+      },
+      {
+        model: provider.metadataModelId,
+        toolCalls: [
+          {
+            arguments: {
+              scenario: "structured",
+              status: "ready",
+            },
+            id: "aimock-call-json",
+            name: "json",
+          },
+        ],
+      }
+    );
+
+    return;
+  }
+
+  mock.on(
+    {
+      userMessage: "Run structured",
+    },
+    {
+      content: {
+        scenario: "structured",
+        status: "ready",
+      },
+      model: provider.metadataModelId,
+    }
+  );
+}
+
+function expectAimockRequestPath(
+  path: string | undefined,
+  provider: AimockProviderCase
+): void {
+  expect(doesAimockRequestPathMatch(path, provider)).toBe(true);
+}
+
+function doesAimockRequestPathMatch(
+  path: string | undefined,
+  provider: AimockProviderCase
+): boolean {
+  if (typeof path !== "string") {
+    return false;
+  }
+
+  const [pathname, query = ""] = path.split("?");
+
+  return (
+    pathname === provider.expectedCompletionPath &&
+    `?${query}` === (provider.expectedQuerySuffix ?? "?")
+  );
 }
 
 function expectSurfaceCoverage(
@@ -694,14 +1363,18 @@ function assertStructuredResponseFormat(value: unknown): void {
 
 function hasSearchToolContinuation(request: ChatCompletionRequest): boolean {
   const assistantToolCall = findAssistantToolCall(request, "search");
-  const toolMessage = findToolMessageForCall(request, assistantToolCall?.id);
+  const toolMessage = findToolMessageForCall(
+    request,
+    assistantToolCall?.id,
+    "search"
+  );
 
   if (assistantToolCall === undefined || toolMessage === undefined) {
     return false;
   }
 
   const args = parseJsonRecord(assistantToolCall.function.arguments);
-  const output = parseJsonRecord(toolMessage.content);
+  const output = parseToolMessageOutput(toolMessage.content);
   const hits = output?.hits;
 
   // Match both the model-authored tool input and the host-authored tool output
@@ -722,12 +1395,22 @@ function hasSearchToolContinuation(request: ChatCompletionRequest): boolean {
 function hasApprovalToolContinuation(request: ChatCompletionRequest): boolean {
   const searchCall = findAssistantToolCall(request, "search");
   const emailCall = findAssistantToolCall(request, "email");
-  const searchMessage = findToolMessageForCall(request, searchCall?.id);
-  const emailMessage = findToolMessageForCall(request, emailCall?.id);
+  const searchMessage = findToolMessageForCall(
+    request,
+    searchCall?.id,
+    "search"
+  );
+  const emailMessage = findToolMessageForCall(request, emailCall?.id, "email");
   const searchArgs = parseJsonRecord(searchCall?.function.arguments);
   const emailArgs = parseJsonRecord(emailCall?.function.arguments);
-  const searchOutput = parseJsonRecord(searchMessage?.content);
-  const emailOutput = parseJsonRecord(emailMessage?.content);
+  const searchOutput =
+    searchMessage === undefined
+      ? undefined
+      : parseToolMessageOutput(searchMessage.content);
+  const emailOutput =
+    emailMessage === undefined
+      ? undefined
+      : parseToolMessageOutput(emailMessage.content);
   const searchHits = searchOutput?.hits;
   const emailResult = emailOutput?.result;
   const approval = emailOutput?.approval;
@@ -782,20 +1465,24 @@ function findAssistantToolCall(
 
 function findToolMessageForCall(
   request: ChatCompletionRequest,
-  toolCallId: string | undefined
+  toolCallId: string | undefined,
+  toolName: string
 ): { content: string } | undefined {
-  if (toolCallId === undefined) {
-    return undefined;
-  }
-
   for (const message of request.messages) {
     if (
       isPlainRecord(message) &&
       message.role === "tool" &&
-      message.tool_call_id === toolCallId &&
       typeof message.content === "string"
     ) {
-      return { content: message.content };
+      if (toolCallId !== undefined && message.tool_call_id === toolCallId) {
+        return { content: message.content };
+      }
+
+      const output = parseJsonRecord(message.content);
+
+      if (output?.name === toolName) {
+        return { content: message.content };
+      }
     }
   }
 
@@ -831,6 +1518,77 @@ function parseJsonRecord(value: unknown): Record<string, unknown> | undefined {
   }
 }
 
+function parseToolMessageOutput(
+  value: string
+): Record<string, unknown> | undefined {
+  const parsed = parseJsonRecord(value);
+
+  if (!isPlainRecord(parsed)) {
+    return undefined;
+  }
+
+  return isPlainRecord(parsed.content) ? parsed.content : parsed;
+}
+
 function isPlainRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function withTemporaryEnv(
+  overrides: Record<string, string | undefined>,
+  run: () => void
+): void {
+  const previousEntries = new Map<string, string | undefined>();
+
+  for (const [key, value] of Object.entries(overrides)) {
+    previousEntries.set(key, process.env[key]);
+
+    if (value === undefined) {
+      delete process.env[key];
+      continue;
+    }
+
+    process.env[key] = value;
+  }
+
+  try {
+    run();
+  } finally {
+    restoreEnvironment(previousEntries);
+  }
+}
+
+async function withTemporaryEnvAsync(
+  overrides: Record<string, string | undefined>,
+  run: () => Promise<void>
+): Promise<void> {
+  const previousEntries = new Map<string, string | undefined>();
+
+  for (const [key, value] of Object.entries(overrides)) {
+    previousEntries.set(key, process.env[key]);
+
+    if (value === undefined) {
+      delete process.env[key];
+      continue;
+    }
+
+    process.env[key] = value;
+  }
+
+  try {
+    await run();
+  } finally {
+    restoreEnvironment(previousEntries);
+  }
+}
+
+function restoreEnvironment(entries: Map<string, string | undefined>): void {
+  for (const [key, value] of entries) {
+    if (value === undefined) {
+      delete process.env[key];
+      continue;
+    }
+
+    process.env[key] = value;
+  }
 }

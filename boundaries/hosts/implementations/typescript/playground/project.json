@@ -30,6 +30,14 @@
         "command": "node dist/cli.js"
       }
     },
+    "scenario-gemini": {
+      "executor": "nx:run-commands",
+      "dependsOn": ["build"],
+      "options": {
+        "cwd": "boundaries/hosts/implementations/typescript/playground",
+        "command": "bun dist/gemini-cli.js --provider ai-sdk-google"
+      }
+    },
     "scenario-sqlite": {
       "executor": "nx:run-commands",
       "dependsOn": ["build"],
@@ -40,6 +48,7 @@
     },
     "test": {
       "executor": "nx:run-commands",
+      "dependsOn": ["^build"],
       "options": {
         "cwd": "boundaries/hosts/implementations/typescript/playground",
         "command": "bun test"

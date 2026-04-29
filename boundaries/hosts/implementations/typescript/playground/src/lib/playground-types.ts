@@ -23,13 +23,18 @@ import type {
   ExecutionHandle,
   ExecutionStatus,
   InputSignal,
+  TuvrenProvider,
   TuvrenRuntime,
+  TuvrenToolDefinition,
 } from "@tuvren/runtime-api";
 import type { TuvrenSseFrame } from "@tuvren/stream-sse";
 
 export type PlaygroundBackendMode = "memory" | "sqlite";
 export type PlaygroundProviderMode =
+  | "aimock-anthropic"
+  | "aimock-google"
   | "aimock-openai"
+  | "ai-sdk-google"
   | "ai-sdk-mock"
   | "fixture";
 export type PlaygroundScenarioName =
@@ -46,6 +51,7 @@ export type PlaygroundScenarioName =
 export interface PlaygroundConfig {
   aimockBaseUrl?: string;
   backend: PlaygroundBackendMode;
+  modelId?: string;
   providerMode: PlaygroundProviderMode;
   scenario: PlaygroundScenarioName;
   sqlitePath?: string;
@@ -75,6 +81,10 @@ export interface PlaygroundStreamProjection {
 export interface PlaygroundScenarioReport {
   backend: PlaygroundBackendMode;
   checks: Record<string, boolean | number | string>;
+  error?: {
+    code?: string;
+    message: string;
+  };
   events: {
     aguiTypes: string[];
     canonicalTypes: string[];
@@ -84,6 +94,20 @@ export interface PlaygroundScenarioReport {
   scenario: PlaygroundScenarioName;
   status: ExecutionStatus;
   thread: PlaygroundThreadSummary;
+}
+
+export interface PlaygroundScenarioMatrixReport {
+  backend: PlaygroundBackendMode;
+  modelId?: string;
+  providerMode: PlaygroundProviderMode;
+  reports: PlaygroundScenarioReport[];
+  scenarios: PlaygroundScenarioName[];
+  summary: {
+    allChecksPassed: boolean;
+    failedScenarioCount: number;
+    failedScenarios: PlaygroundScenarioName[];
+    passedScenarioCount: number;
+  };
 }
 
 export interface PlaygroundHost {
@@ -106,4 +130,11 @@ export interface PlaygroundHost {
   readBranchStatus(branchId: string): Promise<unknown | null>;
   runtime: TuvrenRuntime;
   steer(handle: ExecutionHandle, signal: InputSignal): void;
+}
+
+export interface PlaygroundScenarioExecutionPlan {
+  config?: Omit<AgentConfig, "name">;
+  model?: TuvrenProvider;
+  signal: InputSignal;
+  tools?: TuvrenToolDefinition[];
 }
