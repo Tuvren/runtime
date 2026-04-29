@@ -746,6 +746,11 @@ describe("driver-react", () => {
         yield {
           input: { query: "runtime" },
           name: "search",
+          providerMetadata: {
+            google: {
+              thoughtSignature: "tool-thought-1",
+            },
+          },
           providerCallId: "native-call-1",
           type: "tool_call_done",
         } as const;
@@ -790,7 +795,24 @@ describe("driver-react", () => {
     expect(firstPart.name).toBe("search");
     expect(firstPart.callId).not.toBe("native-call-1");
     expect(firstPart.providerMetadata).toEqual({
+      google: {
+        thoughtSignature: "tool-thought-1",
+      },
       providerCallId: "native-call-1",
+    });
+    expect(
+      emittedEvents.find(
+        (
+          event
+        ): event is Extract<TuvrenStreamEvent, { type: "tool_call.done" }> =>
+          event.type === "tool_call.done"
+      )
+    ).toMatchObject({
+      providerMetadata: {
+        google: {
+          thoughtSignature: "tool-thought-1",
+        },
+      },
     });
     expect(emittedEvents.map((event) => event.type)).toEqual([
       "message.start",
@@ -4191,6 +4213,11 @@ describe("driver-react", () => {
           yield {
             input: { query: "docs" },
             name: "search",
+            providerMetadata: {
+              google: {
+                thoughtSignature: "tool-thought-1",
+              },
+            },
             providerCallId: "provider-call-1",
             type: "tool_call_done",
           } as const;
@@ -4242,6 +4269,20 @@ describe("driver-react", () => {
       )
     ).toBe(true);
     expect(
+      events.find(
+        (
+          event
+        ): event is Extract<TuvrenStreamEvent, { type: "tool_call.done" }> =>
+          event.type === "tool_call.done" && event.name === "search"
+      )
+    ).toMatchObject({
+      providerMetadata: {
+        google: {
+          thoughtSignature: "tool-thought-1",
+        },
+      },
+    });
+    expect(
       events.some(
         (event) => event.type === "tool.result" && event.name === "search"
       )
@@ -4249,6 +4290,23 @@ describe("driver-react", () => {
     expect(handle.status().phase).toBe("completed");
     expect(messages).toEqual(
       expect.arrayContaining([
+        {
+          parts: [
+            {
+              callId: expect.any(String),
+              input: { query: "docs" },
+              name: "search",
+              providerMetadata: {
+                google: {
+                  thoughtSignature: "tool-thought-1",
+                },
+                providerCallId: "provider-call-1",
+              },
+              type: "tool_call",
+            },
+          ],
+          role: "assistant",
+        },
         {
           parts: [{ text: "Tool run complete", type: "text" }],
           role: "assistant",

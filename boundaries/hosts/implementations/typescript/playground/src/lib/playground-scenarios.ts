@@ -20,15 +20,20 @@ import type {
   ExecutionHandle,
   InputSignal,
   LoopPolicy,
+  TuvrenPrompt,
+  TuvrenProvider,
 } from "@tuvren/runtime-api";
 import { toAgUiEvents } from "@tuvren/stream-agui";
 import { teeTuvrenStreamEvents } from "@tuvren/stream-core";
 import { toSseFrames } from "@tuvren/stream-sse";
+import { isAimockProviderMode } from "./playground-config.js";
 import { createPlaygroundHost } from "./playground-host.js";
+import { createPlaygroundProvider } from "./playground-provider.js";
 import { createPlaygroundTools, textSignal } from "./playground-tools.js";
 import type {
   PlaygroundConfig,
   PlaygroundHost,
+  PlaygroundScenarioExecutionPlan,
   PlaygroundScenarioReport,
   PlaygroundStreamProjection,
   PlaygroundThreadSummary,
@@ -73,9 +78,12 @@ async function runSingleTurnScenario(
 ): Promise<PlaygroundScenarioReport> {
   const host = createPlaygroundHost(config);
   const thread = await host.createThread();
+  const executionPlan = createScenarioExecutionPlan(config);
   const handle = host.executeTurn({
     branchId: thread.branchId,
     config: {
+      ...executionPlan.config,
+      model: executionPlan.model,
       name: "primary",
       responseFormat:
         config.scenario === "structured"
@@ -91,33 +99,56 @@ async function runSingleTurnScenario(
               },
             }
           : undefined,
-      tools: createPlaygroundTools(),
+      tools: executionPlan.tools,
     },
-    signal: textSignal(`Run ${config.scenario}`),
+    signal: executionPlan.signal,
     threadId: thread.threadId,
   });
   const projection = await host.project(handle);
   const messages = await host.readBranchMessages(thread.branchId);
+  const toolResultCount = projection.canonical.filter(
+    (event) => event.type === "tool.result"
+  ).length;
+  const toolCallThoughtSignatureCount =
+    countToolCallThoughtSignatureEvents(projection);
+  const durableToolCallThoughtSignatureCount =
+    countDurableToolCallThoughtSignatures(messages);
+  const toolCallProviderCallIdCount =
+    countToolCallProviderCallIdEvents(projection);
+  const durableToolCallProviderCallIdCount =
+    countDurableToolCallProviderCallIds(messages);
+  const metadataObserved = readMetadataObserved(config, messages);
+  const toolHistoryPreserved = readToolHistoryPreserved(
+    config,
+    durableToolCallProviderCallIdCount,
+    durableToolCallThoughtSignatureCount
+  );
+  const toolTraceObserved = readToolTraceObserved(
+    config,
+    toolCallProviderCallIdCount,
+    toolCallThoughtSignatureCount
+  );
 
   return createReport({
     checks: {
       aguiObserved: projection.agui.length > 0,
       canonicalObserved: projection.canonical.length > 0,
       completed: handle.status().phase === "completed",
-      metadataObserved:
-        config.scenario !== "metadata" ||
-        (config.providerMode === "aimock-openai"
-          ? messages.some(hasAimockResponseMetadataEvidence)
-          : messages.some(hasProviderMetadataEvidence)),
+      metadataObserved,
       sseObserved: projection.sse.length > 0,
       structuredObserved:
         config.scenario !== "structured" ||
         projection.canonical.some((event) => event.type === "structured.done"),
       toolObserved:
         config.scenario !== "tools" ||
-        projection.canonical.some((event) => event.type === "tool.result"),
+        (config.providerMode === "ai-sdk-google"
+          ? toolResultCount >= 2
+          : toolResultCount > 0),
+      toolHistoryPreserved,
+      toolTraceObserved,
     },
     config,
+    error: readProjectionError(projection),
     handle,
     projection,
     thread: withHead(thread, projection),
@@ -129,21 +160,55 @@ async function runApprovalScenario(
 ): Promise<PlaygroundScenarioReport> {
   const host = createPlaygroundHost(config);
   const thread = await host.createThread();
+  const executionPlan = createScenarioExecutionPlan(config);
   const pausedHandle = host.executeTurn({
     branchId: thread.branchId,
     config: {
+      ...executionPlan.config,
+      model: executionPlan.model,
       maxParallelToolCalls: 2,
       name: "primary",
-      tools: createPlaygroundTools(),
+      tools: executionPlan.tools,
     },
-    signal: textSignal("Run approval"),
+    signal: executionPlan.signal,
     threadId: thread.threadId,
   });
   const pausedProjection = await host.project(pausedHandle);
   const approval = pausedHandle.status().approval;
+  const pausedMessages = await host.readBranchMessages(thread.branchId);
+  const pausedToolCallProviderCallIdCount =
+    countDurableToolCallProviderCallIds(pausedMessages);
+  const pausedToolMetadataObserved = readApprovalToolMetadataObserved(
+    config,
+    pausedProjection,
+    pausedMessages
+  );
+  const pausedToolMetadataHistoryPreserved = readApprovalToolMetadataHistory(
+    config,
+    pausedMessages,
+    pausedToolCallProviderCallIdCount
+  );
 
   if (approval === undefined) {
-    throw new Error("approval scenario did not pause for approval");
+    return createReport({
+      checks: {
+        approvalRequested: false,
+        approvalResolved: false,
+        editedEmailInputExecuted: false,
+        pausedFirst: pausedHandle.status().phase === "paused",
+        resumedCompleted: false,
+        toolMetadataHistoryPreserved: pausedToolMetadataHistoryPreserved,
+        toolMetadataObserved: pausedToolMetadataObserved,
+        toolResultAfterResume: false,
+      },
+      config,
+      error: readProjectionError(pausedProjection) ?? {
+        message: "approval scenario did not pause for approval",
+      },
+      handle: pausedHandle,
+      projection: pausedProjection,
+      thread: withHead(thread, pausedProjection),
+    });
   }
 
   const emailApproval = approval.toolCalls.find(
@@ -151,7 +216,28 @@ async function runApprovalScenario(
   );
 
   if (emailApproval === undefined) {
-    throw new Error("approval scenario did not request email approval");
+    return createReport({
+      checks: {
+        approvalRequested: projectionHasEvent(
+          pausedProjection,
+          "approval.requested"
+        ),
+        approvalResolved: false,
+        editedEmailInputExecuted: false,
+        pausedFirst: pausedHandle.status().phase === "paused",
+        resumedCompleted: false,
+        toolMetadataHistoryPreserved: pausedToolMetadataHistoryPreserved,
+        toolMetadataObserved: pausedToolMetadataObserved,
+        toolResultAfterResume: false,
+      },
+      config,
+      error: {
+        message: "approval scenario did not request email approval",
+      },
+      handle: pausedHandle,
+      projection: pausedProjection,
+      thread: withHead(thread, pausedProjection),
+    });
   }
 
   const resumedHandle = host.approve(pausedHandle, {
@@ -177,6 +263,7 @@ async function runApprovalScenario(
   });
   const resumedProjection = await projectContinuationCapture(resumedHandle);
   const projection = mergeProjections(pausedProjection, resumedProjection);
+  const resumedMessages = await host.readBranchMessages(thread.branchId);
 
   return createReport({
     checks: {
@@ -191,12 +278,31 @@ async function runApprovalScenario(
       ),
       pausedFirst: pausedHandle.status().phase === "paused",
       resumedCompleted: resumedHandle.status().phase === "completed",
+      thoughtSignatureHistoryPreserved:
+        config.providerMode === "ai-sdk-google"
+          ? countDurableToolCallThoughtSignatures(resumedMessages) >= 1
+          : true,
+      thoughtSignatureObserved:
+        config.providerMode === "ai-sdk-google"
+          ? countToolCallThoughtSignatureEvents(projection) >= 1
+          : true,
+      toolMetadataHistoryPreserved: readApprovalToolMetadataHistory(
+        config,
+        resumedMessages,
+        countDurableToolCallProviderCallIds(resumedMessages)
+      ),
+      toolMetadataObserved: readApprovalToolMetadataObserved(
+        config,
+        projection,
+        resumedMessages
+      ),
       toolResultAfterResume: resumedProjection.canonical.some(
         (event) =>
           event.type === "tool.result" && event.callId === emailApproval.callId
       ),
     },
     config,
+    error: readProjectionError(projection),
     handle: resumedHandle,
     projection,
     thread: withHead(thread, projection),
@@ -395,9 +501,107 @@ async function runReloadScenario(
   });
 }
 
+function readMetadataObserved(
+  config: PlaygroundConfig,
+  messages: unknown[]
+): boolean {
+  if (config.scenario !== "metadata") {
+    return true;
+  }
+
+  if (config.providerMode === "ai-sdk-google") {
+    return messages.some(hasGoogleProviderMetadataEvidence);
+  }
+
+  if (isAimockProviderMode(config.providerMode)) {
+    return messages.some(hasAimockResponseMetadataEvidence);
+  }
+
+  return messages.some(hasProviderMetadataEvidence);
+}
+
+function readToolHistoryPreserved(
+  config: PlaygroundConfig,
+  durableToolCallProviderCallIdCount: number,
+  durableToolCallThoughtSignatureCount: number
+): boolean {
+  if (config.scenario !== "tools") {
+    return true;
+  }
+
+  if (config.providerMode === "ai-sdk-google") {
+    return durableToolCallThoughtSignatureCount >= 2;
+  }
+
+  if (config.providerMode === "aimock-google") {
+    return durableToolCallProviderCallIdCount >= 1;
+  }
+
+  return true;
+}
+
+function readToolTraceObserved(
+  config: PlaygroundConfig,
+  toolCallProviderCallIdCount: number,
+  toolCallThoughtSignatureCount: number
+): boolean {
+  if (config.scenario !== "tools") {
+    return true;
+  }
+
+  if (config.providerMode === "ai-sdk-google") {
+    return toolCallThoughtSignatureCount >= 2;
+  }
+
+  if (config.providerMode === "aimock-google") {
+    return toolCallProviderCallIdCount >= 1;
+  }
+
+  return true;
+}
+
+function readApprovalToolMetadataObserved(
+  config: PlaygroundConfig,
+  projection: PlaygroundStreamProjection,
+  messages: unknown[]
+): boolean {
+  if (config.providerMode === "ai-sdk-google") {
+    return (
+      countToolCallThoughtSignatureEvents(projection) >= 1 &&
+      countDurableToolCallThoughtSignatures(messages) >= 1
+    );
+  }
+
+  if (config.providerMode === "aimock-google") {
+    return countToolCallProviderCallIdEvents(projection) >= 2;
+  }
+
+  return true;
+}
+
+function readApprovalToolMetadataHistory(
+  config: PlaygroundConfig,
+  messages: unknown[],
+  durableToolCallProviderCallIdCount: number
+): boolean {
+  if (config.providerMode === "ai-sdk-google") {
+    return countDurableToolCallThoughtSignatures(messages) >= 1;
+  }
+
+  if (config.providerMode === "aimock-google") {
+    return durableToolCallProviderCallIdCount >= 2;
+  }
+
+  return true;
+}
+
 function createReport(input: {
-  checks: Record<string, boolean | number | string>;
+  checks: Record<string, boolean>;
   config: PlaygroundConfig;
+  error?: {
+    code?: string;
+    message: string;
+  };
   handle: ExecutionHandle;
   projection: PlaygroundStreamProjection;
   thread: PlaygroundThreadSummary;
@@ -405,6 +609,7 @@ function createReport(input: {
   return {
     backend: input.config.backend,
     checks: input.checks,
+    ...(input.error === undefined ? {} : { error: input.error }),
     events: {
       aguiTypes: input.projection.agui.map((event) => String(event.type)),
       canonicalTypes: input.projection.canonical.map((event) => event.type),
@@ -414,6 +619,202 @@ function createReport(input: {
     scenario: input.config.scenario,
     status: input.handle.status(),
     thread: input.thread,
+  };
+}
+
+function createScenarioExecutionPlan(
+  config: PlaygroundConfig
+): PlaygroundScenarioExecutionPlan {
+  if (config.providerMode !== "ai-sdk-google") {
+    return {
+      signal: textSignal(`Run ${config.scenario}`),
+      tools: createPlaygroundTools(),
+    };
+  }
+
+  switch (config.scenario) {
+    case "approval": {
+      const emailTool = findToolDefinition("email");
+
+      return {
+        model: createScenarioProvider(config, {
+          requiredToolResultsBeforeRelease: 1,
+          toolChoice: "email",
+        }),
+        signal: textSignal(
+          'Call the email tool with subject "Status update" and to "ops@example.com".'
+        ),
+        tools: [emailTool],
+      };
+    }
+    case "tools": {
+      const searchTool = findToolDefinition("search");
+
+      return {
+        model: createScenarioProvider(config, {
+          requiredToolResultsBeforeRelease: 2,
+          toolChoice: "search",
+        }),
+        signal: textSignal(
+          'Use the search tool exactly twice in this order: first with query "docs", then with query "runtime". After the second search result, reply with one short summary sentence.'
+        ),
+        tools: [searchTool],
+      };
+    }
+    case "structured":
+      return {
+        signal: textSignal(
+          'Return a playground_summary object. Set scenario to "structured" and status to "ready".'
+        ),
+      };
+    case "metadata":
+      return {
+        signal: textSignal(
+          "Reply with a short sentence confirming provider metadata is preserved."
+        ),
+      };
+    case "streaming":
+      return {
+        signal: textSignal(
+          "Reply with a short single-sentence streaming confirmation."
+        ),
+      };
+    default:
+      return {
+        signal: textSignal(`Run ${config.scenario}`),
+      };
+  }
+}
+
+function createScenarioProvider(
+  config: PlaygroundConfig,
+  settings: {
+    requiredToolResultsBeforeRelease?: number;
+    toolChoice?: string;
+  }
+): TuvrenProvider {
+  const provider = createPlaygroundProvider({
+    aimockBaseUrl: config.aimockBaseUrl,
+    googleApiKey: config.googleApiKey,
+    modelId: config.modelId,
+    mode: config.providerMode,
+    scenario: config.scenario,
+  });
+
+  return {
+    generate(prompt) {
+      return provider.generate(
+        mergePromptSettings(prompt, provider.id, settings)
+      );
+    },
+    id: provider.id,
+    stream(prompt) {
+      return provider.stream(
+        mergePromptSettings(prompt, provider.id, settings)
+      );
+    },
+  };
+}
+
+function mergePromptSettings(
+  prompt: TuvrenPrompt,
+  providerId: string,
+  settings: {
+    requiredToolResultsBeforeRelease?: number;
+    toolChoice?: string;
+  }
+): TuvrenPrompt {
+  const mergedSettings = {
+    ...(prompt.config?.settings ?? {}),
+  };
+  const toolResultCount = countPromptToolResults(prompt.messages);
+  const releaseAfter = settings.requiredToolResultsBeforeRelease ?? 0;
+
+  if (toolResultCount < releaseAfter && settings.toolChoice !== undefined) {
+    mergedSettings.toolChoice = settings.toolChoice;
+  } else if ("toolChoice" in mergedSettings) {
+    mergedSettings.toolChoice = undefined;
+  }
+
+  return {
+    ...prompt,
+    config: {
+      ...prompt.config,
+      provider: providerId,
+      ...(Object.keys(mergedSettings).length === 0
+        ? {}
+        : {
+            settings: mergedSettings,
+          }),
+    },
+  };
+}
+
+function countPromptToolResults(messages: TuvrenPrompt["messages"]): number {
+  let count = 0;
+
+  for (const message of messages) {
+    if (message.role !== "tool") {
+      continue;
+    }
+
+    // Count concrete tool results, not tool-message envelopes, so batched tool
+    // result messages cannot release Gemini tool-choice steering early.
+    count += message.parts.length;
+  }
+
+  return count;
+}
+
+function findToolDefinition(name: "email" | "search") {
+  const tool = createPlaygroundTools().find((entry) => entry.name === name);
+
+  if (tool === undefined) {
+    throw new TuvrenRuntimeError(`missing playground tool "${name}"`, {
+      code: "invalid_playground_config",
+    });
+  }
+
+  return tool;
+}
+
+function projectionHasEvent(
+  projection: PlaygroundStreamProjection,
+  type: TuvrenStreamEvent["type"]
+): boolean {
+  return projection.canonical.some((event) => event.type === type);
+}
+
+function readProjectionError(
+  projection: PlaygroundStreamProjection
+): PlaygroundScenarioReport["error"] | undefined {
+  const errorEvent = [...projection.canonical]
+    .reverse()
+    .find(
+      (event): event is Extract<TuvrenStreamEvent, { type: "error" }> =>
+        event.type === "error"
+    );
+
+  if (errorEvent === undefined) {
+    return undefined;
+  }
+
+  const error = errorEvent.error;
+
+  if (
+    typeof error === "object" &&
+    error !== null &&
+    "message" in error &&
+    typeof error.message === "string"
+  ) {
+    return {
+      ...(typeof error.code === "string" ? { code: error.code } : {}),
+      message: error.message,
+    };
+  }
+
+  return {
+    message: String(error),
   };
 }
 
@@ -526,14 +927,20 @@ function hasAimockResponseMetadataEvidence(value: unknown): boolean {
         const metadata = response.metadata;
 
         // The aimock metadata scenario uses a fixture-specific response id and
-        // model so the report proves provider response metadata survived the
-        // HTTP boundary, bridge mapping, and durable message persistence.
+        // provider-selected model so the report proves provider response
+        // metadata survived the HTTP boundary, bridge mapping, and durable
+        // message persistence across OpenAI, Anthropic, and Gemini shapes.
         if (
           isPlainRecord(metadata) &&
           metadata.id === "aimock-metadata-response" &&
-          metadata.modelId === "gpt-4o-mini"
+          typeof metadata.modelId === "string" &&
+          metadata.modelId.length > 0
         ) {
           return true;
+        }
+
+        if (hasGoogleProviderNamespace(providerMetadata)) {
+          return hasGoogleProviderMetadataEvidence(value);
         }
       }
     }
@@ -546,6 +953,187 @@ function hasAimockResponseMetadataEvidence(value: unknown): boolean {
 
     return hasAimockResponseMetadataEvidence(entry);
   });
+}
+
+function hasGoogleProviderMetadataEvidence(value: unknown): boolean {
+  if (!isPlainRecord(value)) {
+    return false;
+  }
+
+  const providerMetadata = value.providerMetadata;
+
+  if (isPlainRecord(providerMetadata)) {
+    const bridgeMetadata = providerMetadata.aiSdkBridge;
+
+    if (isPlainRecord(bridgeMetadata)) {
+      const response = bridgeMetadata.response;
+      const streamPartMetadata = bridgeMetadata.streamPartMetadata;
+      const responseHeaders = isPlainRecord(response)
+        ? response.headers
+        : undefined;
+
+      // Google adapters do not consistently surface response-level ids/model
+      // metadata, so this proof keys off provider-native `google` / `vertex`
+      // metadata surviving both the finish part capture and the durable
+      // assistant message rather than on OpenAI-shaped response ids.
+      if (
+        (hasGoogleThoughtSignature(providerMetadata) ||
+          hasGoogleProviderNamespace(providerMetadata)) &&
+        isPlainRecord(responseHeaders) &&
+        Array.isArray(streamPartMetadata) &&
+        streamPartMetadata.some(hasGoogleFinishPartMetadataEvidence)
+      ) {
+        return true;
+      }
+    }
+  }
+
+  return Object.values(value).some((entry) => {
+    if (Array.isArray(entry)) {
+      return entry.some(hasGoogleProviderMetadataEvidence);
+    }
+
+    return hasGoogleProviderMetadataEvidence(entry);
+  });
+}
+
+function countToolCallThoughtSignatureEvents(
+  projection: PlaygroundStreamProjection
+): number {
+  return projection.canonical.filter((event) => {
+    if (event.type !== "tool_call.done") {
+      return false;
+    }
+
+    return hasGoogleThoughtSignature(event.providerMetadata);
+  }).length;
+}
+
+function countDurableToolCallThoughtSignatures(messages: unknown[]): number {
+  let count = 0;
+
+  for (const message of messages) {
+    if (
+      !isPlainRecord(message) ||
+      message.role !== "assistant" ||
+      !Array.isArray(message.parts)
+    ) {
+      continue;
+    }
+
+    for (const part of message.parts) {
+      if (
+        isPlainRecord(part) &&
+        part.type === "tool_call" &&
+        hasGoogleThoughtSignature(readProviderMetadata(part))
+      ) {
+        count += 1;
+      }
+    }
+  }
+
+  return count;
+}
+
+function countToolCallProviderCallIdEvents(
+  projection: PlaygroundStreamProjection
+): number {
+  return projection.canonical.filter((event) => {
+    if (event.type !== "tool_call.done") {
+      return false;
+    }
+
+    return hasProviderCallId(event.providerMetadata);
+  }).length;
+}
+
+function countDurableToolCallProviderCallIds(messages: unknown[]): number {
+  let count = 0;
+
+  for (const message of messages) {
+    if (
+      !isPlainRecord(message) ||
+      message.role !== "assistant" ||
+      !Array.isArray(message.parts)
+    ) {
+      continue;
+    }
+
+    for (const part of message.parts) {
+      if (
+        isPlainRecord(part) &&
+        part.type === "tool_call" &&
+        hasProviderCallId(readProviderMetadata(part))
+      ) {
+        count += 1;
+      }
+    }
+  }
+
+  return count;
+}
+
+function hasGoogleThoughtSignature(
+  providerMetadata: Record<string, unknown> | undefined
+): boolean {
+  if (!isPlainRecord(providerMetadata)) {
+    return false;
+  }
+
+  const googleMetadata = providerMetadata.google;
+
+  if (
+    isPlainRecord(googleMetadata) &&
+    typeof googleMetadata.thoughtSignature === "string"
+  ) {
+    return true;
+  }
+
+  const vertexMetadata = providerMetadata.vertex;
+
+  return (
+    isPlainRecord(vertexMetadata) &&
+    typeof vertexMetadata.thoughtSignature === "string"
+  );
+}
+
+function hasGoogleProviderNamespace(
+  providerMetadata: Record<string, unknown> | undefined
+): boolean {
+  if (!isPlainRecord(providerMetadata)) {
+    return false;
+  }
+
+  return (
+    isPlainRecord(providerMetadata.google) ||
+    isPlainRecord(providerMetadata.vertex)
+  );
+}
+
+function hasGoogleFinishPartMetadataEvidence(value: unknown): boolean {
+  if (!isPlainRecord(value) || value.type !== "finish") {
+    return false;
+  }
+
+  return hasGoogleProviderNamespace(readProviderMetadata(value));
+}
+
+function hasProviderCallId(
+  providerMetadata: Record<string, unknown> | undefined
+): boolean {
+  return (
+    isPlainRecord(providerMetadata) &&
+    typeof providerMetadata.providerCallId === "string" &&
+    providerMetadata.providerCallId.length > 0
+  );
+}
+
+function readProviderMetadata(
+  value: Record<string, unknown>
+): Record<string, unknown> | undefined {
+  return isPlainRecord(value.providerMetadata)
+    ? value.providerMetadata
+    : undefined;
 }
 
 function isEditedEmailToolStart(event: TuvrenStreamEvent): boolean {

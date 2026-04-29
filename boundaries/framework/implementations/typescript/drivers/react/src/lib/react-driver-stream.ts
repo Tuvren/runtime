@@ -260,6 +260,7 @@ function synthesizeAssistantEvents(
           callId: part.callId,
           input: cloneValue(part.input),
           name: part.name,
+          providerMetadata: cloneValue(part.providerMetadata),
           timestamp: now(),
           type: "tool_call.done",
         });
@@ -331,6 +332,7 @@ interface PendingToolCall {
   input?: unknown;
   name: string;
   providerCallId: string;
+  providerMetadata?: Record<string, unknown>;
 }
 
 type AccumulatedPart =
@@ -421,7 +423,8 @@ class StreamAccumulator {
         return this.completeToolCallAndCreateEvents(
           chunk.providerCallId,
           chunk.input,
-          chunk.name
+          chunk.name,
+          chunk.providerMetadata
         );
       case "finish":
         this.finishChunk = cloneValue(chunk);
@@ -674,20 +677,26 @@ class StreamAccumulator {
   private completeToolCall(
     providerCallId: string,
     input: unknown,
-    name: string
+    name: string,
+    providerMetadata?: Record<string, unknown>
   ): void {
     const state = this.requireToolCall(providerCallId);
     state.done = true;
     state.input = cloneValue(input);
     state.name = name;
+    state.providerMetadata = mergeProviderMetadata(
+      state.providerMetadata,
+      providerMetadata
+    );
   }
 
   private completeToolCallAndCreateEvents(
     providerCallId: string,
     input: unknown,
-    name: string
+    name: string,
+    providerMetadata?: Record<string, unknown>
   ): TuvrenStreamEvent[] {
-    this.completeToolCall(providerCallId, input, name);
+    this.completeToolCall(providerCallId, input, name, providerMetadata);
     const state = this.requireToolCall(providerCallId);
     const events: TuvrenStreamEvent[] = [];
 
@@ -706,6 +715,10 @@ class StreamAccumulator {
       callId: state.callId,
       input: cloneValue(input),
       name,
+      providerMetadata: buildToolCallProviderMetadata(
+        state.providerCallId,
+        state.providerMetadata
+      ),
       timestamp: this.now(),
       type: "tool_call.done",
     });
@@ -761,6 +774,10 @@ class StreamAccumulator {
                 callId: part.state.callId,
                 input: cloneValue(input),
                 name: part.state.name,
+                providerMetadata: buildToolCallProviderMetadata(
+                  part.state.providerCallId,
+                  part.state.providerMetadata
+                ),
                 timestamp: this.now(),
                 type: "tool_call.done",
               });
@@ -846,6 +863,10 @@ class StreamAccumulator {
               input:
                 part.state.input ?? parseStructuredValue(part.state.argsDelta),
               name: part.state.name,
+              providerMetadata: buildToolCallProviderMetadata(
+                part.state.providerCallId,
+                part.state.providerMetadata
+              ),
               timestamp: this.now(),
               type: "tool_call.done",
             });
@@ -981,11 +1002,51 @@ function finalizeToolCallPart(
         callId: part.state.callId,
         input,
         name: part.state.name,
-        providerMetadata: {
-          providerCallId: part.state.providerCallId,
-        },
+        providerMetadata: buildToolCallProviderMetadata(
+          part.state.providerCallId,
+          part.state.providerMetadata
+        ),
         type: "tool_call",
       };
+}
+
+function buildToolCallProviderMetadata(
+  providerCallId: string,
+  providerMetadata: Record<string, unknown> | undefined
+): Record<string, unknown> {
+  return {
+    ...(providerMetadata === undefined ? {} : cloneValue(providerMetadata)),
+    providerCallId,
+  };
+}
+
+function mergeProviderMetadata(
+  current: Record<string, unknown> | undefined,
+  next: Record<string, unknown> | undefined
+): Record<string, unknown> | undefined {
+  if (!isPlainObject(next)) {
+    return current === undefined ? undefined : cloneValue(current);
+  }
+
+  if (!isPlainObject(current)) {
+    return cloneValue(next);
+  }
+
+  const merged = cloneValue(current);
+
+  for (const [providerName, providerValue] of Object.entries(next)) {
+    const currentProviderValue = merged[providerName];
+
+    // Provider namespaces such as google/vertex can accrete continuity tokens
+    // across multiple stream chunks. Merge nested objects recursively so later
+    // chunks cannot erase earlier keys that still matter for replay.
+    merged[providerName] =
+      isPlainObject(currentProviderValue) && isPlainObject(providerValue)
+        ? mergeProviderMetadata(currentProviderValue, providerValue)
+        : cloneValue(providerValue);
+  }
+
+  return merged;
 }
 
 function collectReasoningProviderMetadata(

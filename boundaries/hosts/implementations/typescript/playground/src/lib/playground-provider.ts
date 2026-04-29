@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+import { createAnthropic } from "@ai-sdk/anthropic";
+import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { createOpenAI } from "@ai-sdk/openai";
 import type {
   LanguageModelV3,
@@ -29,6 +31,11 @@ import type {
   TuvrenPrompt,
   TuvrenProvider,
 } from "@tuvren/runtime-api";
+import {
+  DEFAULT_GEMINI_PLAYGROUND_MODEL_ID,
+  isAimockProviderMode,
+  resolveGoogleApiKey,
+} from "./playground-config.js";
 import type {
   PlaygroundProviderMode,
   PlaygroundScenarioName,
@@ -36,30 +43,13 @@ import type {
 
 export function createPlaygroundProvider(input: {
   aimockBaseUrl?: string;
+  googleApiKey?: string;
+  modelId?: string;
   mode: PlaygroundProviderMode;
   scenario: PlaygroundScenarioName;
 }): TuvrenProvider {
-  if (input.mode === "aimock-openai") {
-    const aimockBaseUrl = input.aimockBaseUrl?.trim();
-
-    if (aimockBaseUrl === undefined || aimockBaseUrl.length === 0) {
-      throw new TuvrenRuntimeError(
-        "aimock-openai playground provider requires --aimock-base-url or TUVREN_PLAYGROUND_AIMOCK_BASE_URL",
-        {
-          code: "invalid_playground_config",
-        }
-      );
-    }
-
-    const openai = createOpenAI({
-      apiKey: "mock",
-      baseURL: aimockBaseUrl,
-    });
-
-    return createAiSdkProviderBridge({
-      id: "playground:aimock-openai",
-      model: openai.chat("gpt-4o-mini"),
-    });
+  if (isAimockProviderMode(input.mode)) {
+    return createAimockProvider(input.mode, input.aimockBaseUrl, input.modelId);
   }
 
   if (input.mode === "ai-sdk-mock") {
@@ -69,7 +59,89 @@ export function createPlaygroundProvider(input: {
     });
   }
 
+  if (input.mode === "ai-sdk-google") {
+    const apiKey = input.googleApiKey ?? resolveGoogleApiKey(process.env);
+
+    if (apiKey === undefined) {
+      throw new TuvrenRuntimeError(
+        "ai-sdk-google playground provider requires GOOGLE_GENERATIVE_AI_API_KEY or GEMINI_API_KEY",
+        {
+          code: "invalid_playground_config",
+        }
+      );
+    }
+
+    const google = createGoogleGenerativeAI({
+      apiKey,
+    });
+
+    return createAiSdkProviderBridge({
+      id: "playground:ai-sdk-google",
+      model: google(input.modelId ?? DEFAULT_GEMINI_PLAYGROUND_MODEL_ID),
+    });
+  }
+
   return createFixtureProvider(input.scenario);
+}
+
+function createAimockProvider(
+  mode: Extract<PlaygroundProviderMode, `aimock-${string}`>,
+  baseUrl: string | undefined,
+  modelId: string | undefined
+): TuvrenProvider {
+  const aimockBaseUrl = baseUrl?.trim();
+
+  if (aimockBaseUrl === undefined || aimockBaseUrl.length === 0) {
+    throw new TuvrenRuntimeError(
+      `${mode} playground provider requires --aimock-base-url or TUVREN_PLAYGROUND_AIMOCK_BASE_URL`,
+      {
+        code: "invalid_playground_config",
+      }
+    );
+  }
+
+  switch (mode) {
+    case "aimock-openai": {
+      const openai = createOpenAI({
+        apiKey: "mock",
+        baseURL: aimockBaseUrl,
+      });
+
+      return createAiSdkProviderBridge({
+        id: "playground:aimock-openai",
+        model: openai.chat(modelId ?? "gpt-4o-mini"),
+      });
+    }
+    case "aimock-anthropic": {
+      const anthropic = createAnthropic({
+        apiKey: "mock",
+        baseURL: aimockBaseUrl,
+      });
+
+      return createAiSdkProviderBridge({
+        id: "playground:aimock-anthropic",
+        model: anthropic(modelId ?? "claude-3-5-haiku-latest"),
+      });
+    }
+    case "aimock-google": {
+      const google = createGoogleGenerativeAI({
+        apiKey: "mock",
+        baseURL: aimockBaseUrl,
+      });
+
+      return createAiSdkProviderBridge({
+        id: "playground:aimock-google",
+        model: google(modelId ?? DEFAULT_GEMINI_PLAYGROUND_MODEL_ID),
+      });
+    }
+    default:
+      throw new TuvrenRuntimeError(
+        `unsupported aimock playground provider "${mode}"`,
+        {
+          code: "invalid_playground_config",
+        }
+      );
+  }
 }
 
 function createFixtureProvider(

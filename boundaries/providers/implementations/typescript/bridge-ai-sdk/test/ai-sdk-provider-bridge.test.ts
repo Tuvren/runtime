@@ -803,6 +803,159 @@ describe("provider-bridge-ai-sdk", () => {
     ]);
   });
 
+  test("replays Google thought signatures on assistant tool call parts", async () => {
+    let capturedOptions: LanguageModelV3CallOptions | undefined;
+    const bridge = createAiSdkProviderBridge({
+      model: createMockModel({
+        async doGenerate(options) {
+          await Promise.resolve();
+          capturedOptions = options;
+          return createGenerateResult();
+        },
+        provider: "google",
+      }),
+    });
+
+    await bridge.generate({
+      messages: [
+        {
+          parts: [
+            {
+              callId: "call-1",
+              input: {
+                query: "docs",
+              },
+              name: "search",
+              providerMetadata: {
+                google: {
+                  thoughtSignature: "thought-tool-1",
+                },
+              },
+              type: "tool_call",
+            },
+          ],
+          role: "assistant",
+        },
+        {
+          parts: [{ text: "Continue", type: "text" }],
+          role: "user",
+        },
+      ],
+    });
+
+    expect(capturedOptions?.prompt).toEqual([
+      {
+        content: [
+          {
+            input: {
+              query: "docs",
+            },
+            providerOptions: {
+              google: {
+                thoughtSignature: "thought-tool-1",
+              },
+            },
+            toolCallId: "call-1",
+            toolName: "search",
+            type: "tool-call",
+          },
+        ],
+        role: "assistant",
+      },
+      {
+        content: [{ text: "Continue", type: "text" }],
+        role: "user",
+      },
+    ]);
+  });
+
+  test("propagates Google tool call thought signatures across parallel assistant tool calls", async () => {
+    let capturedOptions: LanguageModelV3CallOptions | undefined;
+    const bridge = createAiSdkProviderBridge({
+      model: createMockModel({
+        async doGenerate(options) {
+          await Promise.resolve();
+          capturedOptions = options;
+          return createGenerateResult();
+        },
+        provider: "google",
+      }),
+    });
+
+    await bridge.generate({
+      messages: [
+        {
+          parts: [
+            {
+              callId: "call-1",
+              input: {
+                query: "docs",
+              },
+              name: "search",
+              providerMetadata: {
+                google: {
+                  thoughtSignature: "parallel-thought-1",
+                },
+              },
+              type: "tool_call",
+            },
+            {
+              callId: "call-2",
+              input: {
+                to: "ops@example.com",
+              },
+              name: "email",
+              type: "tool_call",
+            },
+          ],
+          role: "assistant",
+        },
+        {
+          parts: [{ text: "Continue", type: "text" }],
+          role: "user",
+        },
+      ],
+    });
+
+    expect(capturedOptions?.prompt).toEqual([
+      {
+        content: [
+          {
+            input: {
+              query: "docs",
+            },
+            providerOptions: {
+              google: {
+                thoughtSignature: "parallel-thought-1",
+              },
+            },
+            toolCallId: "call-1",
+            toolName: "search",
+            type: "tool-call",
+          },
+          {
+            input: {
+              to: "ops@example.com",
+            },
+            providerOptions: {
+              google: {
+                thoughtSignature: "parallel-thought-1",
+              },
+            },
+            toolCallId: "call-2",
+            toolName: "email",
+            type: "tool-call",
+          },
+        ],
+        role: "assistant",
+      },
+      {
+        content: [{ text: "Continue", type: "text" }],
+        role: "user",
+      },
+    ]);
+  });
+
   test("does not replay output-only assistant metadata into provider options", async () => {
     let capturedOptions: LanguageModelV3CallOptions | undefined;
     const bridge = createAiSdkProviderBridge({
@@ -946,6 +1099,42 @@ describe("provider-bridge-ai-sdk", () => {
     );
   });
 
+  test("normalizes generated tool-call finish reasons when a provider reports stop", async () => {
+    const bridge = createAiSdkProviderBridge({
+      model: createMockModel({
+        async doGenerate() {
+          await Promise.resolve();
+          return createGenerateResult({
+            content: [
+              {
+                input: '{"query":"docs"}',
+                toolCallId: "call-1",
+                toolName: "search",
+                type: "tool-call",
+              },
+            ],
+            finishReason: {
+              raw: "STOP",
+              unified: "stop",
+            },
+          });
+        },
+        provider: "google",
+      }),
+    });
+
+    const response = await bridge.generate({
+      messages: [
+        {
+          parts: [{ text: "Search", type: "text" }],
+          role: "user",
+        },
+      ],
+    });
+
+    expect(response.finishReason).toBe("tool_call");
+  });
+
   test("marks generated Anthropic redacted thinking as redacted reasoning", async () => {
     const bridge = createAiSdkProviderBridge({
       model: createMockModel({
@@ -1000,6 +1189,11 @@ describe("provider-bridge-ai-sdk", () => {
             stream: streamFromParts([
               {
                 id: "call-1",
+                providerMetadata: {
+                  google: {
+                    thoughtSignature: "tool-thought-1",
+                  },
+                },
                 toolName: "search",
                 type: "tool-input-start",
               },
@@ -1049,7 +1243,7 @@ describe("provider-bridge-ai-sdk", () => {
       })
     );
 
-    expect(chunks).toEqual([
+    expect(chunks.slice(0, 3)).toEqual([
       {
         name: "search",
         providerCallId: "call-1",
@@ -1066,46 +1260,340 @@ describe("provider-bridge-ai-sdk", () => {
         },
         name: "search",
         providerCallId: "call-1",
-        type: "tool_call_done",
-      },
-      {
-        finishReason: "tool_call",
         providerMetadata: {
-          aiSdkBridge: {
-            rawParts: [],
-            rawUsage: {
-              inputTokens: {
-                cacheRead: 1,
-                cacheWrite: 0,
-                noCache: 3,
-                total: 4,
-              },
-              outputTokens: {
-                reasoning: 0,
-                text: 2,
-                total: 2,
-              },
-              raw: {
-                provider: "mock-provider",
-              },
-            },
-            requestBody: undefined,
-            response: {
-              headers: undefined,
-              metadata: undefined,
-            },
-            sources: [],
-            streamPartMetadata: [],
-            warnings: [],
+          google: {
+            thoughtSignature: "tool-thought-1",
           },
         },
-        type: "finish",
-        usage: {
-          inputTokens: 4,
-          outputTokens: 2,
-        },
+        type: "tool_call_done",
       },
     ]);
+    expect(chunks[3]).toMatchObject({
+      finishReason: "tool_call",
+      providerMetadata: {
+        aiSdkBridge: {
+          rawParts: [],
+          rawUsage: {
+            inputTokens: {
+              cacheRead: 1,
+              cacheWrite: 0,
+              noCache: 3,
+              total: 4,
+            },
+            outputTokens: {
+              reasoning: 0,
+              text: 2,
+              total: 2,
+            },
+            raw: {
+              provider: "mock-provider",
+            },
+          },
+          response: {},
+          sources: [],
+          streamPartMetadata: [
+            {
+              id: "call-1",
+              providerMetadata: {
+                google: {
+                  thoughtSignature: "tool-thought-1",
+                },
+              },
+              type: "tool-input-start",
+            },
+          ],
+          warnings: [],
+        },
+      },
+      type: "finish",
+      usage: {
+        inputTokens: 4,
+        outputTokens: 2,
+      },
+    });
+  });
+
+  test("normalizes streamed Gemini function-call finish reasons from provider fallbacks", async () => {
+    const bridge = createAiSdkProviderBridge({
+      model: createMockModel({
+        async doStream() {
+          await Promise.resolve();
+          return {
+            stream: streamFromParts([
+              {
+                id: "call-1",
+                toolName: "search",
+                type: "tool-input-start",
+              },
+              {
+                delta: '{"query":"docs"}',
+                id: "call-1",
+                type: "tool-input-delta",
+              },
+              {
+                id: "call-1",
+                type: "tool-input-end",
+              },
+              {
+                finishReason: {
+                  raw: "FUNCTION_CALL",
+                  unified: "other",
+                },
+                type: "finish",
+                usage: createUsage(3, 1),
+              },
+            ]),
+          };
+        },
+        provider: "google",
+      }),
+    });
+
+    const chunks = await collectAsyncIterable(
+      bridge.stream({
+        messages: [
+          {
+            parts: [{ text: "Search", type: "text" }],
+            role: "user",
+          },
+        ],
+      })
+    );
+
+    expect(assertProviderFinishChunk(chunks, "tool_call").usage).toEqual({
+      inputTokens: 3,
+      outputTokens: 1,
+    });
+  });
+
+  test("preserves incremental tool-call metadata when the closing tool-call omits it", async () => {
+    const bridge = createAiSdkProviderBridge({
+      model: createMockModel({
+        async doStream() {
+          await Promise.resolve();
+          return {
+            stream: streamFromParts([
+              {
+                id: "call-1",
+                providerMetadata: {
+                  google: {
+                    thoughtSignature: "tool-thought-1",
+                  },
+                },
+                toolName: "search",
+                type: "tool-input-start",
+              },
+              {
+                delta: '{"query":"docs"}',
+                id: "call-1",
+                type: "tool-input-delta",
+              },
+              {
+                input: '{"query":"docs"}',
+                toolCallId: "call-1",
+                toolName: "search",
+                type: "tool-call",
+              },
+              {
+                finishReason: {
+                  raw: "FUNCTION_CALL",
+                  unified: "other",
+                },
+                type: "finish",
+                usage: createUsage(3, 1),
+              },
+            ]),
+          };
+        },
+        provider: "google",
+      }),
+    });
+
+    const chunks = await collectAsyncIterable(
+      bridge.stream({
+        messages: [
+          {
+            parts: [{ text: "Search", type: "text" }],
+            role: "user",
+          },
+        ],
+      })
+    );
+
+    expect(chunks.slice(0, 3)).toEqual([
+      {
+        name: "search",
+        providerCallId: "call-1",
+        type: "tool_call_start",
+      },
+      {
+        delta: '{"query":"docs"}',
+        providerCallId: "call-1",
+        type: "tool_call_args_delta",
+      },
+      {
+        input: {
+          query: "docs",
+        },
+        name: "search",
+        providerCallId: "call-1",
+        providerMetadata: {
+          google: {
+            thoughtSignature: "tool-thought-1",
+          },
+        },
+        type: "tool_call_done",
+      },
+    ]);
+    expect(assertProviderFinishChunk(chunks, "tool_call").usage).toEqual({
+      inputTokens: 3,
+      outputTokens: 1,
+    });
+  });
+
+  test("merges late tool-call metadata after tool-input-end before emitting done", async () => {
+    const bridge = createAiSdkProviderBridge({
+      model: createMockModel({
+        async doStream() {
+          await Promise.resolve();
+          return {
+            stream: streamFromParts([
+              {
+                id: "call-1",
+                toolName: "search",
+                type: "tool-input-start",
+              },
+              {
+                delta: '{"query":"docs"}',
+                id: "call-1",
+                type: "tool-input-delta",
+              },
+              {
+                id: "call-1",
+                type: "tool-input-end",
+              },
+              {
+                input: '{"query":"docs"}',
+                providerMetadata: {
+                  google: {
+                    thoughtSignature: "tool-thought-2",
+                  },
+                },
+                toolCallId: "call-1",
+                toolName: "search",
+                type: "tool-call",
+              },
+              {
+                finishReason: {
+                  raw: "FUNCTION_CALL",
+                  unified: "other",
+                },
+                type: "finish",
+                usage: createUsage(3, 1),
+              },
+            ]),
+          };
+        },
+        provider: "google",
+      }),
+    });
+
+    const chunks = await collectAsyncIterable(
+      bridge.stream({
+        messages: [
+          {
+            parts: [{ text: "Search", type: "text" }],
+            role: "user",
+          },
+        ],
+      })
+    );
+
+    expect(chunks.slice(0, 3)).toEqual([
+      {
+        name: "search",
+        providerCallId: "call-1",
+        type: "tool_call_start",
+      },
+      {
+        delta: '{"query":"docs"}',
+        providerCallId: "call-1",
+        type: "tool_call_args_delta",
+      },
+      {
+        input: {
+          query: "docs",
+        },
+        name: "search",
+        providerCallId: "call-1",
+        providerMetadata: {
+          google: {
+            thoughtSignature: "tool-thought-2",
+          },
+        },
+        type: "tool_call_done",
+      },
+    ]);
+    expect(chunks[3]).toMatchObject({
+      finishReason: "tool_call",
+      providerMetadata: {
+        aiSdkBridge: {
+          streamPartMetadata: [
+            {
+              toolCallId: "call-1",
+              type: "tool-call",
+            },
+          ],
+        },
+      },
+      type: "finish",
+    });
+  });
+
+  test("does not normalize malformed function-call errors into tool-call finishes", async () => {
+    const bridge = createAiSdkProviderBridge({
+      model: createMockModel({
+        async doStream() {
+          await Promise.resolve();
+          return {
+            stream: streamFromParts([
+              {
+                id: "call-1",
+                toolName: "search",
+                type: "tool-input-start",
+              },
+              {
+                delta: '{"query":',
+                id: "call-1",
+                type: "tool-input-delta",
+              },
+              {
+                finishReason: {
+                  raw: "MALFORMED_FUNCTION_CALL",
+                  unified: "error",
+                },
+                type: "finish",
+                usage: createUsage(3, 1),
+              },
+            ]),
+          };
+        },
+        provider: "google",
+      }),
+    });
+
+    await expect(
+      collectAsyncIterable(
+        bridge.stream({
+          messages: [
+            {
+              parts: [{ text: "Search", type: "text" }],
+              role: "user",
+            },
+          ],
+        })
+      )
+    ).rejects.toThrow(TuvrenProviderError);
   });
 
   test("preserves streamed Google reasoning thought signatures in reasoning chunks", async () => {

@@ -12,6 +12,7 @@ coverage
 .tmp-bench
 .env
 .env.*
+!boundaries/hosts/implementations/typescript/playground/.env.example
 .codex
 .DS_Store
 .idea

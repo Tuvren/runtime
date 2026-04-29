@@ -17,16 +17,22 @@
 import { describe, expect, test } from "bun:test";
 import {
   createPlaygroundHost,
+  DEFAULT_GEMINI_PLAYGROUND_SCENARIOS,
   DEFAULT_PLAYGROUND_SCENARIOS,
+  haveAllChecksPassed,
   loadPlaygroundConfig,
   runPlaygroundScenario,
+  runPlaygroundScenarioMatrix,
 } from "@tuvren/playground-host";
 
 describe("@tuvren/playground-host package exports", () => {
   test("exposes the private playground harness surface", () => {
     expect(typeof createPlaygroundHost).toBe("function");
+    expect(typeof haveAllChecksPassed).toBe("function");
     expect(typeof loadPlaygroundConfig).toBe("function");
     expect(typeof runPlaygroundScenario).toBe("function");
+    expect(typeof runPlaygroundScenarioMatrix).toBe("function");
+    expect(DEFAULT_GEMINI_PLAYGROUND_SCENARIOS).toContain("approval");
     expect(DEFAULT_PLAYGROUND_SCENARIOS).toContain("streaming");
   });
 });

@@ -47,8 +47,8 @@ without rediscovering AI SDK provider behavior.
   - tool messages map from durable `tool_result` parts
   - the baseline bridge replays only continuity-safe assistant content metadata
     back into AI SDK `providerOptions`: Anthropic reasoning `signature` /
-    `redactedData`, Google or Vertex `thoughtSignature` on text or reasoning
-    parts, and OpenAI/Azure `reasoningEncryptedContent`
+    `redactedData`, Google or Vertex `thoughtSignature` on text, reasoning, or
+    tool-call parts, and OpenAI/Azure `reasoningEncryptedContent`
   - streamed reasoning continuity may still land as flat durable
     `providerMetadata.signature` because the shared stream seam only exposes a
     generic signature token
@@ -96,6 +96,10 @@ without rediscovering AI SDK provider behavior.
     separate complete `tool-call` part
   - structured-output turns may legitimately finish with `tool-calls` before
     any structured JSON text is emitted
+  - finish mapping treats any tool-bearing provider turn as a canonical
+    `tool_call` finish even when an upstream adapter surfaces a unified
+    `stop`, or a Gemini-style raw `FUNCTION_CALL` fallback with unified
+    `other` / `error`; malformed function-call finishes still remain errors
   - when a provider emits both incremental `tool-input-*` parts and a complete
     `tool-call`, the bridge expects the same provider call identity for both
     surfaces, and the final complete `tool-call` name/input must match the

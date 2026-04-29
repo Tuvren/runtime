@@ -4129,6 +4129,7 @@ class RuntimeCore implements TuvrenRuntime {
             callId: part.callId,
             input: cloneValue(part.input),
             name: part.name,
+            providerMetadata: cloneValue(part.providerMetadata),
             timestamp: this.now(),
             type: "tool_call.done",
           });
@@ -5161,6 +5162,7 @@ function validateToolCallAssistantDeltaEvent(
   if (
     event.callId !== part.callId ||
     event.name !== part.name ||
+    !isDeepStrictEqual(event.providerMetadata, part.providerMetadata) ||
     !state.sawDelta ||
     !doesSerializedDeltaMatchValue(state.deltaBuffer, part.input)
   ) {
@@ -5572,6 +5574,7 @@ function synthesizeAssistantValidationEvents(
           callId: part.callId,
           input: cloneValue(part.input),
           name: part.name,
+          providerMetadata: cloneValue(part.providerMetadata),
           timestamp: 0,
           type: "tool_call.done",
         });
@@ -5643,6 +5646,10 @@ function assistantValidationEventsMatch(
         expectedEvent.type === "tool_call.done" &&
         actualEvent.callId === expectedEvent.callId &&
         actualEvent.name === expectedEvent.name &&
+        isDeepStrictEqual(
+          actualEvent.providerMetadata,
+          expectedEvent.providerMetadata
+        ) &&
         isDeepStrictEqual(actualEvent.input, expectedEvent.input)
       );
     case "message.done":

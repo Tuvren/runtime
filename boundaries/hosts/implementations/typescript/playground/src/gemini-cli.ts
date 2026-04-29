@@ -14,15 +14,22 @@
  * limitations under the License.
  */
 
-import { defineConfig } from "tsup";
+import {
+  DEFAULT_GEMINI_PLAYGROUND_SCENARIOS,
+  loadPlaygroundConfig,
+  runPlaygroundScenarioMatrix,
+} from "./index.js";
 
-export default defineConfig({
-  clean: true,
-  dts: false,
-  entry: ["src/index.ts", "src/cli.ts", "src/gemini-cli.ts"],
-  format: ["esm"],
-  outDir: "dist",
-  sourcemap: false,
-  tsconfig: "tsconfig.tsup.json",
-  target: "esnext",
+const config = loadPlaygroundConfig(process.env, process.argv.slice(2));
+const report = await runPlaygroundScenarioMatrix({
+  // Forward the parsed config wholesale so new private config fields such as
+  // resolved credentials cannot drift out of the Gemini matrix path.
+  config,
+  scenarios: DEFAULT_GEMINI_PLAYGROUND_SCENARIOS,
 });
+
+process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
+
+if (!report.summary.allChecksPassed) {
+  process.exitCode = 1;
+}

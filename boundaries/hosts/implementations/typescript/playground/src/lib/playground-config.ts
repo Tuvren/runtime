@@ -26,6 +26,12 @@ import type {
 } from "./playground-types.js";
 
 const AUTO_SQLITE_PATH_VALUE = "auto";
+export const DEFAULT_GEMINI_PLAYGROUND_MODEL_ID = "gemini-2.5-flash";
+export const AIMOCK_PLAYGROUND_PROVIDER_MODES = [
+  "aimock-openai",
+  "aimock-anthropic",
+  "aimock-google",
+] as const;
 
 export const DEFAULT_PLAYGROUND_SCENARIOS: readonly PlaygroundScenarioName[] = [
   "streaming",
@@ -38,6 +44,9 @@ export const DEFAULT_PLAYGROUND_SCENARIOS: readonly PlaygroundScenarioName[] = [
   "steering",
   "reload",
 ];
+
+export const DEFAULT_GEMINI_PLAYGROUND_SCENARIOS: readonly PlaygroundScenarioName[] =
+  ["streaming", "metadata", "structured", "tools", "approval"];
 
 export function loadPlaygroundConfig(
   env: Record<string, string | undefined>,
@@ -53,6 +62,10 @@ export function loadPlaygroundConfig(
   const providerMode = parseProviderMode(
     options.provider ?? env.TUVREN_PLAYGROUND_PROVIDER_MODE
   );
+  const modelId = normalizeModelId(
+    options.modelId ?? env.TUVREN_PLAYGROUND_MODEL_ID
+  );
+  const googleApiKey = resolveGoogleApiKey(env);
   const aimockBaseUrl = normalizeAimockBaseUrl(
     options.aimockBaseUrl ?? env.TUVREN_PLAYGROUND_AIMOCK_BASE_URL
   );
@@ -69,9 +82,18 @@ export function loadPlaygroundConfig(
     );
   }
 
-  if (providerMode === "aimock-openai" && aimockBaseUrl === undefined) {
+  if (isAimockProviderMode(providerMode) && aimockBaseUrl === undefined) {
     throw new TuvrenRuntimeError(
-      "aimock-openai playground provider requires --aimock-base-url or TUVREN_PLAYGROUND_AIMOCK_BASE_URL",
+      `${providerMode} playground provider requires --aimock-base-url or TUVREN_PLAYGROUND_AIMOCK_BASE_URL`,
+      {
+        code: "invalid_playground_config",
+      }
+    );
+  }
+
+  if (providerMode === "ai-sdk-google" && googleApiKey === undefined) {
+    throw new TuvrenRuntimeError(
+      "ai-sdk-google playground provider requires GOOGLE_GENERATIVE_AI_API_KEY or GEMINI_API_KEY",
       {
         code: "invalid_playground_config",
       }
@@ -81,6 +103,11 @@ export function loadPlaygroundConfig(
   return {
     aimockBaseUrl,
     backend,
+    googleApiKey,
+    modelId:
+      providerMode === "ai-sdk-google"
+        ? (modelId ?? DEFAULT_GEMINI_PLAYGROUND_MODEL_ID)
+        : modelId,
     providerMode,
     scenario,
     sqlitePath,
@@ -105,6 +132,38 @@ function normalizeSqlitePath(value: string | undefined): string | undefined {
   // The Nx SQLite smoke target passes "auto" so repeated validation cannot
   // inherit stale durable state from a previous run.
   return join(tmpdir(), `tuvren-playground-${randomUUID()}.sqlite`);
+}
+
+function normalizeModelId(value: string | undefined): string | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  const normalized = value.trim();
+
+  return normalized.length === 0 ? undefined : normalized;
+}
+
+export function resolveGoogleApiKey(
+  env: Record<string, string | undefined>
+): string | undefined {
+  const googleGenerativeAiApiKey = normalizeModelId(
+    env.GOOGLE_GENERATIVE_AI_API_KEY
+  );
+
+  if (googleGenerativeAiApiKey !== undefined) {
+    return googleGenerativeAiApiKey;
+  }
+
+  return normalizeModelId(env.GEMINI_API_KEY);
+}
+
+export function isAimockProviderMode(
+  value: PlaygroundProviderMode
+): value is (typeof AIMOCK_PLAYGROUND_PROVIDER_MODES)[number] {
+  return (AIMOCK_PLAYGROUND_PROVIDER_MODES as readonly string[]).includes(
+    value
+  );
 }
 
 function parseArgs(argv: readonly string[]): Record<string, string> {
@@ -154,7 +213,10 @@ function parseProviderMode(value: string | undefined): PlaygroundProviderMode {
   const normalized = value ?? "fixture";
 
   switch (normalized) {
+    case "aimock-anthropic":
+    case "aimock-google":
     case "aimock-openai":
+    case "ai-sdk-google":
     case "ai-sdk-mock":
     case "fixture":
       return normalized;

@@ -97,6 +97,7 @@ interface StreamToolState {
   ended: boolean;
   inputBuffer: string;
   name: string;
+  providerMetadata?: Record<string, unknown>;
   started: boolean;
 }
 
@@ -484,6 +485,7 @@ function handleToolInputStartPart(
     ended: false,
     inputBuffer: "",
     name: part.toolName,
+    providerMetadata: readStreamToolPartProviderMetadata(part),
     started: true,
   });
 
@@ -507,6 +509,10 @@ function handleToolInputDeltaPart(
     part
   );
   toolState.inputBuffer += part.delta;
+  toolState.providerMetadata = mergeProviderMetadataRecords(
+    toolState.providerMetadata,
+    readStreamToolPartProviderMetadata(part)
+  );
 
   return [
     {
@@ -528,21 +534,14 @@ function handleToolInputEndPart(
     part
   );
   toolState.ended = true;
-
-  if (toolState.doneEmitted) {
-    return [];
-  }
-
-  toolState.doneEmitted = true;
-
-  return [
-    createToolCallDoneChunk(
-      part.id,
-      toolState.name,
-      toolState.inputBuffer,
-      state.model
-    ),
-  ];
+  toolState.providerMetadata = mergeProviderMetadataRecords(
+    toolState.providerMetadata,
+    readStreamToolPartProviderMetadata(part)
+  );
+  // Some adapters finish the incremental input first and attach continuity
+  // metadata only on a later complete `tool-call`. Keep the call buffered here
+  // so that later metadata can merge before the canonical `tool_call.done`.
+  return [];
 }
 
 function handleToolCallStreamPart(
@@ -554,8 +553,13 @@ function handleToolCallStreamPart(
 
   const chunks = createToolCallPreludeChunks(part, state);
   const existingState = state.toolStates.get(part.toolCallId);
+  const providerMetadata = mergeProviderMetadataRecords(
+    existingState?.providerMetadata,
+    readStreamToolPartProviderMetadata(part)
+  );
 
   if (existingState?.doneEmitted === true) {
+    existingState.providerMetadata = providerMetadata;
     return chunks;
   }
 
@@ -564,7 +568,8 @@ function handleToolCallStreamPart(
       part.toolCallId,
       part.toolName,
       part.input,
-      state.model
+      state.model,
+      providerMetadata
     )
   );
   state.toolStates.set(part.toolCallId, {
@@ -572,6 +577,7 @@ function handleToolCallStreamPart(
     ended: true,
     inputBuffer: part.input,
     name: part.toolName,
+    providerMetadata,
     started: true,
   });
 
@@ -678,7 +684,8 @@ function createToolCallDoneChunk(
   providerCallId: string,
   toolName: string,
   input: string,
-  model: Pick<LanguageModelV3, "modelId" | "provider">
+  model: Pick<LanguageModelV3, "modelId" | "provider">,
+  providerMetadata?: Record<string, unknown>
 ): ProviderStreamChunk {
   return {
     input: parseJsonInput(
@@ -693,8 +700,21 @@ function createToolCallDoneChunk(
     ),
     name: toolName,
     providerCallId,
+    ...(providerMetadata === undefined
+      ? {}
+      : {
+          providerMetadata,
+        }),
     type: "tool_call_done",
   };
+}
+
+function readStreamToolPartProviderMetadata(part: {
+  providerMetadata?: unknown;
+}): Record<string, unknown> | undefined {
+  return isPlainObject(part.providerMetadata)
+    ? sanitizeRecord(part.providerMetadata)
+    : undefined;
 }
 
 function handleTerminalStreamPart(
@@ -720,7 +740,7 @@ function createFinishStreamChunks(
   part: Extract<LanguageModelV3StreamPart, { type: "finish" }>,
   state: StreamMappingState
 ): ProviderStreamChunk[] {
-  const chunks: ProviderStreamChunk[] = [];
+  const chunks = flushCompletedToolCalls(state);
   const structuredChunk = createStructuredStreamDoneChunk(state);
 
   if (structuredChunk !== undefined) {
@@ -737,7 +757,9 @@ function createFinishStreamChunks(
   );
 
   chunks.push({
-    finishReason: mapFinishReason(part.finishReason.unified),
+    finishReason: mapFinishReason(part.finishReason, {
+      hasToolCalls: state.toolStates.size > 0,
+    }),
     ...(providerMetadata === undefined
       ? {}
       : {
@@ -750,6 +772,31 @@ function createFinishStreamChunks(
         }),
     type: "finish",
   });
+
+  return chunks;
+}
+
+function flushCompletedToolCalls(
+  state: StreamMappingState
+): ProviderStreamChunk[] {
+  const chunks: ProviderStreamChunk[] = [];
+
+  for (const [providerCallId, toolState] of state.toolStates.entries()) {
+    if (toolState.doneEmitted || !toolState.ended) {
+      continue;
+    }
+
+    toolState.doneEmitted = true;
+    chunks.push(
+      createToolCallDoneChunk(
+        providerCallId,
+        toolState.name,
+        toolState.inputBuffer,
+        state.model,
+        toolState.providerMetadata
+      )
+    );
+  }
 
   return chunks;
 }
@@ -1057,9 +1104,7 @@ function mapPromptMessage(
 
     case "assistant": {
       return {
-        content: message.parts.map((part) =>
-          mapAssistantPart(activeProvider, part)
-        ),
+        content: mapAssistantParts(activeProvider, message.parts),
         role: "assistant",
       };
     }
@@ -1081,6 +1126,97 @@ function mapPromptMessage(
       );
     }
   }
+}
+
+function mapAssistantParts(
+  activeProvider: string,
+  parts: Extract<TuvrenMessage, { role: "assistant" }>["parts"]
+): Extract<LanguageModelV3Message, { role: "assistant" }>["content"] {
+  const propagatedParts = propagateParallelToolCallThoughtSignatures(
+    activeProvider,
+    parts
+  );
+
+  return propagatedParts.map((part) => mapAssistantPart(activeProvider, part));
+}
+
+function propagateParallelToolCallThoughtSignatures(
+  activeProvider: string,
+  parts: Extract<TuvrenMessage, { role: "assistant" }>["parts"]
+): Extract<TuvrenMessage, { role: "assistant" }>["parts"] {
+  if (
+    !(activeProvider.includes("google") || activeProvider.includes("vertex"))
+  ) {
+    return parts;
+  }
+
+  const signature = readFirstGoogleToolCallThoughtSignature(parts);
+
+  if (signature === undefined) {
+    return parts;
+  }
+
+  return parts.map((part) => {
+    if (part.type !== "tool_call") {
+      return part;
+    }
+
+    const providerMetadata = sanitizeRecord(part.providerMetadata);
+    const googleNamespace = activeProvider.includes("vertex")
+      ? "vertex"
+      : "google";
+    const existingNamespace = providerMetadata?.[googleNamespace];
+
+    if (
+      isPlainObject(existingNamespace) &&
+      typeof existingNamespace.thoughtSignature === "string"
+    ) {
+      return part;
+    }
+
+    return {
+      ...part,
+      providerMetadata: {
+        ...(providerMetadata === undefined ? {} : providerMetadata),
+        [googleNamespace]: mergePromptProviderNamespace(
+          providerMetadata?.[googleNamespace],
+          {
+            thoughtSignature: signature,
+          }
+        ),
+      },
+    };
+  }) as Extract<TuvrenMessage, { role: "assistant" }>["parts"];
+}
+
+function readFirstGoogleToolCallThoughtSignature(
+  parts: Extract<TuvrenMessage, { role: "assistant" }>["parts"]
+): string | undefined {
+  for (const part of parts) {
+    if (part.type !== "tool_call") {
+      continue;
+    }
+
+    const providerMetadata = sanitizeRecord(part.providerMetadata);
+    const googleMetadata = providerMetadata?.google;
+    const vertexMetadata = providerMetadata?.vertex;
+
+    if (
+      isPlainObject(googleMetadata) &&
+      typeof googleMetadata.thoughtSignature === "string"
+    ) {
+      return googleMetadata.thoughtSignature;
+    }
+
+    if (
+      isPlainObject(vertexMetadata) &&
+      typeof vertexMetadata.thoughtSignature === "string"
+    ) {
+      return vertexMetadata.thoughtSignature;
+    }
+  }
+
+  return undefined;
 }
 
 function mapUserPart(part: TuvrenPromptPart) {
@@ -1365,7 +1501,9 @@ function mapGenerateResult(
   );
 
   return {
-    finishReason: mapFinishReason(result.finishReason.unified),
+    finishReason: mapFinishReason(result.finishReason, {
+      hasToolCalls: state.parts.some((part) => part.type === "tool_call"),
+    }),
     parts: state.parts,
     ...(providerMetadata === undefined
       ? {}
@@ -1917,13 +2055,21 @@ function mapUsage(usage: LanguageModelV3GenerateResult["usage"]) {
 }
 
 function mapFinishReason(
-  reason: LanguageModelV3GenerateResult["finishReason"]["unified"]
+  reason: Pick<
+    LanguageModelV3GenerateResult["finishReason"],
+    "raw" | "unified"
+  >,
+  options: {
+    hasToolCalls?: boolean;
+  } = {}
 ): TuvrenModelResponse["finishReason"] {
-  switch (reason) {
+  if (shouldNormalizeToolCallFinishReason(reason, options.hasToolCalls)) {
+    return "tool_call";
+  }
+
+  switch (reason.unified) {
     case "stop":
       return "stop";
-    case "tool-calls":
-      return "tool_call";
     case "length":
       return "length";
     case "content-filter":
@@ -1934,6 +2080,34 @@ function mapFinishReason(
     default:
       return "error";
   }
+}
+
+function shouldNormalizeToolCallFinishReason(
+  reason: Pick<
+    LanguageModelV3GenerateResult["finishReason"],
+    "raw" | "unified"
+  >,
+  hasToolCalls: boolean | undefined
+): boolean {
+  if (!hasToolCalls) {
+    return reason.unified === "tool-calls";
+  }
+
+  if (reason.unified === "tool-calls") {
+    return true;
+  }
+
+  if (reason.unified === "stop") {
+    return true;
+  }
+
+  // Some provider adapters have historically surfaced Gemini function-call
+  // turns as raw FUNCTION_CALL with a unified fallback of "other" or "error".
+  return (
+    typeof reason.raw === "string" &&
+    reason.raw === "FUNCTION_CALL" &&
+    (reason.unified === "error" || reason.unified === "other")
+  );
 }
 
 function parseStructuredOutput(
@@ -2042,6 +2216,7 @@ function captureStreamPartMetadata(
     sanitizeMetadataValue({
       id: "id" in part ? part.id : undefined,
       providerMetadata: part.providerMetadata,
+      toolCallId: "toolCallId" in part ? part.toolCallId : undefined,
       type: part.type,
     })
   );
@@ -2097,6 +2272,13 @@ function mapAssistantReplayProviderOptions(
 
       return cloneProviderOptionsOrUndefined(normalized);
     }
+    case "tool_call":
+      return cloneProviderOptionsOrUndefined(
+        collectAssistantReplayProviderOptions(
+          sanitized,
+          ASSISTANT_TEXT_REPLAY_PROVIDER_KEYS
+        )
+      );
     default:
       return undefined;
   }
