@@ -20,7 +20,10 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { AnySchema } from "ajv";
 import Ajv2020 from "ajv/dist/2020.js";
-import { frameworkStreamTestFixtures } from "../../../../testkit/src/index.ts";
+import {
+  type FrameworkStreamTestFixtureSet,
+  frameworkStreamTestFixtures,
+} from "../../../../testkit/src/index.ts";
 
 const FRAMEWORK_SUITE_MANIFEST = new URL(
   "../../../../conformance/scenarios/suite-manifest.json",
@@ -106,7 +109,7 @@ describe("framework TypeScript conformance runner", () => {
 function readValidatedSingleFixtureSuite(
   manifestUrl: URL,
   expectedFixtureId: string
-): Record<string, unknown> {
+): FrameworkStreamTestFixtureSet {
   const manifest = readSuiteManifest(manifestUrl);
   expect(manifest).toMatchObject({
     boundary: "framework",
@@ -130,6 +133,7 @@ function readValidatedSingleFixtureSuite(
   const validate = ajv.compile(schema);
 
   expect(validate(fixture), ajv.errorsText(validate.errors)).toBe(true);
+  assertFrameworkStreamTestFixtureSet(fixture, fixturePath);
   return fixture;
 }
 
@@ -173,10 +177,26 @@ function readSuiteManifest(url: URL): SuiteManifest {
   return {
     boundary: value.boundary,
     fixtureSchemaPath: value.fixtureSchemaPath,
-    fixtures: [fixture],
+    fixtures: [{ id: fixture.id, path: fixture.path }],
     suiteId: value.suiteId,
     suiteVersion: value.suiteVersion,
   };
+}
+
+function assertFrameworkStreamTestFixtureSet(
+  value: unknown,
+  label: string
+): asserts value is FrameworkStreamTestFixtureSet {
+  if (
+    !(
+      isRecord(value) &&
+      Array.isArray(value.completedTurn) &&
+      Array.isArray(value.failedTurn) &&
+      Array.isArray(value.pausedTurn)
+    )
+  ) {
+    throw new Error(`${label} must contain framework stream fixture arrays`);
+  }
 }
 
 function readJsonObject(path: string): Record<string, unknown> {

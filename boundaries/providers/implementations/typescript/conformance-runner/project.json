@@ -29,6 +29,13 @@
         "cwd": "boundaries/providers/implementations/typescript/conformance-runner",
         "command": "bun test"
       }
+    },
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "boundaries/providers/implementations/typescript/conformance-runner",
+        "command": "bunx --bun tsc --project tsconfig.typecheck.json --noEmit --pretty false"
+      }
     }
   }
 }

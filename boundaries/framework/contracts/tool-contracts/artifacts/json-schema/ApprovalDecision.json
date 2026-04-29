@@ -25,5 +25,37 @@
   "unevaluatedProperties": {
     "not": {}
   },
-  "description": "A host decision for one pending tool call."
+  "description": "A host decision for one pending tool call.",
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "edit"
+          }
+        },
+        "required": ["type"]
+      },
+      "then": {
+        "required": ["editedInput"]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "not": {
+              "const": "edit"
+            }
+          }
+        },
+        "required": ["type"]
+      },
+      "then": {
+        "not": {
+          "required": ["editedInput"]
+        }
+      }
+    }
+  ]
 }

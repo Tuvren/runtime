@@ -19,15 +19,19 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
+  assertTurnTreeSchema,
   decodeDeterministicKernelRecord,
   hashKernelRecord,
   hashOpaqueObjectBytes,
   hashTurnNodeIdentity,
+  type TurnTreeSchema,
 } from "@tuvren/kernel-protocol";
 import type { AnySchema } from "ajv";
 import Ajv2020 from "ajv/dist/2020.js";
 import {
   canonicalKernelTestSchemaFixture,
+  type KernelProtocolDeterministicFixtureSet,
+  type KernelProtocolLogicalFixtureSet,
   kernelProtocolDeterministicFixtures,
   kernelProtocolLogicalFixtures,
 } from "../../../../testkit/src/lib/kernel-conformance-fixtures.ts";
@@ -97,9 +101,9 @@ describe("kernel TypeScript conformance runner", () => {
 });
 
 interface KernelFixtureSuite {
-  canonicalSchema: Record<string, unknown>;
-  deterministic: Record<string, unknown>;
-  logical: Record<string, unknown>;
+  canonicalSchema: TurnTreeSchema;
+  deterministic: KernelProtocolDeterministicFixtureSet;
+  logical: KernelProtocolLogicalFixtureSet;
 }
 
 interface SuiteFixture {
@@ -151,16 +155,27 @@ function readValidatedKernelFixtureSuite(manifestUrl: URL): KernelFixtureSuite {
 
   expect(validate(fixtureIndex), ajv.errorsText(validate.errors)).toBe(true);
 
+  const canonicalSchemaPath = join(
+    manifestDirectory,
+    fixtureIndex.canonicalSchemaPath
+  );
+  const deterministicPath = join(
+    manifestDirectory,
+    fixtureIndex.deterministicFixturePath
+  );
+  const logicalPath = join(manifestDirectory, fixtureIndex.logicalFixturePath);
+  const canonicalSchema = readJsonObject(canonicalSchemaPath);
+  const deterministic = readJsonObject(deterministicPath);
+  const logical = readJsonObject(logicalPath);
+
+  assertTurnTreeSchema(canonicalSchema, canonicalSchemaPath);
+  assertKernelProtocolDeterministicFixtureSet(deterministic, deterministicPath);
+  assertKernelProtocolLogicalFixtureSet(logical, logicalPath);
+
   return {
-    canonicalSchema: readJsonObject(
-      join(manifestDirectory, fixtureIndex.canonicalSchemaPath)
-    ),
-    deterministic: readJsonObject(
-      join(manifestDirectory, fixtureIndex.deterministicFixturePath)
-    ),
-    logical: readJsonObject(
-      join(manifestDirectory, fixtureIndex.logicalFixturePath)
-    ),
+    canonicalSchema,
+    deterministic,
+    logical,
   };
 }
 
@@ -232,6 +247,43 @@ function readJsonSchema(path: string): AnySchema {
   }
 
   throw new Error(`${path} must contain a JSON Schema object or boolean`);
+}
+
+function assertKernelProtocolDeterministicFixtureSet(
+  value: unknown,
+  label: string
+): asserts value is KernelProtocolDeterministicFixtureSet {
+  if (
+    !(
+      isRecord(value) &&
+      Array.isArray(value.rawOpaqueBytes) &&
+      typeof value.rawOpaqueBytesSha256Hex === "string" &&
+      isRecord(value.turnNodeIdentityRecord) &&
+      typeof value.turnNodeIdentityRecordCborHex === "string" &&
+      typeof value.turnNodeIdentityRecordSha256Hex === "string" &&
+      isRecord(value.turnTreeSchemaRecord) &&
+      typeof value.turnTreeSchemaRecordCborHex === "string" &&
+      typeof value.turnTreeSchemaRecordSha256Hex === "string"
+    )
+  ) {
+    throw new Error(`${label} must contain deterministic kernel fixtures`);
+  }
+}
+
+function assertKernelProtocolLogicalFixtureSet(
+  value: unknown,
+  label: string
+): asserts value is KernelProtocolLogicalFixtureSet {
+  if (
+    !(
+      isRecord(value) &&
+      Array.isArray(value.branchHeadListEntry) &&
+      isRecord(value.recoveryState) &&
+      isRecord(value.turnTreeChangeSet)
+    )
+  ) {
+    throw new Error(`${label} must contain logical kernel fixtures`);
+  }
 }
 
 function hexToBytes(value: string): Uint8Array {

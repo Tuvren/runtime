@@ -150,6 +150,26 @@ describe("tool-contracts", () => {
       },
       name: "search",
     };
+    const whitespaceCallIdApprovalRequest = {
+      ...approvalRequest,
+      toolCalls: [{ ...approvalRequest.toolCalls[0], callId: "   " }],
+    };
+    const editDecisionWithoutInput = {
+      decisions: [{ callId: "call-2", type: "edit" }],
+    };
+    const approveDecisionWithEditedInput = {
+      decisions: [
+        {
+          callId: "call-2",
+          editedInput: { query: "changed" },
+          type: "approve",
+        },
+      ],
+    };
+    const invalidJsonSchemaTool = {
+      ...renderedTool,
+      inputSchema: { type: "definitely_not_json_schema_type" },
+    };
 
     expectSchemaValidation(
       ajv,
@@ -160,6 +180,26 @@ describe("tool-contracts", () => {
       ajv,
       "https://tuvren.dev/schemas/framework/tool-contracts/RenderedToolDefinition.json",
       renderedTool
+    );
+    expectSchemaRejection(
+      ajv,
+      "https://tuvren.dev/schemas/framework/tool-contracts/ApprovalRequest.json",
+      whitespaceCallIdApprovalRequest
+    );
+    expectSchemaRejection(
+      ajv,
+      "https://tuvren.dev/schemas/framework/tool-contracts/ApprovalResponse.json",
+      editDecisionWithoutInput
+    );
+    expectSchemaRejection(
+      ajv,
+      "https://tuvren.dev/schemas/framework/tool-contracts/ApprovalResponse.json",
+      approveDecisionWithEditedInput
+    );
+    expectSchemaRejection(
+      ajv,
+      "https://tuvren.dev/schemas/framework/tool-contracts/RenderedToolDefinition.json",
+      invalidJsonSchemaTool
     );
   });
 
@@ -215,6 +255,20 @@ function expectSchemaValidation(
   }
 
   expect(validate(value), ajv.errorsText(validate.errors)).toBe(true);
+}
+
+function expectSchemaRejection(
+  ajv: Ajv2020,
+  schemaId: string,
+  value: unknown
+): void {
+  const validate = ajv.getSchema(schemaId);
+
+  if (validate === undefined) {
+    throw new Error(`missing JSON Schema artifact ${schemaId}`);
+  }
+
+  expect(validate(value)).toBe(false);
 }
 
 function readJsonObject(url: URL): Record<string, unknown> {

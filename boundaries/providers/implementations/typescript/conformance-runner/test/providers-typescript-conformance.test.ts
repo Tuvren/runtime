@@ -20,7 +20,10 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { AnySchema } from "ajv";
 import Ajv2020 from "ajv/dist/2020.js";
-import { providerTestkitFixtures } from "../../../../testkit/src/index.ts";
+import {
+  type ProviderTestkitFixtureSet,
+  providerTestkitFixtures,
+} from "../../../../testkit/src/index.ts";
 
 const PROVIDER_SUITE_MANIFEST = new URL(
   "../../../../conformance/scenarios/suite-manifest.json",
@@ -37,8 +40,8 @@ describe("providers TypeScript conformance runner", () => {
     // The TypeScript helper package is intentionally a consumer facade now.
     // Compatibility evidence starts from the boundary-owned JSON fixture.
     expect(providerTestkitFixtures).toEqual(fixture);
-    expect(readFixtureProperty(fixture, "prompt").messages).toHaveLength(1);
-    expect(readFixtureProperty(fixture, "response")).toEqual({
+    expect(fixture.prompt.messages).toHaveLength(1);
+    expect(fixture.response).toEqual({
       finishReason: "stop",
       parts: [{ text: "ready", type: "text" }],
       usage: {
@@ -46,9 +49,7 @@ describe("providers TypeScript conformance runner", () => {
         outputTokens: 1,
       },
     });
-    expect(
-      readFixtureProperty(fixture, "structuredPrompt").responseFormat
-    ).toEqual({
+    expect(fixture.structuredPrompt.responseFormat).toEqual({
       name: "answer",
       schema: {
         properties: {
@@ -60,7 +61,7 @@ describe("providers TypeScript conformance runner", () => {
         type: "object",
       },
     });
-    expect(readFixtureProperty(fixture, "toolPrompt").tools?.[0]).toEqual({
+    expect(fixture.toolPrompt.tools?.[0]).toEqual({
       description: "Search docs",
       inputSchema: {
         properties: {
@@ -79,7 +80,7 @@ describe("providers TypeScript conformance runner", () => {
 function readValidatedSingleFixtureSuite(
   manifestUrl: URL,
   expectedFixtureId: string
-): Record<string, unknown> {
+): ProviderTestkitFixtureSet {
   const manifest = readSuiteManifest(manifestUrl);
   expect(manifest).toMatchObject({
     boundary: "providers",
@@ -103,6 +104,7 @@ function readValidatedSingleFixtureSuite(
   const validate = ajv.compile(schema);
 
   expect(validate(fixture), ajv.errorsText(validate.errors)).toBe(true);
+  assertProviderTestkitFixtureSet(fixture, fixturePath);
   return fixture;
 }
 
@@ -146,23 +148,27 @@ function readSuiteManifest(url: URL): SuiteManifest {
   return {
     boundary: value.boundary,
     fixtureSchemaPath: value.fixtureSchemaPath,
-    fixtures: [fixture],
+    fixtures: [{ id: fixture.id, path: fixture.path }],
     suiteId: value.suiteId,
     suiteVersion: value.suiteVersion,
   };
 }
 
-function readFixtureProperty(
-  fixture: Record<string, unknown>,
-  key: string
-): Record<string, unknown> {
-  const value = fixture[key];
-
-  if (!isRecord(value)) {
-    throw new Error(`provider fixture ${key} must be an object`);
+function assertProviderTestkitFixtureSet(
+  value: unknown,
+  label: string
+): asserts value is ProviderTestkitFixtureSet {
+  if (
+    !(
+      isRecord(value) &&
+      isRecord(value.prompt) &&
+      isRecord(value.response) &&
+      isRecord(value.structuredPrompt) &&
+      isRecord(value.toolPrompt)
+    )
+  ) {
+    throw new Error(`${label} must contain provider prompt/response fixtures`);
   }
-
-  return value;
 }
 
 function readJsonObject(path: string): Record<string, unknown> {

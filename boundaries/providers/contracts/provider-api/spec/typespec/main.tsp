@@ -12,9 +12,37 @@ namespace Tuvren.Providers.ProviderApi;
 // function surface stays in TypeScript because callables are not portable
 // JSON Schema/OpenAPI artifacts.
 @minLength(1)
+@pattern(".*\\S.*", "Must contain non-whitespace content.")
 scalar NonEmptyString extends string;
 
 model Metadata is Record<unknown>;
+@TypeSpec.JsonSchema.extension(
+  "$comment",
+  "Opaque JSON Schema carrier. This artifact validates portable container shape and selected runtime keyword guards, but it is not a full JSON Schema metaschema replacement."
+)
+@TypeSpec.JsonSchema.extension(
+  "allOf",
+  #[
+    #{
+      `if`: #{required: #["type"]},
+      then: #{
+        properties: #{
+          type: #{
+            anyOf: #[
+              #{`enum`: #["null", "boolean", "object", "array", "number", "integer", "string"]},
+              #{
+                type: "array",
+                minItems: 1,
+                uniqueItems: true,
+                items: #{`enum`: #["null", "boolean", "object", "array", "number", "integer", "string"]},
+              },
+            ],
+          },
+        },
+      },
+    },
+  ]
+)
 model TuvrenJsonSchemaObject is Record<unknown>;
 
 union TuvrenJsonSchema {
@@ -28,12 +56,20 @@ model TextPart {
   providerMetadata?: Metadata;
 }
 
+@TypeSpec.JsonSchema.extension(
+  "allOf",
+  #[
+    #{
+      `if`: #{properties: #{redacted: #{`const`: false}}, required: #["redacted"]},
+      then: #{properties: #{text: #{type: "string", minLength: 1, pattern: ".*\\S.*"}}},
+    },
+  ]
+)
 model ReasoningPart {
   type: "reasoning";
   text: string;
-  // Runtime validation requires non-redacted reasoning to contain text. The
-  // generated artifact keeps the single public shape and leaves that
-  // conditional invariant to the runtime predicate.
+  // Runtime validation permits empty reasoning text only when the provider has
+  // redacted it; the JSON artifact mirrors that conditional invariant above.
   redacted: boolean;
   providerMetadata?: Metadata;
 }
@@ -138,7 +174,11 @@ model TuvrenPrompt {
 }
 
 model ProviderUsage {
+  @minValue(0)
+  @maxValue(9007199254740991)
   inputTokens: safeint;
+  @minValue(0)
+  @maxValue(9007199254740991)
   outputTokens: safeint;
 }
 

@@ -100,6 +100,28 @@ describe("provider-api", () => {
         "utf8"
       )
     );
+    const negativeUsageResponse = {
+      ...fixture.response,
+      usage: {
+        inputTokens: -1,
+        outputTokens: -2,
+      },
+    };
+    const nonRedactedEmptyReasoningResponse = {
+      ...fixture.response,
+      parts: [{ redacted: false, text: "", type: "reasoning" }],
+    };
+    const whitespaceToolPrompt = {
+      ...fixture.toolPrompt,
+      tools: [{ ...fixture.toolPrompt.tools[0], name: "   " }],
+    };
+    const invalidStructuredPrompt = {
+      ...fixture.structuredPrompt,
+      responseFormat: {
+        ...fixture.structuredPrompt.responseFormat,
+        schema: { type: "definitely_not_json_schema_type" },
+      },
+    };
 
     expectSchemaValidation(
       ajv,
@@ -120,6 +142,26 @@ describe("provider-api", () => {
       ajv,
       "https://tuvren.dev/schemas/providers/provider-api/TuvrenPrompt.json",
       fixture.toolPrompt
+    );
+    expectSchemaRejection(
+      ajv,
+      "https://tuvren.dev/schemas/providers/provider-api/TuvrenModelResponse.json",
+      negativeUsageResponse
+    );
+    expectSchemaRejection(
+      ajv,
+      "https://tuvren.dev/schemas/providers/provider-api/TuvrenModelResponse.json",
+      nonRedactedEmptyReasoningResponse
+    );
+    expectSchemaRejection(
+      ajv,
+      "https://tuvren.dev/schemas/providers/provider-api/TuvrenPrompt.json",
+      whitespaceToolPrompt
+    );
+    expectSchemaRejection(
+      ajv,
+      "https://tuvren.dev/schemas/providers/provider-api/TuvrenPrompt.json",
+      invalidStructuredPrompt
     );
   });
 
@@ -172,6 +214,20 @@ function expectSchemaValidation(
   }
 
   expect(validate(value), ajv.errorsText(validate.errors)).toBe(true);
+}
+
+function expectSchemaRejection(
+  ajv: Ajv2020,
+  schemaId: string,
+  value: unknown
+): void {
+  const validate = ajv.getSchema(schemaId);
+
+  if (validate === undefined) {
+    throw new Error(`missing JSON Schema artifact ${schemaId}`);
+  }
+
+  expect(validate(value)).toBe(false);
 }
 
 function readJsonObject(url: URL): Record<string, unknown> {

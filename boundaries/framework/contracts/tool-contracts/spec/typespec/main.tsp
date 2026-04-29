@@ -12,9 +12,37 @@ namespace Tuvren.Framework.ToolContracts;
 // as execute(), approval policies, and custom schema validators stay in the
 // TypeScript runtime contract because they are not artifact-safe wire shapes.
 @doc("Opaque JSON Schema accepted by the Tuvren tool contract surface.")
+@TypeSpec.JsonSchema.extension(
+  "$comment",
+  "Opaque JSON Schema carrier. This artifact validates portable container shape and selected runtime keyword guards, but it is not a full JSON Schema metaschema replacement."
+)
+@TypeSpec.JsonSchema.extension(
+  "allOf",
+  #[
+    #{
+      `if`: #{required: #["type"]},
+      then: #{
+        properties: #{
+          type: #{
+            anyOf: #[
+              #{`enum`: #["null", "boolean", "object", "array", "number", "integer", "string"]},
+              #{
+                type: "array",
+                minItems: 1,
+                uniqueItems: true,
+                items: #{`enum`: #["null", "boolean", "object", "array", "number", "integer", "string"]},
+              },
+            ],
+          },
+        },
+      },
+    },
+  ]
+)
 model TuvrenJsonSchemaObject is Record<unknown>;
 
 @minLength(1)
+@pattern(".*\\S.*", "Must contain non-whitespace content.")
 scalar NonEmptyString extends string;
 
 union TuvrenJsonSchema {
@@ -75,6 +103,19 @@ enum ApprovalDecisionType {
 }
 
 @doc("A host decision for one pending tool call.")
+@TypeSpec.JsonSchema.extension(
+  "allOf",
+  #[
+    #{
+      `if`: #{properties: #{type: #{`const`: "edit"}}, required: #["type"]},
+      then: #{required: #["editedInput"]},
+    },
+    #{
+      `if`: #{properties: #{type: #{not: #{`const`: "edit"}}}, required: #["type"]},
+      then: #{not: #{required: #["editedInput"]}},
+    },
+  ]
+)
 model ApprovalDecision {
   callId: NonEmptyString;
   // The standalone artifact captures response-local shape only. Request-aware
