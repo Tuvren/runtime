@@ -17,6 +17,8 @@
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import type { AnySchema } from "ajv";
+import Ajv2020 from "ajv/dist/2020.js";
 import { runCommand } from "./lib/command-runner.js";
 
 interface CompatibilityMatrix {
@@ -71,7 +73,12 @@ const COMPATIBILITY_MATRIX_PATH = resolve(
   REPO_ROOT,
   "reports/compatibility/compatibility-matrix.json"
 );
+const COMPATIBILITY_SCHEMA_PATH = resolve(
+  REPO_ROOT,
+  "reports/compatibility/compatibility-matrix.schema.json"
+);
 const EVIDENCE_DIRECTORY = resolve(REPO_ROOT, "reports/compatibility/evidence");
+const ajv = new Ajv2020({ allErrors: true, strict: false });
 
 const CONFORMANCE_RUNNERS: readonly ConformanceRunner[] = [
   {
@@ -147,6 +154,7 @@ async function main(): Promise<void> {
   };
 
   assertCompatibilityMatrix(matrix);
+  await assertCompatibilityMatrixSchema(matrix);
   await writeFile(
     COMPATIBILITY_MATRIX_PATH,
     `${JSON.stringify(matrix, null, 2)}\n`
@@ -284,6 +292,33 @@ async function formatGeneratedOutputs(): Promise<void> {
         "formatting generated compatibility outputs failed"
     );
   }
+}
+
+async function assertCompatibilityMatrixSchema(
+  value: CompatibilityMatrix
+): Promise<void> {
+  const schemaText = await readFile(COMPATIBILITY_SCHEMA_PATH, "utf8");
+  const parsedSchema = readJsonSchema(JSON.parse(schemaText));
+  const validate = ajv.compile(parsedSchema);
+
+  // The checked-in schema is the machine contract for compatibility evidence,
+  // so codegen validates against it directly instead of relying only on the
+  // narrower TypeScript assertions above.
+  if (validate(value)) {
+    return;
+  }
+
+  throw new Error(
+    `compatibility matrix failed JSON Schema validation: ${ajv.errorsText(validate.errors)}`
+  );
+}
+
+function readJsonSchema(value: unknown): AnySchema {
+  if (typeof value === "boolean" || isRecord(value)) {
+    return value;
+  }
+
+  throw new Error("compatibility matrix schema must be an object or boolean");
 }
 
 function assertCompatibilityMatrix(

@@ -89,6 +89,13 @@ export const DEFAULT_VERIFICATION_STEPS: readonly VerificationStep[] = [
     id: "workspace lint",
   },
   {
+    command: ["bun", "run", "codegen"],
+    id: "telemetry and compatibility code generation",
+  },
+  {
+    // Telemetry codegen writes a checked-in TypeScript consumer, so verify
+    // compiles and exercises the transition line after regeneration rather than
+    // trusting the pre-codegen build/test outputs.
     command: ["bun", "run", "typecheck"],
     id: "workspace typecheck",
   },
@@ -121,10 +128,6 @@ export const DEFAULT_VERIFICATION_STEPS: readonly VerificationStep[] = [
   {
     command: ["bun", "run", "conformance"],
     id: "boundary-owned conformance suites",
-  },
-  {
-    command: ["bun", "run", "codegen"],
-    id: "telemetry and compatibility code generation",
   },
   {
     command: [

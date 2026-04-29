@@ -11,14 +11,22 @@
       "inputs": [
         "default",
         "^production",
+        "{workspaceRoot}/tools/generators/**/*",
         "{workspaceRoot}/tools/scripts/**/*",
+        "{workspaceRoot}/boundaries/*/conformance/**/*",
+        "{workspaceRoot}/boundaries/*/testkit/package.json",
         "{workspaceRoot}/devenv.nix",
         "{workspaceRoot}/devenv.lock"
       ]
     },
     "conformance": {
       "cache": true,
-      "inputs": ["default", "^production", "{workspaceRoot}/tests/**/*"]
+      "inputs": [
+        "default",
+        "^production",
+        "{workspaceRoot}/tests/**/*",
+        "{workspaceRoot}/boundaries/*/conformance/**/*"
+      ]
     },
     "lint": {
       "cache": true,
