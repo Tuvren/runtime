@@ -16,7 +16,7 @@
 
 import { describe, expect, test } from "bun:test";
 import { tmpdir } from "node:os";
-import { LLMock } from "@copilotkit/aimock";
+import { type ChatCompletionRequest, LLMock } from "@copilotkit/aimock";
 import {
   DEFAULT_PLAYGROUND_SCENARIOS,
   loadPlaygroundConfig,
@@ -35,6 +35,48 @@ describe("playground host scenarios", () => {
       scenario: "streaming",
       sqlitePath: undefined,
     });
+  });
+
+  test("loads aimock-openai configuration from argv and env", () => {
+    const argvConfig = loadPlaygroundConfig({}, [
+      "--provider",
+      "aimock-openai",
+      "--aimock-base-url",
+      " http://127.0.0.1:4010/v1 ",
+    ]);
+
+    expect(argvConfig.providerMode).toBe("aimock-openai");
+    expect(argvConfig.aimockBaseUrl).toBe("http://127.0.0.1:4010/v1");
+
+    const envConfig = loadPlaygroundConfig(
+      {
+        TUVREN_PLAYGROUND_AIMOCK_BASE_URL: "http://127.0.0.1:4011/v1",
+        TUVREN_PLAYGROUND_PROVIDER_MODE: "aimock-openai",
+      },
+      []
+    );
+
+    expect(envConfig.providerMode).toBe("aimock-openai");
+    expect(envConfig.aimockBaseUrl).toBe("http://127.0.0.1:4011/v1");
+  });
+
+  test("rejects aimock-openai configuration without a usable base URL", () => {
+    expectPlaygroundConfigError(
+      () => loadPlaygroundConfig({}, ["--provider", "aimock-openai"]),
+      "aimock-openai playground provider requires --aimock-base-url or TUVREN_PLAYGROUND_AIMOCK_BASE_URL"
+    );
+
+    expectPlaygroundConfigError(
+      () =>
+        loadPlaygroundConfig(
+          {
+            TUVREN_PLAYGROUND_AIMOCK_BASE_URL: "   ",
+            TUVREN_PLAYGROUND_PROVIDER_MODE: "aimock-openai",
+          },
+          []
+        ),
+      "aimock-openai playground provider requires --aimock-base-url or TUVREN_PLAYGROUND_AIMOCK_BASE_URL"
+    );
   });
 
   test("allocates disposable SQLite smoke paths on demand", () => {
@@ -217,6 +259,7 @@ describe("playground host scenarios", () => {
         ],
       });
       expect(request?.body?.response_format?.type).toBe("json_schema");
+      assertStructuredResponseFormat(request?.body?.response_format);
       expect(request?.response.status).toBe(200);
     } finally {
       await mock.stop();
@@ -248,7 +291,7 @@ describe("playground host scenarios", () => {
     mock.on(
       {
         predicate(request) {
-          return request.messages.some((message) => message.role === "tool");
+          return hasSearchToolContinuation(request);
         },
       },
       {
@@ -293,8 +336,9 @@ describe("playground host scenarios", () => {
         true
       );
       expect(
-        requests.some((request) =>
-          request.body?.messages.some((message) => message.role === "tool")
+        requests.some(
+          (request) =>
+            request.body !== null && hasSearchToolContinuation(request.body)
         )
       ).toBe(true);
     } finally {
@@ -335,7 +379,7 @@ describe("playground host scenarios", () => {
     mock.on(
       {
         predicate(request) {
-          return request.messages.some((message) => message.role === "tool");
+          return hasApprovalToolContinuation(request);
         },
       },
       {
@@ -379,8 +423,9 @@ describe("playground host scenarios", () => {
       });
       expect(requests.length).toBe(2);
       expect(
-        requests.some((request) =>
-          request.body?.messages.some((message) => message.role === "tool")
+        requests.some(
+          (request) =>
+            request.body !== null && hasApprovalToolContinuation(request.body)
         )
       ).toBe(true);
     } finally {
@@ -613,4 +658,179 @@ function expectSurfaceCoverage(
   for (const type of expected.aguiTypes) {
     expect(report.events.aguiTypes).toContain(type);
   }
+}
+
+function assertStructuredResponseFormat(value: unknown): void {
+  if (!isPlainRecord(value)) {
+    throw new Error("structured response_format was not an object");
+  }
+
+  const jsonSchema = value.json_schema;
+
+  if (!isPlainRecord(jsonSchema)) {
+    throw new Error("structured response_format.json_schema was not an object");
+  }
+
+  const schema = jsonSchema.schema;
+
+  if (!isPlainRecord(schema)) {
+    throw new Error("structured response_format.json_schema.schema missing");
+  }
+
+  const properties = schema.properties;
+
+  expect(jsonSchema.name).toBe("playground_summary");
+  expect(schema.type).toBe("object");
+  expect(schema.required).toEqual(["scenario", "status"]);
+  expect(isPlainRecord(properties)).toBe(true);
+
+  if (!isPlainRecord(properties)) {
+    throw new Error("structured schema properties missing");
+  }
+
+  expect(properties.scenario).toEqual({ type: "string" });
+  expect(properties.status).toEqual({ type: "string" });
+}
+
+function hasSearchToolContinuation(request: ChatCompletionRequest): boolean {
+  const assistantToolCall = findAssistantToolCall(request, "search");
+  const toolMessage = findToolMessageForCall(request, assistantToolCall?.id);
+
+  if (assistantToolCall === undefined || toolMessage === undefined) {
+    return false;
+  }
+
+  const args = parseJsonRecord(assistantToolCall.function.arguments);
+  const output = parseJsonRecord(toolMessage.content);
+  const hits = output?.hits;
+
+  // Match both the model-authored tool input and the host-authored tool output
+  // so the fixture cannot pass on an unrelated tool message in the second call.
+  return (
+    args?.query === "docs" &&
+    output?.query === "docs" &&
+    Array.isArray(hits) &&
+    hits.some(
+      (hit) =>
+        isPlainRecord(hit) &&
+        hit.title === "Tuvren Runtime" &&
+        hit.url === "https://example.invalid/tuvren"
+    )
+  );
+}
+
+function hasApprovalToolContinuation(request: ChatCompletionRequest): boolean {
+  const searchCall = findAssistantToolCall(request, "search");
+  const emailCall = findAssistantToolCall(request, "email");
+  const searchMessage = findToolMessageForCall(request, searchCall?.id);
+  const emailMessage = findToolMessageForCall(request, emailCall?.id);
+  const searchArgs = parseJsonRecord(searchCall?.function.arguments);
+  const emailArgs = parseJsonRecord(emailCall?.function.arguments);
+  const searchOutput = parseJsonRecord(searchMessage?.content);
+  const emailOutput = parseJsonRecord(emailMessage?.content);
+  const searchHits = searchOutput?.hits;
+  const emailResult = emailOutput?.result;
+  const approval = emailOutput?.approval;
+  const editedInput = isPlainRecord(approval)
+    ? approval.editedInput
+    : undefined;
+  const originalInput = isPlainRecord(approval)
+    ? approval.originalInput
+    : undefined;
+
+  // Approval resume must prove that the model's original tool request ran
+  // through host approval editing, and that the durable continuation includes
+  // the host-authored audit payload rather than an unrelated tool message.
+  return (
+    searchMessage !== undefined &&
+    emailMessage !== undefined &&
+    searchArgs?.query === "latest status" &&
+    emailArgs?.to === "ops@example.com" &&
+    emailArgs.subject === "Status update" &&
+    searchOutput?.query === "latest status" &&
+    Array.isArray(searchHits) &&
+    searchHits.some(
+      (hit) =>
+        isPlainRecord(hit) &&
+        hit.title === "Tuvren Runtime" &&
+        hit.url === "https://example.invalid/tuvren"
+    ) &&
+    isPlainRecord(emailResult) &&
+    emailResult.sent === true &&
+    emailResult.to === "ops@example.com" &&
+    isPlainRecord(approval) &&
+    approval.type === "edit" &&
+    isPlainRecord(editedInput) &&
+    editedInput.to === "ops@example.com" &&
+    editedInput.subject === "Edited status update" &&
+    isPlainRecord(originalInput) &&
+    originalInput.to === "ops@example.com" &&
+    originalInput.subject === "Status update"
+  );
+}
+
+function findAssistantToolCall(
+  request: ChatCompletionRequest,
+  name: string
+):
+  | NonNullable<ChatCompletionRequest["messages"][number]["tool_calls"]>[number]
+  | undefined {
+  return request.messages
+    .flatMap((message) => message.tool_calls ?? [])
+    .find((toolCall) => toolCall.function.name === name);
+}
+
+function findToolMessageForCall(
+  request: ChatCompletionRequest,
+  toolCallId: string | undefined
+): { content: string } | undefined {
+  if (toolCallId === undefined) {
+    return undefined;
+  }
+
+  for (const message of request.messages) {
+    if (
+      isPlainRecord(message) &&
+      message.role === "tool" &&
+      message.tool_call_id === toolCallId &&
+      typeof message.content === "string"
+    ) {
+      return { content: message.content };
+    }
+  }
+
+  return undefined;
+}
+
+function expectPlaygroundConfigError(
+  loadConfig: () => unknown,
+  expectedMessage: string
+): void {
+  let actualMessage: string | undefined;
+
+  try {
+    loadConfig();
+  } catch (error: unknown) {
+    actualMessage = error instanceof Error ? error.message : String(error);
+  }
+
+  expect(actualMessage).toBe(expectedMessage);
+}
+
+function parseJsonRecord(value: unknown): Record<string, unknown> | undefined {
+  if (typeof value !== "string") {
+    return undefined;
+  }
+
+  try {
+    const parsed = JSON.parse(value);
+
+    return isPlainRecord(parsed) ? parsed : undefined;
+  } catch (_error: unknown) {
+    return undefined;
+  }
+}
+
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }

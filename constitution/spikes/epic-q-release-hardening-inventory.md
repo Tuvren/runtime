@@ -27,6 +27,9 @@ publication claim.
   package surfaces under both Bun and Node.
 - `constitution/spikes/epic-q-portability-matrix.md` records the checked-in
   runtime classification matrix.
+- Post-closure playground evidence now also includes the user-directed
+  aimock/OpenAI E2E lane. It is recorded as repository reality for future
+  planning, not as reopened Epic Q scope.
 
 ## Validation Evidence
 
@@ -54,6 +57,11 @@ publication claim.
 - `bun run nx run host-playground:scenario-sqlite`
 - Final `release-check` observed declared Bun `1.3.11`, local Bun `1.3.10`,
   and Node `v24.3.0`; the Bun drift was reported as non-failing by design.
+- Post-closure aimock/OpenAI E2E validation added to `host-playground:test`
+  covers streamed text, structured output, tool continuation, approval
+  pause/resume, provider metadata, cancellation, provider failure, malformed
+  responses, and unmatched fixtures through a local OpenAI-compatible HTTP
+  provider boundary.
 
 ## Portability Conclusions
 

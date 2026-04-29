@@ -40,7 +40,9 @@ export function createPlaygroundProvider(input: {
   scenario: PlaygroundScenarioName;
 }): TuvrenProvider {
   if (input.mode === "aimock-openai") {
-    if (input.aimockBaseUrl === undefined) {
+    const aimockBaseUrl = input.aimockBaseUrl?.trim();
+
+    if (aimockBaseUrl === undefined || aimockBaseUrl.length === 0) {
       throw new TuvrenRuntimeError(
         "aimock-openai playground provider requires --aimock-base-url or TUVREN_PLAYGROUND_AIMOCK_BASE_URL",
         {
@@ -51,7 +53,7 @@ export function createPlaygroundProvider(input: {
 
     const openai = createOpenAI({
       apiKey: "mock",
-      baseURL: input.aimockBaseUrl,
+      baseURL: aimockBaseUrl,
     });
 
     return createAiSdkProviderBridge({
