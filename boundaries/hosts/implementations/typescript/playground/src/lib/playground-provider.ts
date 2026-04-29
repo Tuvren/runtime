@@ -43,6 +43,7 @@ import type {
 
 export function createPlaygroundProvider(input: {
   aimockBaseUrl?: string;
+  googleApiKey?: string;
   modelId?: string;
   mode: PlaygroundProviderMode;
   scenario: PlaygroundScenarioName;
@@ -59,7 +60,7 @@ export function createPlaygroundProvider(input: {
   }
 
   if (input.mode === "ai-sdk-google") {
-    const apiKey = resolveGoogleApiKey(process.env);
+    const apiKey = input.googleApiKey ?? resolveGoogleApiKey(process.env);
 
     if (apiKey === undefined) {
       throw new TuvrenRuntimeError(

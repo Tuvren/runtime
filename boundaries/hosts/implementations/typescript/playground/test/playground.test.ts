@@ -72,6 +72,7 @@ describe("playground host scenarios", () => {
     expect(config).toEqual({
       aimockBaseUrl: undefined,
       backend: "memory",
+      googleApiKey: undefined,
       modelId: undefined,
       providerMode: "fixture",
       scenario: "streaming",
@@ -119,6 +120,7 @@ describe("playground host scenarios", () => {
     );
 
     expect(argvConfig.providerMode).toBe("ai-sdk-google");
+    expect(argvConfig.googleApiKey).toBe("google-key");
     expect(argvConfig.modelId).toBe("gemini-2.5-pro");
 
     const envConfig = loadPlaygroundConfig(
@@ -131,7 +133,36 @@ describe("playground host scenarios", () => {
     );
 
     expect(envConfig.providerMode).toBe("ai-sdk-google");
+    expect(envConfig.googleApiKey).toBe("gemini-key");
     expect(envConfig.modelId).toBe("gemini-2.5-flash-lite");
+  });
+
+  test("uses parsed Gemini credentials for programmatic callers without mutating process.env", () => {
+    const config = loadPlaygroundConfig(
+      {
+        GEMINI_API_KEY: "gemini-key",
+        TUVREN_PLAYGROUND_PROVIDER_MODE: "ai-sdk-google",
+      },
+      []
+    );
+
+    withTemporaryEnv(
+      {
+        GEMINI_API_KEY: undefined,
+        GOOGLE_GENERATIVE_AI_API_KEY: undefined,
+      },
+      () => {
+        let thrownError: unknown;
+
+        try {
+          createPlaygroundHost(config);
+        } catch (error: unknown) {
+          thrownError = error;
+        }
+
+        expect(thrownError === undefined).toBe(true);
+      }
+    );
   });
 
   test("rejects aimock provider configuration without a usable base URL", () => {

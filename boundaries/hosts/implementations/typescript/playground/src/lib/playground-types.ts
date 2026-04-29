@@ -51,6 +51,7 @@ export type PlaygroundScenarioName =
 export interface PlaygroundConfig {
   aimockBaseUrl?: string;
   backend: PlaygroundBackendMode;
+  googleApiKey?: string;
   modelId?: string;
   providerMode: PlaygroundProviderMode;
   scenario: PlaygroundScenarioName;

@@ -1366,6 +1366,91 @@ describe("provider-bridge-ai-sdk", () => {
     });
   });
 
+  test("preserves incremental tool-call metadata when the closing tool-call omits it", async () => {
+    const bridge = createAiSdkProviderBridge({
+      model: createMockModel({
+        async doStream() {
+          await Promise.resolve();
+          return {
+            stream: streamFromParts([
+              {
+                id: "call-1",
+                providerMetadata: {
+                  google: {
+                    thoughtSignature: "tool-thought-1",
+                  },
+                },
+                toolName: "search",
+                type: "tool-input-start",
+              },
+              {
+                delta: '{"query":"docs"}',
+                id: "call-1",
+                type: "tool-input-delta",
+              },
+              {
+                input: '{"query":"docs"}',
+                toolCallId: "call-1",
+                toolName: "search",
+                type: "tool-call",
+              },
+              {
+                finishReason: {
+                  raw: "FUNCTION_CALL",
+                  unified: "other",
+                },
+                type: "finish",
+                usage: createUsage(3, 1),
+              },
+            ]),
+          };
+        },
+        provider: "google",
+      }),
+    });
+
+    const chunks = await collectAsyncIterable(
+      bridge.stream({
+        messages: [
+          {
+            parts: [{ text: "Search", type: "text" }],
+            role: "user",
+          },
+        ],
+      })
+    );
+
+    expect(chunks.slice(0, 3)).toEqual([
+      {
+        name: "search",
+        providerCallId: "call-1",
+        type: "tool_call_start",
+      },
+      {
+        delta: '{"query":"docs"}',
+        providerCallId: "call-1",
+        type: "tool_call_args_delta",
+      },
+      {
+        input: {
+          query: "docs",
+        },
+        name: "search",
+        providerCallId: "call-1",
+        providerMetadata: {
+          google: {
+            thoughtSignature: "tool-thought-1",
+          },
+        },
+        type: "tool_call_done",
+      },
+    ]);
+    expect(assertProviderFinishChunk(chunks, "tool_call").usage).toEqual({
+      inputTokens: 3,
+      outputTokens: 1,
+    });
+  });
+
   test("does not normalize malformed function-call errors into tool-call finishes", async () => {
     const bridge = createAiSdkProviderBridge({
       model: createMockModel({

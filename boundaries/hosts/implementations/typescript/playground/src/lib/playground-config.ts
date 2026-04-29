@@ -65,6 +65,7 @@ export function loadPlaygroundConfig(
   const modelId = normalizeModelId(
     options.modelId ?? env.TUVREN_PLAYGROUND_MODEL_ID
   );
+  const googleApiKey = resolveGoogleApiKey(env);
   const aimockBaseUrl = normalizeAimockBaseUrl(
     options.aimockBaseUrl ?? env.TUVREN_PLAYGROUND_AIMOCK_BASE_URL
   );
@@ -90,10 +91,7 @@ export function loadPlaygroundConfig(
     );
   }
 
-  if (
-    providerMode === "ai-sdk-google" &&
-    resolveGoogleApiKey(env) === undefined
-  ) {
+  if (providerMode === "ai-sdk-google" && googleApiKey === undefined) {
     throw new TuvrenRuntimeError(
       "ai-sdk-google playground provider requires GOOGLE_GENERATIVE_AI_API_KEY or GEMINI_API_KEY",
       {
@@ -105,6 +103,7 @@ export function loadPlaygroundConfig(
   return {
     aimockBaseUrl,
     backend,
+    googleApiKey,
     modelId:
       providerMode === "ai-sdk-google"
         ? (modelId ?? DEFAULT_GEMINI_PLAYGROUND_MODEL_ID)

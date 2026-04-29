@@ -565,6 +565,10 @@ function handleToolCallStreamPart(
 
   const chunks = createToolCallPreludeChunks(part, state);
   const existingState = state.toolStates.get(part.toolCallId);
+  const providerMetadata = mergeProviderMetadataRecords(
+    existingState?.providerMetadata,
+    readStreamToolPartProviderMetadata(part)
+  );
 
   if (existingState?.doneEmitted === true) {
     return chunks;
@@ -576,7 +580,7 @@ function handleToolCallStreamPart(
       part.toolName,
       part.input,
       state.model,
-      readStreamToolPartProviderMetadata(part)
+      providerMetadata
     )
   );
   state.toolStates.set(part.toolCallId, {
@@ -584,7 +588,7 @@ function handleToolCallStreamPart(
     ended: true,
     inputBuffer: part.input,
     name: part.toolName,
-    providerMetadata: readStreamToolPartProviderMetadata(part),
+    providerMetadata,
     started: true,
   });
 
