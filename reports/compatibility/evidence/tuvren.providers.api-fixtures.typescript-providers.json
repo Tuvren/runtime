@@ -1,0 +1,17 @@
+{
+  "boundary": "providers",
+  "command": [
+    "bun",
+    "run",
+    "nx",
+    "run",
+    "providers-testkit:conformance",
+    "--skipNxCache"
+  ],
+  "exitCode": 0,
+  "implementationId": "typescript-providers",
+  "project": "providers-testkit",
+  "status": "pass",
+  "suiteId": "tuvren.providers.api-fixtures",
+  "suiteVersion": "0.1.0"
+}

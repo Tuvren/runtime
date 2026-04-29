@@ -1,0 +1,61 @@
+{
+  "implementations": [
+    {
+      "implementationId": "typescript-framework",
+      "language": "typescript",
+      "results": [
+        {
+          "evidencePath": "reports/compatibility/evidence/tuvren.framework.stream-events.typescript-framework.json",
+          "status": "pass",
+          "suiteId": "tuvren.framework.stream-events",
+          "suiteVersion": "0.1.0"
+        }
+      ],
+      "version": "unreleased-workspace"
+    },
+    {
+      "implementationId": "typescript-kernel",
+      "language": "typescript",
+      "results": [
+        {
+          "evidencePath": "reports/compatibility/evidence/tuvren.kernel.protocol-seed.typescript-kernel.json",
+          "status": "pass",
+          "suiteId": "tuvren.kernel.protocol-seed",
+          "suiteVersion": "0.1.0"
+        }
+      ],
+      "version": "unreleased-workspace"
+    },
+    {
+      "implementationId": "typescript-providers",
+      "language": "typescript",
+      "results": [
+        {
+          "evidencePath": "reports/compatibility/evidence/tuvren.providers.api-fixtures.typescript-providers.json",
+          "status": "pass",
+          "suiteId": "tuvren.providers.api-fixtures",
+          "suiteVersion": "0.1.0"
+        }
+      ],
+      "version": "unreleased-workspace"
+    }
+  ],
+  "interop": [],
+  "suites": [
+    {
+      "boundary": "framework",
+      "suiteId": "tuvren.framework.stream-events",
+      "suiteVersion": "0.1.0"
+    },
+    {
+      "boundary": "kernel",
+      "suiteId": "tuvren.kernel.protocol-seed",
+      "suiteVersion": "0.1.0"
+    },
+    {
+      "boundary": "providers",
+      "suiteId": "tuvren.providers.api-fixtures",
+      "suiteVersion": "0.1.0"
+    }
+  ]
+}

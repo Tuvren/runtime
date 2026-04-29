@@ -17,6 +17,8 @@
     "format": "bunx --bun @biomejs/biome check --write .",
     "nx": "bun ./tools/run-nx.mjs",
     "typecheck": "bun run nx run-many -t typecheck",
+    "conformance": "bun run nx run-many -t conformance -p kernel-testkit,framework-testkit,providers-testkit",
+    "codegen": "bun run nx run-many -t codegen -p telemetry-semconv,compatibility-reporting",
     "verify": "bun tools/scripts/verify.ts",
     "release-check": "bun tools/scripts/release-check.ts",
     "graph": "bun run nx graph"
@@ -27,6 +29,7 @@
     "@nx/workspace": "22.6.3",
     "@types/bun": "^1.3.11",
     "@types/node": "^25.5.0",
+    "ajv": "8.18.0",
     "cbor-x": "1.6.4",
     "nx": "22.6.3",
     "tsup": "8.5.1",

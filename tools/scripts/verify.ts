@@ -28,7 +28,7 @@ export interface VerificationResult {
   id: string;
 }
 
-export const EPIC_Q_TEST_PROJECTS: readonly string[] = [
+export const WORKSPACE_TEST_PROJECTS: readonly string[] = [
   "provider-api",
   "framework-event-stream",
   "framework-runtime-api",
@@ -45,7 +45,7 @@ export const EPIC_Q_TEST_PROJECTS: readonly string[] = [
   "host-playground",
 ];
 
-export const EPIC_Q_BUILD_PROJECTS: readonly string[] = [
+export const WORKSPACE_BUILD_PROJECTS: readonly string[] = [
   "shared-core-types",
   "kernel-contract-protocol",
   "kernel-testkit",
@@ -67,10 +67,12 @@ export const EPIC_Q_BUILD_PROJECTS: readonly string[] = [
   "host-playground",
 ];
 
-export const EPIC_Q_EXPORT_SMOKE_PROJECTS: readonly string[] = [
+export const WORKSPACE_EXPORT_SMOKE_PROJECTS: readonly string[] = [
+  "kernel-testkit",
   "framework-driver-api",
   "framework-event-stream",
   "framework-runtime-api",
+  "framework-runtime-core",
   "framework-tool-contracts",
   "provider-api",
   "providers-testkit",
@@ -88,6 +90,26 @@ export const DEFAULT_VERIFICATION_STEPS: readonly VerificationStep[] = [
     id: "workspace lint",
   },
   {
+    command: [
+      "bun",
+      "run",
+      "nx",
+      "run-many",
+      "-t",
+      "codegen",
+      "-p",
+      "telemetry-semconv,compatibility-reporting",
+      // Compatibility codegen shells out to the conformance runners to produce
+      // measured evidence, so verify forces a fresh execution here instead of
+      // accepting cached artifacts from another workspace state.
+      "--skipNxCache",
+    ],
+    id: "telemetry and compatibility code generation",
+  },
+  {
+    // Telemetry codegen writes a checked-in TypeScript consumer, so verify
+    // compiles and exercises the transition line after regeneration rather than
+    // trusting the pre-codegen build/test outputs.
     command: ["bun", "run", "typecheck"],
     id: "workspace typecheck",
   },
@@ -100,9 +122,9 @@ export const DEFAULT_VERIFICATION_STEPS: readonly VerificationStep[] = [
       "-t",
       "build",
       "-p",
-      EPIC_Q_BUILD_PROJECTS.join(","),
+      WORKSPACE_BUILD_PROJECTS.join(","),
     ],
-    id: "Epic Q targeted builds",
+    id: "transition-line targeted builds",
   },
   {
     command: [
@@ -113,9 +135,13 @@ export const DEFAULT_VERIFICATION_STEPS: readonly VerificationStep[] = [
       "-t",
       "test",
       "-p",
-      EPIC_Q_TEST_PROJECTS.join(","),
+      WORKSPACE_TEST_PROJECTS.join(","),
     ],
-    id: "Epic Q targeted tests",
+    id: "transition-line targeted tests",
+  },
+  {
+    command: ["bun", "run", "conformance"],
+    id: "boundary-owned conformance suites",
   },
   {
     command: [
@@ -126,7 +152,7 @@ export const DEFAULT_VERIFICATION_STEPS: readonly VerificationStep[] = [
       "-t",
       "exports-smoke",
       "-p",
-      EPIC_Q_EXPORT_SMOKE_PROJECTS.join(","),
+      WORKSPACE_EXPORT_SMOKE_PROJECTS.join(","),
       // The prior build step is the release gate for dist output; export smoke
       // should only validate those artifacts, not rebuild the graph again.
       "--excludeTaskDependencies",
@@ -144,6 +170,8 @@ export const DEFAULT_VERIFICATION_STEPS: readonly VerificationStep[] = [
       "nx",
       "run",
       "host-playground:scenario-sqlite",
+      // The Nx target itself pins `--provider fixture` so this reload proof
+      // stays deterministic even when a session has Gemini-oriented env vars.
       // The SQLite scenario intentionally consumes the host build produced
       // earlier in verify so repeated release checks avoid a third rebuild.
       "--excludeTaskDependencies",
@@ -179,7 +207,7 @@ export function printVerificationSummary(
   results: readonly VerificationResult[]
 ): void {
   console.log("");
-  console.log("Epic Q verification summary");
+  console.log("Transition verification summary");
 
   for (const result of results) {
     const status = result.code === 0 ? "pass" : `fail (${result.code})`;

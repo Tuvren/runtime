@@ -6,6 +6,37 @@
     "production": ["default"]
   },
   "targetDefaults": {
+    "codegen": {
+      "cache": true,
+      "inputs": [
+        "default",
+        "^production",
+        "{workspaceRoot}/tools/generators/**/*",
+        "{workspaceRoot}/tools/scripts/**/*",
+        "{workspaceRoot}/boundaries/*/conformance/**/*",
+        "{workspaceRoot}/boundaries/*/testkit/src/**/*",
+        "{workspaceRoot}/boundaries/*/testkit/test/**/*",
+        "{workspaceRoot}/boundaries/*/testkit/package.json",
+        "{workspaceRoot}/devenv.nix",
+        "{workspaceRoot}/devenv.lock"
+      ]
+    },
+    "conformance": {
+      "cache": true,
+      "inputs": [
+        "default",
+        "^production",
+        "{workspaceRoot}/tests/**/*",
+        "{workspaceRoot}/boundaries/*/conformance/**/*",
+        "{workspaceRoot}/boundaries/*/testkit/src/**/*",
+        "{workspaceRoot}/boundaries/*/testkit/test/**/*",
+        "{workspaceRoot}/boundaries/*/testkit/package.json"
+      ]
+    },
+    "lint": {
+      "cache": true,
+      "inputs": ["default", "{workspaceRoot}/biome.jsonc"]
+    },
     "typecheck": {
       "cache": true,
       "inputs": [

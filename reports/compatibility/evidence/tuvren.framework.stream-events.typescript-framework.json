@@ -1,0 +1,17 @@
+{
+  "boundary": "framework",
+  "command": [
+    "bun",
+    "run",
+    "nx",
+    "run",
+    "framework-testkit:conformance",
+    "--skipNxCache"
+  ],
+  "exitCode": 0,
+  "implementationId": "typescript-framework",
+  "project": "framework-testkit",
+  "status": "pass",
+  "suiteId": "tuvren.framework.stream-events",
+  "suiteVersion": "0.1.0"
+}
