@@ -33,6 +33,13 @@ Do not invent behavior, contracts, or scope that conflict with those sources.
 
 Use `bun` for package management and runtime entry points. Use Nx targets for package-scoped work instead of ad hoc inner-package scripts.
 
+### Tooling Authority Guardrail
+
+- Treat the current `devenv + native toolchains + Nx` stack as transitional.
+- Native tools remain authoritative inside their ecosystems: Cargo for Rust workspace truth, Buf for `.proto` governance, Bun/TypeScript manifests and `tsconfig` for TypeScript package truth, and generator CLIs such as TypeSpec or Weaver for their artifact families.
+- Nx may provide local ergonomics, target routing, generators, and developer UX wrappers, but it must not become the canonical cross-language monorepo graph, contract authority, artifact-validity authority, or CI truth source.
+- When adding or changing cross-language build, test, codegen, or interop lanes, prefer making the native command the real source of truth and Nx the wrapper around it rather than encoding unique validity rules only in Nx metadata.
+
 ## Coding Style & Naming Conventions
 
 Formatting and linting are owned by Biome. Keep package entrypoints small and explicit, and prefer Nx target wiring over package-local script sprawl.
