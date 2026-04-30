@@ -1,9 +1,11 @@
 use prost::Message;
 use tokio_stream::StreamExt;
 use tokio_stream::wrappers::TcpListenerStream;
+use tonic::Request;
 use tonic::transport::Server;
 use tuvren_kernel_rust::InMemoryKernel;
 use tuvren_kernel_rust_grpc_service::KernelGrpcServiceImpl;
+use tuvren_kernel_rust_grpc_service::proto::kernel_tree_service_server::KernelTreeService;
 use tuvren_kernel_rust_grpc_service::proto::{
     self, IncorporationRule, PathCollectionKind, PathDefinition, RunCompletionStatus,
     SettledStagedResult, StagedResultStatus, StepDeclaration,
@@ -177,6 +179,27 @@ async fn kernel_errors_include_stable_payload_details() {
     assert!(payload.details_cbor.is_none());
 
     server_handle.abort();
+}
+
+#[tokio::test]
+async fn tree_create_rejects_duplicate_transport_paths() {
+    let service = KernelGrpcServiceImpl::new(InMemoryKernel::new());
+    let duplicate_entry = proto::PathValueEntry {
+        path: "messages".to_string(),
+        value: Some(proto::PathValue {
+            value: Some(proto::path_value::Value::NullValue(proto::NullPathValue {})),
+        }),
+    };
+    let error = service
+        .tree_create(Request::new(proto::TreeCreateRequest {
+            base_turn_tree_hash: None,
+            changes: vec![duplicate_entry.clone(), duplicate_entry],
+            schema_id: "schema_main".to_string(),
+        }))
+        .await
+        .expect_err("duplicate transport paths are rejected");
+
+    assert_eq!(error.code(), tonic::Code::InvalidArgument);
 }
 
 async fn spawn_kernel_server() -> (String, tokio::task::JoinHandle<()>) {

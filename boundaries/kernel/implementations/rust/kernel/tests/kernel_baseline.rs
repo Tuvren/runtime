@@ -3,9 +3,9 @@ use std::sync::Arc;
 
 use tuvren_kernel_rust::{
     InMemoryKernel, InMemoryKernelOptions, IncorporationRule, KernelRecord, PathCollectionKind,
-    PathDefinition, RunCompletionStatus, StagedResult, StagedResultStatus, StepDeclaration,
-    TurnNode, TurnTreeSchema, decode_deterministic_kernel_record, hash_bytes_to_hex,
-    hash_kernel_record, hash_turn_node_identity, schema_to_record,
+    PathDefinition, PathValue, RunCompletionStatus, StagedResult, StagedResultStatus,
+    StepDeclaration, TurnNode, TurnTreeSchema, decode_deterministic_kernel_record,
+    hash_bytes_to_hex, hash_kernel_record, hash_turn_node_identity, schema_to_record,
 };
 
 #[test]
@@ -228,7 +228,7 @@ fn provided_step_tree_must_match_run_schema() {
         .schema_register(other_schema)
         .expect("other schema registers");
     let other_tree = kernel
-        .tree_create("schema_other", BTreeMap::new(), None)
+        .tree_create("schema_other", empty_canonical_manifest(), None)
         .expect("other tree creates");
     let error = kernel
         .run_complete_step("run_main", "model_call", None, Vec::new(), Some(other_tree))
@@ -345,6 +345,205 @@ fn duplicate_incorporation_object_types_are_rejected() {
     );
 }
 
+#[test]
+fn event_hash_must_reference_stored_object() {
+    let (kernel, _) = kernel_with_run(StepDeclaration {
+        deterministic: false,
+        id: "model_call".to_string(),
+        metadata: None,
+        side_effects: false,
+    });
+    let error = kernel
+        .run_complete_step(
+            "run_main",
+            "model_call",
+            Some("missing_event".to_string()),
+            Vec::new(),
+            None,
+        )
+        .expect_err("missing event object is rejected");
+
+    assert_eq!(error.payload.code, "event_object_not_found");
+}
+
+#[test]
+fn terminal_event_hash_must_reference_stored_object() {
+    let (kernel, _) = kernel_with_run(StepDeclaration {
+        deterministic: false,
+        id: "model_call".to_string(),
+        metadata: None,
+        side_effects: false,
+    });
+    let error = kernel
+        .run_complete(
+            "run_main",
+            RunCompletionStatus::Completed,
+            Some("missing_event".to_string()),
+        )
+        .expect_err("missing terminal event object is rejected");
+
+    assert_eq!(error.payload.code, "event_object_not_found");
+}
+
+#[test]
+fn branch_rewind_fails_active_runs() {
+    let (kernel, root_hash) = kernel_with_run(StepDeclaration {
+        deterministic: false,
+        id: "model_call".to_string(),
+        metadata: None,
+        side_effects: false,
+    });
+    let (_, node_hash) = kernel
+        .run_complete_step("run_main", "model_call", None, Vec::new(), None)
+        .expect("step checkpoints");
+    let node_hash = node_hash.expect("checkpoint hash");
+
+    let set_head = kernel
+        .branch_set_head("branch_main", &root_hash)
+        .expect("rewind archives old head");
+    assert_eq!(
+        set_head
+            .archive_branch
+            .expect("archive branch")
+            .head_turn_node_hash,
+        node_hash
+    );
+    let error = kernel
+        .run_begin_step("run_main", "model_call")
+        .expect_err("rewound active run is failed");
+    assert_eq!(error.payload.code, "run_not_running");
+}
+
+#[test]
+fn staging_stage_requires_running_run() {
+    let (kernel, _) = kernel_with_run(StepDeclaration {
+        deterministic: false,
+        id: "model_call".to_string(),
+        metadata: None,
+        side_effects: false,
+    });
+    kernel
+        .run_complete("run_main", RunCompletionStatus::Completed, None)
+        .expect("run completes");
+    let error = kernel
+        .staging_stage(
+            "run_main",
+            b"late".to_vec(),
+            "msg_late",
+            "message",
+            StagedResultStatus::Completed,
+            None,
+        )
+        .expect_err("completed run cannot stage");
+
+    assert_eq!(error.payload.code, "run_not_running");
+}
+
+#[test]
+fn staging_stage_duplicate_is_atomic() {
+    let (kernel, _) = kernel_with_run(StepDeclaration {
+        deterministic: false,
+        id: "model_call".to_string(),
+        metadata: None,
+        side_effects: false,
+    });
+    kernel
+        .staging_stage(
+            "run_main",
+            b"hello".to_vec(),
+            "msg_assistant",
+            "message",
+            StagedResultStatus::Completed,
+            None,
+        )
+        .expect("first stage succeeds");
+    let duplicate_hash = hash_bytes_to_hex(b"bye");
+    let error = kernel
+        .staging_stage(
+            "run_main",
+            b"bye".to_vec(),
+            "msg_assistant",
+            "message",
+            StagedResultStatus::Completed,
+            None,
+        )
+        .expect_err("duplicate stage fails");
+
+    assert_eq!(error.payload.code, "staged_result_task_already_exists");
+    assert!(
+        !kernel
+            .store_has(&duplicate_hash)
+            .expect("store lookup succeeds")
+    );
+}
+
+#[test]
+fn turn_update_head_requires_descendant_of_turn_start() {
+    let (kernel, root_hash) = kernel_with_run(StepDeclaration {
+        deterministic: false,
+        id: "model_call".to_string(),
+        metadata: None,
+        side_effects: false,
+    });
+    let (_, node_hash) = kernel
+        .run_complete_step("run_main", "model_call", None, Vec::new(), None)
+        .expect("step checkpoints");
+    let node_hash = node_hash.expect("checkpoint hash");
+    kernel
+        .turn_create(
+            "turn_child",
+            "thread_main",
+            "branch_main",
+            Some("turn_main".to_string()),
+            &node_hash,
+        )
+        .expect("child turn starts at parent head");
+    let error = kernel
+        .turn_update_head("turn_child", &root_hash)
+        .expect_err("turn head cannot move before start");
+
+    assert_eq!(error.payload.code, "turn_head_not_descendant");
+}
+
+#[test]
+fn turn_create_parent_must_chain_to_start() {
+    let (kernel, root_hash) = kernel_with_run(StepDeclaration {
+        deterministic: false,
+        id: "model_call".to_string(),
+        metadata: None,
+        side_effects: false,
+    });
+    kernel
+        .run_complete_step("run_main", "model_call", None, Vec::new(), None)
+        .expect("step checkpoints");
+    let error = kernel
+        .turn_create(
+            "turn_child",
+            "thread_main",
+            "branch_main",
+            Some("turn_main".to_string()),
+            &root_hash,
+        )
+        .expect_err("child start must match parent head");
+
+    assert_eq!(error.payload.code, "parent_turn_head_mismatch");
+}
+
+#[test]
+fn tree_create_without_base_requires_all_paths() {
+    let kernel = InMemoryKernel::new();
+    kernel
+        .schema_register(canonical_schema())
+        .expect("schema registers");
+    let mut changes = BTreeMap::new();
+    changes.insert("messages".to_string(), PathValue::Ordered(Vec::new()));
+    let error = kernel
+        .tree_create("schema_main", changes, None)
+        .expect_err("partial base-less tree create is rejected");
+
+    assert_eq!(error.payload.code, "incomplete_turn_tree_manifest");
+}
+
 fn kernel_with_run(step: StepDeclaration) -> (InMemoryKernel, String) {
     let kernel = InMemoryKernel::with_options(InMemoryKernelOptions {
         now: Some(Arc::new(|| 1_717_171_717_171)),
@@ -375,6 +574,13 @@ fn kernel_with_run(step: StepDeclaration) -> (InMemoryKernel, String) {
         )
         .expect("run create succeeds");
     (kernel, thread.root_turn_node_hash)
+}
+
+fn empty_canonical_manifest() -> BTreeMap<String, PathValue> {
+    let mut manifest = BTreeMap::new();
+    manifest.insert("messages".to_string(), PathValue::Ordered(Vec::new()));
+    manifest.insert("context.manifest".to_string(), PathValue::Null);
+    manifest
 }
 
 fn canonical_schema() -> TurnTreeSchema {

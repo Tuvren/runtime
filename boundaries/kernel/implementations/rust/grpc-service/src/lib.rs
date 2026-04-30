@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
 use tonic::codegen::Bytes;
@@ -743,16 +745,19 @@ fn schema_to_proto(schema: TurnTreeSchema) -> proto::TurnTreeSchema {
 }
 
 fn manifest_from_entries(entries: Vec<proto::PathValueEntry>) -> Result<TurnTreeManifest, Status> {
-    entries
-        .into_iter()
-        .map(|entry| {
-            let value = entry
-                .value
-                .ok_or_else(|| Status::invalid_argument("path value is required"))
-                .and_then(path_value_from_proto)?;
-            Ok((entry.path, value))
-        })
-        .collect()
+    let mut manifest = BTreeMap::new();
+    for entry in entries {
+        let value = entry
+            .value
+            .ok_or_else(|| Status::invalid_argument("path value is required"))
+            .and_then(path_value_from_proto)?;
+        // Duplicate transport entries must fail explicitly; otherwise map
+        // insertion would hide malformed client input before kernel validation.
+        if manifest.insert(entry.path, value).is_some() {
+            return Err(Status::invalid_argument("duplicate path value entry"));
+        }
+    }
+    Ok(manifest)
 }
 
 fn path_value_from_proto(value: proto::PathValue) -> Result<PathValue, Status> {

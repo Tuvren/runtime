@@ -131,7 +131,12 @@ impl InMemoryKernel {
                 }
                 base_tree.manifest.clone()
             }
-            None => empty_manifest(&schema),
+            None => {
+                // Without a base tree there is no previous manifest to fill
+                // gaps, so callers must provide the complete schema surface.
+                ensure_complete_tree_create_changes(&schema, &changes)?;
+                empty_manifest(&schema)
+            }
         };
 
         apply_changes(&schema, &mut manifest, changes)?;
@@ -382,6 +387,9 @@ impl InMemoryKernel {
                 thread_id: branch.thread_id.clone(),
             };
             state.branches.insert(archive_id, archive.clone());
+            // A branch rewind changes the active lineage under running work;
+            // fail in-flight runs so recovery must be explicit on a fresh run.
+            fail_active_runs_on_branch(&mut state, branch_id);
             Some(archive)
         } else {
             return Err(KernelError::new(
@@ -449,6 +457,13 @@ impl InMemoryKernel {
                     None,
                 ));
             }
+            if parent.head_turn_node_hash != start_turn_node_hash {
+                return Err(KernelError::new(
+                    "parent_turn_head_mismatch",
+                    "child turn must start at the parent turn head",
+                    None,
+                ));
+            }
         }
         let turn = TurnRecord {
             branch_id: branch_id.to_string(),
@@ -475,6 +490,13 @@ impl InMemoryKernel {
             .cloned()
             .ok_or_else(|| missing("turn_not_found", "turn does not exist"))?;
         ensure_node_belongs_to_thread(&state, head_turn_node_hash, &turn.thread_id)?;
+        if !is_ancestor(&state, &turn.start_turn_node_hash, head_turn_node_hash)? {
+            return Err(KernelError::new(
+                "turn_head_not_descendant",
+                "turn head must remain on or after the turn start node",
+                None,
+            ));
+        }
         turn.head_turn_node_hash = head_turn_node_hash.to_string();
         state.turns.insert(turn_id.to_string(), turn);
         Ok(())
@@ -499,8 +521,30 @@ impl InMemoryKernel {
         let object_hash = hash_bytes_to_hex(&blob);
         let timestamp_ms = (self.now)();
         let mut state = self.lock_state()?;
-        if !state.runs.contains_key(run_id) {
-            return Err(missing("run_not_found", "run does not exist"));
+        let run = state
+            .runs
+            .get(run_id)
+            .ok_or_else(|| missing("run_not_found", "run does not exist"))?;
+        if run.status != RunStatus::Running {
+            return Err(KernelError::new(
+                "run_not_running",
+                "only running runs can stage results",
+                None,
+            ));
+        }
+        if state
+            .staged_results
+            .get(run_id)
+            .is_some_and(|staged_results| {
+                staged_results
+                    .iter()
+                    .any(|existing| existing.task_id == task_id)
+            })
+        {
+            return Err(duplicate(
+                "staged_result_task_already_exists",
+                "run already has a staged result for this task id",
+            ));
         }
         state
             .objects
@@ -514,15 +558,6 @@ impl InMemoryKernel {
             timestamp_ms,
         };
         let staged_results = state.staged_results.entry(run_id.to_string()).or_default();
-        if staged_results
-            .iter()
-            .any(|existing| existing.task_id == staged_result.task_id)
-        {
-            return Err(duplicate(
-                "staged_result_task_already_exists",
-                "run already has a staged result for this task id",
-            ));
-        }
         staged_results.push(staged_result.clone());
         Ok((object_hash, staged_result))
     }
@@ -684,6 +719,7 @@ impl InMemoryKernel {
                 },
             );
         }
+        ensure_event_hash_exists(&state, event_hash.as_deref())?;
         let staged_results = state
             .staged_results
             .get(run_id)
@@ -757,6 +793,7 @@ impl InMemoryKernel {
             .get(run_id)
             .cloned()
             .unwrap_or_default();
+        ensure_event_hash_exists(&state, event_hash.as_deref())?;
         let checkpoint_required = event_hash.is_some() || !staged_results.is_empty();
         let terminal_hash = if checkpoint_required {
             let prior_node = state
@@ -919,6 +956,26 @@ fn set_run_head_refs(
     Ok(())
 }
 
+fn fail_active_runs_on_branch(state: &mut KernelState, branch_id: &str) {
+    for run in state.runs.values_mut().filter(|run| {
+        run.branch_id == branch_id && matches!(run.status, RunStatus::Running | RunStatus::Paused)
+    }) {
+        run.status = RunStatus::Failed;
+    }
+}
+
+fn ensure_event_hash_exists(state: &KernelState, event_hash: Option<&str>) -> KernelResult<()> {
+    if let Some(event_hash) = event_hash
+        && !state.objects.contains_key(event_hash)
+    {
+        return Err(missing(
+            "event_object_not_found",
+            "event hash must reference an existing object",
+        ));
+    }
+    Ok(())
+}
+
 fn ensure_turn_tree_schema(
     state: &KernelState,
     tree_hash: &str,
@@ -989,6 +1046,23 @@ fn apply_changes(
             .ok_or_else(|| missing("turn_tree_path_not_found", "turn tree path does not exist"))?;
         validate_path_value(definition.collection.clone(), &value)?;
         manifest.insert(path, value);
+    }
+    Ok(())
+}
+
+fn ensure_complete_tree_create_changes(
+    schema: &TurnTreeSchema,
+    changes: &TurnTreeManifest,
+) -> KernelResult<()> {
+    for definition in &schema.paths {
+        let value = changes.get(&definition.path).ok_or_else(|| {
+            KernelError::new(
+                "incomplete_turn_tree_manifest",
+                "tree create without a base must provide every schema path",
+                None,
+            )
+        })?;
+        validate_path_value(definition.collection.clone(), value)?;
     }
     Ok(())
 }
