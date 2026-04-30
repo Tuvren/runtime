@@ -4,12 +4,14 @@ use tokio_stream::wrappers::TcpListenerStream;
 use tonic::Request;
 use tonic::transport::Server;
 use tuvren_kernel_rust::{
-    InMemoryKernel, IncorporationRule as RustIncorporationRule,
+    InMemoryKernel, IncorporationRule as RustIncorporationRule, KernelRecord,
     PathCollectionKind as RustPathCollectionKind, PathDefinition as RustPathDefinition,
     StepDeclaration as RustStepDeclaration, TurnTreeSchema as RustTurnTreeSchema,
+    encode_deterministic_kernel_record,
 };
 use tuvren_kernel_rust_grpc_service::KernelGrpcServiceImpl;
 use tuvren_kernel_rust_grpc_service::proto::kernel_run_service_server::KernelRunService;
+use tuvren_kernel_rust_grpc_service::proto::kernel_schema_service_server::KernelSchemaService;
 use tuvren_kernel_rust_grpc_service::proto::kernel_tree_service_server::KernelTreeService;
 use tuvren_kernel_rust_grpc_service::proto::{
     self, IncorporationRule, PathCollectionKind, PathDefinition, RunCompletionStatus,
@@ -208,6 +210,33 @@ async fn tree_create_rejects_duplicate_transport_paths() {
 }
 
 #[tokio::test]
+async fn schema_shape_errors_map_to_invalid_argument() {
+    let service = KernelGrpcServiceImpl::new(InMemoryKernel::new());
+    let duplicate_path = PathDefinition {
+        collection: PathCollectionKind::Ordered as i32,
+        metadata_cbor: None,
+        path: "messages".to_string(),
+    };
+    let error = KernelSchemaService::schema_register(
+        &service,
+        Request::new(proto::SchemaRegisterRequest {
+            schema: Some(proto::TurnTreeSchema {
+                incorporation_rules: Vec::new(),
+                paths: vec![duplicate_path.clone(), duplicate_path],
+                schema_id: "schema_main".to_string(),
+            }),
+        }),
+    )
+    .await
+    .expect_err("duplicate schema paths are input shape errors");
+
+    assert_eq!(error.code(), tonic::Code::InvalidArgument);
+    let payload = proto::KernelErrorPayload::decode(error.details())
+        .expect("status details decode as KernelErrorPayload");
+    assert_eq!(payload.code, "duplicate_schema_path");
+}
+
+#[tokio::test]
 async fn run_complete_step_rejects_invalid_annotation_cbor() {
     let service = KernelGrpcServiceImpl::new(InMemoryKernel::new());
     service
@@ -273,6 +302,80 @@ async fn run_complete_step_rejects_invalid_annotation_cbor() {
     .expect_err("invalid annotation CBOR is rejected");
 
     assert_eq!(error.code(), tonic::Code::InvalidArgument);
+}
+
+#[tokio::test]
+async fn run_complete_step_rejects_non_object_annotations() {
+    let service = KernelGrpcServiceImpl::new(InMemoryKernel::new());
+    service
+        .kernel()
+        .schema_register(RustTurnTreeSchema {
+            incorporation_rules: vec![RustIncorporationRule {
+                object_type: "message".to_string(),
+                target_path: "messages".to_string(),
+            }],
+            paths: vec![RustPathDefinition {
+                collection: RustPathCollectionKind::Ordered,
+                metadata: None,
+                path: "messages".to_string(),
+            }],
+            schema_id: "schema_main".to_string(),
+        })
+        .expect("schema registers");
+    let thread = service
+        .kernel()
+        .thread_create("thread_main", "schema_main", "branch_main")
+        .expect("thread creates");
+    service
+        .kernel()
+        .turn_create(
+            "turn_main",
+            "thread_main",
+            "branch_main",
+            None,
+            &thread.root_turn_node_hash,
+        )
+        .expect("turn creates");
+    service
+        .kernel()
+        .run_create(
+            "run_main",
+            "turn_main",
+            "branch_main",
+            "schema_main",
+            &thread.root_turn_node_hash,
+            vec![RustStepDeclaration {
+                deterministic: false,
+                id: "model_call".to_string(),
+                metadata: None,
+                side_effects: false,
+            }],
+        )
+        .expect("run creates");
+    let scalar_annotation =
+        encode_deterministic_kernel_record(&KernelRecord::Text("not an object".to_string()))
+            .expect("scalar annotation encodes");
+
+    let error = KernelRunService::run_complete_step(
+        &service,
+        Request::new(proto::RunCompleteStepRequest {
+            event_hash: None,
+            observe_results: vec![proto::ObserveResult {
+                annotations_cbor: vec![scalar_annotation],
+                signals_cbor: Vec::new(),
+            }],
+            run_id: "run_main".to_string(),
+            step_id: "model_call".to_string(),
+            tree_hash: None,
+        }),
+    )
+    .await
+    .expect_err("annotations must be object records");
+
+    assert_eq!(error.code(), tonic::Code::InvalidArgument);
+    let payload = proto::KernelErrorPayload::decode(error.details())
+        .expect("status details decode as KernelErrorPayload");
+    assert_eq!(payload.code, "invalid_annotation_record");
 }
 
 async fn spawn_kernel_server() -> (String, tokio::task::JoinHandle<()>) {

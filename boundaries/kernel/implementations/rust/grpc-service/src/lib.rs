@@ -258,13 +258,29 @@ impl KernelNodeService for KernelGrpcServiceImpl {
         &self,
         request: Request<proto::NodeWalkBackRequest>,
     ) -> Result<Response<Self::NodeWalkBackStream>, Status> {
-        let nodes = self
-            .kernel
-            .node_walk_back(&request.into_inner().from_hash)
-            .map_err(status_from_kernel_error)?;
+        let kernel = self.kernel.clone();
+        let mut next_hash = Some(request.into_inner().from_hash);
         let (sender, receiver) = mpsc::channel(8);
         tokio::spawn(async move {
-            for node in nodes {
+            while let Some(hash) = next_hash {
+                let node = match kernel.node_get(&hash) {
+                    Ok(Some(node)) => node,
+                    Ok(None) => {
+                        let _ = sender
+                            .send(Err(status_from_kernel_error(KernelError::new(
+                                "turn_node_not_found",
+                                "turn node does not exist",
+                                None,
+                            ))))
+                            .await;
+                        break;
+                    }
+                    Err(error) => {
+                        let _ = sender.send(Err(status_from_kernel_error(error))).await;
+                        break;
+                    }
+                };
+                next_hash = node.previous_turn_node_hash.clone();
                 if sender
                     .send(Ok(proto::NodeWalkBackResponse {
                         node: Some(turn_node_to_proto(node)),
@@ -503,8 +519,15 @@ impl KernelRunService for KernelGrpcServiceImpl {
                     .annotations_cbor
                     .iter()
                     .map(|bytes| {
-                        decode_deterministic_kernel_record(bytes)
-                            .and_then(|record| encode_deterministic_kernel_record(&record))
+                        let record = decode_deterministic_kernel_record(bytes)?;
+                        if !matches!(record, KernelRecord::Map(_)) {
+                            return Err(KernelError::new(
+                                "invalid_annotation_record",
+                                "observe annotations must be kernel object records",
+                                None,
+                            ));
+                        }
+                        encode_deterministic_kernel_record(&record)
                     })
                     .collect::<KernelResult<Vec<_>>>()?;
                 Ok(tuvren_kernel_rust::ObserveResult {
@@ -653,17 +676,7 @@ impl KernelVerdictsService for KernelGrpcServiceImpl {
 }
 
 fn status_from_kernel_error(error: KernelError) -> Status {
-    let code = if error.payload.code.contains("not_found") {
-        Code::NotFound
-    } else if error.payload.code.contains("already_exists")
-        || error.payload.code.contains("duplicate")
-    {
-        Code::AlreadyExists
-    } else if error.payload.code.contains("invalid") || error.payload.code.contains("mismatch") {
-        Code::InvalidArgument
-    } else {
-        Code::FailedPrecondition
-    };
+    let code = kernel_error_code_to_status(&error.payload.code);
     let details_cbor = error
         .payload
         .details
@@ -682,6 +695,81 @@ fn status_from_kernel_error(error: KernelError) -> Status {
         return Status::with_details(code, message, Bytes::from(details));
     }
     Status::new(code, message)
+}
+
+fn kernel_error_code_to_status(code: &str) -> Code {
+    match code {
+        "branch_not_found"
+        | "event_object_not_found"
+        | "incorporation_rule_not_found"
+        | "parent_turn_not_found"
+        | "run_not_found"
+        | "run_step_not_found"
+        | "schema_not_found"
+        | "staged_object_not_found"
+        | "thread_not_found"
+        | "turn_node_not_found"
+        | "turn_not_found"
+        | "turn_tree_not_found"
+        | "turn_tree_path_not_found" => Code::NotFound,
+        "branch_already_exists"
+        | "run_already_exists"
+        | "schema_already_exists"
+        | "staged_result_task_already_exists"
+        | "thread_already_exists"
+        | "turn_already_exists" => Code::AlreadyExists,
+        "duplicate_incorporation_rule_object_type"
+        | "duplicate_schema_path"
+        | "duplicate_step_id"
+        | "incomplete_turn_tree_manifest"
+        | "invalid_annotation_record"
+        | "invalid_decoded_kernel_record"
+        | "invalid_epoch_ms"
+        | "invalid_hash_string"
+        | "invalid_incorporation_rule"
+        | "invalid_incorporation_rule_target"
+        | "invalid_json_kernel_record_number"
+        | "invalid_kernel_record_integer"
+        | "invalid_kernel_record_map_key"
+        | "invalid_kernel_record_value"
+        | "invalid_object_type"
+        | "invalid_path_value_kind"
+        | "invalid_run_id"
+        | "invalid_schema_id"
+        | "invalid_schema_path"
+        | "invalid_staged_result_outcome"
+        | "invalid_step_id"
+        | "invalid_step_sequence"
+        | "invalid_task_id"
+        | "invalid_thread_id"
+        | "invalid_branch_id"
+        | "invalid_turn_id"
+        | "invalid_parent_turn_id"
+        | "non_canonical_kernel_record_encoding"
+        | "unsupported_kernel_record_value" => Code::InvalidArgument,
+        "branch_has_active_run"
+        | "branch_head_lateral_move"
+        | "invalid_ordered_path_state"
+        | "invalid_run_completion_transition"
+        | "parent_turn_head_mismatch"
+        | "parent_turn_thread_mismatch"
+        | "run_branch_head_mismatch"
+        | "run_not_running"
+        | "run_schema_mismatch"
+        | "run_start_head_mismatch"
+        | "run_step_mismatch"
+        | "run_steps_incomplete"
+        | "run_turn_branch_mismatch"
+        | "run_turn_span_mismatch"
+        | "turn_branch_thread_mismatch"
+        | "turn_head_lateral_move"
+        | "turn_head_not_descendant"
+        | "turn_node_thread_mismatch"
+        | "turn_parent_not_immediate"
+        | "turn_parent_required"
+        | "turn_tree_schema_mismatch" => Code::FailedPrecondition,
+        _ => Code::FailedPrecondition,
+    }
 }
 
 fn schema_from_proto(schema: proto::TurnTreeSchema) -> Result<TurnTreeSchema, Status> {

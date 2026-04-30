@@ -1020,6 +1020,162 @@ fn turn_create_requires_parent_when_previous_turn_reaches_start() {
 }
 
 #[test]
+fn turn_create_requires_immediate_same_branch_parent() {
+    let (kernel, _) = kernel_with_run(StepDeclaration {
+        deterministic: false,
+        id: "model_call".to_string(),
+        metadata: None,
+        side_effects: false,
+    });
+    let (_, node_hash) = kernel
+        .run_complete_step("run_main", "model_call", None, Vec::new(), None)
+        .expect("step checkpoints");
+    let node_hash = node_hash.expect("node hash");
+    kernel
+        .turn_create(
+            "turn_child",
+            "thread_main",
+            "branch_main",
+            Some("turn_main".to_string()),
+            &node_hash,
+        )
+        .expect("first child turn starts at parent head");
+    let error = kernel
+        .turn_create(
+            "turn_late",
+            "thread_main",
+            "branch_main",
+            Some("turn_main".to_string()),
+            &node_hash,
+        )
+        .expect_err("later same-branch turn must name the immediate parent");
+
+    assert_eq!(error.payload.code, "turn_parent_not_immediate");
+}
+
+#[test]
+fn run_create_requires_start_within_turn_span() {
+    let kernel = InMemoryKernel::new();
+    kernel
+        .schema_register(canonical_schema())
+        .expect("schema registers");
+    let thread = kernel
+        .thread_create("thread_main", "schema_main", "branch_main")
+        .expect("thread creates");
+    kernel
+        .turn_create(
+            "turn_stale",
+            "thread_main",
+            "branch_main",
+            None,
+            &thread.root_turn_node_hash,
+        )
+        .expect("stale turn creates");
+    let active_turn = kernel
+        .turn_create(
+            "turn_active",
+            "thread_main",
+            "branch_main",
+            Some("turn_stale".to_string()),
+            &thread.root_turn_node_hash,
+        )
+        .expect("active turn creates");
+    kernel
+        .run_create(
+            "run_active",
+            &active_turn.turn_id,
+            "branch_main",
+            "schema_main",
+            &thread.root_turn_node_hash,
+            vec![StepDeclaration {
+                deterministic: false,
+                id: "model_call".to_string(),
+                metadata: None,
+                side_effects: false,
+            }],
+        )
+        .expect("active run creates");
+    let (_, node_hash) = kernel
+        .run_complete_step("run_active", "model_call", None, Vec::new(), None)
+        .expect("active run checkpoints");
+    kernel
+        .run_complete("run_active", RunCompletionStatus::Completed, None)
+        .expect("active run completes");
+    let error = kernel
+        .run_create(
+            "run_stale",
+            "turn_stale",
+            "branch_main",
+            "schema_main",
+            &node_hash.expect("node hash"),
+            vec![StepDeclaration {
+                deterministic: false,
+                id: "late_step".to_string(),
+                metadata: None,
+                side_effects: false,
+            }],
+        )
+        .expect_err("run cannot attach outside the stale turn span");
+
+    assert_eq!(error.payload.code, "run_turn_span_mismatch");
+}
+
+#[test]
+fn public_owned_ids_must_be_non_empty() {
+    let kernel = InMemoryKernel::new();
+    kernel
+        .schema_register(canonical_schema())
+        .expect("schema registers");
+    let thread_error = kernel
+        .thread_create("", "schema_main", "branch_main")
+        .expect_err("empty thread id is rejected");
+    let branch_error = kernel
+        .thread_create("thread_main", "schema_main", "")
+        .expect_err("empty initial branch id is rejected");
+    let thread = kernel
+        .thread_create("thread_main", "schema_main", "branch_main")
+        .expect("thread creates");
+    let turn_error = kernel
+        .turn_create(
+            "",
+            "thread_main",
+            "branch_main",
+            None,
+            &thread.root_turn_node_hash,
+        )
+        .expect_err("empty turn id is rejected");
+    kernel
+        .turn_create(
+            "turn_main",
+            "thread_main",
+            "branch_main",
+            None,
+            &thread.root_turn_node_hash,
+        )
+        .expect("turn creates");
+    let run_error = kernel
+        .run_create(
+            "",
+            "turn_main",
+            "branch_main",
+            "schema_main",
+            &thread.root_turn_node_hash,
+            vec![StepDeclaration {
+                deterministic: false,
+                id: "model_call".to_string(),
+                metadata: None,
+                side_effects: false,
+            }],
+        )
+        .expect_err("empty run id is rejected");
+
+    assert_eq!(thread_error.payload.code, "invalid_thread_id");
+    assert_eq!(branch_error.payload.code, "invalid_branch_id");
+    assert_eq!(turn_error.payload.code, "invalid_turn_id");
+    assert_eq!(run_error.payload.code, "invalid_run_id");
+}
+
+#[test]
 fn tree_create_without_base_requires_all_paths() {
     let kernel = InMemoryKernel::new();
     kernel

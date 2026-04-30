@@ -49,6 +49,7 @@ struct KernelState {
     staged_results: HashMap<String, Vec<StagedResult>>,
     threads: HashMap<String, ThreadRecord>,
     turn_nodes: HashMap<HashString, TurnNode>,
+    turn_order: Vec<String>,
     turns: HashMap<String, TurnRecord>,
     turn_trees: HashMap<HashString, StoredTurnTree>,
 }
@@ -278,6 +279,16 @@ impl InMemoryKernel {
         schema_id: &str,
         initial_branch_id: &str,
     ) -> KernelResult<ThreadCreateResult> {
+        validate_id(
+            thread_id,
+            "invalid_thread_id",
+            "thread id must not be empty",
+        )?;
+        validate_id(
+            initial_branch_id,
+            "invalid_branch_id",
+            "initial branch id must not be empty",
+        )?;
         let mut state = self.lock_state()?;
         if state.threads.contains_key(thread_id) {
             return Err(duplicate("thread_already_exists", "thread already exists"));
@@ -346,6 +357,11 @@ impl InMemoryKernel {
     }
 
     pub fn thread_get(&self, thread_id: &str) -> KernelResult<Option<ThreadRecord>> {
+        validate_id(
+            thread_id,
+            "invalid_thread_id",
+            "thread id must not be empty",
+        )?;
         let state = self.lock_state()?;
         Ok(state.threads.get(thread_id).cloned())
     }
@@ -356,6 +372,16 @@ impl InMemoryKernel {
         thread_id: &str,
         from_turn_node_hash: &str,
     ) -> KernelResult<BranchRecord> {
+        validate_id(
+            branch_id,
+            "invalid_branch_id",
+            "branch id must not be empty",
+        )?;
+        validate_id(
+            thread_id,
+            "invalid_thread_id",
+            "thread id must not be empty",
+        )?;
         let mut state = self.lock_state()?;
         if state.branches.contains_key(branch_id) {
             return Err(duplicate("branch_already_exists", "branch already exists"));
@@ -371,6 +397,11 @@ impl InMemoryKernel {
     }
 
     pub fn branch_get(&self, branch_id: &str) -> KernelResult<Option<BranchRecord>> {
+        validate_id(
+            branch_id,
+            "invalid_branch_id",
+            "branch id must not be empty",
+        )?;
         let state = self.lock_state()?;
         Ok(state.branches.get(branch_id).cloned())
     }
@@ -380,6 +411,11 @@ impl InMemoryKernel {
         branch_id: &str,
         turn_node_hash: &str,
     ) -> KernelResult<SetHeadResult> {
+        validate_id(
+            branch_id,
+            "invalid_branch_id",
+            "branch id must not be empty",
+        )?;
         let mut state = self.lock_state()?;
         let mut branch = state
             .branches
@@ -433,6 +469,11 @@ impl InMemoryKernel {
     }
 
     pub fn branch_list(&self, thread_id: &str) -> KernelResult<Vec<(String, HashString)>> {
+        validate_id(
+            thread_id,
+            "invalid_thread_id",
+            "thread id must not be empty",
+        )?;
         let state = self.lock_state()?;
         if !state.threads.contains_key(thread_id) {
             return Err(missing("thread_not_found", "thread does not exist"));
@@ -455,6 +496,24 @@ impl InMemoryKernel {
         parent_turn_id: Option<String>,
         start_turn_node_hash: &str,
     ) -> KernelResult<TurnRecord> {
+        validate_id(turn_id, "invalid_turn_id", "turn id must not be empty")?;
+        validate_id(
+            thread_id,
+            "invalid_thread_id",
+            "thread id must not be empty",
+        )?;
+        validate_id(
+            branch_id,
+            "invalid_branch_id",
+            "branch id must not be empty",
+        )?;
+        if let Some(parent_turn_id) = &parent_turn_id {
+            validate_id(
+                parent_turn_id,
+                "invalid_parent_turn_id",
+                "parent turn id must not be empty",
+            )?;
+        }
         let mut state = self.lock_state()?;
         if state.turns.contains_key(turn_id) {
             return Err(duplicate("turn_already_exists", "turn already exists"));
@@ -471,14 +530,15 @@ impl InMemoryKernel {
             ));
         }
         ensure_node_belongs_to_thread(&state, start_turn_node_hash, thread_id)?;
-        let candidate_parent_turns = state
-            .turns
-            .values()
-            .filter(|turn| {
-                turn.thread_id == thread_id && turn.head_turn_node_hash == start_turn_node_hash
-            })
-            .collect::<Vec<_>>();
-        if parent_turn_id.is_none() && !candidate_parent_turns.is_empty() {
+        let immediate_same_branch_parent = latest_turn_matching(&state, |turn| {
+            turn.thread_id == thread_id
+                && turn.branch_id == branch_id
+                && turn.head_turn_node_hash == start_turn_node_hash
+        });
+        let any_parent_at_start = latest_turn_matching(&state, |turn| {
+            turn.thread_id == thread_id && turn.head_turn_node_hash == start_turn_node_hash
+        });
+        if parent_turn_id.is_none() && any_parent_at_start.is_some() {
             return Err(KernelError::new(
                 "turn_parent_required",
                 "turn parent must reference the previous semantic turn when one exists",
@@ -486,6 +546,15 @@ impl InMemoryKernel {
             ));
         }
         if let Some(parent_turn_id) = &parent_turn_id {
+            if let Some(immediate_parent) = immediate_same_branch_parent
+                && parent_turn_id != &immediate_parent.turn_id
+            {
+                return Err(KernelError::new(
+                    "turn_parent_not_immediate",
+                    "turn parent must be the immediately previous turn on the branch",
+                    None,
+                ));
+            }
             let parent = state
                 .turns
                 .get(parent_turn_id)
@@ -514,15 +583,20 @@ impl InMemoryKernel {
             turn_id: turn_id.to_string(),
         };
         state.turns.insert(turn_id.to_string(), turn.clone());
+        // Creation order is the only deterministic way to define "immediate"
+        // when multiple semantic turns share the same branch and start node.
+        state.turn_order.push(turn_id.to_string());
         Ok(turn)
     }
 
     pub fn turn_get(&self, turn_id: &str) -> KernelResult<Option<TurnRecord>> {
+        validate_id(turn_id, "invalid_turn_id", "turn id must not be empty")?;
         let state = self.lock_state()?;
         Ok(state.turns.get(turn_id).cloned())
     }
 
     pub fn turn_update_head(&self, turn_id: &str, head_turn_node_hash: &str) -> KernelResult<()> {
+        validate_id(turn_id, "invalid_turn_id", "turn id must not be empty")?;
         let mut state = self.lock_state()?;
         let mut turn = state
             .turns
@@ -558,6 +632,7 @@ impl InMemoryKernel {
         status: StagedResultStatus,
         interrupt_payload: Option<KernelRecord>,
     ) -> KernelResult<(HashString, StagedResult)> {
+        validate_id(run_id, "invalid_run_id", "run id must not be empty")?;
         let object_hash = hash_bytes_to_hex(&blob);
         let timestamp_ms = (self.now)();
         let staged_result = StagedResult {
@@ -606,6 +681,7 @@ impl InMemoryKernel {
     }
 
     pub fn staging_current(&self, run_id: &str) -> KernelResult<Vec<StagedResult>> {
+        validate_id(run_id, "invalid_run_id", "run id must not be empty")?;
         let state = self.lock_state()?;
         if !state.runs.contains_key(run_id) {
             return Err(missing("run_not_found", "run does not exist"));
@@ -626,6 +702,13 @@ impl InMemoryKernel {
         start_turn_node_hash: &str,
         steps: Vec<StepDeclaration>,
     ) -> KernelResult<RunRecord> {
+        validate_id(run_id, "invalid_run_id", "run id must not be empty")?;
+        validate_id(turn_id, "invalid_turn_id", "turn id must not be empty")?;
+        validate_id(
+            branch_id,
+            "invalid_branch_id",
+            "branch id must not be empty",
+        )?;
         validate_steps(&steps)?;
         let mut state = self.lock_state()?;
         if state.runs.contains_key(run_id) {
@@ -650,6 +733,15 @@ impl InMemoryKernel {
             return Err(KernelError::new(
                 "run_turn_branch_mismatch",
                 "run turn must belong to the requested branch",
+                None,
+            ));
+        }
+        if !is_ancestor(&state, &turn.start_turn_node_hash, start_turn_node_hash)?
+            || !is_ancestor(&state, start_turn_node_hash, &turn.head_turn_node_hash)?
+        {
+            return Err(KernelError::new(
+                "run_turn_span_mismatch",
+                "run start node must be inside the referenced turn span",
                 None,
             ));
         }
@@ -693,6 +785,7 @@ impl InMemoryKernel {
     }
 
     pub fn run_begin_step(&self, run_id: &str, step_id: &str) -> KernelResult<StepContext> {
+        validate_id(run_id, "invalid_run_id", "run id must not be empty")?;
         let mut state = self.lock_state()?;
         let (current_turn_node_hash, schema_id, step) = {
             let run = state
@@ -747,6 +840,7 @@ impl InMemoryKernel {
         observe_results: Vec<ObserveResult>,
         tree_hash: Option<String>,
     ) -> KernelResult<(bool, Option<HashString>)> {
+        validate_id(run_id, "invalid_run_id", "run id must not be empty")?;
         let mut state = self.lock_state()?;
         let mut run = state
             .runs
@@ -847,6 +941,7 @@ impl InMemoryKernel {
         status: RunCompletionStatus,
         event_hash: Option<String>,
     ) -> KernelResult<Option<HashString>> {
+        validate_id(run_id, "invalid_run_id", "run id must not be empty")?;
         let mut state = self.lock_state()?;
         let mut run = state
             .runs
@@ -914,6 +1009,7 @@ impl InMemoryKernel {
     }
 
     pub fn run_recover(&self, run_id: &str) -> KernelResult<RecoveryState> {
+        validate_id(run_id, "invalid_run_id", "run id must not be empty")?;
         let state = self.lock_state()?;
         let run = state
             .runs
@@ -1127,6 +1223,19 @@ fn branch_has_active_run(state: &KernelState, branch_id: &str) -> bool {
     state.runs.values().any(|run| {
         run.branch_id == branch_id && matches!(run.status, RunStatus::Running | RunStatus::Paused)
     })
+}
+
+fn latest_turn_matching(
+    state: &KernelState,
+    mut predicate: impl FnMut(&TurnRecord) -> bool,
+) -> Option<TurnRecord> {
+    state
+        .turn_order
+        .iter()
+        .rev()
+        .filter_map(|turn_id| state.turns.get(turn_id))
+        .find(|turn| predicate(turn))
+        .cloned()
 }
 
 fn ensure_run_active_at_branch_head(state: &KernelState, run: &RunRecord) -> KernelResult<()> {
@@ -1388,6 +1497,10 @@ fn validate_hash_string(hash: &str) -> KernelResult<()> {
             None,
         ))
     }
+}
+
+fn validate_id(value: &str, code: &'static str, message: &'static str) -> KernelResult<()> {
+    validate_non_empty(value, code, message)
 }
 
 fn validate_schema(schema: &TurnTreeSchema) -> KernelResult<()> {
