@@ -6,8 +6,9 @@ use serde::Deserialize;
 use serde_json::Value;
 use tuvren_kernel_rust::{
     InMemoryKernel, KernelError, KernelRecord, PathCollectionKind, PathDefinition, PathValue,
-    StagedResult, StagedResultStatus, TurnNode, TurnTreeSchema, hash_bytes_to_hex,
-    hash_kernel_record, hash_turn_node_identity, kernel_record_from_json, schema_to_record,
+    RecoveryState, StagedResult, StagedResultStatus, StepDeclaration, TurnNode, TurnTreeSchema,
+    hash_bytes_to_hex, hash_kernel_record, hash_turn_node_identity, kernel_record_from_json,
+    schema_to_record,
 };
 
 const MANIFEST_PATH: &str = "boundaries/kernel/conformance/scenarios/suite-manifest.json";
@@ -42,6 +43,21 @@ fn main() -> Result<(), KernelError> {
     let created = kernel.thread_create("thread_conformance", "schema_main", "branch_main")?;
     let mut changes = BTreeMap::new();
     let logical = suite.logical;
+    let branch_head = parse_branch_head_list_entry(&logical.branch_head_list_entry)?;
+    assert_eq!(branch_head.0, "branch_main");
+    assert_eq!(
+        branch_head.1,
+        "9999999999999999999999999999999999999999999999999999999999999999"
+    );
+    let recovery_state = parse_recovery_state(&logical.recovery_state)?;
+    assert_eq!(
+        recovery_state.last_completed_step_id.as_deref(),
+        Some("tool_execution")
+    );
+    assert_eq!(recovery_state.consumed_staged_results.len(), 1);
+    assert_eq!(recovery_state.step_sequence.len(), 2);
+    assert_eq!(recovery_state.uncommitted_staged_results.len(), 1);
+
     let logical_changes = logical
         .turn_tree_change_set
         .as_object()
@@ -98,6 +114,10 @@ struct DeterministicFixture {
 
 #[derive(Deserialize)]
 struct LogicalFixture {
+    #[serde(rename = "branchHeadListEntry")]
+    branch_head_list_entry: Value,
+    #[serde(rename = "recoveryState")]
+    recovery_state: Value,
     #[serde(rename = "turnTreeChangeSet")]
     turn_tree_change_set: Value,
 }
@@ -273,6 +293,71 @@ fn parse_staged_result(value: &Value) -> Result<StagedResult, KernelError> {
     })
 }
 
+fn parse_recovery_state(value: &Value) -> Result<RecoveryState, KernelError> {
+    let object = value
+        .as_object()
+        .ok_or_else(|| error("invalid_recovery_state", "recovery state must be an object"))?;
+    let consumed_staged_results =
+        read_array(object.get("consumedStagedResults"), "consumedStagedResults")?
+            .iter()
+            .map(parse_staged_result)
+            .collect::<Result<Vec<_>, _>>()?;
+    let step_sequence = read_array(object.get("stepSequence"), "stepSequence")?
+        .iter()
+        .map(parse_step_declaration)
+        .collect::<Result<Vec<_>, _>>()?;
+    let uncommitted_staged_results = read_array(
+        object.get("uncommittedStagedResults"),
+        "uncommittedStagedResults",
+    )?
+    .iter()
+    .map(parse_staged_result)
+    .collect::<Result<Vec<_>, _>>()?;
+
+    Ok(RecoveryState {
+        consumed_staged_results,
+        last_completed_step_id: read_nullable_string(
+            object.get("lastCompletedStepId"),
+            "lastCompletedStepId",
+        )?,
+        last_turn_node_hash: read_string(object.get("lastTurnNodeHash"), "lastTurnNodeHash")?,
+        step_sequence,
+        uncommitted_staged_results,
+    })
+}
+
+fn parse_step_declaration(value: &Value) -> Result<StepDeclaration, KernelError> {
+    let object = value.as_object().ok_or_else(|| {
+        error(
+            "invalid_step_declaration",
+            "step declaration must be an object",
+        )
+    })?;
+    Ok(StepDeclaration {
+        deterministic: read_bool(object.get("deterministic"), "deterministic")?,
+        id: read_string(object.get("id"), "id")?,
+        metadata: object
+            .get("metadata")
+            .map(kernel_record_from_json)
+            .transpose()?,
+        side_effects: read_bool(object.get("sideEffects"), "sideEffects")?,
+    })
+}
+
+fn parse_branch_head_list_entry(value: &Value) -> Result<(String, String), KernelError> {
+    let values = read_array(Some(value), "branchHeadListEntry")?;
+    if values.len() != 2 {
+        return Err(error(
+            "invalid_branch_head_list_entry",
+            "branchHeadListEntry must contain branch id and head hash",
+        ));
+    }
+    Ok((
+        read_string(values.first(), "branchHeadListEntry[0]")?,
+        read_string(values.get(1), "branchHeadListEntry[1]")?,
+    ))
+}
+
 fn parse_path_value(value: &Value) -> Result<PathValue, KernelError> {
     if value.is_null() {
         return Ok(PathValue::Null);
@@ -291,6 +376,18 @@ fn parse_path_value(value: &Value) -> Result<PathValue, KernelError> {
             .collect::<Result<Vec<_>, _>>()
             .map(PathValue::Ordered)
     })
+}
+
+fn read_bool(value: Option<&Value>, label: &str) -> Result<bool, KernelError> {
+    value
+        .as_ref()
+        .and_then(|value| value.as_bool())
+        .ok_or_else(|| {
+            error(
+                "invalid_boolean_fixture",
+                &format!("{label} must be a boolean"),
+            )
+        })
 }
 
 fn read_string(value: Option<&Value>, label: &str) -> Result<String, KernelError> {

@@ -9,6 +9,7 @@ Epic U is closed in current repo reality.
 - Added the root Cargo workspace with Rust `1.95.0`, edition `2024`, and kernel-owned Rust members under `boundaries/kernel/implementations/rust/`.
 - Added Devenv Rust support through `languages.rust.toolchainFile = ./rust-toolchain.toml`, plus the required `rust-overlay` input and `protobuf` package for Cargo-time Tonic/Prost generation.
 - Implemented `tuvren-kernel-rust` with protocol/domain types, deterministic SHA-256 identity helpers, explicit deterministic CBOR value encoding, and a process-local in-memory kernel surface.
+- The Rust in-memory thread bootstrap uses a backend-owned root event Object so genesis TurnNode hashes remain unique across threads that share the same schema and empty root tree; this is documented in the kernel specification as an implementation-owned lineage-proof exception.
 - Implemented Rust conformance execution over the boundary-owned kernel fixture suite `tuvren.kernel.protocol-seed@0.1.0`.
 - Implemented `tuvren-kernel-rust-grpc-service` for the governed `tuvren.kernel.interop.v1` proto surface, including unary kernel operations, `NodeWalkBack` streaming, stable kernel error-code to gRPC status mapping, and a runnable Tonic server entrypoint.
 - Enabled generated Rust telemetry helper output from `telemetry/semconv/tuvren-runtime.yaml` under the Rust kernel consumer tree.

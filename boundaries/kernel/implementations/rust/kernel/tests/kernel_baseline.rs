@@ -2,10 +2,11 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use tuvren_kernel_rust::{
-    InMemoryKernel, InMemoryKernelOptions, IncorporationRule, KernelRecord, PathCollectionKind,
-    PathDefinition, PathValue, RunCompletionStatus, StagedResult, StagedResultStatus,
-    StepDeclaration, TurnNode, TurnTreeSchema, decode_deterministic_kernel_record,
-    hash_bytes_to_hex, hash_kernel_record, hash_turn_node_identity, schema_to_record,
+    InMemoryKernel, InMemoryKernelOptions, IncorporationRule, KernelRecord, ObserveResult,
+    PathCollectionKind, PathDefinition, PathValue, RunCompletionStatus, StagedResult,
+    StagedResultStatus, StepDeclaration, TurnNode, TurnTreeSchema, Verdict, VerdictDisposition,
+    decode_deterministic_kernel_record, hash_bytes_to_hex, hash_kernel_record,
+    hash_turn_node_identity, schema_to_record,
 };
 
 #[test]
@@ -397,6 +398,16 @@ fn branch_rewind_fails_active_runs() {
         .run_complete_step("run_main", "model_call", None, Vec::new(), None)
         .expect("step checkpoints");
     let node_hash = node_hash.expect("checkpoint hash");
+    kernel
+        .staging_stage(
+            "run_main",
+            b"uncommitted".to_vec(),
+            "late_task",
+            "message",
+            StagedResultStatus::Completed,
+            None,
+        )
+        .expect("active run can still have uncommitted staged work");
 
     let set_head = kernel
         .branch_set_head("branch_main", &root_hash)
@@ -412,6 +423,49 @@ fn branch_rewind_fails_active_runs() {
         .run_begin_step("run_main", "model_call")
         .expect_err("rewound active run is failed");
     assert_eq!(error.payload.code, "run_not_running");
+    assert!(
+        kernel
+            .staging_current("run_main")
+            .expect("failed run staging remains readable")
+            .is_empty()
+    );
+}
+
+#[test]
+fn branch_rewind_does_not_overwrite_existing_archive_ids() {
+    let (kernel, root_hash) = kernel_with_run(StepDeclaration {
+        deterministic: false,
+        id: "model_call".to_string(),
+        metadata: None,
+        side_effects: false,
+    });
+    let (_, node_hash) = kernel
+        .run_complete_step("run_main", "model_call", None, Vec::new(), None)
+        .expect("step checkpoints");
+    let node_hash = node_hash.expect("checkpoint hash");
+    kernel
+        .branch_create("branch_main_archive_1", "thread_main", &root_hash)
+        .expect("host branch using archive-like id creates");
+
+    let set_head = kernel
+        .branch_set_head("branch_main", &root_hash)
+        .expect("rewind archives old head without collision");
+
+    assert_eq!(
+        kernel
+            .branch_get("branch_main_archive_1")
+            .expect("branch get")
+            .expect("pre-existing archive-like branch")
+            .head_turn_node_hash,
+        root_hash
+    );
+    assert_eq!(
+        set_head
+            .archive_branch
+            .expect("generated archive branch")
+            .head_turn_node_hash,
+        node_hash
+    );
 }
 
 #[test]
@@ -440,6 +494,48 @@ fn staging_stage_requires_running_run() {
         .expect_err("completed run cannot stage");
 
     assert_eq!(error.payload.code, "run_not_running");
+}
+
+#[test]
+fn observe_signals_are_available_to_next_step_once() {
+    let (kernel, _) = kernel_with_steps(vec![
+        StepDeclaration {
+            deterministic: false,
+            id: "first".to_string(),
+            metadata: None,
+            side_effects: false,
+        },
+        StepDeclaration {
+            deterministic: true,
+            id: "second".to_string(),
+            metadata: None,
+            side_effects: false,
+        },
+    ]);
+    kernel
+        .run_complete_step(
+            "run_main",
+            "first",
+            None,
+            vec![ObserveResult {
+                annotations: Vec::new(),
+                signals: vec![KernelRecord::Text("wake_next_step".to_string())],
+            }],
+            None,
+        )
+        .expect("first step completes with observe signal");
+    let next_context = kernel
+        .run_begin_step("run_main", "second")
+        .expect("second step begins");
+    let replay_context = kernel
+        .run_begin_step("run_main", "second")
+        .expect("second step can be observed again without stale signals");
+
+    assert_eq!(
+        next_context.signals,
+        vec![KernelRecord::Text("wake_next_step".to_string())]
+    );
+    assert!(replay_context.signals.is_empty());
 }
 
 #[test]
@@ -478,6 +574,47 @@ fn staging_stage_duplicate_is_atomic() {
             .store_has(&duplicate_hash)
             .expect("store lookup succeeds")
     );
+}
+
+#[test]
+fn verdict_composition_uses_fixed_priority_over_input_order() {
+    let kernel = InMemoryKernel::new();
+    let composed = kernel
+        .verdicts_compose(vec![
+            Verdict::Retry {
+                adjustment: KernelRecord::Text("retry".to_string()),
+            },
+            Verdict::Pause {
+                reason: "pause".to_string(),
+                resumption_schema: KernelRecord::Null,
+            },
+            Verdict::Abort {
+                disposition: VerdictDisposition::SoftFail,
+                reason: "abort".to_string(),
+            },
+        ])
+        .expect("verdicts compose");
+
+    assert!(matches!(composed, Verdict::Abort { .. }));
+}
+
+#[test]
+fn verdict_composition_preserves_first_verdict_within_priority() {
+    let kernel = InMemoryKernel::new();
+    let composed = kernel
+        .verdicts_compose(vec![
+            Verdict::Pause {
+                reason: "first".to_string(),
+                resumption_schema: KernelRecord::Null,
+            },
+            Verdict::Pause {
+                reason: "second".to_string(),
+                resumption_schema: KernelRecord::Null,
+            },
+        ])
+        .expect("verdicts compose");
+
+    assert!(matches!(composed, Verdict::Pause { reason, .. } if reason == "first"));
 }
 
 #[test]

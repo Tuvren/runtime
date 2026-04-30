@@ -8,7 +8,7 @@ use crate::types::{
     ObserveResult, PathCollectionKind, PathValue, RecoveryState, RunCompletionStatus, RunRecord,
     RunStatus, SetHeadResult, StagedResult, StagedResultStatus, StepContext, StepDeclaration,
     ThreadCreateResult, ThreadRecord, TurnNode, TurnRecord, TurnTreeManifest, TurnTreeSchema,
-    Verdict, VerdictDisposition,
+    Verdict,
 };
 
 #[derive(Clone)]
@@ -40,6 +40,7 @@ struct KernelState {
     branches: HashMap<String, BranchRecord>,
     objects: HashMap<HashString, ObjectRecord>,
     runs: HashMap<String, RunRecord>,
+    run_signals: HashMap<String, Vec<KernelRecord>>,
     schemas: HashMap<String, TurnTreeSchema>,
     staged_results: HashMap<String, Vec<StagedResult>>,
     threads: HashMap<String, ThreadRecord>,
@@ -390,8 +391,7 @@ impl InMemoryKernel {
         } else if is_ancestor(&state, turn_node_hash, &prior_head)? {
             // Backward moves preserve the abandoned head under an archive
             // branch so branch rewinds do not silently discard reachable work.
-            state.archive_counter += 1;
-            let archive_id = format!("{branch_id}_archive_{}", state.archive_counter);
+            let archive_id = next_archive_branch_id(&mut state, branch_id);
             let archive = BranchRecord {
                 branch_id: archive_id.clone(),
                 head_turn_node_hash: prior_head,
@@ -399,7 +399,8 @@ impl InMemoryKernel {
             };
             state.branches.insert(archive_id, archive.clone());
             // A branch rewind changes the active lineage under running work;
-            // fail in-flight runs so recovery must be explicit on a fresh run.
+            // fail in-flight runs and clear run-local scratch state so no
+            // uncommitted staging survives without a legal checkpoint path.
             fail_active_runs_on_branch(&mut state, branch_id);
             Some(archive)
         } else {
@@ -667,39 +668,49 @@ impl InMemoryKernel {
     }
 
     pub fn run_begin_step(&self, run_id: &str, step_id: &str) -> KernelResult<StepContext> {
-        let state = self.lock_state()?;
-        let run = state
-            .runs
-            .get(run_id)
-            .ok_or_else(|| missing("run_not_found", "run does not exist"))?;
-        if run.status != RunStatus::Running {
-            return Err(KernelError::new(
-                "run_not_running",
-                "only running runs can begin steps",
-                None,
-            ));
-        }
-        let step = run
-            .step_sequence
-            .get(run.current_step_index)
-            .ok_or_else(|| missing("run_step_not_found", "run has no current step"))?;
-        if step.id != step_id {
-            return Err(KernelError::new(
-                "run_step_mismatch",
-                "requested step id must match the current run step",
-                None,
-            ));
-        }
+        let mut state = self.lock_state()?;
+        let (current_turn_node_hash, schema_id, step) = {
+            let run = state
+                .runs
+                .get(run_id)
+                .ok_or_else(|| missing("run_not_found", "run does not exist"))?;
+            if run.status != RunStatus::Running {
+                return Err(KernelError::new(
+                    "run_not_running",
+                    "only running runs can begin steps",
+                    None,
+                ));
+            }
+            let step = run
+                .step_sequence
+                .get(run.current_step_index)
+                .ok_or_else(|| missing("run_step_not_found", "run has no current step"))?;
+            if step.id != step_id {
+                return Err(KernelError::new(
+                    "run_step_mismatch",
+                    "requested step id must match the current run step",
+                    None,
+                ));
+            }
+            (
+                run_active_turn_node_hash(run),
+                run.schema_id.clone(),
+                step.clone(),
+            )
+        };
         let schema = state
             .schemas
-            .get(&run.schema_id)
+            .get(&schema_id)
             .cloned()
             .ok_or_else(|| missing("schema_not_found", "schema does not exist"))?;
+        let signals = state.run_signals.remove(run_id).unwrap_or_default();
         Ok(StepContext {
-            current_turn_node_hash: run_active_turn_node_hash(run),
+            current_turn_node_hash,
             schema,
-            signals: Vec::new(),
-            step: step.clone(),
+            // Observe signals are ephemeral run-local inputs for exactly the
+            // next step begin; consuming them here prevents stale replays.
+            signals,
+            step,
         })
     }
 
@@ -748,6 +759,10 @@ impl InMemoryKernel {
             );
         }
         ensure_event_hash_exists(&state, event_hash.as_deref())?;
+        let next_signals = observe_results
+            .iter()
+            .flat_map(|observe_result| observe_result.signals.iter().cloned())
+            .collect::<Vec<_>>();
         let staged_results = state
             .staged_results
             .get(run_id)
@@ -762,6 +777,7 @@ impl InMemoryKernel {
 
         if !checkpoint_required {
             run.current_step_index += 1;
+            set_next_step_signals(&mut state, run_id, next_signals);
             state.runs.insert(run_id.to_string(), run);
             return Ok((false, None));
         }
@@ -794,6 +810,7 @@ impl InMemoryKernel {
         // Staged results are cleared only after the checkpoint node and head
         // refs commit, preserving retry/recovery state on validation failures.
         state.staged_results.remove(run_id);
+        set_next_step_signals(&mut state, run_id, next_signals);
         state.runs.insert(run_id.to_string(), run);
         Ok((true, Some(node.hash)))
     }
@@ -864,6 +881,7 @@ impl InMemoryKernel {
         } else {
             None
         };
+        state.run_signals.remove(run_id);
         run.status = terminal_status;
         state.runs.insert(run_id.to_string(), run);
         Ok(terminal_hash)
@@ -902,25 +920,24 @@ impl InMemoryKernel {
     }
 
     pub fn verdicts_compose(&self, verdicts: Vec<Verdict>) -> KernelResult<Verdict> {
-        let mut soft_abort: Option<Verdict> = None;
+        let mut abort = None;
+        let mut pause = None;
+        let mut modify = None;
+        let mut retry = None;
         for verdict in verdicts {
             match verdict {
-                Verdict::Abort {
-                    disposition: VerdictDisposition::HardFail,
-                    ..
-                }
-                | Verdict::Pause { .. }
-                | Verdict::Modify { .. }
-                | Verdict::Retry { .. } => return Ok(verdict),
-                Verdict::Abort { .. } => {
-                    if soft_abort.is_none() {
-                        soft_abort = Some(verdict);
-                    }
-                }
-                Verdict::Proceed => {}
+                Verdict::Abort { .. } if abort.is_none() => abort = Some(verdict),
+                Verdict::Pause { .. } if pause.is_none() => pause = Some(verdict),
+                Verdict::Modify { .. } if modify.is_none() => modify = Some(verdict),
+                Verdict::Retry { .. } if retry.is_none() => retry = Some(verdict),
+                _ => {}
             }
         }
-        Ok(soft_abort.unwrap_or(Verdict::Proceed))
+        Ok(abort
+            .or(pause)
+            .or(modify)
+            .or(retry)
+            .unwrap_or(Verdict::Proceed))
     }
 
     fn lock_state(&self) -> KernelResult<std::sync::MutexGuard<'_, KernelState>> {
@@ -995,10 +1012,34 @@ fn set_run_head_refs(
 }
 
 fn fail_active_runs_on_branch(state: &mut KernelState, branch_id: &str) {
+    let mut failed_run_ids = Vec::new();
     for run in state.runs.values_mut().filter(|run| {
         run.branch_id == branch_id && matches!(run.status, RunStatus::Running | RunStatus::Paused)
     }) {
         run.status = RunStatus::Failed;
+        failed_run_ids.push(run.run_id.clone());
+    }
+    for run_id in failed_run_ids {
+        state.staged_results.remove(&run_id);
+        state.run_signals.remove(&run_id);
+    }
+}
+
+fn next_archive_branch_id(state: &mut KernelState, branch_id: &str) -> String {
+    loop {
+        state.archive_counter += 1;
+        let archive_id = format!("{branch_id}_archive_{}", state.archive_counter);
+        if !state.branches.contains_key(&archive_id) {
+            return archive_id;
+        }
+    }
+}
+
+fn set_next_step_signals(state: &mut KernelState, run_id: &str, signals: Vec<KernelRecord>) {
+    if signals.is_empty() {
+        state.run_signals.remove(run_id);
+    } else {
+        state.run_signals.insert(run_id.to_string(), signals);
     }
 }
 
