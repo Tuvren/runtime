@@ -195,7 +195,7 @@ TurnNode
 
 `schemaId` records which schema was active, so future reads can interpret the TurnTree correctly even after schema evolution.
 
-`eventHash` is an opaque reference to a framework-defined Object. The kernel stores the link, never reads the content. If not provided, `eventHash` is null.
+`eventHash` is an opaque reference to a framework-defined Object. The kernel stores the link, never reads the content. If not provided, `eventHash` is null. The one implementation-owned exception is thread bootstrap: a kernel may attach a backend-owned root event Object when the storage identity model would otherwise allow two threads with the same schema and empty root tree to share an indistinguishable genesis TurnNode. That event is opaque to the framework and exists only to preserve cross-thread lineage proofs.
 
 #### TurnNode Operations
 
@@ -267,7 +267,7 @@ thread.create(threadId, schemaId, initialBranchId) → {
 }
 ```
 
-The kernel internally: registers the Thread, creates an empty TurnTree from the schema, creates the root TurnNode (`previousTurnNodeHash: null`, empty tree, `eventHash: null`), creates the Branch with Head pointing to the root TurnNode. No intermediate invalid moments.
+The kernel internally: registers the Thread, creates an empty TurnTree from the schema, creates the root TurnNode (`previousTurnNodeHash: null`, empty tree, `eventHash: null` unless a backend-owned bootstrap event is required for unique lineage identity), creates the Branch with Head pointing to the root TurnNode. No intermediate invalid moments.
 
 #### Thread Operations
 

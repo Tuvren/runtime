@@ -2,6 +2,7 @@
 
 ## 0. Version History & Changelog
 
+- v0.8.7 - Closed Epic U in current repo reality with the root Cargo workspace, Devenv Rust toolchain, Rust kernel core, Rust conformance runner, Rust gRPC service, and generated Rust telemetry helper.
 - v0.8.6 - Closed Epic T in current repo reality with kernel-only proto authority, root Buf governance, Devenv-provisioned Buf/protoc tooling, generated binding placement, and the first interop-smoke governance lane.
 - v0.8.5 - Closed Epic S in current repo reality with TypeSpec-authored tool/provider contract artifacts, kernel CDDL grammar, implementation-scoped TypeScript conformance runners, and compatibility evidence sourced from those runners.
 - v0.8.4 - Closed Epic R in current repo reality with boundary-owned conformance and contract scaffold, canonical `lint` / `conformance` / `codegen` target vocabulary, a weaver-backed telemetry semantic-convention source and generated helper path, and the first measured TypeScript-only compatibility baseline.
@@ -9,9 +10,9 @@
 
 ## 1. Executive Summary & Active Critical Path
 
-- **Total Active Story Points:** 33
-- **Critical Path:** `KRT-U001 -> KRT-U002 -> KRT-U004 -> KRT-V001 -> KRT-V002 -> KRT-V003 -> KRT-V004`
-- **Planning Assumptions:** Epics A-T are closed in current repo reality. Epic T closure evidence now lives in `constitution/spikes/epic-t-kernel-interop-governance-inventory.md`. TechSpec v0.6.5 keeps the baseline AI SDK bridge on `LanguageModelV3` / `ProviderV3` from `@ai-sdk/provider@3.0.8`, pins the AG-UI adapter to `@ag-ui/core@0.0.52`, preserves the existing `ProviderStreamChunk` seam while documenting the current tool-call metadata continuity requirements, treats tee-based fanout above `ExecutionHandle.events()` as the sanctioned multi-consumer host path when every required tee branch subscribes before the first pull, records SQLite playground validation as a Node-backed path because `@tuvren/backend-sqlite` uses `better-sqlite3`, keeps the playground-owned automated aimock provider lanes across OpenAI, Anthropic, and Gemini as local validation rather than a public provider contract, records the manual Gemini lane as an opt-in local proof rather than default automation, requires a formal telemetry semantic-convention source before Rust implementation work begins, treats Buf `FILE` compatibility as the default interop gate from the first `.proto` merge, and treats the compatibility matrix as a conservative near-public readiness signal rather than a private scratch report.
+- **Total Active Story Points:** 20
+- **Critical Path:** `KRT-V001 -> KRT-V002 -> KRT-V003 -> KRT-V004`
+- **Planning Assumptions:** Epics A-U are closed in current repo reality. Epic U closure evidence now lives in `constitution/spikes/epic-u-rust-kernel-baseline-inventory.md`. TechSpec v0.6.6 keeps the baseline AI SDK bridge on `LanguageModelV3` / `ProviderV3` from `@ai-sdk/provider@3.0.8`, pins the AG-UI adapter to `@ag-ui/core@0.0.52`, preserves the existing `ProviderStreamChunk` seam while documenting the current tool-call metadata continuity requirements, treats tee-based fanout above `ExecutionHandle.events()` as the sanctioned multi-consumer host path when every required tee branch subscribes before the first pull, records SQLite playground validation as a Node-backed path because `@tuvren/backend-sqlite` uses `better-sqlite3`, keeps the playground-owned automated aimock provider lanes across OpenAI, Anthropic, and Gemini as local validation rather than a public provider contract, records the manual Gemini lane as an opt-in local proof rather than default automation, requires the Rust baseline to keep TypeScript transport client and runtime switching out of scope, treats Buf `FILE` compatibility as the default interop gate from the first `.proto` merge, and treats the compatibility matrix as a conservative near-public readiness signal rather than a private scratch report.
 
 ### Brownfield Continuity Note
 
@@ -26,11 +27,11 @@
 - Epic N now extends repo reality beyond those planning notes: the bridge package exists and the closure artifact above is the authoritative upstream seam for Epic O.
 - Epic O now extends repo reality beyond those planning notes: `@tuvren/stream-core`, `@tuvren/stream-sse`, and `@tuvren/stream-agui` exist, `constitution/spikes/epic-o-stream-adapter-inventory.md` is the authoritative adapter mapping record, and Epic P must treat tee-based fanout plus the documented `tuvren.runtime.*` AG-UI custom namespace as the handoff surface rather than rediscovering protocol gaps or resubscription hazards.
 - Epic P now extends repo reality beyond those planning notes: `@tuvren/playground-host` exists under `boundaries/hosts/implementations/typescript/playground`, `constitution/spikes/epic-p-playground-host-inventory.md` is the authoritative playground handoff, full-turn streams cover canonical/SSE/AG-UI fanout, approval resume continuation is projected to canonical/SSE only, non-reload memory scenarios run under Bun tests, branching is validated from a completed source head, and SQLite reload is validated through the built Node CLI path.
-- Epic R now extends repo reality beyond those planning notes: the repository has the explicit multi-language transition guide plus the closure inventory in `constitution/spikes/epic-r-multilanguage-transition-foundation-inventory.md`, Epic S has since closed the artifact promotion line, and Epic T has since closed the kernel interop governance line before Rust implementation work begins.
+- Epic R now extends repo reality beyond those planning notes: the repository has the explicit multi-language transition guide plus the closure inventory in `constitution/spikes/epic-r-multilanguage-transition-foundation-inventory.md`, Epic S has since closed the artifact promotion line, Epic T has since closed the kernel interop governance line, and Epic U has since closed the Rust kernel baseline line before TypeScript framework to Rust kernel interop begins.
 
 ### Sequential Scope Rule
 
-- Epic T is closed. The next implementation line begins with Epic U Rust kernel baseline work and must not skip directly to TypeScript framework to Rust kernel stabilization before the Cargo workspace, Rust kernel core, Rust gRPC service, and Rust conformance runner are authoritative in repo reality.
+- Epic U is closed. The next implementation line begins with Epic V TypeScript framework and Rust kernel interop stabilization and must not skip directly to Rust framework work before the TypeScript transport client, runtime switch, compatibility evidence, and telemetry lanes are authoritative in repo reality.
 
 ### Planning Heuristic
 
@@ -47,7 +48,7 @@
 ### Current Active Scope
 
 - Epic T is closed and now defines the narrow kernel-only interop transport, Buf-governed `.proto` ownership, and interop-smoke/codegen orchestration.
-- Epic U introduces the root Cargo workspace and the first Rust implementation only inside the kernel boundary.
+- Epic U is closed and now defines the root Cargo workspace plus the first Rust implementation only inside the kernel boundary.
 - Epic V stabilizes real TypeScript framework to Rust kernel interoperability, compatibility-ledger generation, and cross-language telemetry/CI posture.
 
 ### Future / Deferred Scope
@@ -67,6 +68,8 @@
 - Epics N-Q closed the post-ReAct TypeScript expansion line for the AI SDK bridge, host stream adapters, playground host harness, and release/portability hardening; authoritative closure evidence lives in `constitution/spikes/epic-n-ai-sdk-bridge-inventory.md`, `constitution/spikes/epic-o-stream-adapter-inventory.md`, `constitution/spikes/epic-p-playground-host-inventory.md`, and `constitution/spikes/epic-q-release-hardening-inventory.md`. That closure line now includes automated aimock provider-boundary coverage across OpenAI, Anthropic, and Gemini plus an opt-in real Gemini playground lane without reactivating the closed Epic Q backlog.
 - Epic R closed the multi-language transition foundation through `constitution/spikes/epic-r-multilanguage-transition-guide.md` and `constitution/spikes/epic-r-multilanguage-transition-foundation-inventory.md`, delivering boundary-owned conformance and contract scaffold, canonical target vocabulary, telemetry codegen authority, and the first measured TypeScript-only compatibility baseline.
 - Epic S closed boundary contract and conformance artifactization through `constitution/spikes/epic-s-boundary-contract-conformance-artifactization-inventory.md`, delivering TypeSpec-authored tool/provider artifacts, kernel CDDL grammar, implementation-scoped TypeScript conformance runners, and compatibility evidence sourced from those runners.
+- Epic T closed kernel interop governance through `constitution/spikes/epic-t-kernel-interop-surface-inventory.md` and `constitution/spikes/epic-t-kernel-interop-governance-inventory.md`, delivering the governed kernel-only proto authority and Buf-backed interop governance lane.
+- Epic U closed the Rust kernel baseline through `constitution/spikes/epic-u-rust-kernel-baseline-inventory.md`, delivering the root Cargo workspace, Rust kernel core, Rust conformance runner, runnable Rust gRPC service, and Rust telemetry helper without adding a TypeScript transport client or Rust framework path.
 
 ## 3. Build Order (Mermaid)
 
@@ -323,7 +326,7 @@ And the repo exposes `codegen` and `interop-smoke` targets that invoke the nativ
 
 ### Epic U - Rust Kernel Baseline (RKB)
 
-- Planned. This epic introduces Rust only under the kernel boundary and only after the artifact-backed seam exists.
+- Closed in current repo reality through `constitution/spikes/epic-u-rust-kernel-baseline-inventory.md`. This epic introduced Rust only under the kernel boundary and only after the artifact-backed seam existed.
 
 **KRT-U001 Cargo Workspace and Rust Toolchain Integration**
 

@@ -53,9 +53,41 @@
         "{workspaceRoot}/buf.gen.yaml"
       ]
     },
+    "build": {
+      "cache": true,
+      "inputs": [
+        "default",
+        "^production",
+        "{workspaceRoot}/Cargo.toml",
+        "{workspaceRoot}/Cargo.lock",
+        "{workspaceRoot}/rust-toolchain.toml",
+        "{workspaceRoot}/devenv.nix",
+        "{workspaceRoot}/devenv.lock"
+      ]
+    },
     "lint": {
       "cache": true,
-      "inputs": ["default", "{workspaceRoot}/biome.jsonc"]
+      "inputs": [
+        "default",
+        "{workspaceRoot}/biome.jsonc",
+        "{workspaceRoot}/Cargo.toml",
+        "{workspaceRoot}/Cargo.lock",
+        "{workspaceRoot}/rust-toolchain.toml"
+      ]
+    },
+    "test": {
+      "cache": true,
+      "inputs": [
+        "default",
+        "^production",
+        "{workspaceRoot}/Cargo.toml",
+        "{workspaceRoot}/Cargo.lock",
+        "{workspaceRoot}/rust-toolchain.toml",
+        "{workspaceRoot}/devenv.nix",
+        "{workspaceRoot}/devenv.lock",
+        "{workspaceRoot}/boundaries/kernel/conformance/**/*",
+        "{workspaceRoot}/boundaries/kernel/interop/**/*"
+      ]
     },
     "typecheck": {
       "cache": true,

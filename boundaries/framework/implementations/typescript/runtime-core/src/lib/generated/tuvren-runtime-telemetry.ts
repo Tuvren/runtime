@@ -100,7 +100,7 @@ export type TuvrenRuntimeTelemetryAttributeKey =
   "tuvren.runtime.tool_call.id" |
   "tuvren.runtime.turn.id";
 
-export const TUVREN_RUNTIME_TELEMETRY_ATTRIBUTE_KEYS: ReadonlyArray<TuvrenRuntimeTelemetryAttributeKey> =
+export const TUVREN_RUNTIME_TELEMETRY_ATTRIBUTE_KEYS: readonly TuvrenRuntimeTelemetryAttributeKey[] =
   Object.freeze([
     "tuvren.runtime.backend.id",
     "tuvren.runtime.branch.id",

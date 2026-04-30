@@ -28,6 +28,17 @@ export interface VerificationResult {
   id: string;
 }
 
+export const RUST_NX_BUILD_PROJECTS: readonly string[] = [
+  "kernel-rust-kernel",
+  "kernel-rust-grpc-service",
+  "kernel-rust-conformance-runner",
+];
+
+export const RUST_NX_TEST_PROJECTS: readonly string[] = [
+  "kernel-rust-kernel",
+  "kernel-rust-grpc-service",
+];
+
 export const WORKSPACE_TEST_PROJECTS: readonly string[] = [
   "provider-api",
   "framework-event-stream",
@@ -91,6 +102,92 @@ export const DEFAULT_VERIFICATION_STEPS: readonly VerificationStep[] = [
   {
     command: ["bun", "run", "lint"],
     id: "workspace lint",
+  },
+  {
+    command: [
+      "devenv",
+      "shell",
+      "--",
+      "cargo",
+      "fmt",
+      "--all",
+      "--",
+      "--check",
+    ],
+    id: "Rust workspace formatting",
+  },
+  {
+    command: [
+      "devenv",
+      "shell",
+      "--",
+      "cargo",
+      "clippy",
+      "--workspace",
+      "--all-targets",
+      "--",
+      "-D",
+      "warnings",
+    ],
+    id: "Rust workspace lint",
+  },
+  {
+    command: ["devenv", "shell", "--", "cargo", "test", "--workspace"],
+    id: "Rust workspace tests",
+  },
+  {
+    command: [
+      "bun",
+      "run",
+      "nx",
+      "run",
+      "kernel-rust-conformance-runner:conformance",
+      "--skipNxCache",
+    ],
+    id: "Rust kernel conformance runner",
+  },
+  {
+    command: [
+      "bun",
+      "run",
+      "nx",
+      "run",
+      "kernel-rust-grpc-service:interop-smoke",
+      "--skipNxCache",
+    ],
+    id: "Rust kernel gRPC interop smoke",
+  },
+  {
+    command: [
+      "bun",
+      "run",
+      "nx",
+      "run-many",
+      "-t",
+      "build",
+      "-p",
+      RUST_NX_BUILD_PROJECTS.join(","),
+      // Devenv updates its workspace shell files while entering; serializing
+      // Rust Nx wrappers keeps verify deterministic instead of racing .devenv.
+      "--parallel=1",
+    ],
+    id: "Rust Nx target builds",
+  },
+  {
+    command: [
+      "bun",
+      "run",
+      "nx",
+      "run-many",
+      "-t",
+      "test",
+      "-p",
+      RUST_NX_TEST_PROJECTS.join(","),
+      // These targets wrap Cargo through devenv, so run them one at a time for
+      // the same reason as the Rust build target smoke above.
+      "--parallel=1",
+    ],
+    id: "Rust Nx target tests",
   },
   {
     command: [
