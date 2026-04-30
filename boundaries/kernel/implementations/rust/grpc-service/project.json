@@ -16,7 +16,7 @@
       "executor": "nx:run-commands",
       "options": {
         "cwd": ".",
-        "command": "devenv shell -- cargo test -p tuvren-kernel-rust-grpc-service interop_smoke"
+        "command": "devenv shell -- cargo test -p tuvren-kernel-rust-grpc-service --test interop_smoke"
       }
     },
     "lint": {

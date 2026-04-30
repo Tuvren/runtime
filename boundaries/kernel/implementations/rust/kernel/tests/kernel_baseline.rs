@@ -1033,6 +1033,34 @@ fn staging_stage_rejects_empty_task_and_object_type() {
 }
 
 #[test]
+fn staging_stage_validates_interrupt_payload_profile() {
+    let (kernel, _) = kernel_with_run(StepDeclaration {
+        deterministic: false,
+        id: "model_call".to_string(),
+        metadata: None,
+        side_effects: false,
+    });
+    let error = kernel
+        .staging_stage(
+            "run_main",
+            b"interrupted".to_vec(),
+            "approval_pause",
+            "message",
+            StagedResultStatus::Interrupted,
+            Some(KernelRecord::Integer(i64::MAX)),
+        )
+        .expect_err("invalid interrupt payload is rejected before staging");
+
+    assert_eq!(error.payload.code, "invalid_kernel_record_integer");
+    assert!(
+        kernel
+            .staging_current("run_main")
+            .expect("staging remains readable")
+            .is_empty()
+    );
+}
+
+#[test]
 fn tree_values_must_contain_hash_strings() {
     let kernel = InMemoryKernel::new();
     kernel

@@ -2,6 +2,7 @@ use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, Mutex};
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use crate::cbor::encode_deterministic_kernel_record;
 use crate::identity::{hash_bytes_to_hex, hash_turn_node_identity, hash_turn_tree_identity};
 use crate::types::{
     BranchRecord, EpochMs, HashString, IncorporationRule, KernelError, KernelRecord, KernelResult,
@@ -564,6 +565,11 @@ impl InMemoryKernel {
                 "only interrupted staged results may carry interrupt payloads",
                 None,
             ));
+        }
+        if let Some(interrupt_payload) = interrupt_payload.as_ref() {
+            // Validate run-local payloads before staging so a later checkpoint
+            // cannot discover that already-durable work is unhashable.
+            encode_deterministic_kernel_record(interrupt_payload)?;
         }
         let object_hash = hash_bytes_to_hex(&blob);
         let timestamp_ms = (self.now)();
