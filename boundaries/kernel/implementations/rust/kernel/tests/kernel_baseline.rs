@@ -856,6 +856,32 @@ fn verdict_composition_preserves_first_verdict_within_priority() {
 }
 
 #[test]
+fn verdict_composition_preserves_ordered_modify_transforms() {
+    let kernel = InMemoryKernel::new();
+    let composed = kernel
+        .verdicts_compose(vec![
+            Verdict::Modify {
+                transform: KernelRecord::Text("first".to_string()),
+            },
+            Verdict::Modify {
+                transform: KernelRecord::Text("second".to_string()),
+            },
+        ])
+        .expect("verdicts compose");
+
+    assert!(matches!(
+        composed,
+        Verdict::Modify {
+            transform: KernelRecord::Array(transforms),
+        } if transforms
+            == vec![
+                KernelRecord::Text("first".to_string()),
+                KernelRecord::Text("second".to_string()),
+            ]
+    ));
+}
+
+#[test]
 fn turn_update_head_requires_descendant_of_turn_start() {
     let (kernel, root_hash) = kernel_with_run(StepDeclaration {
         deterministic: false,

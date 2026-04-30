@@ -7,8 +7,8 @@ use serde_json::Value;
 use tuvren_kernel_rust::{
     InMemoryKernel, KernelError, KernelRecord, PathCollectionKind, PathDefinition, PathValue,
     RecoveryState, StagedResult, StagedResultStatus, StepDeclaration, TurnNode, TurnTreeSchema,
-    hash_bytes_to_hex, hash_kernel_record, hash_turn_node_identity, kernel_record_from_json,
-    schema_to_record,
+    decode_deterministic_kernel_record, hash_bytes_to_hex, hash_kernel_record,
+    hash_turn_node_identity, kernel_record_from_json, schema_to_record,
 };
 
 const MANIFEST_PATH: &str = "boundaries/kernel/conformance/scenarios/suite-manifest.json";
@@ -31,11 +31,22 @@ fn main() -> Result<(), KernelError> {
         hash_kernel_record(&schema_to_record(&schema))?,
         deterministic.turn_tree_schema_record_sha256_hex
     );
+    let decoded_schema = decode_deterministic_kernel_record(&hex_to_bytes(
+        &deterministic.turn_tree_schema_record_cbor_hex,
+    )?)?;
+    assert_eq!(decoded_schema, schema_to_record(&schema));
 
     let node = parse_turn_node_identity(&deterministic.turn_node_identity_record)?;
     assert_eq!(
         hash_turn_node_identity(&node)?,
         deterministic.turn_node_identity_record_sha256_hex
+    );
+    let decoded_node = decode_deterministic_kernel_record(&hex_to_bytes(
+        &deterministic.turn_node_identity_record_cbor_hex,
+    )?)?;
+    assert_eq!(
+        decoded_node,
+        kernel_record_from_json(&deterministic.turn_node_identity_record)?
     );
 
     let kernel = InMemoryKernel::new();
@@ -87,6 +98,8 @@ fn main() -> Result<(), KernelError> {
 #[derive(Deserialize)]
 struct SuiteManifest {
     boundary: String,
+    #[serde(rename = "fixtureSchemaPath")]
+    fixture_schema_path: String,
     fixtures: Vec<SuiteFixture>,
     #[serde(rename = "suiteId")]
     suite_id: String,
@@ -108,10 +121,14 @@ struct DeterministicFixture {
     raw_opaque_bytes_sha256_hex: String,
     #[serde(rename = "turnNodeIdentityRecord")]
     turn_node_identity_record: Value,
+    #[serde(rename = "turnNodeIdentityRecordCborHex")]
+    turn_node_identity_record_cbor_hex: String,
     #[serde(rename = "turnNodeIdentityRecordSha256Hex")]
     turn_node_identity_record_sha256_hex: String,
     #[serde(rename = "turnTreeSchemaRecord")]
     turn_tree_schema_record: Value,
+    #[serde(rename = "turnTreeSchemaRecordCborHex")]
+    turn_tree_schema_record_cbor_hex: String,
     #[serde(rename = "turnTreeSchemaRecordSha256Hex")]
     turn_tree_schema_record_sha256_hex: String,
 }
@@ -139,6 +156,7 @@ fn read_suite() -> Result<FixtureSuite, KernelError> {
     let manifest_dir = manifest_path
         .parent()
         .ok_or_else(|| error("invalid_manifest_path", "manifest path must have a parent"))?;
+    validate_fixture_schema_path(manifest_dir, &manifest.fixture_schema_path)?;
     let canonical_schema: Value = read_json(&fixture_path(
         manifest_dir,
         &manifest.fixtures,
@@ -163,6 +181,39 @@ fn read_suite() -> Result<FixtureSuite, KernelError> {
     })
 }
 
+fn validate_fixture_schema_path(
+    manifest_dir: &Path,
+    fixture_schema_path: &str,
+) -> Result<(), KernelError> {
+    let schema_path = manifest_dir.join(fixture_schema_path);
+    let schema: Value = read_json(&schema_path)?;
+    let required = schema
+        .get("required")
+        .and_then(Value::as_array)
+        .ok_or_else(|| {
+            error(
+                "invalid_fixture_schema",
+                "fixture schema must list required keys",
+            )
+        })?;
+    for expected_key in [
+        "canonicalSchemaPath",
+        "deterministicFixturePath",
+        "logicalFixturePath",
+    ] {
+        if !required
+            .iter()
+            .any(|value| value.as_str() == Some(expected_key))
+        {
+            return Err(error(
+                "invalid_fixture_schema",
+                "fixture schema required keys drifted from the conformance contract",
+            ));
+        }
+    }
+    Ok(())
+}
+
 fn fixture_path(
     manifest_dir: &Path,
     fixtures: &[SuiteFixture],
@@ -173,6 +224,22 @@ fn fixture_path(
         .find(|fixture| fixture.id == expected_id)
         .ok_or_else(|| error("fixture_not_found", "suite fixture is missing"))?;
     Ok(manifest_dir.join(&fixture.path))
+}
+
+fn hex_to_bytes(value: &str) -> Result<Vec<u8>, KernelError> {
+    if !value.len().is_multiple_of(2) {
+        return Err(error(
+            "invalid_hex_fixture",
+            "fixture hex must have even length",
+        ));
+    }
+    (0..value.len())
+        .step_by(2)
+        .map(|index| {
+            u8::from_str_radix(&value[index..index + 2], 16)
+                .map_err(|_| error("invalid_hex_fixture", "fixture hex must decode"))
+        })
+        .collect()
 }
 
 fn read_json<T: for<'de> Deserialize<'de>>(path: &Path) -> Result<T, KernelError> {

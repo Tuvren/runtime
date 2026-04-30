@@ -1048,17 +1048,30 @@ impl InMemoryKernel {
     pub fn verdicts_compose(&self, verdicts: Vec<Verdict>) -> KernelResult<Verdict> {
         let mut abort = None;
         let mut pause = None;
-        let mut modify = None;
+        let mut modifies = Vec::new();
         let mut retry = None;
         for verdict in verdicts {
             match verdict {
                 Verdict::Abort { .. } if abort.is_none() => abort = Some(verdict),
                 Verdict::Pause { .. } if pause.is_none() => pause = Some(verdict),
-                Verdict::Modify { .. } if modify.is_none() => modify = Some(verdict),
+                Verdict::Modify { transform } => modifies.push(transform),
                 Verdict::Retry { .. } if retry.is_none() => retry = Some(verdict),
                 _ => {}
             }
         }
+        let modify = match modifies.len() {
+            0 => None,
+            1 => modifies
+                .into_iter()
+                .next()
+                .map(|transform| Verdict::Modify { transform }),
+            _ => Some(Verdict::Modify {
+                // Transforms are opaque to the kernel; wrapping multiple
+                // transforms in order preserves registration sequencing
+                // without inventing transform-specific merge semantics.
+                transform: KernelRecord::Array(modifies),
+            }),
+        };
         Ok(abort
             .or(pause)
             .or(modify)

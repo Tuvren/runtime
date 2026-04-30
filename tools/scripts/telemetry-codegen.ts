@@ -116,7 +116,12 @@ async function main(): Promise<void> {
       rustOutputPath,
       resolvedRegistry
     );
-    await formatGeneratedOutputs(typescriptOutputPath, rustOutputPath);
+    // Rust telemetry can still be disabled by the generator plan, so rustfmt
+    // only runs when this invocation actually wrote the Rust target file.
+    await formatGeneratedOutputs(
+      typescriptOutputPath,
+      generatorPlan.rust.enabled ? rustOutputPath : undefined
+    );
   } finally {
     await rm(temporaryDirectory, { force: true, recursive: true });
   }
@@ -276,7 +281,7 @@ async function readRegistrySchemaUrl(): Promise<string> {
 
 async function formatGeneratedOutputs(
   typescriptOutputPath: string,
-  rustOutputPath: string
+  rustOutputPath: string | undefined
 ): Promise<void> {
   const result = await runCommand(
     [
@@ -301,6 +306,10 @@ async function formatGeneratedOutputs(
         result.stdout ||
         "formatting generated telemetry outputs failed"
     );
+  }
+
+  if (rustOutputPath == null) {
+    return;
   }
 
   const rustfmtResult = await runCommand(["rustfmt", rustOutputPath], {
