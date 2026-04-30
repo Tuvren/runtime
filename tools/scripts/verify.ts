@@ -29,6 +29,8 @@ export interface VerificationResult {
 }
 
 export const WORKSPACE_TEST_PROJECTS: readonly string[] = [
+  "kernel-rust-kernel",
+  "kernel-rust-grpc-service",
   "provider-api",
   "framework-event-stream",
   "framework-runtime-api",
@@ -49,6 +51,9 @@ export const WORKSPACE_TEST_PROJECTS: readonly string[] = [
 ];
 
 export const WORKSPACE_BUILD_PROJECTS: readonly string[] = [
+  "kernel-rust-kernel",
+  "kernel-rust-grpc-service",
+  "kernel-rust-conformance-runner",
   "shared-core-types",
   "kernel-contract-protocol",
   "kernel-testkit",
@@ -91,6 +96,60 @@ export const DEFAULT_VERIFICATION_STEPS: readonly VerificationStep[] = [
   {
     command: ["bun", "run", "lint"],
     id: "workspace lint",
+  },
+  {
+    command: [
+      "devenv",
+      "shell",
+      "--",
+      "cargo",
+      "fmt",
+      "--all",
+      "--",
+      "--check",
+    ],
+    id: "Rust workspace formatting",
+  },
+  {
+    command: [
+      "devenv",
+      "shell",
+      "--",
+      "cargo",
+      "clippy",
+      "--workspace",
+      "--all-targets",
+      "--",
+      "-D",
+      "warnings",
+    ],
+    id: "Rust workspace lint",
+  },
+  {
+    command: ["devenv", "shell", "--", "cargo", "test", "--workspace"],
+    id: "Rust workspace tests",
+  },
+  {
+    command: [
+      "bun",
+      "run",
+      "nx",
+      "run",
+      "kernel-rust-conformance-runner:conformance",
+      "--skipNxCache",
+    ],
+    id: "Rust kernel conformance runner",
+  },
+  {
+    command: [
+      "bun",
+      "run",
+      "nx",
+      "run",
+      "kernel-rust-grpc-service:interop-smoke",
+      "--skipNxCache",
+    ],
+    id: "Rust kernel gRPC interop smoke",
   },
   {
     command: [

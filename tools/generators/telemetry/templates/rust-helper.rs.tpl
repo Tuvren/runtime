@@ -1,4 +1,5 @@
 // Repo-owned Rust telemetry helper template path.
 //
-// Epic R keeps the future Rust generation path checked in here without
-// generating a reviewed Rust output before a Rust implementation tree exists.
+// The TypeScript generator renders the current Rust helper directly from the
+// resolved semantic-convention registry so Rust consumers use the same
+// attribute vocabulary as the TypeScript runtime line.

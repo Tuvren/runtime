@@ -74,6 +74,7 @@ async function main(): Promise<void> {
     REPO_ROOT,
     generatorPlan.typescript.outputPath
   );
+  const rustOutputPath = resolve(REPO_ROOT, generatorPlan.rust.outputPath);
 
   const temporaryDirectory = await mkdtemp(
     resolve(tmpdir(), "tuvren-telemetry-")
@@ -88,6 +89,7 @@ async function main(): Promise<void> {
     await mkdir(dirname(MARKDOWN_OUTPUT_PATH), { recursive: true });
     await mkdir(dirname(JSON_OUTPUT_PATH), { recursive: true });
     await mkdir(dirname(typescriptOutputPath), { recursive: true });
+    await mkdir(dirname(rustOutputPath), { recursive: true });
 
     await writeFile(
       MARKDOWN_OUTPUT_PATH,
@@ -105,15 +107,16 @@ async function main(): Promise<void> {
         2
       )}\n`
     );
-    // Epic R keeps the checked-in template paths and future Rust output plan
-    // explicit, but it still renders the single TypeScript consumer directly
-    // until a second implementation tree exists to share the templating logic.
     await writeFile(
       typescriptOutputPath,
       renderTelemetryTypescript(resolvedRegistry)
     );
-    await assertDeferredRustGenerationPath(generatorPlan.rust);
-    await formatGeneratedOutputs(typescriptOutputPath);
+    await writeRustTelemetryOutput(
+      generatorPlan.rust,
+      rustOutputPath,
+      resolvedRegistry
+    );
+    await formatGeneratedOutputs(typescriptOutputPath, rustOutputPath);
   } finally {
     await rm(temporaryDirectory, { force: true, recursive: true });
   }
@@ -152,16 +155,18 @@ function readGeneratorTarget(
   };
 }
 
-async function assertDeferredRustGenerationPath(
-  rustTarget: TelemetryGeneratorTarget
+async function writeRustTelemetryOutput(
+  rustTarget: TelemetryGeneratorTarget,
+  rustOutputPath: string,
+  resolvedRegistry: ResolvedTelemetryRegistry
 ): Promise<void> {
   await readFile(resolve(REPO_ROOT, rustTarget.templatePath), "utf8");
 
-  if (rustTarget.enabled) {
-    throw new Error(
-      "telemetry generator rust target must stay disabled until a Rust implementation tree exists"
-    );
+  if (!rustTarget.enabled) {
+    return;
   }
+
+  await writeFile(rustOutputPath, renderTelemetryRust(resolvedRegistry));
 }
 
 async function ensureWeaverIsAvailable(): Promise<void> {
@@ -270,7 +275,8 @@ async function readRegistrySchemaUrl(): Promise<string> {
 }
 
 async function formatGeneratedOutputs(
-  typescriptOutputPath: string
+  typescriptOutputPath: string,
+  rustOutputPath: string
 ): Promise<void> {
   const result = await runCommand(
     [
@@ -294,6 +300,19 @@ async function formatGeneratedOutputs(
       result.stderr ||
         result.stdout ||
         "formatting generated telemetry outputs failed"
+    );
+  }
+
+  const rustfmtResult = await runCommand(["rustfmt", rustOutputPath], {
+    captureOutput: true,
+    cwd: REPO_ROOT,
+  });
+
+  if (rustfmtResult.code !== 0) {
+    throw new Error(
+      rustfmtResult.stderr ||
+        rustfmtResult.stdout ||
+        "formatting generated Rust telemetry output failed"
     );
   }
 }
@@ -464,9 +483,58 @@ ${attributeEntries}
 export type TuvrenRuntimeTelemetryAttributeKey =
   ${attributeKeyUnion};
 
-export const TUVREN_RUNTIME_TELEMETRY_ATTRIBUTE_KEYS: ReadonlyArray<TuvrenRuntimeTelemetryAttributeKey> =
+export const TUVREN_RUNTIME_TELEMETRY_ATTRIBUTE_KEYS: readonly TuvrenRuntimeTelemetryAttributeKey[] =
   Object.freeze([
 ${attributeKeys}
   ]);
+`;
+}
+
+function renderTelemetryRust(registry: ResolvedTelemetryRegistry): string {
+  const attributeEntries = registry.attributes
+    .map(
+      (attribute) =>
+        `    TuvrenRuntimeTelemetryAttributeDefinition {\n        key: ${JSON.stringify(
+          attribute.key
+        )},\n        brief: ${JSON.stringify(
+          attribute.brief
+        )},\n        examples: &[${attribute.examples
+          .map((example) => JSON.stringify(example))
+          .join(", ")}],\n        stability: ${JSON.stringify(
+          attribute.stability
+        )},\n        r#type: ${JSON.stringify(attribute.type)},\n    },`
+    )
+    .join("\n");
+
+  const attributeKeys = registry.attributes
+    .map((attribute) => `    ${JSON.stringify(attribute.key)},`)
+    .join("\n");
+
+  return `// Copyright 2026 Oscar Yáñez Cisterna (@SkrOYC)
+//
+// Licensed under the Apache License, Version 2.0.
+//
+// Generated from telemetry/semconv/tuvren-runtime.yaml via weaver.
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct TuvrenRuntimeTelemetryAttributeDefinition {
+    pub key: &'static str,
+    pub brief: &'static str,
+    pub examples: &'static [&'static str],
+    pub stability: &'static str,
+    pub r#type: &'static str,
+}
+
+pub const TUVREN_RUNTIME_TELEMETRY_SCHEMA_URL: &str = ${JSON.stringify(
+    registry.schemaUrl
+  )};
+
+pub const TUVREN_RUNTIME_TELEMETRY_ATTRIBUTES: &[TuvrenRuntimeTelemetryAttributeDefinition] = &[
+${attributeEntries}
+];
+
+pub const TUVREN_RUNTIME_TELEMETRY_ATTRIBUTE_KEYS: &[&str] = &[
+${attributeKeys}
+];
 `;
 }

@@ -1,0 +1,17 @@
+[package]
+name = "tuvren-kernel-rust-grpc-service"
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+version.workspace = true
+
+[dependencies]
+prost.workspace = true
+tokio.workspace = true
+tokio-stream.workspace = true
+tonic.workspace = true
+tonic-prost.workspace = true
+tuvren-kernel-rust.workspace = true
+
+[build-dependencies]
+tonic-prost-build.workspace = true
