@@ -246,7 +246,7 @@ fn provided_step_tree_must_match_run_schema() {
 }
 
 #[test]
-fn terminal_completion_checkpoints_unanchored_staged_results() {
+fn terminal_failure_checkpoints_unanchored_staged_results() {
     let (kernel, _) = kernel_with_run(StepDeclaration {
         deterministic: false,
         id: "model_call".to_string(),
@@ -264,8 +264,8 @@ fn terminal_completion_checkpoints_unanchored_staged_results() {
         )
         .expect("stage succeeds");
     let terminal_hash = kernel
-        .run_complete("run_main", RunCompletionStatus::Completed, None)
-        .expect("run completes")
+        .run_complete("run_main", RunCompletionStatus::Failed, None)
+        .expect("run fails with a terminal checkpoint")
         .expect("terminal checkpoint hash");
     let recovery = kernel.run_recover("run_main").expect("recovery succeeds");
 
@@ -377,7 +377,7 @@ fn terminal_event_hash_must_reference_stored_object() {
     let error = kernel
         .run_complete(
             "run_main",
-            RunCompletionStatus::Completed,
+            RunCompletionStatus::Failed,
             Some("missing_event".to_string()),
         )
         .expect_err("missing terminal event object is rejected");
@@ -422,6 +422,9 @@ fn staging_stage_requires_running_run() {
         metadata: None,
         side_effects: false,
     });
+    kernel
+        .run_complete_step("run_main", "model_call", None, Vec::new(), None)
+        .expect("step completes");
     kernel
         .run_complete("run_main", RunCompletionStatus::Completed, None)
         .expect("run completes");
@@ -544,7 +547,199 @@ fn tree_create_without_base_requires_all_paths() {
     assert_eq!(error.payload.code, "incomplete_turn_tree_manifest");
 }
 
+#[test]
+fn thread_roots_are_unique_for_lineage_proofs() {
+    let (kernel, root_a) = kernel_with_run(StepDeclaration {
+        deterministic: false,
+        id: "model_call".to_string(),
+        metadata: None,
+        side_effects: false,
+    });
+    let (_, node_a) = kernel
+        .run_complete_step("run_main", "model_call", None, Vec::new(), None)
+        .expect("thread A step checkpoints");
+    let node_a = node_a.expect("checkpoint hash");
+    let thread_b = kernel
+        .thread_create("thread_b", "schema_main", "branch_b")
+        .expect("second thread creates with same schema");
+
+    assert_ne!(root_a, thread_b.root_turn_node_hash);
+    let error = kernel
+        .branch_create("branch_cross_thread", "thread_b", &node_a)
+        .expect_err("thread A node cannot seed thread B branch");
+    assert_eq!(error.payload.code, "turn_node_thread_mismatch");
+}
+
+#[test]
+fn run_create_schema_must_match_start_node() {
+    let kernel = InMemoryKernel::new();
+    kernel
+        .schema_register(canonical_schema())
+        .expect("schema registers");
+    let mut other_schema = canonical_schema();
+    other_schema.schema_id = "schema_other".to_string();
+    kernel
+        .schema_register(other_schema)
+        .expect("other schema registers");
+    let thread = kernel
+        .thread_create("thread_main", "schema_main", "branch_main")
+        .expect("thread creates");
+    let turn = kernel
+        .turn_create(
+            "turn_main",
+            "thread_main",
+            "branch_main",
+            None,
+            &thread.root_turn_node_hash,
+        )
+        .expect("turn creates");
+    let error = kernel
+        .run_create(
+            "run_main",
+            &turn.turn_id,
+            "branch_main",
+            "schema_other",
+            &thread.root_turn_node_hash,
+            vec![StepDeclaration {
+                deterministic: false,
+                id: "model_call".to_string(),
+                metadata: None,
+                side_effects: false,
+            }],
+        )
+        .expect_err("run schema cannot differ from start node schema");
+
+    assert_eq!(error.payload.code, "run_schema_mismatch");
+}
+
+#[test]
+fn run_create_rejects_empty_step_sequence() {
+    let kernel = InMemoryKernel::new();
+    kernel
+        .schema_register(canonical_schema())
+        .expect("schema registers");
+    let thread = kernel
+        .thread_create("thread_main", "schema_main", "branch_main")
+        .expect("thread creates");
+    let turn = kernel
+        .turn_create(
+            "turn_main",
+            "thread_main",
+            "branch_main",
+            None,
+            &thread.root_turn_node_hash,
+        )
+        .expect("turn creates");
+    let error = kernel
+        .run_create(
+            "run_main",
+            &turn.turn_id,
+            "branch_main",
+            "schema_main",
+            &thread.root_turn_node_hash,
+            Vec::new(),
+        )
+        .expect_err("empty step sequence is rejected");
+
+    assert_eq!(error.payload.code, "invalid_step_sequence");
+}
+
+#[test]
+fn run_complete_completed_requires_all_steps() {
+    let (kernel, _) = kernel_with_steps(vec![
+        StepDeclaration {
+            deterministic: true,
+            id: "first".to_string(),
+            metadata: None,
+            side_effects: false,
+        },
+        StepDeclaration {
+            deterministic: true,
+            id: "second".to_string(),
+            metadata: None,
+            side_effects: false,
+        },
+    ]);
+    let error = kernel
+        .run_complete("run_main", RunCompletionStatus::Completed, None)
+        .expect_err("completed run must exhaust steps");
+
+    assert_eq!(error.payload.code, "run_steps_incomplete");
+}
+
+#[test]
+fn staging_stage_rejects_empty_task_and_object_type() {
+    let (kernel, _) = kernel_with_run(StepDeclaration {
+        deterministic: false,
+        id: "model_call".to_string(),
+        metadata: None,
+        side_effects: false,
+    });
+    let task_error = kernel
+        .staging_stage(
+            "run_main",
+            b"hello".to_vec(),
+            "",
+            "message",
+            StagedResultStatus::Completed,
+            None,
+        )
+        .expect_err("empty task id is rejected");
+    let object_type_error = kernel
+        .staging_stage(
+            "run_main",
+            b"hello".to_vec(),
+            "msg_assistant",
+            "",
+            StagedResultStatus::Completed,
+            None,
+        )
+        .expect_err("empty object type is rejected");
+
+    assert_eq!(task_error.payload.code, "invalid_task_id");
+    assert_eq!(object_type_error.payload.code, "invalid_object_type");
+}
+
+#[test]
+fn tree_values_must_contain_hash_strings() {
+    let kernel = InMemoryKernel::new();
+    kernel
+        .schema_register(canonical_schema())
+        .expect("schema registers");
+    let thread = kernel
+        .thread_create("thread_main", "schema_main", "branch_main")
+        .expect("thread creates");
+    let mut invalid_manifest = empty_canonical_manifest();
+    invalid_manifest.insert(
+        "messages".to_string(),
+        PathValue::Ordered(vec!["not_a_hash".to_string()]),
+    );
+    let create_error = kernel
+        .tree_create("schema_main", invalid_manifest, None)
+        .expect_err("invalid manifest hash is rejected");
+    let incorporate_error = kernel
+        .tree_incorporate(
+            &thread.root_turn_tree_hash,
+            &[StagedResult {
+                interrupt_payload: None,
+                object_hash: "not_a_hash".to_string(),
+                object_type: "message".to_string(),
+                status: StagedResultStatus::Completed,
+                task_id: "msg_assistant".to_string(),
+                timestamp_ms: 1_717_171_717_171,
+            }],
+        )
+        .expect_err("invalid staged object hash is rejected");
+
+    assert_eq!(create_error.payload.code, "invalid_hash_string");
+    assert_eq!(incorporate_error.payload.code, "invalid_hash_string");
+}
+
 fn kernel_with_run(step: StepDeclaration) -> (InMemoryKernel, String) {
+    kernel_with_steps(vec![step])
+}
+
+fn kernel_with_steps(steps: Vec<StepDeclaration>) -> (InMemoryKernel, String) {
     let kernel = InMemoryKernel::with_options(InMemoryKernelOptions {
         now: Some(Arc::new(|| 1_717_171_717_171)),
     });
@@ -570,7 +765,7 @@ fn kernel_with_run(step: StepDeclaration) -> (InMemoryKernel, String) {
             "branch_main",
             "schema_main",
             &thread.root_turn_node_hash,
-            vec![step],
+            steps,
         )
         .expect("run create succeeds");
     (kernel, thread.root_turn_node_hash)

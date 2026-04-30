@@ -170,6 +170,7 @@ impl InMemoryKernel {
         let mut manifest = base_tree.manifest;
 
         for staged_result in staged_results {
+            validate_staged_result_shape(staged_result)?;
             let rule = schema
                 .incorporation_rules
                 .iter()
@@ -293,9 +294,19 @@ impl InMemoryKernel {
                 schema_id: schema_id.to_string(),
             },
         );
+        let root_event_blob = format!("tuvren.kernel.thread-root:{thread_id}").into_bytes();
+        let root_event_hash = hash_bytes_to_hex(&root_event_blob);
+        state.objects.insert(
+            root_event_hash.clone(),
+            ObjectRecord {
+                blob: root_event_blob,
+            },
+        );
         let mut root_node = TurnNode {
             consumed_staged_results: Vec::new(),
-            event_hash: None,
+            // Root nodes include a backend-owned event object so two threads
+            // sharing a schema do not collapse to the same genesis hash.
+            event_hash: Some(root_event_hash),
             hash: String::new(),
             previous_turn_node_hash: None,
             schema_id: schema_id.to_string(),
@@ -511,6 +522,12 @@ impl InMemoryKernel {
         status: StagedResultStatus,
         interrupt_payload: Option<KernelRecord>,
     ) -> KernelResult<(HashString, StagedResult)> {
+        validate_non_empty(task_id, "invalid_task_id", "task id must not be empty")?;
+        validate_non_empty(
+            object_type,
+            "invalid_object_type",
+            "object type must not be empty",
+        )?;
         if matches!(status, StagedResultStatus::Interrupted) != interrupt_payload.is_some() {
             return Err(KernelError::new(
                 "invalid_staged_result_outcome",
@@ -612,6 +629,17 @@ impl InMemoryKernel {
         }
         if !state.schemas.contains_key(schema_id) {
             return Err(missing("schema_not_found", "schema does not exist"));
+        }
+        let start_node = state
+            .turn_nodes
+            .get(start_turn_node_hash)
+            .ok_or_else(|| missing("turn_node_not_found", "run start turn node does not exist"))?;
+        if start_node.schema_id != schema_id {
+            return Err(KernelError::new(
+                "run_schema_mismatch",
+                "run schema must match the start turn node schema",
+                None,
+            ));
         }
         if state.runs.values().any(|run| {
             run.branch_id == branch_id
@@ -788,6 +816,15 @@ impl InMemoryKernel {
             RunCompletionStatus::Failed => RunStatus::Failed,
         };
         validate_run_completion_transition(&run.status, &terminal_status)?;
+        if terminal_status == RunStatus::Completed
+            && run.current_step_index != run.step_sequence.len()
+        {
+            return Err(KernelError::new(
+                "run_steps_incomplete",
+                "completed runs must exhaust their declared step sequence",
+                None,
+            ));
+        }
         let staged_results = state
             .staged_results
             .get(run_id)
@@ -914,6 +951,7 @@ fn incorporate_locked(
         .ok_or_else(|| missing("schema_not_found", "turn tree schema does not exist"))?;
     let mut manifest = base_tree.manifest;
     for staged_result in staged_results {
+        validate_staged_result_shape(staged_result)?;
         let rule = schema
             .incorporation_rules
             .iter()
@@ -1101,14 +1139,50 @@ fn apply_incorporation_rule(
 
 fn validate_path_value(collection: PathCollectionKind, value: &PathValue) -> KernelResult<()> {
     match (collection, value) {
-        (PathCollectionKind::Ordered, PathValue::Ordered(_))
-        | (PathCollectionKind::Single, PathValue::Single(_))
-        | (PathCollectionKind::Single, PathValue::Null) => Ok(()),
+        (PathCollectionKind::Ordered, PathValue::Ordered(values)) => {
+            for value in values {
+                validate_hash_string(value)?;
+            }
+            Ok(())
+        }
+        (PathCollectionKind::Single, PathValue::Single(value)) => validate_hash_string(value),
+        (PathCollectionKind::Single, PathValue::Null) => Ok(()),
         _ => Err(KernelError::new(
             "invalid_path_value_kind",
             "path value does not match path collection kind",
             None,
         )),
+    }
+}
+
+fn validate_staged_result_shape(staged_result: &StagedResult) -> KernelResult<()> {
+    validate_non_empty(
+        &staged_result.task_id,
+        "invalid_task_id",
+        "task id must not be empty",
+    )?;
+    validate_non_empty(
+        &staged_result.object_type,
+        "invalid_object_type",
+        "object type must not be empty",
+    )?;
+    validate_hash_string(&staged_result.object_hash)
+}
+
+fn validate_hash_string(hash: &str) -> KernelResult<()> {
+    if hash.len() == 64
+        && hash
+            .as_bytes()
+            .iter()
+            .all(|byte| matches!(byte, b'0'..=b'9' | b'a'..=b'f'))
+    {
+        Ok(())
+    } else {
+        Err(KernelError::new(
+            "invalid_hash_string",
+            "hash must be a lowercase 64-character SHA-256 hex digest",
+            None,
+        ))
     }
 }
 
@@ -1157,6 +1231,13 @@ fn validate_schema(schema: &TurnTreeSchema) -> KernelResult<()> {
 }
 
 fn validate_steps(steps: &[StepDeclaration]) -> KernelResult<()> {
+    if steps.is_empty() {
+        return Err(KernelError::new(
+            "invalid_step_sequence",
+            "run step sequence must not be empty",
+            None,
+        ));
+    }
     let mut ids = HashSet::new();
     for step in steps {
         validate_non_empty(&step.id, "invalid_step_id", "step id must not be empty")?;
