@@ -166,8 +166,23 @@
       "assertions": [
         {
           "kind": "evidenceField",
-          "field": "$.controls.cancelAfterEvent",
+          "field": "$.cancellation.observedEventType",
           "equals": "turn.start"
+        },
+        {
+          "kind": "evidenceField",
+          "field": "$.cancellation.observedEventIndex",
+          "equals": 0
+        },
+        {
+          "kind": "evidenceField",
+          "field": "$.cancellation.cancelInvocations",
+          "equals": 2
+        },
+        {
+          "kind": "evidenceField",
+          "field": "$.cancellation.errorEventCount",
+          "equals": 1
         },
         {
           "kind": "evidenceField",
@@ -175,7 +190,13 @@
           "equals": "failed"
         }
       ],
-      "evidence": ["controls.cancelAfterEvent", "runtime.phase"]
+      "evidence": [
+        "cancellation.observedEventType",
+        "cancellation.observedEventIndex",
+        "cancellation.cancelInvocations",
+        "cancellation.errorEventCount",
+        "runtime.phase"
+      ]
     }
   ]
 }

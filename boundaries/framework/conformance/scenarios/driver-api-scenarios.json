@@ -23,12 +23,38 @@
   },
   "driver-resume-approval": {
     "operation": "driver.resume",
+    "pendingToolCalls": [
+      {
+        "callId": "call-search",
+        "name": "search",
+        "input": { "query": "driver resume approval" }
+      }
+    ],
     "approvalDecisions": [{ "callId": "call-search", "type": "approve" }],
     "providerResponses": [
       {
         "finishReason": "stop",
         "parts": [
           { "type": "text", "text": "driver resume from shared scenario" }
+        ]
+      }
+    ]
+  },
+  "driver-resume-missing-pending-call": {
+    "operation": "driver.resume",
+    "pendingToolCalls": [
+      {
+        "callId": "call-search",
+        "name": "search",
+        "input": { "query": "driver resume approval" }
+      }
+    ],
+    "approvalDecisions": [{ "callId": "call-missing", "type": "approve" }],
+    "providerResponses": [
+      {
+        "finishReason": "stop",
+        "parts": [
+          { "type": "text", "text": "driver resume should reject mismatch" }
         ]
       }
     ]

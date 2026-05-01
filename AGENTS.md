@@ -104,6 +104,9 @@ Event-stream implementation conformance must consume events emitted by the
 runtime or driver implementation under test; projection-only checks over
 preauthored stream fixtures belong in binding-local adapter tests or fixture
 validation, not in compatibility evidence for an implementation lane.
+Promoted plans must not assert implementation-owned error-code literals such as
+driver- or runner-specific prefixes unless a neutral contract artifact owns that
+code first.
 
 ## Pull Request Follow-Up
 

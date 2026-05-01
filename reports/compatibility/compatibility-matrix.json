@@ -14,6 +14,7 @@
             "driver-callable.checkpoint",
             "driver-api.execute.resolution",
             "driver-api.resume.approval",
+            "driver-api.resume.requires-pending-call",
             "driver-api.error.envelope",
             "event-stream.sse.projection",
             "event-stream.sse.eager-subscription",
@@ -35,8 +36,8 @@
           ],
           "checkSummary": {
             "failedChecks": 0,
-            "passedChecks": 25,
-            "totalChecks": 25
+            "passedChecks": 26,
+            "totalChecks": 26
           },
           "evidencePath": "reports/compatibility/evidence/framework-typescript-conformance-runner.typescript-framework.json",
           "status": "pass",
@@ -136,6 +137,7 @@
             "driver-callable.checkpoint",
             "driver-api.execute.resolution",
             "driver-api.resume.approval",
+            "driver-api.resume.requires-pending-call",
             "driver-api.error.envelope",
             "event-stream.sse.projection",
             "event-stream.sse.eager-subscription",
@@ -156,9 +158,9 @@
             "runtime-api.recover-result.staged-result"
           ],
           "checkSummary": {
-            "failedChecks": 25,
+            "failedChecks": 26,
             "passedChecks": 0,
-            "totalChecks": 25
+            "totalChecks": 26
           },
           "evidencePath": "reports/compatibility/evidence/framework-rust-conformance-runner.rust-framework.json",
           "status": "fail",

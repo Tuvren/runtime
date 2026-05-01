@@ -26,7 +26,7 @@
     {
       "checkId": "runtime-api.cancel-execution.failure",
       "operation": "runtime.cancel-execution",
-      "controls": { "deadlineMs": 1000 },
+      "controls": { "deadlineMs": 1000, "cancelAfterEvent": "turn.start" },
       "assertions": [
         {
           "kind": "errorEnvelope",
@@ -66,18 +66,30 @@
       "assertions": [
         {
           "kind": "stateField",
-          "field": "$.branch.createdHeadTurnNodeHash",
-          "matches": "^[a-f0-9]{64}$"
+          "field": "$.branch.completedTurnPhase",
+          "equals": "completed"
+        },
+        {
+          "kind": "stateField",
+          "field": "$.branch.sourceMessageCount",
+          "equals": 2
         },
         {
           "kind": "stateField",
           "field": "$.branch.sourceHeadTurnNodeHash",
+          "matches": "^[a-f0-9]{64}$"
+        },
+        {
+          "kind": "stateField",
+          "field": "$.branch.createdHeadTurnNodeHash",
           "matches": "^[a-f0-9]{64}$"
         }
       ],
       "evidence": [
         "branch.createdBranchId",
         "branch.sourceBranchId",
+        "branch.completedTurnPhase",
+        "branch.sourceMessageCount",
         "branch.createdHeadTurnNodeHash",
         "branch.sourceHeadTurnNodeHash"
       ]

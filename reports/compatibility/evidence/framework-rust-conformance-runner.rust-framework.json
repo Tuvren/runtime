@@ -264,9 +264,64 @@
         {
           "assertionId": "driver-api.resume.approval.1.evidenceField",
           "status": "fail"
+        },
+        {
+          "assertionId": "driver-api.resume.approval.2.evidenceField",
+          "status": "fail"
+        },
+        {
+          "assertionId": "driver-api.resume.approval.3.evidenceField",
+          "status": "fail"
         }
       ],
       "checkId": "driver-api.resume.approval",
+      "details": {
+        "adapterOutcome": {
+          "error": {
+            "code": "rust_framework_operation_not_implemented",
+            "details": {
+              "operation": "driver.resume",
+              "receivedControlKeys": [],
+              "receivedInputKeys": ["checkInput", "scenario"]
+            },
+            "message": "Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet"
+          },
+          "kind": "error"
+        },
+        "authority": {
+          "packetId": "tuvren.framework.driver-api",
+          "planId": "tuvren.framework.driver-api.core",
+          "planPath": "boundaries/framework/conformance/plans/driver-api-core.json",
+          "planVersion": "0.1.0"
+        },
+        "controls": {},
+        "operation": "driver.resume",
+        "state": {
+          "adapterError": {
+            "code": "rust_framework_operation_not_implemented",
+            "details": {
+              "operation": "driver.resume",
+              "receivedControlKeys": [],
+              "receivedInputKeys": ["checkInput", "scenario"]
+            },
+            "message": "Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet"
+          }
+        }
+      },
+      "status": "fail"
+    },
+    {
+      "assertionResults": [
+        {
+          "assertionId": "driver-api.resume.requires-pending-call.1.evidenceField",
+          "status": "fail"
+        },
+        {
+          "assertionId": "driver-api.resume.requires-pending-call.2.errorEnvelope",
+          "status": "fail"
+        }
+      ],
+      "checkId": "driver-api.resume.requires-pending-call",
       "details": {
         "adapterOutcome": {
           "error": {
@@ -502,6 +557,10 @@
         },
         {
           "assertionId": "event-stream.agui.failed-turn-error-projection.2.evidenceField",
+          "status": "fail"
+        },
+        {
+          "assertionId": "event-stream.agui.failed-turn-error-projection.3.evidenceField",
           "status": "fail"
         }
       ],
@@ -864,6 +923,18 @@
         {
           "assertionId": "runtime-callable.timeout-retry-cancellation-idempotency.2.evidenceField",
           "status": "fail"
+        },
+        {
+          "assertionId": "runtime-callable.timeout-retry-cancellation-idempotency.3.evidenceField",
+          "status": "fail"
+        },
+        {
+          "assertionId": "runtime-callable.timeout-retry-cancellation-idempotency.4.evidenceField",
+          "status": "fail"
+        },
+        {
+          "assertionId": "runtime-callable.timeout-retry-cancellation-idempotency.5.evidenceField",
+          "status": "fail"
         }
       ],
       "checkId": "runtime-callable.timeout-retry-cancellation-idempotency",
@@ -962,7 +1033,7 @@
             "code": "rust_framework_operation_not_implemented",
             "details": {
               "operation": "runtime.cancel-execution",
-              "receivedControlKeys": ["deadlineMs"],
+              "receivedControlKeys": ["cancelAfterEvent", "deadlineMs"],
               "receivedInputKeys": ["checkInput"]
             },
             "message": "Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet"
@@ -976,6 +1047,7 @@
           "planVersion": "0.1.0"
         },
         "controls": {
+          "cancelAfterEvent": "turn.start",
           "deadlineMs": 1000
         },
         "operation": "runtime.cancel-execution",
@@ -984,7 +1056,7 @@
             "code": "rust_framework_operation_not_implemented",
             "details": {
               "operation": "runtime.cancel-execution",
-              "receivedControlKeys": ["deadlineMs"],
+              "receivedControlKeys": ["cancelAfterEvent", "deadlineMs"],
               "receivedInputKeys": ["checkInput"]
             },
             "message": "Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet"
@@ -1048,6 +1120,14 @@
         },
         {
           "assertionId": "runtime-api.branch-create.recovery.2.stateField",
+          "status": "fail"
+        },
+        {
+          "assertionId": "runtime-api.branch-create.recovery.3.stateField",
+          "status": "fail"
+        },
+        {
+          "assertionId": "runtime-api.branch-create.recovery.4.stateField",
           "status": "fail"
         }
       ],
@@ -1196,9 +1276,9 @@
   "project": "framework-rust-conformance-runner",
   "status": "fail",
   "summary": {
-    "failedChecks": 25,
+    "failedChecks": 26,
     "passedChecks": 0,
-    "totalChecks": 25
+    "totalChecks": 26
   },
   "suiteId": "tuvren.framework.promoted-authority",
   "suiteVersion": "0.1.0"

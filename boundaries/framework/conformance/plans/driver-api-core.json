@@ -33,9 +33,41 @@
           "kind": "evidenceField",
           "field": "$.driver.resolutionType",
           "equals": "end_turn"
+        },
+        {
+          "kind": "evidenceField",
+          "field": "$.driver.approvalDecisionCallIds",
+          "equals": ["call-search"]
+        },
+        {
+          "kind": "evidenceField",
+          "field": "$.driver.pendingToolCallIds",
+          "equals": ["call-search"]
         }
       ],
-      "evidence": ["driver.resolutionType"]
+      "evidence": [
+        "driver.resolutionType",
+        "driver.approvalDecisionCallIds",
+        "driver.pendingToolCallIds"
+      ]
+    },
+    {
+      "checkId": "driver-api.resume.requires-pending-call",
+      "operation": "driver.resume",
+      "scenario": "driver-api-scenarios",
+      "input": { "scenarioPath": "$.driver-resume-missing-pending-call" },
+      "assertions": [
+        {
+          "kind": "evidenceField",
+          "field": "$.driver.resolutionType",
+          "equals": "fail"
+        },
+        {
+          "kind": "errorEnvelope",
+          "path": "$.result.error"
+        }
+      ],
+      "evidence": ["driver.resolutionType", "result.error.code"]
     },
     {
       "checkId": "driver-api.error.envelope",

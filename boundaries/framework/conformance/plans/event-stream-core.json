@@ -152,8 +152,13 @@
         },
         {
           "kind": "evidenceField",
-          "field": "$.events.8.code",
-          "equals": "react_driver_provider_failure"
+          "field": "$.events.8.rawEvent.type",
+          "equals": "error"
+        },
+        {
+          "kind": "evidenceField",
+          "field": "$.events.8.rawEvent.error.code",
+          "matches": "^[a-z0-9]+(?:_[a-z0-9]+)*$"
         }
       ],
       "evidence": ["sourceEventTypes", "eventTypes", "events"]

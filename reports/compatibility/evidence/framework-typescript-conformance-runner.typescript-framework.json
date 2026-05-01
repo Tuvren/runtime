@@ -434,6 +434,14 @@
         {
           "assertionId": "driver-api.resume.approval.1.evidenceField",
           "status": "pass"
+        },
+        {
+          "assertionId": "driver-api.resume.approval.2.evidenceField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "driver-api.resume.approval.3.evidenceField",
+          "status": "pass"
         }
       ],
       "checkId": "driver-api.resume.approval",
@@ -443,19 +451,83 @@
           "value": {
             "evidence": {
               "driver": {
+                "approvalDecisionCallIds": ["call-search"],
+                "pendingToolCallIds": ["call-search"],
                 "resolutionType": "end_turn"
               }
-            }
+            },
+            "result": {}
           }
         },
         "driver": {
+          "approvalDecisionCallIds": ["call-search"],
+          "pendingToolCallIds": ["call-search"],
           "resolutionType": "end_turn"
         },
+        "result": {},
         "state": {
           "adapter": {
             "adapterEvents": 1,
             "initialized": true,
             "status": "completed"
+          }
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "assertionResults": [
+        {
+          "assertionId": "driver-api.resume.requires-pending-call.1.evidenceField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "driver-api.resume.requires-pending-call.2.errorEnvelope",
+          "status": "pass"
+        }
+      ],
+      "checkId": "driver-api.resume.requires-pending-call",
+      "details": {
+        "adapterOutcome": {
+          "kind": "result",
+          "value": {
+            "evidence": {
+              "driver": {
+                "approvalDecisionCallIds": ["call-missing"],
+                "pendingToolCallIds": ["call-search"],
+                "resolutionType": "fail"
+              }
+            },
+            "result": {
+              "error": {
+                "code": "driver_resume_unknown_approval_call",
+                "message": "driver resume approval decision does not match a pending tool call",
+                "details": {
+                  "callId": "call-missing"
+                }
+              }
+            }
+          }
+        },
+        "driver": {
+          "approvalDecisionCallIds": ["call-missing"],
+          "pendingToolCallIds": ["call-search"],
+          "resolutionType": "fail"
+        },
+        "result": {
+          "error": {
+            "code": "driver_resume_unknown_approval_call",
+            "message": "driver resume approval decision does not match a pending tool call",
+            "details": {
+              "callId": "call-missing"
+            }
+          }
+        },
+        "state": {
+          "adapter": {
+            "adapterEvents": 1,
+            "initialized": true,
+            "status": "failed"
           }
         }
       },
@@ -603,7 +675,7 @@
               "framePayloads": [
                 {
                   "threadId": "conformance-id-1",
-                  "timestamp": 1777639852611,
+                  "timestamp": 1777641052796,
                   "turnId": "conformance-id-3",
                   "type": "turn.start",
                   "source": {
@@ -614,7 +686,7 @@
                 },
                 {
                   "iterationCount": 0,
-                  "timestamp": 1777639852612,
+                  "timestamp": 1777641052797,
                   "turnNodeHash": "140056641f536293271cb5e47ec17f1afbb333e40a3bb142821be4b5e7028a50",
                   "type": "state.checkpoint",
                   "source": {
@@ -646,7 +718,7 @@
                     },
                     "turnBoundaries": [0]
                   },
-                  "timestamp": 1777639852612,
+                  "timestamp": 1777641052797,
                   "type": "state.snapshot",
                   "source": {
                     "agent": "typescript-conformance-agent",
@@ -656,7 +728,7 @@
                 },
                 {
                   "iterationCount": 1,
-                  "timestamp": 1777639852612,
+                  "timestamp": 1777641052797,
                   "type": "iteration.start",
                   "source": {
                     "agent": "typescript-conformance-agent",
@@ -665,9 +737,9 @@
                   }
                 },
                 {
-                  "messageId": "4fcf63be-0227-4a0c-96f0-73980ea55f2a",
+                  "messageId": "ca0ff148-c6b1-44be-9a15-2b6e1d324b64",
                   "role": "assistant",
-                  "timestamp": 1777639852613,
+                  "timestamp": 1777641052798,
                   "type": "message.start",
                   "source": {
                     "agent": "typescript-conformance-agent",
@@ -677,9 +749,9 @@
                 },
                 {
                   "callId": "call-search",
-                  "messageId": "4fcf63be-0227-4a0c-96f0-73980ea55f2a",
+                  "messageId": "ca0ff148-c6b1-44be-9a15-2b6e1d324b64",
                   "name": "search",
-                  "timestamp": 1777639852613,
+                  "timestamp": 1777641052798,
                   "type": "tool_call.start",
                   "source": {
                     "agent": "typescript-conformance-agent",
@@ -690,7 +762,7 @@
                 {
                   "callId": "call-search",
                   "delta": "{\"query\":\"event stream measurement\"}",
-                  "timestamp": 1777639852613,
+                  "timestamp": 1777641052798,
                   "type": "tool_call.args_delta",
                   "source": {
                     "agent": "typescript-conformance-agent",
@@ -704,7 +776,7 @@
                     "query": "event stream measurement"
                   },
                   "name": "search",
-                  "timestamp": 1777639852613,
+                  "timestamp": 1777641052798,
                   "type": "tool_call.done",
                   "source": {
                     "agent": "typescript-conformance-agent",
@@ -714,8 +786,8 @@
                 },
                 {
                   "finishReason": "tool_call",
-                  "messageId": "4fcf63be-0227-4a0c-96f0-73980ea55f2a",
-                  "timestamp": 1777639852613,
+                  "messageId": "ca0ff148-c6b1-44be-9a15-2b6e1d324b64",
+                  "timestamp": 1777641052798,
                   "type": "message.done",
                   "source": {
                     "agent": "typescript-conformance-agent",
@@ -729,7 +801,7 @@
                     "query": "event stream measurement"
                   },
                   "name": "search",
-                  "timestamp": 1777639852614,
+                  "timestamp": 1777641052799,
                   "type": "tool.start",
                   "source": {
                     "agent": "typescript-conformance-agent",
@@ -744,7 +816,7 @@
                     "ok": true,
                     "source": "shared event stream scenario"
                   },
-                  "timestamp": 1777639852614,
+                  "timestamp": 1777641052799,
                   "type": "tool.result",
                   "source": {
                     "agent": "typescript-conformance-agent",
@@ -754,7 +826,7 @@
                 },
                 {
                   "iterationCount": 1,
-                  "timestamp": 1777639852620,
+                  "timestamp": 1777641052800,
                   "turnNodeHash": "fa67587e044e22b815f2c95919e8c4253157bd2d629a3f889e828932197026b1",
                   "type": "state.checkpoint",
                   "source": {
@@ -790,7 +862,7 @@
                     },
                     "turnBoundaries": [0]
                   },
-                  "timestamp": 1777639852620,
+                  "timestamp": 1777641052800,
                   "type": "state.snapshot",
                   "source": {
                     "agent": "typescript-conformance-agent",
@@ -800,7 +872,7 @@
                 },
                 {
                   "iterationCount": 1,
-                  "timestamp": 1777639852620,
+                  "timestamp": 1777641052800,
                   "type": "iteration.end",
                   "source": {
                     "agent": "typescript-conformance-agent",
@@ -810,7 +882,7 @@
                 },
                 {
                   "iterationCount": 2,
-                  "timestamp": 1777639852620,
+                  "timestamp": 1777641052800,
                   "type": "iteration.start",
                   "source": {
                     "agent": "typescript-conformance-agent",
@@ -819,9 +891,9 @@
                   }
                 },
                 {
-                  "messageId": "786a56ea-98ee-46c2-82d1-0850d1464162",
+                  "messageId": "35563c99-77fe-4eb3-a2ad-cf21003c02b9",
                   "role": "assistant",
-                  "timestamp": 1777639852621,
+                  "timestamp": 1777641052801,
                   "type": "message.start",
                   "source": {
                     "agent": "typescript-conformance-agent",
@@ -831,8 +903,8 @@
                 },
                 {
                   "delta": "event stream turn completed",
-                  "messageId": "786a56ea-98ee-46c2-82d1-0850d1464162",
-                  "timestamp": 1777639852621,
+                  "messageId": "35563c99-77fe-4eb3-a2ad-cf21003c02b9",
+                  "timestamp": 1777641052801,
                   "type": "text.delta",
                   "source": {
                     "agent": "typescript-conformance-agent",
@@ -841,9 +913,9 @@
                   }
                 },
                 {
-                  "messageId": "786a56ea-98ee-46c2-82d1-0850d1464162",
+                  "messageId": "35563c99-77fe-4eb3-a2ad-cf21003c02b9",
                   "text": "event stream turn completed",
-                  "timestamp": 1777639852621,
+                  "timestamp": 1777641052801,
                   "type": "text.done",
                   "source": {
                     "agent": "typescript-conformance-agent",
@@ -853,8 +925,8 @@
                 },
                 {
                   "finishReason": "stop",
-                  "messageId": "786a56ea-98ee-46c2-82d1-0850d1464162",
-                  "timestamp": 1777639852621,
+                  "messageId": "35563c99-77fe-4eb3-a2ad-cf21003c02b9",
+                  "timestamp": 1777641052801,
                   "type": "message.done",
                   "source": {
                     "agent": "typescript-conformance-agent",
@@ -864,7 +936,7 @@
                 },
                 {
                   "iterationCount": 2,
-                  "timestamp": 1777639852622,
+                  "timestamp": 1777641052802,
                   "turnNodeHash": "5ec2475ec7babf2660987caeebabb488eb99bc54f959e72cbf0e6d916dcdc88b",
                   "type": "state.checkpoint",
                   "source": {
@@ -900,7 +972,7 @@
                     },
                     "turnBoundaries": [0]
                   },
-                  "timestamp": 1777639852623,
+                  "timestamp": 1777641052802,
                   "type": "state.snapshot",
                   "source": {
                     "agent": "typescript-conformance-agent",
@@ -910,7 +982,7 @@
                 },
                 {
                   "iterationCount": 2,
-                  "timestamp": 1777639852623,
+                  "timestamp": 1777641052802,
                   "type": "iteration.end",
                   "source": {
                     "agent": "typescript-conformance-agent",
@@ -920,7 +992,7 @@
                 },
                 {
                   "iterationCount": 2,
-                  "timestamp": 1777639852624,
+                  "timestamp": 1777641052803,
                   "turnNodeHash": "c9b4ddfd122a60339c3afeb14208518273d8f1492e1b918789f57302e53f4bf4",
                   "type": "state.checkpoint",
                   "source": {
@@ -931,7 +1003,7 @@
                 },
                 {
                   "status": "completed",
-                  "timestamp": 1777639852624,
+                  "timestamp": 1777641052804,
                   "turnId": "conformance-id-3",
                   "type": "turn.end",
                   "source": {
@@ -999,7 +1071,7 @@
         "framePayloads": [
           {
             "threadId": "conformance-id-1",
-            "timestamp": 1777639852611,
+            "timestamp": 1777641052796,
             "turnId": "conformance-id-3",
             "type": "turn.start",
             "source": {
@@ -1010,7 +1082,7 @@
           },
           {
             "iterationCount": 0,
-            "timestamp": 1777639852612,
+            "timestamp": 1777641052797,
             "turnNodeHash": "140056641f536293271cb5e47ec17f1afbb333e40a3bb142821be4b5e7028a50",
             "type": "state.checkpoint",
             "source": {
@@ -1042,7 +1114,7 @@
               },
               "turnBoundaries": [0]
             },
-            "timestamp": 1777639852612,
+            "timestamp": 1777641052797,
             "type": "state.snapshot",
             "source": {
               "agent": "typescript-conformance-agent",
@@ -1052,7 +1124,7 @@
           },
           {
             "iterationCount": 1,
-            "timestamp": 1777639852612,
+            "timestamp": 1777641052797,
             "type": "iteration.start",
             "source": {
               "agent": "typescript-conformance-agent",
@@ -1061,9 +1133,9 @@
             }
           },
           {
-            "messageId": "4fcf63be-0227-4a0c-96f0-73980ea55f2a",
+            "messageId": "ca0ff148-c6b1-44be-9a15-2b6e1d324b64",
             "role": "assistant",
-            "timestamp": 1777639852613,
+            "timestamp": 1777641052798,
             "type": "message.start",
             "source": {
               "agent": "typescript-conformance-agent",
@@ -1073,9 +1145,9 @@
           },
           {
             "callId": "call-search",
-            "messageId": "4fcf63be-0227-4a0c-96f0-73980ea55f2a",
+            "messageId": "ca0ff148-c6b1-44be-9a15-2b6e1d324b64",
             "name": "search",
-            "timestamp": 1777639852613,
+            "timestamp": 1777641052798,
             "type": "tool_call.start",
             "source": {
               "agent": "typescript-conformance-agent",
@@ -1086,7 +1158,7 @@
           {
             "callId": "call-search",
             "delta": "{\"query\":\"event stream measurement\"}",
-            "timestamp": 1777639852613,
+            "timestamp": 1777641052798,
             "type": "tool_call.args_delta",
             "source": {
               "agent": "typescript-conformance-agent",
@@ -1100,7 +1172,7 @@
               "query": "event stream measurement"
             },
             "name": "search",
-            "timestamp": 1777639852613,
+            "timestamp": 1777641052798,
             "type": "tool_call.done",
             "source": {
               "agent": "typescript-conformance-agent",
@@ -1110,8 +1182,8 @@
           },
           {
             "finishReason": "tool_call",
-            "messageId": "4fcf63be-0227-4a0c-96f0-73980ea55f2a",
-            "timestamp": 1777639852613,
+            "messageId": "ca0ff148-c6b1-44be-9a15-2b6e1d324b64",
+            "timestamp": 1777641052798,
             "type": "message.done",
             "source": {
               "agent": "typescript-conformance-agent",
@@ -1125,7 +1197,7 @@
               "query": "event stream measurement"
             },
             "name": "search",
-            "timestamp": 1777639852614,
+            "timestamp": 1777641052799,
             "type": "tool.start",
             "source": {
               "agent": "typescript-conformance-agent",
@@ -1140,7 +1212,7 @@
               "ok": true,
               "source": "shared event stream scenario"
             },
-            "timestamp": 1777639852614,
+            "timestamp": 1777641052799,
             "type": "tool.result",
             "source": {
               "agent": "typescript-conformance-agent",
@@ -1150,7 +1222,7 @@
           },
           {
             "iterationCount": 1,
-            "timestamp": 1777639852620,
+            "timestamp": 1777641052800,
             "turnNodeHash": "fa67587e044e22b815f2c95919e8c4253157bd2d629a3f889e828932197026b1",
             "type": "state.checkpoint",
             "source": {
@@ -1186,7 +1258,7 @@
               },
               "turnBoundaries": [0]
             },
-            "timestamp": 1777639852620,
+            "timestamp": 1777641052800,
             "type": "state.snapshot",
             "source": {
               "agent": "typescript-conformance-agent",
@@ -1196,7 +1268,7 @@
           },
           {
             "iterationCount": 1,
-            "timestamp": 1777639852620,
+            "timestamp": 1777641052800,
             "type": "iteration.end",
             "source": {
               "agent": "typescript-conformance-agent",
@@ -1206,7 +1278,7 @@
           },
           {
             "iterationCount": 2,
-            "timestamp": 1777639852620,
+            "timestamp": 1777641052800,
             "type": "iteration.start",
             "source": {
               "agent": "typescript-conformance-agent",
@@ -1215,9 +1287,9 @@
             }
           },
           {
-            "messageId": "786a56ea-98ee-46c2-82d1-0850d1464162",
+            "messageId": "35563c99-77fe-4eb3-a2ad-cf21003c02b9",
             "role": "assistant",
-            "timestamp": 1777639852621,
+            "timestamp": 1777641052801,
             "type": "message.start",
             "source": {
               "agent": "typescript-conformance-agent",
@@ -1227,8 +1299,8 @@
           },
           {
             "delta": "event stream turn completed",
-            "messageId": "786a56ea-98ee-46c2-82d1-0850d1464162",
-            "timestamp": 1777639852621,
+            "messageId": "35563c99-77fe-4eb3-a2ad-cf21003c02b9",
+            "timestamp": 1777641052801,
             "type": "text.delta",
             "source": {
               "agent": "typescript-conformance-agent",
@@ -1237,9 +1309,9 @@
             }
           },
           {
-            "messageId": "786a56ea-98ee-46c2-82d1-0850d1464162",
+            "messageId": "35563c99-77fe-4eb3-a2ad-cf21003c02b9",
             "text": "event stream turn completed",
-            "timestamp": 1777639852621,
+            "timestamp": 1777641052801,
             "type": "text.done",
             "source": {
               "agent": "typescript-conformance-agent",
@@ -1249,8 +1321,8 @@
           },
           {
             "finishReason": "stop",
-            "messageId": "786a56ea-98ee-46c2-82d1-0850d1464162",
-            "timestamp": 1777639852621,
+            "messageId": "35563c99-77fe-4eb3-a2ad-cf21003c02b9",
+            "timestamp": 1777641052801,
             "type": "message.done",
             "source": {
               "agent": "typescript-conformance-agent",
@@ -1260,7 +1332,7 @@
           },
           {
             "iterationCount": 2,
-            "timestamp": 1777639852622,
+            "timestamp": 1777641052802,
             "turnNodeHash": "5ec2475ec7babf2660987caeebabb488eb99bc54f959e72cbf0e6d916dcdc88b",
             "type": "state.checkpoint",
             "source": {
@@ -1296,7 +1368,7 @@
               },
               "turnBoundaries": [0]
             },
-            "timestamp": 1777639852623,
+            "timestamp": 1777641052802,
             "type": "state.snapshot",
             "source": {
               "agent": "typescript-conformance-agent",
@@ -1306,7 +1378,7 @@
           },
           {
             "iterationCount": 2,
-            "timestamp": 1777639852623,
+            "timestamp": 1777641052802,
             "type": "iteration.end",
             "source": {
               "agent": "typescript-conformance-agent",
@@ -1316,7 +1388,7 @@
           },
           {
             "iterationCount": 2,
-            "timestamp": 1777639852624,
+            "timestamp": 1777641052803,
             "turnNodeHash": "c9b4ddfd122a60339c3afeb14208518273d8f1492e1b918789f57302e53f4bf4",
             "type": "state.checkpoint",
             "source": {
@@ -1327,7 +1399,7 @@
           },
           {
             "status": "completed",
-            "timestamp": 1777639852624,
+            "timestamp": 1777641052804,
             "turnId": "conformance-id-3",
             "type": "turn.end",
             "source": {
@@ -1456,10 +1528,10 @@
               "events": [
                 {
                   "type": "RUN_STARTED",
-                  "timestamp": 1777639852641,
+                  "timestamp": 1777641052828,
                   "rawEvent": {
                     "threadId": "conformance-id-1",
-                    "timestamp": 1777639852641,
+                    "timestamp": 1777641052828,
                     "turnId": "conformance-id-3",
                     "type": "turn.start",
                     "source": {
@@ -1473,10 +1545,10 @@
                 },
                 {
                   "type": "CUSTOM",
-                  "timestamp": 1777639852642,
+                  "timestamp": 1777641052829,
                   "rawEvent": {
                     "iterationCount": 0,
-                    "timestamp": 1777639852642,
+                    "timestamp": 1777641052829,
                     "turnNodeHash": "140056641f536293271cb5e47ec17f1afbb333e40a3bb142821be4b5e7028a50",
                     "type": "state.checkpoint",
                     "source": {
@@ -1488,7 +1560,7 @@
                   "name": "tuvren.runtime.state.checkpoint",
                   "value": {
                     "iterationCount": 0,
-                    "timestamp": 1777639852642,
+                    "timestamp": 1777641052829,
                     "turnNodeHash": "140056641f536293271cb5e47ec17f1afbb333e40a3bb142821be4b5e7028a50",
                     "type": "state.checkpoint",
                     "source": {
@@ -1500,7 +1572,7 @@
                 },
                 {
                   "type": "STATE_SNAPSHOT",
-                  "timestamp": 1777639852642,
+                  "timestamp": 1777641052829,
                   "rawEvent": {
                     "manifest": {
                       "byRole": {
@@ -1524,7 +1596,7 @@
                       },
                       "turnBoundaries": [0]
                     },
-                    "timestamp": 1777639852642,
+                    "timestamp": 1777641052829,
                     "type": "state.snapshot",
                     "source": {
                       "agent": "typescript-conformance-agent",
@@ -1559,10 +1631,10 @@
                 },
                 {
                   "type": "STEP_STARTED",
-                  "timestamp": 1777639852642,
+                  "timestamp": 1777641052829,
                   "rawEvent": {
                     "iterationCount": 1,
-                    "timestamp": 1777639852642,
+                    "timestamp": 1777641052829,
                     "type": "iteration.start",
                     "source": {
                       "agent": "typescript-conformance-agent",
@@ -1574,12 +1646,12 @@
                 },
                 {
                   "type": "TOOL_CALL_START",
-                  "timestamp": 1777639852643,
+                  "timestamp": 1777641052829,
                   "rawEvent": {
                     "callId": "call-search",
-                    "messageId": "a095c779-8145-4e1d-83ad-fad4137b2c9c",
+                    "messageId": "7717a0a2-acba-4d98-a4fe-31c724c899dc",
                     "name": "search",
-                    "timestamp": 1777639852643,
+                    "timestamp": 1777641052829,
                     "type": "tool_call.start",
                     "source": {
                       "agent": "typescript-conformance-agent",
@@ -1589,15 +1661,15 @@
                   },
                   "toolCallId": "call-search",
                   "toolCallName": "search",
-                  "parentMessageId": "a095c779-8145-4e1d-83ad-fad4137b2c9c"
+                  "parentMessageId": "7717a0a2-acba-4d98-a4fe-31c724c899dc"
                 },
                 {
                   "type": "TOOL_CALL_ARGS",
-                  "timestamp": 1777639852643,
+                  "timestamp": 1777641052829,
                   "rawEvent": {
                     "callId": "call-search",
                     "delta": "{\"query\":\"event stream measurement\"}",
-                    "timestamp": 1777639852643,
+                    "timestamp": 1777641052829,
                     "type": "tool_call.args_delta",
                     "source": {
                       "agent": "typescript-conformance-agent",
@@ -1610,14 +1682,14 @@
                 },
                 {
                   "type": "TOOL_CALL_END",
-                  "timestamp": 1777639852643,
+                  "timestamp": 1777641052829,
                   "rawEvent": {
                     "callId": "call-search",
                     "input": {
                       "query": "event stream measurement"
                     },
                     "name": "search",
-                    "timestamp": 1777639852643,
+                    "timestamp": 1777641052829,
                     "type": "tool_call.done",
                     "source": {
                       "agent": "typescript-conformance-agent",
@@ -1629,11 +1701,11 @@
                 },
                 {
                   "type": "CUSTOM",
-                  "timestamp": 1777639852643,
+                  "timestamp": 1777641052829,
                   "rawEvent": {
                     "finishReason": "tool_call",
-                    "messageId": "a095c779-8145-4e1d-83ad-fad4137b2c9c",
-                    "timestamp": 1777639852643,
+                    "messageId": "7717a0a2-acba-4d98-a4fe-31c724c899dc",
+                    "timestamp": 1777641052829,
                     "type": "message.done",
                     "source": {
                       "agent": "typescript-conformance-agent",
@@ -1644,8 +1716,8 @@
                   "name": "tuvren.runtime.message.done",
                   "value": {
                     "finishReason": "tool_call",
-                    "messageId": "a095c779-8145-4e1d-83ad-fad4137b2c9c",
-                    "timestamp": 1777639852643,
+                    "messageId": "7717a0a2-acba-4d98-a4fe-31c724c899dc",
+                    "timestamp": 1777641052829,
                     "type": "message.done",
                     "source": {
                       "agent": "typescript-conformance-agent",
@@ -1656,14 +1728,14 @@
                 },
                 {
                   "type": "CUSTOM",
-                  "timestamp": 1777639852644,
+                  "timestamp": 1777641052830,
                   "rawEvent": {
                     "callId": "call-search",
                     "input": {
                       "query": "event stream measurement"
                     },
                     "name": "search",
-                    "timestamp": 1777639852644,
+                    "timestamp": 1777641052830,
                     "type": "tool.start",
                     "source": {
                       "agent": "typescript-conformance-agent",
@@ -1678,7 +1750,7 @@
                       "query": "event stream measurement"
                     },
                     "name": "search",
-                    "timestamp": 1777639852644,
+                    "timestamp": 1777641052830,
                     "type": "tool.start",
                     "source": {
                       "agent": "typescript-conformance-agent",
@@ -1689,7 +1761,7 @@
                 },
                 {
                   "type": "TOOL_CALL_RESULT",
-                  "timestamp": 1777639852644,
+                  "timestamp": 1777641052831,
                   "rawEvent": {
                     "callId": "call-search",
                     "name": "search",
@@ -1697,7 +1769,7 @@
                       "ok": true,
                       "source": "shared event stream scenario"
                     },
-                    "timestamp": 1777639852644,
+                    "timestamp": 1777641052831,
                     "type": "tool.result",
                     "source": {
                       "agent": "typescript-conformance-agent",
@@ -1712,10 +1784,10 @@
                 },
                 {
                   "type": "CUSTOM",
-                  "timestamp": 1777639852645,
+                  "timestamp": 1777641052831,
                   "rawEvent": {
                     "iterationCount": 1,
-                    "timestamp": 1777639852645,
+                    "timestamp": 1777641052831,
                     "turnNodeHash": "fa67587e044e22b815f2c95919e8c4253157bd2d629a3f889e828932197026b1",
                     "type": "state.checkpoint",
                     "source": {
@@ -1727,7 +1799,7 @@
                   "name": "tuvren.runtime.state.checkpoint",
                   "value": {
                     "iterationCount": 1,
-                    "timestamp": 1777639852645,
+                    "timestamp": 1777641052831,
                     "turnNodeHash": "fa67587e044e22b815f2c95919e8c4253157bd2d629a3f889e828932197026b1",
                     "type": "state.checkpoint",
                     "source": {
@@ -1739,7 +1811,7 @@
                 },
                 {
                   "type": "STATE_SNAPSHOT",
-                  "timestamp": 1777639852645,
+                  "timestamp": 1777641052832,
                   "rawEvent": {
                     "manifest": {
                       "byRole": {
@@ -1767,7 +1839,7 @@
                       },
                       "turnBoundaries": [0]
                     },
-                    "timestamp": 1777639852645,
+                    "timestamp": 1777641052832,
                     "type": "state.snapshot",
                     "source": {
                       "agent": "typescript-conformance-agent",
@@ -1806,10 +1878,10 @@
                 },
                 {
                   "type": "STEP_FINISHED",
-                  "timestamp": 1777639852645,
+                  "timestamp": 1777641052832,
                   "rawEvent": {
                     "iterationCount": 1,
-                    "timestamp": 1777639852645,
+                    "timestamp": 1777641052832,
                     "type": "iteration.end",
                     "source": {
                       "agent": "typescript-conformance-agent",
@@ -1821,10 +1893,10 @@
                 },
                 {
                   "type": "STEP_STARTED",
-                  "timestamp": 1777639852645,
+                  "timestamp": 1777641052832,
                   "rawEvent": {
                     "iterationCount": 2,
-                    "timestamp": 1777639852645,
+                    "timestamp": 1777641052832,
                     "type": "iteration.start",
                     "source": {
                       "agent": "typescript-conformance-agent",
@@ -1836,11 +1908,11 @@
                 },
                 {
                   "type": "TEXT_MESSAGE_START",
-                  "timestamp": 1777639852646,
+                  "timestamp": 1777641052832,
                   "rawEvent": {
                     "delta": "event stream turn completed",
-                    "messageId": "fd2c61d0-61d3-43c5-8017-6369404ce5bd",
-                    "timestamp": 1777639852646,
+                    "messageId": "f4ff499a-f5ef-4c32-93e5-05dc880c3e5e",
+                    "timestamp": 1777641052832,
                     "type": "text.delta",
                     "source": {
                       "agent": "typescript-conformance-agent",
@@ -1848,16 +1920,16 @@
                       "threadId": "conformance-id-1"
                     }
                   },
-                  "messageId": "fd2c61d0-61d3-43c5-8017-6369404ce5bd",
+                  "messageId": "f4ff499a-f5ef-4c32-93e5-05dc880c3e5e",
                   "role": "assistant"
                 },
                 {
                   "type": "TEXT_MESSAGE_CONTENT",
-                  "timestamp": 1777639852646,
+                  "timestamp": 1777641052832,
                   "rawEvent": {
                     "delta": "event stream turn completed",
-                    "messageId": "fd2c61d0-61d3-43c5-8017-6369404ce5bd",
-                    "timestamp": 1777639852646,
+                    "messageId": "f4ff499a-f5ef-4c32-93e5-05dc880c3e5e",
+                    "timestamp": 1777641052832,
                     "type": "text.delta",
                     "source": {
                       "agent": "typescript-conformance-agent",
@@ -1865,16 +1937,16 @@
                       "threadId": "conformance-id-1"
                     }
                   },
-                  "messageId": "fd2c61d0-61d3-43c5-8017-6369404ce5bd",
+                  "messageId": "f4ff499a-f5ef-4c32-93e5-05dc880c3e5e",
                   "delta": "event stream turn completed"
                 },
                 {
                   "type": "TEXT_MESSAGE_END",
-                  "timestamp": 1777639852646,
+                  "timestamp": 1777641052832,
                   "rawEvent": {
-                    "messageId": "fd2c61d0-61d3-43c5-8017-6369404ce5bd",
+                    "messageId": "f4ff499a-f5ef-4c32-93e5-05dc880c3e5e",
                     "text": "event stream turn completed",
-                    "timestamp": 1777639852646,
+                    "timestamp": 1777641052832,
                     "type": "text.done",
                     "source": {
                       "agent": "typescript-conformance-agent",
@@ -1882,15 +1954,15 @@
                       "threadId": "conformance-id-1"
                     }
                   },
-                  "messageId": "fd2c61d0-61d3-43c5-8017-6369404ce5bd"
+                  "messageId": "f4ff499a-f5ef-4c32-93e5-05dc880c3e5e"
                 },
                 {
                   "type": "CUSTOM",
-                  "timestamp": 1777639852646,
+                  "timestamp": 1777641052832,
                   "rawEvent": {
                     "finishReason": "stop",
-                    "messageId": "fd2c61d0-61d3-43c5-8017-6369404ce5bd",
-                    "timestamp": 1777639852646,
+                    "messageId": "f4ff499a-f5ef-4c32-93e5-05dc880c3e5e",
+                    "timestamp": 1777641052832,
                     "type": "message.done",
                     "source": {
                       "agent": "typescript-conformance-agent",
@@ -1901,8 +1973,8 @@
                   "name": "tuvren.runtime.message.done",
                   "value": {
                     "finishReason": "stop",
-                    "messageId": "fd2c61d0-61d3-43c5-8017-6369404ce5bd",
-                    "timestamp": 1777639852646,
+                    "messageId": "f4ff499a-f5ef-4c32-93e5-05dc880c3e5e",
+                    "timestamp": 1777641052832,
                     "type": "message.done",
                     "source": {
                       "agent": "typescript-conformance-agent",
@@ -1913,10 +1985,10 @@
                 },
                 {
                   "type": "CUSTOM",
-                  "timestamp": 1777639852648,
+                  "timestamp": 1777641052834,
                   "rawEvent": {
                     "iterationCount": 2,
-                    "timestamp": 1777639852648,
+                    "timestamp": 1777641052834,
                     "turnNodeHash": "5ec2475ec7babf2660987caeebabb488eb99bc54f959e72cbf0e6d916dcdc88b",
                     "type": "state.checkpoint",
                     "source": {
@@ -1928,7 +2000,7 @@
                   "name": "tuvren.runtime.state.checkpoint",
                   "value": {
                     "iterationCount": 2,
-                    "timestamp": 1777639852648,
+                    "timestamp": 1777641052834,
                     "turnNodeHash": "5ec2475ec7babf2660987caeebabb488eb99bc54f959e72cbf0e6d916dcdc88b",
                     "type": "state.checkpoint",
                     "source": {
@@ -1940,7 +2012,7 @@
                 },
                 {
                   "type": "STATE_SNAPSHOT",
-                  "timestamp": 1777639852648,
+                  "timestamp": 1777641052834,
                   "rawEvent": {
                     "manifest": {
                       "byRole": {
@@ -1968,7 +2040,7 @@
                       },
                       "turnBoundaries": [0]
                     },
-                    "timestamp": 1777639852648,
+                    "timestamp": 1777641052834,
                     "type": "state.snapshot",
                     "source": {
                       "agent": "typescript-conformance-agent",
@@ -2007,10 +2079,10 @@
                 },
                 {
                   "type": "STEP_FINISHED",
-                  "timestamp": 1777639852652,
+                  "timestamp": 1777641052834,
                   "rawEvent": {
                     "iterationCount": 2,
-                    "timestamp": 1777639852652,
+                    "timestamp": 1777641052834,
                     "type": "iteration.end",
                     "source": {
                       "agent": "typescript-conformance-agent",
@@ -2022,10 +2094,10 @@
                 },
                 {
                   "type": "CUSTOM",
-                  "timestamp": 1777639852653,
+                  "timestamp": 1777641052835,
                   "rawEvent": {
                     "iterationCount": 2,
-                    "timestamp": 1777639852653,
+                    "timestamp": 1777641052835,
                     "turnNodeHash": "c9b4ddfd122a60339c3afeb14208518273d8f1492e1b918789f57302e53f4bf4",
                     "type": "state.checkpoint",
                     "source": {
@@ -2037,7 +2109,7 @@
                   "name": "tuvren.runtime.state.checkpoint",
                   "value": {
                     "iterationCount": 2,
-                    "timestamp": 1777639852653,
+                    "timestamp": 1777641052835,
                     "turnNodeHash": "c9b4ddfd122a60339c3afeb14208518273d8f1492e1b918789f57302e53f4bf4",
                     "type": "state.checkpoint",
                     "source": {
@@ -2049,10 +2121,10 @@
                 },
                 {
                   "type": "RUN_FINISHED",
-                  "timestamp": 1777639852653,
+                  "timestamp": 1777641052836,
                   "rawEvent": {
                     "status": "completed",
-                    "timestamp": 1777639852653,
+                    "timestamp": 1777641052836,
                     "turnId": "conformance-id-3",
                     "type": "turn.end",
                     "source": {
@@ -2130,10 +2202,10 @@
         "events": [
           {
             "type": "RUN_STARTED",
-            "timestamp": 1777639852641,
+            "timestamp": 1777641052828,
             "rawEvent": {
               "threadId": "conformance-id-1",
-              "timestamp": 1777639852641,
+              "timestamp": 1777641052828,
               "turnId": "conformance-id-3",
               "type": "turn.start",
               "source": {
@@ -2147,10 +2219,10 @@
           },
           {
             "type": "CUSTOM",
-            "timestamp": 1777639852642,
+            "timestamp": 1777641052829,
             "rawEvent": {
               "iterationCount": 0,
-              "timestamp": 1777639852642,
+              "timestamp": 1777641052829,
               "turnNodeHash": "140056641f536293271cb5e47ec17f1afbb333e40a3bb142821be4b5e7028a50",
               "type": "state.checkpoint",
               "source": {
@@ -2162,7 +2234,7 @@
             "name": "tuvren.runtime.state.checkpoint",
             "value": {
               "iterationCount": 0,
-              "timestamp": 1777639852642,
+              "timestamp": 1777641052829,
               "turnNodeHash": "140056641f536293271cb5e47ec17f1afbb333e40a3bb142821be4b5e7028a50",
               "type": "state.checkpoint",
               "source": {
@@ -2174,7 +2246,7 @@
           },
           {
             "type": "STATE_SNAPSHOT",
-            "timestamp": 1777639852642,
+            "timestamp": 1777641052829,
             "rawEvent": {
               "manifest": {
                 "byRole": {
@@ -2198,7 +2270,7 @@
                 },
                 "turnBoundaries": [0]
               },
-              "timestamp": 1777639852642,
+              "timestamp": 1777641052829,
               "type": "state.snapshot",
               "source": {
                 "agent": "typescript-conformance-agent",
@@ -2233,10 +2305,10 @@
           },
           {
             "type": "STEP_STARTED",
-            "timestamp": 1777639852642,
+            "timestamp": 1777641052829,
             "rawEvent": {
               "iterationCount": 1,
-              "timestamp": 1777639852642,
+              "timestamp": 1777641052829,
               "type": "iteration.start",
               "source": {
                 "agent": "typescript-conformance-agent",
@@ -2248,12 +2320,12 @@
           },
           {
             "type": "TOOL_CALL_START",
-            "timestamp": 1777639852643,
+            "timestamp": 1777641052829,
             "rawEvent": {
               "callId": "call-search",
-              "messageId": "a095c779-8145-4e1d-83ad-fad4137b2c9c",
+              "messageId": "7717a0a2-acba-4d98-a4fe-31c724c899dc",
               "name": "search",
-              "timestamp": 1777639852643,
+              "timestamp": 1777641052829,
               "type": "tool_call.start",
               "source": {
                 "agent": "typescript-conformance-agent",
@@ -2263,15 +2335,15 @@
             },
             "toolCallId": "call-search",
             "toolCallName": "search",
-            "parentMessageId": "a095c779-8145-4e1d-83ad-fad4137b2c9c"
+            "parentMessageId": "7717a0a2-acba-4d98-a4fe-31c724c899dc"
           },
           {
             "type": "TOOL_CALL_ARGS",
-            "timestamp": 1777639852643,
+            "timestamp": 1777641052829,
             "rawEvent": {
               "callId": "call-search",
               "delta": "{\"query\":\"event stream measurement\"}",
-              "timestamp": 1777639852643,
+              "timestamp": 1777641052829,
               "type": "tool_call.args_delta",
               "source": {
                 "agent": "typescript-conformance-agent",
@@ -2284,14 +2356,14 @@
           },
           {
             "type": "TOOL_CALL_END",
-            "timestamp": 1777639852643,
+            "timestamp": 1777641052829,
             "rawEvent": {
               "callId": "call-search",
               "input": {
                 "query": "event stream measurement"
               },
               "name": "search",
-              "timestamp": 1777639852643,
+              "timestamp": 1777641052829,
               "type": "tool_call.done",
               "source": {
                 "agent": "typescript-conformance-agent",
@@ -2303,11 +2375,11 @@
           },
           {
             "type": "CUSTOM",
-            "timestamp": 1777639852643,
+            "timestamp": 1777641052829,
             "rawEvent": {
               "finishReason": "tool_call",
-              "messageId": "a095c779-8145-4e1d-83ad-fad4137b2c9c",
-              "timestamp": 1777639852643,
+              "messageId": "7717a0a2-acba-4d98-a4fe-31c724c899dc",
+              "timestamp": 1777641052829,
               "type": "message.done",
               "source": {
                 "agent": "typescript-conformance-agent",
@@ -2318,8 +2390,8 @@
             "name": "tuvren.runtime.message.done",
             "value": {
               "finishReason": "tool_call",
-              "messageId": "a095c779-8145-4e1d-83ad-fad4137b2c9c",
-              "timestamp": 1777639852643,
+              "messageId": "7717a0a2-acba-4d98-a4fe-31c724c899dc",
+              "timestamp": 1777641052829,
               "type": "message.done",
               "source": {
                 "agent": "typescript-conformance-agent",
@@ -2330,14 +2402,14 @@
           },
           {
             "type": "CUSTOM",
-            "timestamp": 1777639852644,
+            "timestamp": 1777641052830,
             "rawEvent": {
               "callId": "call-search",
               "input": {
                 "query": "event stream measurement"
               },
               "name": "search",
-              "timestamp": 1777639852644,
+              "timestamp": 1777641052830,
               "type": "tool.start",
               "source": {
                 "agent": "typescript-conformance-agent",
@@ -2352,7 +2424,7 @@
                 "query": "event stream measurement"
               },
               "name": "search",
-              "timestamp": 1777639852644,
+              "timestamp": 1777641052830,
               "type": "tool.start",
               "source": {
                 "agent": "typescript-conformance-agent",
@@ -2363,7 +2435,7 @@
           },
           {
             "type": "TOOL_CALL_RESULT",
-            "timestamp": 1777639852644,
+            "timestamp": 1777641052831,
             "rawEvent": {
               "callId": "call-search",
               "name": "search",
@@ -2371,7 +2443,7 @@
                 "ok": true,
                 "source": "shared event stream scenario"
               },
-              "timestamp": 1777639852644,
+              "timestamp": 1777641052831,
               "type": "tool.result",
               "source": {
                 "agent": "typescript-conformance-agent",
@@ -2386,10 +2458,10 @@
           },
           {
             "type": "CUSTOM",
-            "timestamp": 1777639852645,
+            "timestamp": 1777641052831,
             "rawEvent": {
               "iterationCount": 1,
-              "timestamp": 1777639852645,
+              "timestamp": 1777641052831,
               "turnNodeHash": "fa67587e044e22b815f2c95919e8c4253157bd2d629a3f889e828932197026b1",
               "type": "state.checkpoint",
               "source": {
@@ -2401,7 +2473,7 @@
             "name": "tuvren.runtime.state.checkpoint",
             "value": {
               "iterationCount": 1,
-              "timestamp": 1777639852645,
+              "timestamp": 1777641052831,
               "turnNodeHash": "fa67587e044e22b815f2c95919e8c4253157bd2d629a3f889e828932197026b1",
               "type": "state.checkpoint",
               "source": {
@@ -2413,7 +2485,7 @@
           },
           {
             "type": "STATE_SNAPSHOT",
-            "timestamp": 1777639852645,
+            "timestamp": 1777641052832,
             "rawEvent": {
               "manifest": {
                 "byRole": {
@@ -2441,7 +2513,7 @@
                 },
                 "turnBoundaries": [0]
               },
-              "timestamp": 1777639852645,
+              "timestamp": 1777641052832,
               "type": "state.snapshot",
               "source": {
                 "agent": "typescript-conformance-agent",
@@ -2480,10 +2552,10 @@
           },
           {
             "type": "STEP_FINISHED",
-            "timestamp": 1777639852645,
+            "timestamp": 1777641052832,
             "rawEvent": {
               "iterationCount": 1,
-              "timestamp": 1777639852645,
+              "timestamp": 1777641052832,
               "type": "iteration.end",
               "source": {
                 "agent": "typescript-conformance-agent",
@@ -2495,10 +2567,10 @@
           },
           {
             "type": "STEP_STARTED",
-            "timestamp": 1777639852645,
+            "timestamp": 1777641052832,
             "rawEvent": {
               "iterationCount": 2,
-              "timestamp": 1777639852645,
+              "timestamp": 1777641052832,
               "type": "iteration.start",
               "source": {
                 "agent": "typescript-conformance-agent",
@@ -2510,11 +2582,11 @@
           },
           {
             "type": "TEXT_MESSAGE_START",
-            "timestamp": 1777639852646,
+            "timestamp": 1777641052832,
             "rawEvent": {
               "delta": "event stream turn completed",
-              "messageId": "fd2c61d0-61d3-43c5-8017-6369404ce5bd",
-              "timestamp": 1777639852646,
+              "messageId": "f4ff499a-f5ef-4c32-93e5-05dc880c3e5e",
+              "timestamp": 1777641052832,
               "type": "text.delta",
               "source": {
                 "agent": "typescript-conformance-agent",
@@ -2522,16 +2594,16 @@
                 "threadId": "conformance-id-1"
               }
             },
-            "messageId": "fd2c61d0-61d3-43c5-8017-6369404ce5bd",
+            "messageId": "f4ff499a-f5ef-4c32-93e5-05dc880c3e5e",
             "role": "assistant"
           },
           {
             "type": "TEXT_MESSAGE_CONTENT",
-            "timestamp": 1777639852646,
+            "timestamp": 1777641052832,
             "rawEvent": {
               "delta": "event stream turn completed",
-              "messageId": "fd2c61d0-61d3-43c5-8017-6369404ce5bd",
-              "timestamp": 1777639852646,
+              "messageId": "f4ff499a-f5ef-4c32-93e5-05dc880c3e5e",
+              "timestamp": 1777641052832,
               "type": "text.delta",
               "source": {
                 "agent": "typescript-conformance-agent",
@@ -2539,16 +2611,16 @@
                 "threadId": "conformance-id-1"
               }
             },
-            "messageId": "fd2c61d0-61d3-43c5-8017-6369404ce5bd",
+            "messageId": "f4ff499a-f5ef-4c32-93e5-05dc880c3e5e",
             "delta": "event stream turn completed"
           },
           {
             "type": "TEXT_MESSAGE_END",
-            "timestamp": 1777639852646,
+            "timestamp": 1777641052832,
             "rawEvent": {
-              "messageId": "fd2c61d0-61d3-43c5-8017-6369404ce5bd",
+              "messageId": "f4ff499a-f5ef-4c32-93e5-05dc880c3e5e",
               "text": "event stream turn completed",
-              "timestamp": 1777639852646,
+              "timestamp": 1777641052832,
               "type": "text.done",
               "source": {
                 "agent": "typescript-conformance-agent",
@@ -2556,15 +2628,15 @@
                 "threadId": "conformance-id-1"
               }
             },
-            "messageId": "fd2c61d0-61d3-43c5-8017-6369404ce5bd"
+            "messageId": "f4ff499a-f5ef-4c32-93e5-05dc880c3e5e"
           },
           {
             "type": "CUSTOM",
-            "timestamp": 1777639852646,
+            "timestamp": 1777641052832,
             "rawEvent": {
               "finishReason": "stop",
-              "messageId": "fd2c61d0-61d3-43c5-8017-6369404ce5bd",
-              "timestamp": 1777639852646,
+              "messageId": "f4ff499a-f5ef-4c32-93e5-05dc880c3e5e",
+              "timestamp": 1777641052832,
               "type": "message.done",
               "source": {
                 "agent": "typescript-conformance-agent",
@@ -2575,8 +2647,8 @@
             "name": "tuvren.runtime.message.done",
             "value": {
               "finishReason": "stop",
-              "messageId": "fd2c61d0-61d3-43c5-8017-6369404ce5bd",
-              "timestamp": 1777639852646,
+              "messageId": "f4ff499a-f5ef-4c32-93e5-05dc880c3e5e",
+              "timestamp": 1777641052832,
               "type": "message.done",
               "source": {
                 "agent": "typescript-conformance-agent",
@@ -2587,10 +2659,10 @@
           },
           {
             "type": "CUSTOM",
-            "timestamp": 1777639852648,
+            "timestamp": 1777641052834,
             "rawEvent": {
               "iterationCount": 2,
-              "timestamp": 1777639852648,
+              "timestamp": 1777641052834,
               "turnNodeHash": "5ec2475ec7babf2660987caeebabb488eb99bc54f959e72cbf0e6d916dcdc88b",
               "type": "state.checkpoint",
               "source": {
@@ -2602,7 +2674,7 @@
             "name": "tuvren.runtime.state.checkpoint",
             "value": {
               "iterationCount": 2,
-              "timestamp": 1777639852648,
+              "timestamp": 1777641052834,
               "turnNodeHash": "5ec2475ec7babf2660987caeebabb488eb99bc54f959e72cbf0e6d916dcdc88b",
               "type": "state.checkpoint",
               "source": {
@@ -2614,7 +2686,7 @@
           },
           {
             "type": "STATE_SNAPSHOT",
-            "timestamp": 1777639852648,
+            "timestamp": 1777641052834,
             "rawEvent": {
               "manifest": {
                 "byRole": {
@@ -2642,7 +2714,7 @@
                 },
                 "turnBoundaries": [0]
               },
-              "timestamp": 1777639852648,
+              "timestamp": 1777641052834,
               "type": "state.snapshot",
               "source": {
                 "agent": "typescript-conformance-agent",
@@ -2681,10 +2753,10 @@
           },
           {
             "type": "STEP_FINISHED",
-            "timestamp": 1777639852652,
+            "timestamp": 1777641052834,
             "rawEvent": {
               "iterationCount": 2,
-              "timestamp": 1777639852652,
+              "timestamp": 1777641052834,
               "type": "iteration.end",
               "source": {
                 "agent": "typescript-conformance-agent",
@@ -2696,10 +2768,10 @@
           },
           {
             "type": "CUSTOM",
-            "timestamp": 1777639852653,
+            "timestamp": 1777641052835,
             "rawEvent": {
               "iterationCount": 2,
-              "timestamp": 1777639852653,
+              "timestamp": 1777641052835,
               "turnNodeHash": "c9b4ddfd122a60339c3afeb14208518273d8f1492e1b918789f57302e53f4bf4",
               "type": "state.checkpoint",
               "source": {
@@ -2711,7 +2783,7 @@
             "name": "tuvren.runtime.state.checkpoint",
             "value": {
               "iterationCount": 2,
-              "timestamp": 1777639852653,
+              "timestamp": 1777641052835,
               "turnNodeHash": "c9b4ddfd122a60339c3afeb14208518273d8f1492e1b918789f57302e53f4bf4",
               "type": "state.checkpoint",
               "source": {
@@ -2723,10 +2795,10 @@
           },
           {
             "type": "RUN_FINISHED",
-            "timestamp": 1777639852653,
+            "timestamp": 1777641052836,
             "rawEvent": {
               "status": "completed",
-              "timestamp": 1777639852653,
+              "timestamp": 1777641052836,
               "turnId": "conformance-id-3",
               "type": "turn.end",
               "source": {
@@ -2766,6 +2838,10 @@
         {
           "assertionId": "event-stream.agui.failed-turn-error-projection.2.evidenceField",
           "status": "pass"
+        },
+        {
+          "assertionId": "event-stream.agui.failed-turn-error-projection.3.evidenceField",
+          "status": "pass"
         }
       ],
       "checkId": "event-stream.agui.failed-turn-error-projection",
@@ -2800,10 +2876,10 @@
               "events": [
                 {
                   "type": "RUN_STARTED",
-                  "timestamp": 1777639852660,
+                  "timestamp": 1777641052848,
                   "rawEvent": {
                     "threadId": "conformance-id-1",
-                    "timestamp": 1777639852660,
+                    "timestamp": 1777641052848,
                     "turnId": "conformance-id-3",
                     "type": "turn.start",
                     "source": {
@@ -2817,10 +2893,10 @@
                 },
                 {
                   "type": "CUSTOM",
-                  "timestamp": 1777639852661,
+                  "timestamp": 1777641052849,
                   "rawEvent": {
                     "iterationCount": 0,
-                    "timestamp": 1777639852661,
+                    "timestamp": 1777641052849,
                     "turnNodeHash": "ef46945ffc1fb44ae7e7eb95a35034ae6379a773af7b4bc0ea0164c777171452",
                     "type": "state.checkpoint",
                     "source": {
@@ -2832,7 +2908,7 @@
                   "name": "tuvren.runtime.state.checkpoint",
                   "value": {
                     "iterationCount": 0,
-                    "timestamp": 1777639852661,
+                    "timestamp": 1777641052849,
                     "turnNodeHash": "ef46945ffc1fb44ae7e7eb95a35034ae6379a773af7b4bc0ea0164c777171452",
                     "type": "state.checkpoint",
                     "source": {
@@ -2844,7 +2920,7 @@
                 },
                 {
                   "type": "STATE_SNAPSHOT",
-                  "timestamp": 1777639852661,
+                  "timestamp": 1777641052849,
                   "rawEvent": {
                     "manifest": {
                       "byRole": {
@@ -2868,7 +2944,7 @@
                       },
                       "turnBoundaries": [0]
                     },
-                    "timestamp": 1777639852661,
+                    "timestamp": 1777641052849,
                     "type": "state.snapshot",
                     "source": {
                       "agent": "typescript-conformance-agent",
@@ -2903,10 +2979,10 @@
                 },
                 {
                   "type": "STEP_STARTED",
-                  "timestamp": 1777639852661,
+                  "timestamp": 1777641052849,
                   "rawEvent": {
                     "iterationCount": 1,
-                    "timestamp": 1777639852661,
+                    "timestamp": 1777641052849,
                     "type": "iteration.start",
                     "source": {
                       "agent": "typescript-conformance-agent",
@@ -2918,10 +2994,10 @@
                 },
                 {
                   "type": "CUSTOM",
-                  "timestamp": 1777639852663,
+                  "timestamp": 1777641052850,
                   "rawEvent": {
                     "iterationCount": 1,
-                    "timestamp": 1777639852663,
+                    "timestamp": 1777641052850,
                     "turnNodeHash": "1bc4f8348423f7d25ba27b5eb8042efb4c3c5f67084eecad723eb1690da65386",
                     "type": "state.checkpoint",
                     "source": {
@@ -2933,7 +3009,7 @@
                   "name": "tuvren.runtime.state.checkpoint",
                   "value": {
                     "iterationCount": 1,
-                    "timestamp": 1777639852663,
+                    "timestamp": 1777641052850,
                     "turnNodeHash": "1bc4f8348423f7d25ba27b5eb8042efb4c3c5f67084eecad723eb1690da65386",
                     "type": "state.checkpoint",
                     "source": {
@@ -2945,7 +3021,7 @@
                 },
                 {
                   "type": "STATE_SNAPSHOT",
-                  "timestamp": 1777639852663,
+                  "timestamp": 1777641052850,
                   "rawEvent": {
                     "manifest": {
                       "byRole": {
@@ -2969,7 +3045,7 @@
                       },
                       "turnBoundaries": [0]
                     },
-                    "timestamp": 1777639852663,
+                    "timestamp": 1777641052850,
                     "type": "state.snapshot",
                     "source": {
                       "agent": "typescript-conformance-agent",
@@ -3004,10 +3080,10 @@
                 },
                 {
                   "type": "STEP_FINISHED",
-                  "timestamp": 1777639852663,
+                  "timestamp": 1777641052850,
                   "rawEvent": {
                     "iterationCount": 1,
-                    "timestamp": 1777639852663,
+                    "timestamp": 1777641052850,
                     "type": "iteration.end",
                     "source": {
                       "agent": "typescript-conformance-agent",
@@ -3019,10 +3095,10 @@
                 },
                 {
                   "type": "CUSTOM",
-                  "timestamp": 1777639852667,
+                  "timestamp": 1777641052851,
                   "rawEvent": {
                     "iterationCount": 1,
-                    "timestamp": 1777639852667,
+                    "timestamp": 1777641052851,
                     "turnNodeHash": "bd8316546853aa3e3d3452785e7b87ab1519656b695d3c55353b19d2c1934418",
                     "type": "state.checkpoint",
                     "source": {
@@ -3034,7 +3110,7 @@
                   "name": "tuvren.runtime.state.checkpoint",
                   "value": {
                     "iterationCount": 1,
-                    "timestamp": 1777639852667,
+                    "timestamp": 1777641052851,
                     "turnNodeHash": "bd8316546853aa3e3d3452785e7b87ab1519656b695d3c55353b19d2c1934418",
                     "type": "state.checkpoint",
                     "source": {
@@ -3046,7 +3122,7 @@
                 },
                 {
                   "type": "RUN_ERROR",
-                  "timestamp": 1777639852667,
+                  "timestamp": 1777641052852,
                   "rawEvent": {
                     "error": {
                       "code": "react_driver_provider_failure",
@@ -3064,7 +3140,7 @@
                       "message": "provider returned an error finish reason"
                     },
                     "fatal": true,
-                    "timestamp": 1777639852667,
+                    "timestamp": 1777641052851,
                     "type": "error",
                     "source": {
                       "agent": "typescript-conformance-agent",
@@ -3106,10 +3182,10 @@
         "events": [
           {
             "type": "RUN_STARTED",
-            "timestamp": 1777639852660,
+            "timestamp": 1777641052848,
             "rawEvent": {
               "threadId": "conformance-id-1",
-              "timestamp": 1777639852660,
+              "timestamp": 1777641052848,
               "turnId": "conformance-id-3",
               "type": "turn.start",
               "source": {
@@ -3123,10 +3199,10 @@
           },
           {
             "type": "CUSTOM",
-            "timestamp": 1777639852661,
+            "timestamp": 1777641052849,
             "rawEvent": {
               "iterationCount": 0,
-              "timestamp": 1777639852661,
+              "timestamp": 1777641052849,
               "turnNodeHash": "ef46945ffc1fb44ae7e7eb95a35034ae6379a773af7b4bc0ea0164c777171452",
               "type": "state.checkpoint",
               "source": {
@@ -3138,7 +3214,7 @@
             "name": "tuvren.runtime.state.checkpoint",
             "value": {
               "iterationCount": 0,
-              "timestamp": 1777639852661,
+              "timestamp": 1777641052849,
               "turnNodeHash": "ef46945ffc1fb44ae7e7eb95a35034ae6379a773af7b4bc0ea0164c777171452",
               "type": "state.checkpoint",
               "source": {
@@ -3150,7 +3226,7 @@
           },
           {
             "type": "STATE_SNAPSHOT",
-            "timestamp": 1777639852661,
+            "timestamp": 1777641052849,
             "rawEvent": {
               "manifest": {
                 "byRole": {
@@ -3174,7 +3250,7 @@
                 },
                 "turnBoundaries": [0]
               },
-              "timestamp": 1777639852661,
+              "timestamp": 1777641052849,
               "type": "state.snapshot",
               "source": {
                 "agent": "typescript-conformance-agent",
@@ -3209,10 +3285,10 @@
           },
           {
             "type": "STEP_STARTED",
-            "timestamp": 1777639852661,
+            "timestamp": 1777641052849,
             "rawEvent": {
               "iterationCount": 1,
-              "timestamp": 1777639852661,
+              "timestamp": 1777641052849,
               "type": "iteration.start",
               "source": {
                 "agent": "typescript-conformance-agent",
@@ -3224,10 +3300,10 @@
           },
           {
             "type": "CUSTOM",
-            "timestamp": 1777639852663,
+            "timestamp": 1777641052850,
             "rawEvent": {
               "iterationCount": 1,
-              "timestamp": 1777639852663,
+              "timestamp": 1777641052850,
               "turnNodeHash": "1bc4f8348423f7d25ba27b5eb8042efb4c3c5f67084eecad723eb1690da65386",
               "type": "state.checkpoint",
               "source": {
@@ -3239,7 +3315,7 @@
             "name": "tuvren.runtime.state.checkpoint",
             "value": {
               "iterationCount": 1,
-              "timestamp": 1777639852663,
+              "timestamp": 1777641052850,
               "turnNodeHash": "1bc4f8348423f7d25ba27b5eb8042efb4c3c5f67084eecad723eb1690da65386",
               "type": "state.checkpoint",
               "source": {
@@ -3251,7 +3327,7 @@
           },
           {
             "type": "STATE_SNAPSHOT",
-            "timestamp": 1777639852663,
+            "timestamp": 1777641052850,
             "rawEvent": {
               "manifest": {
                 "byRole": {
@@ -3275,7 +3351,7 @@
                 },
                 "turnBoundaries": [0]
               },
-              "timestamp": 1777639852663,
+              "timestamp": 1777641052850,
               "type": "state.snapshot",
               "source": {
                 "agent": "typescript-conformance-agent",
@@ -3310,10 +3386,10 @@
           },
           {
             "type": "STEP_FINISHED",
-            "timestamp": 1777639852663,
+            "timestamp": 1777641052850,
             "rawEvent": {
               "iterationCount": 1,
-              "timestamp": 1777639852663,
+              "timestamp": 1777641052850,
               "type": "iteration.end",
               "source": {
                 "agent": "typescript-conformance-agent",
@@ -3325,10 +3401,10 @@
           },
           {
             "type": "CUSTOM",
-            "timestamp": 1777639852667,
+            "timestamp": 1777641052851,
             "rawEvent": {
               "iterationCount": 1,
-              "timestamp": 1777639852667,
+              "timestamp": 1777641052851,
               "turnNodeHash": "bd8316546853aa3e3d3452785e7b87ab1519656b695d3c55353b19d2c1934418",
               "type": "state.checkpoint",
               "source": {
@@ -3340,7 +3416,7 @@
             "name": "tuvren.runtime.state.checkpoint",
             "value": {
               "iterationCount": 1,
-              "timestamp": 1777639852667,
+              "timestamp": 1777641052851,
               "turnNodeHash": "bd8316546853aa3e3d3452785e7b87ab1519656b695d3c55353b19d2c1934418",
               "type": "state.checkpoint",
               "source": {
@@ -3352,7 +3428,7 @@
           },
           {
             "type": "RUN_ERROR",
-            "timestamp": 1777639852667,
+            "timestamp": 1777641052852,
             "rawEvent": {
               "error": {
                 "code": "react_driver_provider_failure",
@@ -3370,7 +3446,7 @@
                 "message": "provider returned an error finish reason"
               },
               "fatal": true,
-              "timestamp": 1777639852667,
+              "timestamp": 1777641052851,
               "type": "error",
               "source": {
                 "agent": "typescript-conformance-agent",
@@ -3449,10 +3525,10 @@
               "events": [
                 {
                   "type": "RUN_STARTED",
-                  "timestamp": 1777639852669,
+                  "timestamp": 1777641052854,
                   "rawEvent": {
                     "threadId": "conformance-id-1",
-                    "timestamp": 1777639852669,
+                    "timestamp": 1777641052854,
                     "turnId": "conformance-id-3",
                     "type": "turn.start",
                     "source": {
@@ -3466,10 +3542,10 @@
                 },
                 {
                   "type": "CUSTOM",
-                  "timestamp": 1777639852670,
+                  "timestamp": 1777641052854,
                   "rawEvent": {
                     "iterationCount": 0,
-                    "timestamp": 1777639852670,
+                    "timestamp": 1777641052854,
                     "turnNodeHash": "009a6a2047ae30a5fa283449aa503c137181867db21bacca7d44145a9e6db9d5",
                     "type": "state.checkpoint",
                     "source": {
@@ -3481,7 +3557,7 @@
                   "name": "tuvren.runtime.state.checkpoint",
                   "value": {
                     "iterationCount": 0,
-                    "timestamp": 1777639852670,
+                    "timestamp": 1777641052854,
                     "turnNodeHash": "009a6a2047ae30a5fa283449aa503c137181867db21bacca7d44145a9e6db9d5",
                     "type": "state.checkpoint",
                     "source": {
@@ -3493,7 +3569,7 @@
                 },
                 {
                   "type": "STATE_SNAPSHOT",
-                  "timestamp": 1777639852670,
+                  "timestamp": 1777641052855,
                   "rawEvent": {
                     "manifest": {
                       "byRole": {
@@ -3517,7 +3593,7 @@
                       },
                       "turnBoundaries": [0]
                     },
-                    "timestamp": 1777639852670,
+                    "timestamp": 1777641052855,
                     "type": "state.snapshot",
                     "source": {
                       "agent": "typescript-conformance-agent",
@@ -3552,10 +3628,10 @@
                 },
                 {
                   "type": "STEP_STARTED",
-                  "timestamp": 1777639852670,
+                  "timestamp": 1777641052855,
                   "rawEvent": {
                     "iterationCount": 1,
-                    "timestamp": 1777639852670,
+                    "timestamp": 1777641052855,
                     "type": "iteration.start",
                     "source": {
                       "agent": "typescript-conformance-agent",
@@ -3567,12 +3643,12 @@
                 },
                 {
                   "type": "TOOL_CALL_START",
-                  "timestamp": 1777639852671,
+                  "timestamp": 1777641052855,
                   "rawEvent": {
                     "callId": "call-email",
-                    "messageId": "34f3ef4f-69d1-4f4b-9ce3-6a6fcdba21b5",
+                    "messageId": "18286c78-8cc1-4d7c-a72f-b6ec4785cc64",
                     "name": "email",
-                    "timestamp": 1777639852671,
+                    "timestamp": 1777641052855,
                     "type": "tool_call.start",
                     "source": {
                       "agent": "typescript-conformance-agent",
@@ -3582,15 +3658,15 @@
                   },
                   "toolCallId": "call-email",
                   "toolCallName": "email",
-                  "parentMessageId": "34f3ef4f-69d1-4f4b-9ce3-6a6fcdba21b5"
+                  "parentMessageId": "18286c78-8cc1-4d7c-a72f-b6ec4785cc64"
                 },
                 {
                   "type": "TOOL_CALL_ARGS",
-                  "timestamp": 1777639852671,
+                  "timestamp": 1777641052855,
                   "rawEvent": {
                     "callId": "call-email",
                     "delta": "{\"to\":\"team@example.com\"}",
-                    "timestamp": 1777639852671,
+                    "timestamp": 1777641052855,
                     "type": "tool_call.args_delta",
                     "source": {
                       "agent": "typescript-conformance-agent",
@@ -3603,14 +3679,14 @@
                 },
                 {
                   "type": "TOOL_CALL_END",
-                  "timestamp": 1777639852671,
+                  "timestamp": 1777641052855,
                   "rawEvent": {
                     "callId": "call-email",
                     "input": {
                       "to": "team@example.com"
                     },
                     "name": "email",
-                    "timestamp": 1777639852671,
+                    "timestamp": 1777641052855,
                     "type": "tool_call.done",
                     "source": {
                       "agent": "typescript-conformance-agent",
@@ -3622,11 +3698,11 @@
                 },
                 {
                   "type": "CUSTOM",
-                  "timestamp": 1777639852671,
+                  "timestamp": 1777641052855,
                   "rawEvent": {
                     "finishReason": "tool_call",
-                    "messageId": "34f3ef4f-69d1-4f4b-9ce3-6a6fcdba21b5",
-                    "timestamp": 1777639852671,
+                    "messageId": "18286c78-8cc1-4d7c-a72f-b6ec4785cc64",
+                    "timestamp": 1777641052855,
                     "type": "message.done",
                     "source": {
                       "agent": "typescript-conformance-agent",
@@ -3637,8 +3713,8 @@
                   "name": "tuvren.runtime.message.done",
                   "value": {
                     "finishReason": "tool_call",
-                    "messageId": "34f3ef4f-69d1-4f4b-9ce3-6a6fcdba21b5",
-                    "timestamp": 1777639852671,
+                    "messageId": "18286c78-8cc1-4d7c-a72f-b6ec4785cc64",
+                    "timestamp": 1777641052855,
                     "type": "message.done",
                     "source": {
                       "agent": "typescript-conformance-agent",
@@ -3649,10 +3725,10 @@
                 },
                 {
                   "type": "CUSTOM",
-                  "timestamp": 1777639852673,
+                  "timestamp": 1777641052857,
                   "rawEvent": {
                     "iterationCount": 1,
-                    "timestamp": 1777639852673,
+                    "timestamp": 1777641052857,
                     "turnNodeHash": "0cbed2b52eca17c061442595a467672828eff36f1426a3506edcc2c09d9bcac1",
                     "type": "state.checkpoint",
                     "source": {
@@ -3664,7 +3740,7 @@
                   "name": "tuvren.runtime.state.checkpoint",
                   "value": {
                     "iterationCount": 1,
-                    "timestamp": 1777639852673,
+                    "timestamp": 1777641052857,
                     "turnNodeHash": "0cbed2b52eca17c061442595a467672828eff36f1426a3506edcc2c09d9bcac1",
                     "type": "state.checkpoint",
                     "source": {
@@ -3676,7 +3752,7 @@
                 },
                 {
                   "type": "STATE_SNAPSHOT",
-                  "timestamp": 1777639852673,
+                  "timestamp": 1777641052857,
                   "rawEvent": {
                     "manifest": {
                       "byRole": {
@@ -3702,7 +3778,7 @@
                       },
                       "turnBoundaries": [0]
                     },
-                    "timestamp": 1777639852673,
+                    "timestamp": 1777641052857,
                     "type": "state.snapshot",
                     "source": {
                       "agent": "typescript-conformance-agent",
@@ -3739,10 +3815,10 @@
                 },
                 {
                   "type": "STEP_FINISHED",
-                  "timestamp": 1777639852673,
+                  "timestamp": 1777641052858,
                   "rawEvent": {
                     "iterationCount": 1,
-                    "timestamp": 1777639852673,
+                    "timestamp": 1777641052858,
                     "type": "iteration.end",
                     "source": {
                       "agent": "typescript-conformance-agent",
@@ -3754,7 +3830,7 @@
                 },
                 {
                   "type": "CUSTOM",
-                  "timestamp": 1777639852673,
+                  "timestamp": 1777641052858,
                   "rawEvent": {
                     "request": {
                       "completedResults": [],
@@ -3770,7 +3846,7 @@
                         }
                       ]
                     },
-                    "timestamp": 1777639852673,
+                    "timestamp": 1777641052858,
                     "type": "approval.requested",
                     "source": {
                       "agent": "typescript-conformance-agent",
@@ -3794,7 +3870,7 @@
                         }
                       ]
                     },
-                    "timestamp": 1777639852673,
+                    "timestamp": 1777641052858,
                     "type": "approval.requested",
                     "source": {
                       "agent": "typescript-conformance-agent",
@@ -3805,10 +3881,10 @@
                 },
                 {
                   "type": "CUSTOM",
-                  "timestamp": 1777639852673,
+                  "timestamp": 1777641052858,
                   "rawEvent": {
                     "status": "paused",
-                    "timestamp": 1777639852673,
+                    "timestamp": 1777641052858,
                     "turnId": "conformance-id-3",
                     "type": "turn.end",
                     "source": {
@@ -3820,7 +3896,7 @@
                   "name": "tuvren.runtime.turn.paused",
                   "value": {
                     "status": "paused",
-                    "timestamp": 1777639852673,
+                    "timestamp": 1777641052858,
                     "turnId": "conformance-id-3",
                     "type": "turn.end",
                     "source": {
@@ -3832,10 +3908,10 @@
                 },
                 {
                   "type": "RUN_FINISHED",
-                  "timestamp": 1777639852673,
+                  "timestamp": 1777641052858,
                   "rawEvent": {
                     "status": "paused",
-                    "timestamp": 1777639852673,
+                    "timestamp": 1777641052858,
                     "turnId": "conformance-id-3",
                     "type": "turn.end",
                     "source": {
@@ -3895,10 +3971,10 @@
         "events": [
           {
             "type": "RUN_STARTED",
-            "timestamp": 1777639852669,
+            "timestamp": 1777641052854,
             "rawEvent": {
               "threadId": "conformance-id-1",
-              "timestamp": 1777639852669,
+              "timestamp": 1777641052854,
               "turnId": "conformance-id-3",
               "type": "turn.start",
               "source": {
@@ -3912,10 +3988,10 @@
           },
           {
             "type": "CUSTOM",
-            "timestamp": 1777639852670,
+            "timestamp": 1777641052854,
             "rawEvent": {
               "iterationCount": 0,
-              "timestamp": 1777639852670,
+              "timestamp": 1777641052854,
               "turnNodeHash": "009a6a2047ae30a5fa283449aa503c137181867db21bacca7d44145a9e6db9d5",
               "type": "state.checkpoint",
               "source": {
@@ -3927,7 +4003,7 @@
             "name": "tuvren.runtime.state.checkpoint",
             "value": {
               "iterationCount": 0,
-              "timestamp": 1777639852670,
+              "timestamp": 1777641052854,
               "turnNodeHash": "009a6a2047ae30a5fa283449aa503c137181867db21bacca7d44145a9e6db9d5",
               "type": "state.checkpoint",
               "source": {
@@ -3939,7 +4015,7 @@
           },
           {
             "type": "STATE_SNAPSHOT",
-            "timestamp": 1777639852670,
+            "timestamp": 1777641052855,
             "rawEvent": {
               "manifest": {
                 "byRole": {
@@ -3963,7 +4039,7 @@
                 },
                 "turnBoundaries": [0]
               },
-              "timestamp": 1777639852670,
+              "timestamp": 1777641052855,
               "type": "state.snapshot",
               "source": {
                 "agent": "typescript-conformance-agent",
@@ -3998,10 +4074,10 @@
           },
           {
             "type": "STEP_STARTED",
-            "timestamp": 1777639852670,
+            "timestamp": 1777641052855,
             "rawEvent": {
               "iterationCount": 1,
-              "timestamp": 1777639852670,
+              "timestamp": 1777641052855,
               "type": "iteration.start",
               "source": {
                 "agent": "typescript-conformance-agent",
@@ -4013,12 +4089,12 @@
           },
           {
             "type": "TOOL_CALL_START",
-            "timestamp": 1777639852671,
+            "timestamp": 1777641052855,
             "rawEvent": {
               "callId": "call-email",
-              "messageId": "34f3ef4f-69d1-4f4b-9ce3-6a6fcdba21b5",
+              "messageId": "18286c78-8cc1-4d7c-a72f-b6ec4785cc64",
               "name": "email",
-              "timestamp": 1777639852671,
+              "timestamp": 1777641052855,
               "type": "tool_call.start",
               "source": {
                 "agent": "typescript-conformance-agent",
@@ -4028,15 +4104,15 @@
             },
             "toolCallId": "call-email",
             "toolCallName": "email",
-            "parentMessageId": "34f3ef4f-69d1-4f4b-9ce3-6a6fcdba21b5"
+            "parentMessageId": "18286c78-8cc1-4d7c-a72f-b6ec4785cc64"
           },
           {
             "type": "TOOL_CALL_ARGS",
-            "timestamp": 1777639852671,
+            "timestamp": 1777641052855,
             "rawEvent": {
               "callId": "call-email",
               "delta": "{\"to\":\"team@example.com\"}",
-              "timestamp": 1777639852671,
+              "timestamp": 1777641052855,
               "type": "tool_call.args_delta",
               "source": {
                 "agent": "typescript-conformance-agent",
@@ -4049,14 +4125,14 @@
           },
           {
             "type": "TOOL_CALL_END",
-            "timestamp": 1777639852671,
+            "timestamp": 1777641052855,
             "rawEvent": {
               "callId": "call-email",
               "input": {
                 "to": "team@example.com"
               },
               "name": "email",
-              "timestamp": 1777639852671,
+              "timestamp": 1777641052855,
               "type": "tool_call.done",
               "source": {
                 "agent": "typescript-conformance-agent",
@@ -4068,11 +4144,11 @@
           },
           {
             "type": "CUSTOM",
-            "timestamp": 1777639852671,
+            "timestamp": 1777641052855,
             "rawEvent": {
               "finishReason": "tool_call",
-              "messageId": "34f3ef4f-69d1-4f4b-9ce3-6a6fcdba21b5",
-              "timestamp": 1777639852671,
+              "messageId": "18286c78-8cc1-4d7c-a72f-b6ec4785cc64",
+              "timestamp": 1777641052855,
               "type": "message.done",
               "source": {
                 "agent": "typescript-conformance-agent",
@@ -4083,8 +4159,8 @@
             "name": "tuvren.runtime.message.done",
             "value": {
               "finishReason": "tool_call",
-              "messageId": "34f3ef4f-69d1-4f4b-9ce3-6a6fcdba21b5",
-              "timestamp": 1777639852671,
+              "messageId": "18286c78-8cc1-4d7c-a72f-b6ec4785cc64",
+              "timestamp": 1777641052855,
               "type": "message.done",
               "source": {
                 "agent": "typescript-conformance-agent",
@@ -4095,10 +4171,10 @@
           },
           {
             "type": "CUSTOM",
-            "timestamp": 1777639852673,
+            "timestamp": 1777641052857,
             "rawEvent": {
               "iterationCount": 1,
-              "timestamp": 1777639852673,
+              "timestamp": 1777641052857,
               "turnNodeHash": "0cbed2b52eca17c061442595a467672828eff36f1426a3506edcc2c09d9bcac1",
               "type": "state.checkpoint",
               "source": {
@@ -4110,7 +4186,7 @@
             "name": "tuvren.runtime.state.checkpoint",
             "value": {
               "iterationCount": 1,
-              "timestamp": 1777639852673,
+              "timestamp": 1777641052857,
               "turnNodeHash": "0cbed2b52eca17c061442595a467672828eff36f1426a3506edcc2c09d9bcac1",
               "type": "state.checkpoint",
               "source": {
@@ -4122,7 +4198,7 @@
           },
           {
             "type": "STATE_SNAPSHOT",
-            "timestamp": 1777639852673,
+            "timestamp": 1777641052857,
             "rawEvent": {
               "manifest": {
                 "byRole": {
@@ -4148,7 +4224,7 @@
                 },
                 "turnBoundaries": [0]
               },
-              "timestamp": 1777639852673,
+              "timestamp": 1777641052857,
               "type": "state.snapshot",
               "source": {
                 "agent": "typescript-conformance-agent",
@@ -4185,10 +4261,10 @@
           },
           {
             "type": "STEP_FINISHED",
-            "timestamp": 1777639852673,
+            "timestamp": 1777641052858,
             "rawEvent": {
               "iterationCount": 1,
-              "timestamp": 1777639852673,
+              "timestamp": 1777641052858,
               "type": "iteration.end",
               "source": {
                 "agent": "typescript-conformance-agent",
@@ -4200,7 +4276,7 @@
           },
           {
             "type": "CUSTOM",
-            "timestamp": 1777639852673,
+            "timestamp": 1777641052858,
             "rawEvent": {
               "request": {
                 "completedResults": [],
@@ -4216,7 +4292,7 @@
                   }
                 ]
               },
-              "timestamp": 1777639852673,
+              "timestamp": 1777641052858,
               "type": "approval.requested",
               "source": {
                 "agent": "typescript-conformance-agent",
@@ -4240,7 +4316,7 @@
                   }
                 ]
               },
-              "timestamp": 1777639852673,
+              "timestamp": 1777641052858,
               "type": "approval.requested",
               "source": {
                 "agent": "typescript-conformance-agent",
@@ -4251,10 +4327,10 @@
           },
           {
             "type": "CUSTOM",
-            "timestamp": 1777639852673,
+            "timestamp": 1777641052858,
             "rawEvent": {
               "status": "paused",
-              "timestamp": 1777639852673,
+              "timestamp": 1777641052858,
               "turnId": "conformance-id-3",
               "type": "turn.end",
               "source": {
@@ -4266,7 +4342,7 @@
             "name": "tuvren.runtime.turn.paused",
             "value": {
               "status": "paused",
-              "timestamp": 1777639852673,
+              "timestamp": 1777641052858,
               "turnId": "conformance-id-3",
               "type": "turn.end",
               "source": {
@@ -4278,10 +4354,10 @@
           },
           {
             "type": "RUN_FINISHED",
-            "timestamp": 1777639852673,
+            "timestamp": 1777641052858,
             "rawEvent": {
               "status": "paused",
-              "timestamp": 1777639852673,
+              "timestamp": 1777641052858,
               "turnId": "conformance-id-3",
               "type": "turn.end",
               "source": {
@@ -4724,6 +4800,18 @@
         {
           "assertionId": "runtime-callable.timeout-retry-cancellation-idempotency.2.evidenceField",
           "status": "pass"
+        },
+        {
+          "assertionId": "runtime-callable.timeout-retry-cancellation-idempotency.3.evidenceField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "runtime-callable.timeout-retry-cancellation-idempotency.4.evidenceField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "runtime-callable.timeout-retry-cancellation-idempotency.5.evidenceField",
+          "status": "pass"
         }
       ],
       "checkId": "runtime-callable.timeout-retry-cancellation-idempotency",
@@ -4732,12 +4820,18 @@
           "kind": "result",
           "value": {
             "evidence": {
+              "cancellation": {
+                "cancelInvocations": 2,
+                "errorEventCount": 1,
+                "observedEventIndex": 0,
+                "observedEventType": "turn.start"
+              },
               "controls": {
                 "cancelAfterEvent": "turn.start",
                 "deadlineMs": 1000
               },
               "runtime": {
-                "iterationCount": 2,
+                "iterationCount": 0,
                 "phase": "failed"
               }
             },
@@ -4749,12 +4843,18 @@
             }
           }
         },
+        "cancellation": {
+          "cancelInvocations": 2,
+          "errorEventCount": 1,
+          "observedEventIndex": 0,
+          "observedEventType": "turn.start"
+        },
         "controls": {
           "cancelAfterEvent": "turn.start",
           "deadlineMs": 1000
         },
         "runtime": {
-          "iterationCount": 2,
+          "iterationCount": 0,
           "phase": "failed"
         },
         "result": {
@@ -4820,11 +4920,18 @@
           "kind": "result",
           "value": {
             "evidence": {
+              "cancellation": {
+                "cancelInvocations": 2,
+                "errorEventCount": 1,
+                "observedEventIndex": 0,
+                "observedEventType": "turn.start"
+              },
               "controls": {
+                "cancelAfterEvent": "turn.start",
                 "deadlineMs": 1000
               },
               "runtime": {
-                "iterationCount": 2,
+                "iterationCount": 0,
                 "phase": "failed"
               }
             },
@@ -4836,11 +4943,18 @@
             }
           }
         },
+        "cancellation": {
+          "cancelInvocations": 2,
+          "errorEventCount": 1,
+          "observedEventIndex": 0,
+          "observedEventType": "turn.start"
+        },
         "controls": {
+          "cancelAfterEvent": "turn.start",
           "deadlineMs": 1000
         },
         "runtime": {
-          "iterationCount": 2,
+          "iterationCount": 0,
           "phase": "failed"
         },
         "result": {
@@ -4928,6 +5042,14 @@
         {
           "assertionId": "runtime-api.branch-create.recovery.2.stateField",
           "status": "pass"
+        },
+        {
+          "assertionId": "runtime-api.branch-create.recovery.3.stateField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "runtime-api.branch-create.recovery.4.stateField",
+          "status": "pass"
         }
       ],
       "checkId": "runtime-api.branch-create.recovery",
@@ -4937,20 +5059,24 @@
           "value": {
             "state": {
               "branch": {
-                "createdBranchId": "conformance-id-3",
-                "createdHeadTurnNodeHash": "59968d93c8a85042e36db0214b7c0aa71d22e3d9453c9441e9c408bc799e89a3",
+                "completedTurnPhase": "completed",
+                "createdBranchId": "conformance-id-11",
+                "createdHeadTurnNodeHash": "384f0090c487f12e14a36b1e66c7e0ff0c3428753491c69c103114556a2091da",
                 "sourceBranchId": "conformance-id-2",
-                "sourceHeadTurnNodeHash": "59968d93c8a85042e36db0214b7c0aa71d22e3d9453c9441e9c408bc799e89a3"
+                "sourceHeadTurnNodeHash": "384f0090c487f12e14a36b1e66c7e0ff0c3428753491c69c103114556a2091da",
+                "sourceMessageCount": 2
               }
             }
           }
         },
         "state": {
           "branch": {
-            "createdBranchId": "conformance-id-3",
-            "createdHeadTurnNodeHash": "59968d93c8a85042e36db0214b7c0aa71d22e3d9453c9441e9c408bc799e89a3",
+            "completedTurnPhase": "completed",
+            "createdBranchId": "conformance-id-11",
+            "createdHeadTurnNodeHash": "384f0090c487f12e14a36b1e66c7e0ff0c3428753491c69c103114556a2091da",
             "sourceBranchId": "conformance-id-2",
-            "sourceHeadTurnNodeHash": "59968d93c8a85042e36db0214b7c0aa71d22e3d9453c9441e9c408bc799e89a3"
+            "sourceHeadTurnNodeHash": "384f0090c487f12e14a36b1e66c7e0ff0c3428753491c69c103114556a2091da",
+            "sourceMessageCount": 2
           },
           "adapter": {
             "adapterEvents": 1,
@@ -5140,8 +5266,8 @@
   "status": "pass",
   "summary": {
     "failedChecks": 0,
-    "passedChecks": 25,
-    "totalChecks": 25
+    "passedChecks": 26,
+    "totalChecks": 26
   },
   "suiteId": "tuvren.framework.promoted-authority",
   "suiteVersion": "0.1.0"

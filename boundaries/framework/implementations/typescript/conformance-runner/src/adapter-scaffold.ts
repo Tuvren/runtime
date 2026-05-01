@@ -15,6 +15,7 @@
  */
 
 import { EventSchemas } from "@ag-ui/core";
+import { assertHashString, type HashString } from "@tuvren/core-types";
 import type {
   DriverExecutionContext,
   DriverExecutionResult,
@@ -565,14 +566,47 @@ async function runCancelledRuntimeTurn(
     signal: textSignal("cancel"),
     threadId: thread.threadId,
   });
-  const capture = captureEvents(handle.events());
+  const events: unknown[] = [];
+  const cancelAfterEvent = controls.cancelAfterEvent;
+  let cancelInvocations = 0;
+  let observedEventIndex: number | undefined;
+  let observedEventType: string | undefined;
 
-  await waitFor(() => handle.status().iterationCount === 2);
-  handle.cancel();
-  await capture.done;
+  if (cancelAfterEvent === undefined) {
+    throw new Error(
+      "runtime cancellation checks must declare cancelAfterEvent"
+    );
+  }
+
+  for await (const event of handle.events()) {
+    events.push(event);
+
+    if (observedEventType !== undefined) {
+      continue;
+    }
+
+    const eventType = readRecordString(event, "type");
+
+    if (eventType === cancelAfterEvent) {
+      observedEventIndex = events.length - 1;
+      observedEventType = eventType;
+      // The second cancel call proves the handle's cancellation surface is
+      // idempotent for the measured stream, instead of only proving one abort.
+      handle.cancel();
+      cancelInvocations += 1;
+      handle.cancel();
+      cancelInvocations += 1;
+    }
+  }
 
   return {
     evidence: {
+      cancellation: {
+        cancelInvocations,
+        errorEventCount: countEventsByType(events, "error"),
+        observedEventIndex,
+        observedEventType,
+      },
       controls: {
         cancelAfterEvent: controls.cancelAfterEvent,
         deadlineMs: controls.deadlineMs,
@@ -583,7 +617,7 @@ async function runCancelledRuntimeTurn(
       },
     },
     result: {
-      error: readFirstErrorEnvelope(capture.events),
+      error: readFirstErrorEnvelope(events),
     },
   };
 }
@@ -711,18 +745,29 @@ async function runBranchCreate(): Promise<AdapterProjection> {
     kernel: harness.kernel,
   });
   const thread = await runtime.createThread({});
+  const handle = runtime.executeTurn({
+    branchId: thread.branchId,
+    config: { name: AGENT_NAME },
+    signal: textSignal("complete before branch"),
+    threadId: thread.threadId,
+  });
+  const completedEvents = await collectValues(handle.events());
+  const completedHeadTurnNodeHash = readLastCheckpointHash(completedEvents);
+  const sourceMessages = await harness.readBranchMessages(thread.branchId);
   const branch = await runtime.createBranch({
-    fromTurnNodeHash: thread.rootTurnNodeHash,
+    fromTurnNodeHash: completedHeadTurnNodeHash,
     threadId: thread.threadId,
   });
 
   return {
     state: {
       branch: {
+        completedTurnPhase: handle.status().phase,
         createdBranchId: branch.branchId,
         createdHeadTurnNodeHash: branch.headTurnNodeHash,
         sourceBranchId: thread.branchId,
-        sourceHeadTurnNodeHash: thread.rootTurnNodeHash,
+        sourceHeadTurnNodeHash: completedHeadTurnNodeHash,
+        sourceMessageCount: sourceMessages.length,
       },
     },
   };
@@ -1268,6 +1313,10 @@ async function runDriverExecuteError(
 
 async function runDriverResume(input: unknown): Promise<AdapterProjection> {
   const scenario = readOperationScenario(input, "driver.resume");
+  const pendingToolCalls = readPendingToolCalls(
+    scenario,
+    "driver.resume.pendingToolCalls"
+  );
   const decisions = readApprovalDecisions(
     scenario,
     "driver.resume.approvalDecisions"
@@ -1285,15 +1334,26 @@ async function runDriverResume(input: unknown): Promise<AdapterProjection> {
     throw new Error("implementation driver does not expose resume");
   }
 
+  const resumedFrom = "0".repeat(64);
+  assertHashString(resumedFrom, "driver.resume.resumedFrom");
+
   const result = await driver.resume({
     ...createDriverExecutionContext(),
     config: {
       model: createScenarioProvider(providerResponses, () => undefined),
       name: AGENT_NAME,
     },
+    messages: [
+      {
+        parts: [{ text: "resume pending tool calls", type: "text" }],
+        role: "user",
+      },
+      assistantToolCalls(pendingToolCalls),
+    ],
     approval: {
       decisions,
     },
+    resumedFrom,
   });
 
   assertDriverExecutionResult(result, "driver resume result");
@@ -1301,8 +1361,16 @@ async function runDriverResume(input: unknown): Promise<AdapterProjection> {
   return {
     evidence: {
       driver: {
+        approvalDecisionCallIds: decisions.map((decision) => decision.callId),
+        pendingToolCallIds: pendingToolCalls.map((call) => call.callId),
         resolutionType: result.resolution.type,
       },
+    },
+    result: {
+      error:
+        result.resolution.type === "fail"
+          ? errorToEnvelope(result.resolution.error)
+          : undefined,
     },
   };
 }
@@ -1450,6 +1518,7 @@ function createDriverExecutionContext(input?: {
   config?: DriverExecutionContext["config"];
   emittedEvents?: TuvrenStreamEvent[];
   manifest?: ContextManifest;
+  messages?: readonly TuvrenMessage[];
   signal?: AbortSignal;
   toolDefinitions?: TuvrenToolDefinition[];
 }): DriverExecutionContext {
@@ -1491,7 +1560,7 @@ function createDriverExecutionContext(input?: {
     },
     iterationCount: 1,
     manifest: input?.manifest ?? createContextManifest(),
-    messages: [
+    messages: input?.messages ?? [
       {
         parts: [{ text: "hello", type: "text" }],
         role: "user",
@@ -1642,37 +1711,6 @@ async function collectValues<T>(values: AsyncIterable<T>): Promise<T[]> {
   return collected;
 }
 
-function captureEvents<T>(events: AsyncIterable<T>): {
-  done: Promise<void>;
-  events: T[];
-} {
-  const collected: T[] = [];
-
-  return {
-    done: (async () => {
-      for await (const event of events) {
-        collected.push(event);
-      }
-    })(),
-    events: collected,
-  };
-}
-
-async function waitFor(
-  condition: () => boolean,
-  timeoutMilliseconds = 1000
-): Promise<void> {
-  const startedAt = Date.now();
-
-  while (!condition()) {
-    if (Date.now() - startedAt >= timeoutMilliseconds) {
-      throw new Error("timed out waiting for implementation condition");
-    }
-
-    await new Promise<void>((resolve) => setTimeout(resolve, 5));
-  }
-}
-
 function waitForAbort(signal: AbortSignal | undefined): Promise<void> {
   if (signal === undefined || signal.aborted) {
     return Promise.resolve();
@@ -1693,6 +1731,37 @@ function readFirstErrorEnvelope(
   }
 
   return undefined;
+}
+
+function countEventsByType(events: readonly unknown[], type: string): number {
+  let count = 0;
+
+  for (const event of events) {
+    if (readRecordString(event, "type") === type) {
+      count += 1;
+    }
+  }
+
+  return count;
+}
+
+function readLastCheckpointHash(events: readonly unknown[]): HashString {
+  let checkpointHash: HashString | undefined;
+
+  for (const event of events) {
+    const turnNodeHash = readRecordString(event, "turnNodeHash");
+
+    if (turnNodeHash !== undefined) {
+      assertHashString(turnNodeHash, "state.checkpoint.turnNodeHash");
+      checkpointHash = turnNodeHash;
+    }
+  }
+
+  if (checkpointHash === undefined) {
+    throw new Error("completed branch scenario did not emit a checkpoint hash");
+  }
+
+  return checkpointHash;
 }
 
 function errorToEnvelope(error: Error): Record<string, unknown> {
@@ -1913,6 +1982,19 @@ function readScenarioToolCall(
             `${label}.requiresApproval`
           ),
   };
+}
+
+function readPendingToolCalls(
+  scenario: Record<string, unknown>,
+  label: string
+): ScenarioToolCall[] {
+  return readArrayProperty(scenario, "pendingToolCalls", label).map(
+    (value, index) =>
+      readScenarioToolCall(
+        readRecord(value, `${label}[${index}]`),
+        `${label}[${index}]`
+      )
+  );
 }
 
 function readApprovalDecisions(

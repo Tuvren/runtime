@@ -152,9 +152,20 @@ class ReActDriver implements RuntimeDriver {
   }
 
   async resume(context: DriverResumeContext): Promise<DriverExecutionResult> {
-    // Resume uses the same ReAct iteration engine as execute; approval replay is
-    // prepared by the runtime before the driver is re-entered.
-    return await this.execute(context);
+    try {
+      validateResumeApprovalContext(context);
+      // Resume uses the same ReAct iteration engine as execute after validating
+      // that approval decisions correspond to already-pending tool calls.
+      return await executeIteration(context, this.options);
+    } catch (error: unknown) {
+      return {
+        resolution: {
+          error: normalizeExecutionError(error),
+          fatality: "hard",
+          type: "fail",
+        },
+      };
+    }
   }
 }
 
@@ -497,6 +508,45 @@ function createExecutionCancelledResolution(): Extract<
     fatality: "hard",
     type: "fail",
   };
+}
+
+function validateResumeApprovalContext(context: DriverResumeContext): void {
+  const pendingCallIds = new Set<string>();
+
+  for (const message of context.messages) {
+    if (message.role !== "assistant") {
+      continue;
+    }
+
+    for (const part of message.parts) {
+      if (part.type === "tool_call") {
+        pendingCallIds.add(part.callId);
+      }
+    }
+  }
+
+  if (context.approval.decisions.length === 0) {
+    throw new TuvrenRuntimeError(
+      "driver resume requires at least one approval decision",
+      {
+        code: "driver_resume_missing_approval_decision",
+      }
+    );
+  }
+
+  for (const decision of context.approval.decisions) {
+    if (!pendingCallIds.has(decision.callId)) {
+      throw new TuvrenRuntimeError(
+        "driver resume approval decision does not match a pending tool call",
+        {
+          code: "driver_resume_unknown_approval_call",
+          details: {
+            callId: decision.callId,
+          },
+        }
+      );
+    }
+  }
 }
 
 async function emitPostNextAroundModelError(
