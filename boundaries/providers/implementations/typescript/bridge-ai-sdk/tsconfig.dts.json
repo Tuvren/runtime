@@ -8,25 +8,25 @@
     "outDir": "./dist",
     "paths": {
       "@tuvren/core-types": [
-        "../../../../shared/contracts/core-types/dist/index.d.ts"
+        "../../../../shared/contracts/core-types/implementations/typescript/dist/index.d.ts"
       ],
       "@tuvren/provider-api": [
-        "../../../contracts/provider-api/dist/index.d.ts"
+        "../../../contracts/provider-api/implementations/typescript/dist/index.d.ts"
       ],
       "@tuvren/runtime-api": [
-        "../../../../framework/contracts/runtime-api/dist/index.d.ts"
+        "../../../../framework/contracts/runtime-api/implementations/typescript/dist/index.d.ts"
       ],
       "@tuvren/runtime-api/events": [
-        "../../../../framework/contracts/runtime-api/dist/events.d.ts"
+        "../../../../framework/contracts/runtime-api/implementations/typescript/dist/events.d.ts"
       ],
       "@tuvren/runtime-api/execution": [
-        "../../../../framework/contracts/runtime-api/dist/execution.d.ts"
+        "../../../../framework/contracts/runtime-api/implementations/typescript/dist/execution.d.ts"
       ],
       "@tuvren/runtime-api/provider": [
-        "../../../../framework/contracts/runtime-api/dist/provider.d.ts"
+        "../../../../framework/contracts/runtime-api/implementations/typescript/dist/provider.d.ts"
       ],
       "@tuvren/runtime-api/tools": [
-        "../../../../framework/contracts/runtime-api/dist/tools.d.ts"
+        "../../../../framework/contracts/runtime-api/implementations/typescript/dist/tools.d.ts"
       ]
     },
     "rootDir": "./src",

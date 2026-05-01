@@ -1,0 +1,26 @@
+{
+  "extends": "./tsconfig.lib.json",
+  "compilerOptions": {
+    "composite": false,
+    "rootDir": "../../../../../../",
+    "allowImportingTsExtensions": true,
+    "paths": {
+      "@tuvren/core-types": [
+        "../../../../../shared/contracts/core-types/implementations/typescript/src/index.ts"
+      ],
+      "@tuvren/runtime-api": [
+        "../../../../../framework/contracts/runtime-api/implementations/typescript/src/index.ts"
+      ],
+      "@tuvren/kernel-protocol": ["./src/index.ts"]
+    },
+    "types": ["bun"]
+  },
+  "include": [
+    "bench/**/*.ts",
+    "src/**/*.ts",
+    "test/**/*.ts",
+    "../../../../../shared/contracts/core-types/implementations/typescript/src/**/*.ts",
+    "../../../../../framework/contracts/runtime-api/implementations/typescript/src/**/*.ts",
+    "../../../../../../tests/fixtures/**/*.ts"
+  ]
+}

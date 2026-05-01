@@ -33,8 +33,8 @@ import type {
   TurnRecord,
   TurnTreeChangeSet,
   TurnTreeSchema,
-} from "../../boundaries/kernel/contracts/protocol/src/index.ts";
-import { encodeDeterministicKernelRecord } from "../../boundaries/kernel/contracts/protocol/src/index.ts";
+} from "@tuvren/kernel-protocol";
+import { encodeDeterministicKernelRecord } from "@tuvren/kernel-protocol";
 
 const orderedPathHashes = [
   "5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f",

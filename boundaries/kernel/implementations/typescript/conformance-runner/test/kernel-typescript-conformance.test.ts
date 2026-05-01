@@ -34,7 +34,7 @@ import {
   type KernelProtocolLogicalFixtureSet,
   kernelProtocolDeterministicFixtures,
   kernelProtocolLogicalFixtures,
-} from "../../../../testkit/src/lib/kernel-conformance-fixtures.ts";
+} from "../../testkit/src/lib/kernel-conformance-fixtures.ts";
 
 const LOWERCASE_SHA256_HEX_PATTERN = /^[0-9a-f]{64}$/u;
 const KERNEL_SUITE_MANIFEST = new URL(

@@ -8,16 +8,16 @@
   "include": ["src/**/*.ts"],
   "references": [
     {
-      "path": "../../../../shared/contracts/core-types/tsconfig.lib.json"
+      "path": "../../../../shared/contracts/core-types/implementations/typescript/tsconfig.lib.json"
     },
     {
-      "path": "../../../contracts/runtime-api/tsconfig.lib.json"
+      "path": "../../../contracts/runtime-api/implementations/typescript/tsconfig.lib.json"
     },
     {
-      "path": "../../../contracts/driver-api/tsconfig.lib.json"
+      "path": "../../../contracts/driver-api/implementations/typescript/tsconfig.lib.json"
     },
     {
-      "path": "../../../../kernel/contracts/protocol/tsconfig.lib.json"
+      "path": "../../../../kernel/contracts/protocol/implementations/typescript/tsconfig.lib.json"
     }
   ]
 }

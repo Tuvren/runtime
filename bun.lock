@@ -29,7 +29,7 @@
         "ultracite": "7.4.2",
       },
     },
-    "boundaries/framework/contracts/driver-api": {
+    "boundaries/framework/contracts/driver-api/implementations/typescript": {
       "name": "@tuvren/driver-api",
       "version": "0.0.0",
       "dependencies": {
@@ -37,21 +37,21 @@
         "@tuvren/runtime-api": "workspace:*",
       },
     },
-    "boundaries/framework/contracts/event-stream": {
+    "boundaries/framework/contracts/event-stream/implementations/typescript": {
       "name": "@tuvren/event-stream",
       "version": "0.0.0",
       "dependencies": {
         "@tuvren/runtime-api": "workspace:*",
       },
     },
-    "boundaries/framework/contracts/runtime-api": {
+    "boundaries/framework/contracts/runtime-api/implementations/typescript": {
       "name": "@tuvren/runtime-api",
       "version": "0.0.0",
       "dependencies": {
         "@tuvren/core-types": "workspace:*",
       },
     },
-    "boundaries/framework/contracts/tool-contracts": {
+    "boundaries/framework/contracts/tool-contracts/implementations/typescript": {
       "name": "@tuvren/tool-contracts",
       "version": "0.0.0",
       "dependencies": {
@@ -142,7 +142,7 @@
         "@tuvren/framework-testkit": "workspace:*",
       },
     },
-    "boundaries/framework/testkit": {
+    "boundaries/framework/implementations/typescript/testkit": {
       "name": "@tuvren/framework-testkit",
       "version": "0.0.0",
       "dependencies": {
@@ -177,7 +177,7 @@
         "@copilotkit/aimock": "1.15.1",
       },
     },
-    "boundaries/kernel/contracts/protocol": {
+    "boundaries/kernel/contracts/protocol/implementations/typescript": {
       "name": "@tuvren/kernel-protocol",
       "version": "0.0.0",
       "dependencies": {
@@ -219,7 +219,7 @@
         "@tuvren/kernel-testkit": "workspace:*",
       },
     },
-    "boundaries/kernel/testkit": {
+    "boundaries/kernel/implementations/typescript/testkit": {
       "name": "@tuvren/kernel-testkit",
       "version": "0.0.0",
       "dependencies": {
@@ -228,7 +228,7 @@
         "ajv": "8.18.0",
       },
     },
-    "boundaries/providers/contracts/provider-api": {
+    "boundaries/providers/contracts/provider-api/implementations/typescript": {
       "name": "@tuvren/provider-api",
       "version": "0.0.0",
       "dependencies": {
@@ -263,7 +263,7 @@
         "@tuvren/provider-testkit": "workspace:*",
       },
     },
-    "boundaries/providers/testkit": {
+    "boundaries/providers/implementations/typescript/testkit": {
       "name": "@tuvren/provider-testkit",
       "version": "0.0.0",
       "dependencies": {
@@ -271,7 +271,7 @@
         "ajv": "8.18.0",
       },
     },
-    "boundaries/shared/contracts/core-types": {
+    "boundaries/shared/contracts/core-types/implementations/typescript": {
       "name": "@tuvren/core-types",
       "version": "0.0.0",
     },
@@ -824,35 +824,35 @@
 
     "@tuvren/backend-sqlite": ["@tuvren/backend-sqlite@workspace:boundaries/kernel/implementations/typescript/backend-sqlite"],
 
-    "@tuvren/core-types": ["@tuvren/core-types@workspace:boundaries/shared/contracts/core-types"],
+    "@tuvren/core-types": ["@tuvren/core-types@workspace:boundaries/shared/contracts/core-types/implementations/typescript"],
 
-    "@tuvren/driver-api": ["@tuvren/driver-api@workspace:boundaries/framework/contracts/driver-api"],
+    "@tuvren/driver-api": ["@tuvren/driver-api@workspace:boundaries/framework/contracts/driver-api/implementations/typescript"],
 
     "@tuvren/driver-react": ["@tuvren/driver-react@workspace:boundaries/framework/implementations/typescript/drivers/react"],
 
-    "@tuvren/event-stream": ["@tuvren/event-stream@workspace:boundaries/framework/contracts/event-stream"],
+    "@tuvren/event-stream": ["@tuvren/event-stream@workspace:boundaries/framework/contracts/event-stream/implementations/typescript"],
 
-    "@tuvren/framework-testkit": ["@tuvren/framework-testkit@workspace:boundaries/framework/testkit"],
+    "@tuvren/framework-testkit": ["@tuvren/framework-testkit@workspace:boundaries/framework/implementations/typescript/testkit"],
 
     "@tuvren/framework-typescript-conformance-runner": ["@tuvren/framework-typescript-conformance-runner@workspace:boundaries/framework/implementations/typescript/conformance-runner"],
 
-    "@tuvren/kernel-protocol": ["@tuvren/kernel-protocol@workspace:boundaries/kernel/contracts/protocol"],
+    "@tuvren/kernel-protocol": ["@tuvren/kernel-protocol@workspace:boundaries/kernel/contracts/protocol/implementations/typescript"],
 
-    "@tuvren/kernel-testkit": ["@tuvren/kernel-testkit@workspace:boundaries/kernel/testkit"],
+    "@tuvren/kernel-testkit": ["@tuvren/kernel-testkit@workspace:boundaries/kernel/implementations/typescript/testkit"],
 
     "@tuvren/kernel-typescript-conformance-runner": ["@tuvren/kernel-typescript-conformance-runner@workspace:boundaries/kernel/implementations/typescript/conformance-runner"],
 
     "@tuvren/playground-host": ["@tuvren/playground-host@workspace:boundaries/hosts/implementations/typescript/playground"],
 
-    "@tuvren/provider-api": ["@tuvren/provider-api@workspace:boundaries/providers/contracts/provider-api"],
+    "@tuvren/provider-api": ["@tuvren/provider-api@workspace:boundaries/providers/contracts/provider-api/implementations/typescript"],
 
     "@tuvren/provider-bridge-ai-sdk": ["@tuvren/provider-bridge-ai-sdk@workspace:boundaries/providers/implementations/typescript/bridge-ai-sdk"],
 
-    "@tuvren/provider-testkit": ["@tuvren/provider-testkit@workspace:boundaries/providers/testkit"],
+    "@tuvren/provider-testkit": ["@tuvren/provider-testkit@workspace:boundaries/providers/implementations/typescript/testkit"],
 
     "@tuvren/providers-typescript-conformance-runner": ["@tuvren/providers-typescript-conformance-runner@workspace:boundaries/providers/implementations/typescript/conformance-runner"],
 
-    "@tuvren/runtime-api": ["@tuvren/runtime-api@workspace:boundaries/framework/contracts/runtime-api"],
+    "@tuvren/runtime-api": ["@tuvren/runtime-api@workspace:boundaries/framework/contracts/runtime-api/implementations/typescript"],
 
     "@tuvren/runtime-core": ["@tuvren/runtime-core@workspace:boundaries/framework/implementations/typescript/runtime-core"],
 
@@ -862,7 +862,7 @@
 
     "@tuvren/stream-sse": ["@tuvren/stream-sse@workspace:boundaries/framework/implementations/typescript/stream-sse"],
 
-    "@tuvren/tool-contracts": ["@tuvren/tool-contracts@workspace:boundaries/framework/contracts/tool-contracts"],
+    "@tuvren/tool-contracts": ["@tuvren/tool-contracts@workspace:boundaries/framework/contracts/tool-contracts/implementations/typescript"],
 
     "@tybys/wasm-util": ["@tybys/wasm-util@0.9.0", "", { "dependencies": { "tslib": "^2.4.0" } }, "sha512-6+7nlbMVX/PVDCwaIQ8nTOPveOcFLSt8GcXdx8hD0bt39uWxYT88uXzqTd4fTvqta7oeUJqudepapKNt2DYJFw=="],
 

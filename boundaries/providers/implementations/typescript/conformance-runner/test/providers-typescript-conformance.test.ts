@@ -23,7 +23,7 @@ import Ajv2020 from "ajv/dist/2020.js";
 import {
   type ProviderTestkitFixtureSet,
   providerTestkitFixtures,
-} from "../../../../testkit/src/index.ts";
+} from "../../testkit/src/index.ts";
 
 const PROVIDER_SUITE_MANIFEST = new URL(
   "../../../../conformance/scenarios/suite-manifest.json",

@@ -5,43 +5,43 @@
     "moduleResolution": "bundler",
     "paths": {
       "@tuvren/core-types": [
-        "./boundaries/shared/contracts/core-types/src/index.ts"
+        "./boundaries/shared/contracts/core-types/implementations/typescript/src/index.ts"
       ],
       "@tuvren/kernel-protocol": [
-        "./boundaries/kernel/contracts/protocol/src/index.ts"
+        "./boundaries/kernel/contracts/protocol/implementations/typescript/src/index.ts"
       ],
       "@tuvren/runtime-api": [
-        "./boundaries/framework/contracts/runtime-api/src/index.ts"
+        "./boundaries/framework/contracts/runtime-api/implementations/typescript/src/index.ts"
       ],
       "@tuvren/runtime-api/events": [
-        "./boundaries/framework/contracts/runtime-api/src/events.ts"
+        "./boundaries/framework/contracts/runtime-api/implementations/typescript/src/events.ts"
       ],
       "@tuvren/runtime-api/execution": [
-        "./boundaries/framework/contracts/runtime-api/src/execution.ts"
+        "./boundaries/framework/contracts/runtime-api/implementations/typescript/src/execution.ts"
       ],
       "@tuvren/runtime-api/orchestration": [
-        "./boundaries/framework/contracts/runtime-api/src/orchestration.ts"
+        "./boundaries/framework/contracts/runtime-api/implementations/typescript/src/orchestration.ts"
       ],
       "@tuvren/runtime-api/provider": [
-        "./boundaries/framework/contracts/runtime-api/src/provider.ts"
+        "./boundaries/framework/contracts/runtime-api/implementations/typescript/src/provider.ts"
       ],
       "@tuvren/runtime-api/tools": [
-        "./boundaries/framework/contracts/runtime-api/src/tools.ts"
+        "./boundaries/framework/contracts/runtime-api/implementations/typescript/src/tools.ts"
       ],
       "@tuvren/event-stream": [
-        "./boundaries/framework/contracts/event-stream/src/index.ts"
+        "./boundaries/framework/contracts/event-stream/implementations/typescript/src/index.ts"
       ],
       "@tuvren/tool-contracts": [
-        "./boundaries/framework/contracts/tool-contracts/src/index.ts"
+        "./boundaries/framework/contracts/tool-contracts/implementations/typescript/src/index.ts"
       ],
       "@tuvren/driver-api": [
-        "./boundaries/framework/contracts/driver-api/src/index.ts"
+        "./boundaries/framework/contracts/driver-api/implementations/typescript/src/index.ts"
       ],
       "@tuvren/provider-api": [
-        "./boundaries/providers/contracts/provider-api/src/index.ts"
+        "./boundaries/providers/contracts/provider-api/implementations/typescript/src/index.ts"
       ],
       "@tuvren/provider-testkit": [
-        "./boundaries/providers/testkit/src/index.ts"
+        "./boundaries/providers/implementations/typescript/testkit/src/index.ts"
       ],
       "@tuvren/runtime-core": [
         "./boundaries/framework/implementations/typescript/runtime-core/src/index.ts"
@@ -61,9 +61,11 @@
       "@tuvren/backend-sqlite": [
         "./boundaries/kernel/implementations/typescript/backend-sqlite/src/index.ts"
       ],
-      "@tuvren/kernel-testkit": ["./boundaries/kernel/testkit/src/index.ts"],
+      "@tuvren/kernel-testkit": [
+        "./boundaries/kernel/implementations/typescript/testkit/src/index.ts"
+      ],
       "@tuvren/framework-testkit": [
-        "./boundaries/framework/testkit/src/index.ts"
+        "./boundaries/framework/implementations/typescript/testkit/src/index.ts"
       ],
       "@tuvren/playground-host": [
         "./boundaries/hosts/implementations/typescript/playground/src/index.ts"

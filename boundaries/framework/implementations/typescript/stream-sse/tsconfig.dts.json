@@ -8,7 +8,7 @@
     "outDir": "./dist",
     "paths": {
       "@tuvren/event-stream": [
-        "../../../contracts/event-stream/dist/index.d.ts"
+        "../../../contracts/event-stream/implementations/typescript/dist/index.d.ts"
       ],
       "@tuvren/stream-core": ["../stream-core/dist/index.d.ts"]
     },

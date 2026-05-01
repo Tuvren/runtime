@@ -16,9 +16,9 @@
         "{workspaceRoot}/boundaries/*/conformance/**/*",
         "{workspaceRoot}/boundaries/*/interop/**/*",
         "{workspaceRoot}/boundaries/*/implementations/typescript/conformance-runner/**/*",
-        "{workspaceRoot}/boundaries/*/testkit/src/**/*",
-        "{workspaceRoot}/boundaries/*/testkit/test/**/*",
-        "{workspaceRoot}/boundaries/*/testkit/package.json",
+        "{workspaceRoot}/boundaries/*/implementations/typescript/testkit/src/**/*",
+        "{workspaceRoot}/boundaries/*/implementations/typescript/testkit/test/**/*",
+        "{workspaceRoot}/boundaries/*/implementations/typescript/testkit/package.json",
         "{workspaceRoot}/devenv.nix",
         "{workspaceRoot}/devenv.lock"
       ]
@@ -32,9 +32,9 @@
         "{workspaceRoot}/boundaries/*/conformance/**/*",
         "{workspaceRoot}/boundaries/*/interop/**/*",
         "{workspaceRoot}/boundaries/*/implementations/typescript/conformance-runner/**/*",
-        "{workspaceRoot}/boundaries/*/testkit/src/**/*",
-        "{workspaceRoot}/boundaries/*/testkit/test/**/*",
-        "{workspaceRoot}/boundaries/*/testkit/package.json"
+        "{workspaceRoot}/boundaries/*/implementations/typescript/testkit/src/**/*",
+        "{workspaceRoot}/boundaries/*/implementations/typescript/testkit/test/**/*",
+        "{workspaceRoot}/boundaries/*/implementations/typescript/testkit/package.json"
       ]
     },
     "interop-smoke": {

@@ -420,7 +420,7 @@ Report-->>Maintainer: compatibility matrix and remaining parity gaps
 
 - **Risk:** TypeScript-first repo structure or test tooling becomes a permanent exception that later languages have to work around.
 - **Why it matters:** A one-off structure would turn every future implementation into an adapter to historical accidents instead of a peer in one boundary-owned semantic system.
-- **Mitigation or follow-up:** Normalize TypeScript into the same final contract/conformance/interop structure expected of later languages before Rust or any other implementation line becomes authoritative.
+- **Mitigation or follow-up:** Epic X now enforces the topology rule in repo reality: language-neutral assets stay at boundary-owned roots, and language-specific package roots live only under `implementations/<lang>/`. Future implementation lines must enter through that normalized structure instead of reopening TypeScript-first exceptions.
 
 - **Risk:** Machine-readable artifacts drift away from the human semantic sources in `docs/` and `constitution/`.
 - **Why it matters:** Cross-language parity collapses quickly when schemas, fixtures, or reports become de facto truth without matching the normative specs.

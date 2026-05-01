@@ -1,0 +1,19 @@
+{
+  "extends": "./tsconfig.lib.json",
+  "compilerOptions": {
+    "composite": false,
+    "rootDir": "../../../../../",
+    "allowImportingTsExtensions": true,
+    "paths": {
+      "@tuvren/event-stream": [
+        "../../../contracts/event-stream/implementations/typescript/src/index.ts"
+      ]
+    },
+    "types": ["bun", "node"]
+  },
+  "include": [
+    "src/**/*.ts",
+    "test/**/*.ts",
+    "../../../contracts/event-stream/implementations/typescript/src/**/*.ts"
+  ]
+}

@@ -1,0 +1,20 @@
+{
+  "extends": "../../../../../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "./src",
+    "outDir": "./dist",
+    "paths": {
+      "@tuvren/runtime-api": [
+        "../../../runtime-api/implementations/typescript/dist/index.d.ts"
+      ],
+      "@tuvren/runtime-api/tools": [
+        "../../../runtime-api/implementations/typescript/dist/tools.d.ts"
+      ],
+      "@tuvren/core-types": [
+        "../../../../../shared/contracts/core-types/implementations/typescript/dist/index.d.ts"
+      ],
+      "@tuvren/tool-contracts": ["./src/index.ts"]
+    }
+  },
+  "include": ["src/**/*.ts"]
+}
