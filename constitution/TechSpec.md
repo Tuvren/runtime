@@ -2,9 +2,9 @@
 
 ## 0. Version History & Changelog
 
+- v0.8.0 - Opened Epic Y Machine-Enforced Neutral Authority Closure with ADR-023 (No Implementation Oracle), ADR-024 (No Prose Oracle), ADR-025 (No Runner Oracle), ADR-026 (Authority Packet Model), ADR-027 (Generated Artifact Freshness), and ADR-028 (Forbidden Implementation Vocabulary in Authority Sources). Added §4.11 Authority Packet Manifest contract, §4.12 Conformance Plan contract, and §4.13 Implementation Adapter Protocol. Extended §3.6 with packet membership rules and §5.4 with the Epic Y step. Stack section now records the layered authority stack vocabulary (TypeSpec, CDDL, Protobuf, JSON Schema, conformance-plan JSON, semconv/Weaver) without adding new pinned tooling.
 - v0.7.1 - Closed Epic X in current repo reality with the relocated TypeScript testkit and contract implementation roots, normalized Bun/Nx/tsconfig/tooling path rewires, explicit contract-root README placeholders for deferred neutral sources, and the Epic X closure inventory. ADR-022 is now enforced in repo reality, not just planned.
 - v0.7.0 - Opened Epic X TypeScript Topology Normalization with ADR-022, target-state structure rules that ban language-specific build manifests outside `implementations/<lang>/`, an updated project-structure diagram that shows contract `implementations/typescript/` subtrees, and partition-status placeholders for the Epic X tickets. No logical-architecture changes; physical realization only.
-- v0.6.9 - Closed Epic W in current repo reality with the semantic coverage matrix, assertion-bearing conformance suites, structured runner evidence, check-level compatibility reporting, and the Epic W closure inventory.
 - ... [Older history truncated, refer to git logs]
 
 ## 1. Stack Specification (Bill of Materials)
@@ -23,6 +23,7 @@
 - **Semantic authority posture:** `docs/` and `constitution/` are the human semantic authorities. Boundary-owned machine-readable contract, conformance, and interop assets are downstream projections of that authority unless explicitly promoted as normative in the same change.
 - **Portability posture:** Core packages stay runtime-portable where practical; backend packages and provider bridges may have narrower runtime support when their dependencies require it.
 - **Multilanguage posture:** Tuvren is one semantic ecosystem with multiple implementations, not multiple independent ports. Shape contracts, behavioral conformance, and cross-process transport are separate authority layers.
+- **Authority stack posture:** Cross-implementation meaning is carried by a layered authority stack — TypeSpec for the logical contract spine; CDDL for deterministic CBOR/kernel binary-record grammar; Protobuf/Buf for transport projections where gRPC is the chosen transport; JSON Schema 2020-12 for portable validation artifacts; conformance-plan JSON for executable behavior assertions; OpenTelemetry semconv via Weaver for telemetry vocabulary. TypeScript and Rust are implementation languages and binding-projection surfaces, not authority. Markdown is governance and rationale prose, not authority. Authority Packet manifests under `boundaries/<area>/contracts/<surface>/spec/authority-packet.json` declare which of these formats together carry one cross-implementation semantic surface and which sources are forbidden authority for that surface.
 - **Framework posture:** The framework layer is driver-oriented. Shared framework contracts and runtime services stay driver-neutral where practical, while concrete execution semantics live in driver implementations.
 - **Initial driver posture:** The first production-depth driver is the ReAct Driver. It is the baseline implementation, not the whole framework ontology.
 - **Provider posture:** Tuvren Runtime owns the canonical provider contract, while Kraken supplies the engine semantics behind it. The baseline bridge surface is AI SDK Providers only. LangChain is intentionally out of baseline scope. First-class Tuvren-scoped provider packages for major providers are expected later.
@@ -197,6 +198,48 @@
   No language-specific build manifest, source directory, or generated binding may live at a boundary, contract, conformance, or interop root. Epic X performs the initial physical relocation. Surfaces that lack a language-neutral source today (`runtime-api`, `driver-api`, `event-stream`, `core-types`) keep their TypeScript implementation under `implementations/typescript/` and carry only README placeholders at the contract root until a later epic authors a neutral source.
 - **Consequences:** Reviewers can reject misplaced TypeScript-only files on path evidence alone. Future epics that add a Rust crate, a Go module, or a new TypeScript package must place their build artifacts under `implementations/<lang>/` from day one. Existing TypeScript package names stay stable across the relocation because consumers depend on workspace handles rather than directory paths, so no public API change is required. The constitution carries this rule alongside ADR-020 to make path topology auditable independently of semantic-authority decisions.
 
+### ADR-023 No Implementation Oracle
+
+- **Status:** accepted
+- **Context:** Several deferred shared contract surfaces (`runtime-api`, `driver-api`, `event-stream`, `core-types`, callable seams) still describe their cross-language meaning by pointing at a TypeScript or Rust implementation file. That posture turns the implementation language into the silent oracle, which is exactly the failure mode CAP-P0-037 forbids.
+- **Decision:** No cross-implementation semantic claim, conformance assertion, or compatibility claim may cite any file under `boundaries/<area>/contracts/<surface>/implementations/<lang>/`, `boundaries/<area>/implementations/<lang>/`, or any other implementation-language source tree as authority. Implementation-language files may host bindings, adapters, generated projections, local tests, and optimization logic; they may not define portable truth.
+- **Consequences:** Every surface that currently relies on a TypeScript or Rust file as authority must promote to a boundary-owned authority packet (ADR-026) or be explicitly classified as implementation-specific in the Epic Y inventory. Existing `@tuvren/runtime-api` and other facade packages remain valid binding projections, but the phrase "semantic anchor" no longer attaches to any TypeScript package; the anchor is the authority packet manifest.
+
+### ADR-024 No Prose Oracle
+
+- **Status:** accepted
+- **Context:** Markdown under `docs/`, `constitution/`, `AGENTS.md`, and boundary `README.md` placeholders is essential for rationale, workflow, planning, ADRs, and reviewer handoffs, but it is not executable. Treating prose as the source of a binding cross-language semantic produces silent drift between text, generated artifacts, and implementation behavior.
+- **Decision:** No acceptance criterion, conformance claim, compatibility claim, release gate, or interop check may depend solely on Markdown. Every binding cross-language semantic claim must cite or derive from a machine authority packet (ADR-026), generated artifact, conformance plan, or measured evidence file. Markdown remains the home for rationale, workflow, ADRs, decision records, summaries, and review prose, paired with the executable artifacts that carry the actual contract.
+- **Consequences:** README placeholders that today say "TypeScript implementation is the source of truth" or "see docs/ for semantics" are not authority and must be paired with an authority packet entry before the surface can be claimed cross-language. `docs/KrakenKernelSpecification.md` and `docs/KrakenFrameworkSpecification.md` retain their role as human authority chain inputs but cannot satisfy a portability claim by themselves.
+
+### ADR-025 No Runner Oracle
+
+- **Status:** accepted
+- **Context:** A generic conformance runner that hard-codes expected event sequences, expected error codes, expected check IDs, expected lifecycle transitions, or expected provider/tool behavior in its source code becomes a second oracle. Switching runner implementations or adding a new language line then depends on inheriting hidden runner assumptions rather than reading the conformance plan.
+- **Decision:** Conformance runner source code may implement only generic mechanics: adapter startup, operation dispatch, schema validation, generic assertion operators (equality, regex, set membership, ordering), ordered-channel consumption, cancellation injection, timeout control, and evidence emission. Product semantics — expected event sequences, expected durable state transitions, expected checkpoint behavior, expected provider/tool behavior, expected error codes, expected recovery behavior, and expected check IDs — must arrive only from a Conformance Plan (§4.12) referenced by an Authority Packet manifest (§4.11).
+- **Consequences:** Existing TypeScript and Rust conformance runners under `boundaries/<area>/implementations/<lang>/conformance-runner` must migrate toward consuming compiled conformance plans rather than encoding semantics in source. CI guardrails (KRT-Y011) reject product-semantic literals — known event-type strings, known error codes, known check IDs — appearing inside generic runner source outside permitted plan-loading code paths.
+
+### ADR-026 Authority Packet Model
+
+- **Status:** accepted
+- **Context:** ADR-015 set "human spec → machine artifact" lineage and ADR-016 partitioned shape contracts, behavioral conformance, and interop transport as separate layers. Neither ADR yet declares, per surface, exactly which combination of those layers together carries one cross-implementation semantic, nor which sources are explicitly forbidden authority for that surface. Without that declaration, drift between TypeSpec, CDDL, Protobuf, JSON Schema, conformance plans, semconv, and binding projections is invisible.
+- **Decision:** Every cross-implementation semantic surface owns exactly one Authority Packet manifest at `boundaries/<area>/contracts/<surface>/spec/authority-packet.json` (or, for surfaces whose home is `boundaries/<area>/conformance/` or `boundaries/<area>/interop/<channel>/`, at the matching `spec/authority-packet.json` under that root). The manifest names a stable `packetId`, the packet `version`, the authoritative source files, the generated artifact directories, the language-binding projection roots, the referenced conformance plans, the allowed binding-specific appendices, the forbidden authority sources, and the freshness/compatibility checks the surface must satisfy. The manifest format is specified in §4.11.
+- **Consequences:** Every Epic Y promotion ticket (KRT-Y003 through KRT-Y007) lands one authority packet manifest per promoted surface. Reviewers can reject any new contract source, generated artifact, or binding projection that is not declared in the manifest, and CI (KRT-Y011) verifies that declared sources exist, that declared generated artifacts are reachable from the declared sources, and that declared forbidden authority sources do not appear in any conformance evidence.
+
+### ADR-027 Generated Artifact Freshness Is a CI Gate
+
+- **Status:** accepted
+- **Context:** Generated JSON Schema, OpenAPI, Protobuf descriptors and bindings, CDDL-derived validators, conformance plans, compatibility schemas, and telemetry outputs are functionally an authority change when they drift from their authority sources. Today drift is caught only by ad hoc review.
+- **Decision:** Every generated artifact named by an Authority Packet manifest is regenerated and diff-checked in CI through the existing `bun run codegen` lane plus authority-packet-aware verification. CI fails when the generated artifact differs from the regeneration output, when the generated artifact is missing, or when a declared source is missing. The same gate applies to checked-in generated language bindings, when present.
+- **Consequences:** `tools/scripts` gains an authority-packet freshness verifier wired into the existing repo-global verification flow. Authority packet manifests must declare every generated artifact subject to this gate; an undeclared generated artifact is not authoritative and may be deleted by the verifier. Implementations that depend on stale generated bindings must regenerate before merge.
+
+### ADR-028 Forbidden Implementation Vocabulary in Authority Sources
+
+- **Status:** accepted
+- **Context:** TypeScript primitives (`Promise`, `AsyncIterable`, `AbortSignal`, `Uint8Array`, `Buffer`, language-native `Error`, `unknown`, `Record<string, unknown>`, callable signatures, Node/Bun/Deno runtime assumptions) and Rust ownership/lifetime vocabulary are convenient at the implementation layer but are not portable cross-language semantics. Allowing them inside authority sources lets the implementation language quietly leak into the contract.
+- **Decision:** Authority packet sources (`spec/typespec/`, `spec/cddl/`, `.proto`, conformance plans, semconv YAML, fixture schemas) and the prose that documents them must use neutral vocabulary: operation, ordered event channel, cancellation/deadline control, byte sequence/octet payload, opaque JSON payload, metadata map, stable error envelope, language binding, implementation adapter. TypeScript and Rust primitives may appear only inside explicitly named binding-specific appendices declared by the Authority Packet manifest (for example `bindings/typescript.tsp` or `bindings/rust.md`).
+- **Consequences:** Existing TypeScript-shaped narrative inside contract README files and inside §4 of this TechSpec progressively migrates to the neutral vocabulary as each surface is promoted. The TypeScript binding appendix for each promoted surface remains free to express the language-native shape (for instance the existing `Promise`/`AsyncIterable` `RuntimeKernel` shape) so implementation ergonomics are preserved while authority stays neutral.
+
 ### 2.1 Compatibility Record
 
 - **Kernel identity compatibility:** Changes to deterministic CBOR profile, SHA-256 usage, hash string representation, or durable record shapes are semver-major.
@@ -208,6 +251,8 @@
 - **Conformance compatibility:** Normative fixture schemas, scenario identity, and suite semantics version independently from implementation packages. Behavior changes require explicit suite-version or compatibility-policy updates.
 - **Interop transport compatibility:** Cross-process transport versions evolve independently from npm package or crate versions. Buf breaking policy must guard `.proto` changes once the interop surface exists.
 - **Compatibility ledger posture:** `reports/compatibility/` records measured implementation parity and is not a public support matrix unless a later release policy explicitly promotes it.
+- **Authority packet compatibility:** Each Authority Packet manifest carries its own `version`. Adding declared sources, generated artifacts, conformance plans, or binding projections is minor; removing a declared authoritative source, removing a referenced conformance plan, or relaxing a declared forbidden authority source is major. Conformance plans referenced by a manifest version-track independently and follow conformance-suite compatibility rules.
+- **Generated artifact freshness:** Per ADR-027, every artifact declared as generated under an Authority Packet manifest is regenerated and diff-checked in CI. A drifting generated artifact is treated as a contract change for the purpose of release gating.
 
 ## 3. State & Data Modeling
 
@@ -481,6 +526,7 @@ erDiagram
   - by repo-global generated outputs: `reports/compatibility/...`
   - by repo-global observability conventions: `telemetry/...`
 - **Migration Notes:** Existing TypeScript testkit packages now live under `boundaries/<area>/implementations/typescript/testkit/` and remain helper/facade packages. Compatibility evidence now flows through implementation-specific TypeScript conformance runners over shared conformance assets before Rust or other non-TypeScript implementations become authoritative. Epic W must shrink the gap between TypeScript-local tests and boundary-owned semantic suites before any future framework, driver, backend, provider, or host implementation line is authorized.
+- **Authority packet membership (Epic Y):** Per ADR-026, every cross-implementation semantic surface owns exactly one Authority Packet manifest at the surface's `spec/authority-packet.json`. The manifest names which boundary-owned contract sources, conformance plans, transport projections, and binding projections together carry that surface and which sources are forbidden authority for it. A cross-implementation semantic claim that is not declared in such a manifest is not authoritative. Existing surfaces without a manifest (`runtime-api`, `driver-api`, `event-stream`, `core-types`, callable seams) are promoted through Epic Y; until promoted, their TypeScript implementations remain valid binding projections but cannot be cited as cross-language authority.
 
 ## 4. Interface Contract
 
@@ -1481,6 +1527,315 @@ service KernelRunService {
 - Every implementation and interop result must name the executed `checkIds` and a `checkSummary` so reviewers can distinguish check-level semantic evidence from coarse suite success.
 - Ledger wording must stay conservative and measured enough that the file can move toward external readiness signaling without later semantic cleanup.
 
+### 4.11 Authority Packet Manifest Contract
+
+- **Style:** boundary-owned JSON manifest validated by JSON Schema 2020-12
+- **Authentication / Authorization:** None. The manifest is reviewed source under normal repo policy.
+- **Compatibility Strategy:** Per the §2.1 authority-packet compatibility rule. Adding declared sources, generated artifacts, plans, or binding projections is minor; removing a declared authoritative source, removing a referenced conformance plan, or relaxing a declared forbidden authority source is major.
+- **Error model:** Manifest-validation failures, missing declared sources, unreachable generated artifacts, undeclared generated outputs, and references to declared forbidden authority sources stop CI through the §ADR-027 freshness gate.
+
+The manifest lives at `boundaries/<area>/contracts/<surface>/spec/authority-packet.json` for contract surfaces, and at `boundaries/<area>/conformance/spec/authority-packet.json` or `boundaries/<area>/interop/<channel>/spec/authority-packet.json` for behavior-rooted or interop-rooted surfaces. Each manifest validates against the JSON Schema below, which lives at `tools/schemas/authority-packet.schema.json`.
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tuvren.dev/schemas/authority-packet.schema.json",
+  "type": "object",
+  "required": [
+    "packetId",
+    "version",
+    "boundary",
+    "surface",
+    "authoritativeSources",
+    "forbiddenAuthoritySources",
+    "verificationPaths"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "packetId": {
+      "type": "string",
+      "pattern": "^tuvren\\.[a-z][a-z0-9-]*(?:\\.[a-z][a-z0-9-]*)+$"
+    },
+    "version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" },
+    "boundary": {
+      "type": "string",
+      "enum": ["framework", "kernel", "providers", "shared", "hosts"]
+    },
+    "surface": { "type": "string", "minLength": 1 },
+    "humanAuthorityRefs": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "default": []
+    },
+    "authoritativeSources": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["path", "format"],
+        "additionalProperties": false,
+        "properties": {
+          "path": { "type": "string", "minLength": 1 },
+          "format": {
+            "type": "string",
+            "enum": [
+              "typespec",
+              "cddl",
+              "proto",
+              "json-schema",
+              "conformance-plan",
+              "semconv-yaml",
+              "fixture-set"
+            ]
+          }
+        }
+      }
+    },
+    "generatedArtifacts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["path", "generatedFrom"],
+        "additionalProperties": false,
+        "properties": {
+          "path": { "type": "string", "minLength": 1 },
+          "generatedFrom": { "type": "string", "minLength": 1 },
+          "generator": { "type": "string", "minLength": 1 }
+        }
+      },
+      "default": []
+    },
+    "conformancePlans": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["planId", "planVersion", "path"],
+        "additionalProperties": false,
+        "properties": {
+          "planId": { "type": "string", "minLength": 1 },
+          "planVersion": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" },
+          "path": { "type": "string", "minLength": 1 }
+        }
+      },
+      "default": []
+    },
+    "bindingProjections": {
+      "type": "object",
+      "additionalProperties": { "type": "string", "minLength": 1 },
+      "default": {}
+    },
+    "bindingAppendices": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["language", "path"],
+        "additionalProperties": false,
+        "properties": {
+          "language": { "type": "string", "minLength": 1 },
+          "path": { "type": "string", "minLength": 1 }
+        }
+      },
+      "default": []
+    },
+    "forbiddenAuthoritySources": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "verificationPaths": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["kind", "target"],
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "schema-validation",
+              "conformance-plan",
+              "interop-smoke",
+              "freshness-check",
+              "vocabulary-check"
+            ]
+          },
+          "target": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "freshnessChecks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["artifact", "regenerateCommand"],
+        "additionalProperties": false,
+        "properties": {
+          "artifact": { "type": "string", "minLength": 1 },
+          "regenerateCommand": { "type": "string", "minLength": 1 }
+        }
+      },
+      "default": []
+    }
+  }
+}
+```
+
+- `humanAuthorityRefs` lists rationale documents (such as `docs/KrakenKernelSpecification.md` sections) that the packet projects but does not depend on for executable verification.
+- `forbiddenAuthoritySources` always includes at minimum every implementation-language root that contributes binding projections for the surface, plus `README.md`, `docs`, and `constitution` paths that historically described it. Per ADR-023 and ADR-024, those are explicit forbidden authority sources for cross-language semantics carried by this packet, not forbidden source files.
+- Every binding-language projection root listed under `bindingProjections` must also appear in `forbiddenAuthoritySources` (the projection is a downstream of the packet, not authority for it).
+- `verificationPaths` must include at least one `schema-validation` or `conformance-plan` kind. A packet with only `freshness-check` entries is not yet executable authority and must be marked with `version` `0.0.x` until at least one verification path lands.
+
+### 4.12 Conformance Plan Contract
+
+- **Style:** boundary-owned JSON document validated by JSON Schema 2020-12
+- **Authentication / Authorization:** None. Plans are reviewed source under normal repo policy.
+- **Compatibility Strategy:** Plans use `planVersion` independent of npm/crate versions. Adding new checks or new applicable adapters is minor; removing a check or tightening an existing assertion is major.
+- **Error model:** Plan-loading failures, schema validation failures against the plan schema, and unresolved `$ref`s to fixtures or scenarios stop CI before any adapter executes.
+
+A conformance plan is data-owned per ADR-025. Plans live alongside the surface they verify under `boundaries/<area>/conformance/plans/<plan-id>.json` (or under a sibling `interop/<channel>/plans/` directory for interop-rooted plans). Plans validate against `tools/schemas/conformance-plan.schema.json`.
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tuvren.dev/schemas/conformance-plan.schema.json",
+  "type": "object",
+  "required": [
+    "planId",
+    "planVersion",
+    "packetId",
+    "applicability",
+    "checks"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "planId": { "type": "string", "minLength": 1 },
+    "planVersion": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" },
+    "packetId": { "type": "string", "minLength": 1 },
+    "applicability": {
+      "type": "object",
+      "required": ["adapters"],
+      "additionalProperties": false,
+      "properties": {
+        "adapters": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "fixtures": {
+      "type": "object",
+      "additionalProperties": { "type": "string", "minLength": 1 },
+      "default": {}
+    },
+    "checks": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["checkId", "operation", "assertions"],
+        "additionalProperties": false,
+        "properties": {
+          "checkId": { "type": "string", "minLength": 1 },
+          "operation": { "type": "string", "minLength": 1 },
+          "fixture": { "type": "string", "minLength": 1 },
+          "scenario": { "type": "string", "minLength": 1 },
+          "input": {},
+          "controls": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "deadlineMs": { "type": "integer", "minimum": 1 },
+              "cancelAfterEvent": { "type": "string", "minLength": 1 }
+            }
+          },
+          "assertions": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "required": ["kind"],
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "eventSequence",
+                    "terminalEvent",
+                    "schemaValid",
+                    "errorEnvelope",
+                    "stateField",
+                    "evidenceField",
+                    "ordering",
+                    "noEvent"
+                  ]
+                },
+                "path": { "type": "string", "minLength": 1 },
+                "schema": { "type": "string", "minLength": 1 },
+                "equals": {},
+                "matches": { "type": "string", "minLength": 1 },
+                "contains": {},
+                "field": { "type": "string", "minLength": 1 },
+                "eventType": { "type": "string", "minLength": 1 }
+              }
+            }
+          },
+          "evidence": {
+            "type": "array",
+            "items": { "type": "string", "minLength": 1 },
+            "default": []
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+- `operation` is a neutral operation name resolved by the Implementation Adapter Protocol (§4.13). The plan never names a TypeScript function or a Rust trait method directly; it names the neutral operation declared by the authority packet.
+- `assertions[].kind` covers shape (`schemaValid`, `errorEnvelope`), behavior (`eventSequence`, `terminalEvent`, `ordering`, `noEvent`), durable state (`stateField`), and evidence (`evidenceField`). Generic runners implement these kinds; product-specific assertion logic must be expressed through these operators rather than added as runner-side bespoke code.
+- `controls` covers cancellation injection and deadlines; additional generic mechanics may be added through `applicability.adapters`-aware adapter capabilities rather than by hard-coding new control semantics in runner source.
+- `evidence[]` lists the evidence artifact paths the runner must emit for the Compatibility Reporting Boundary; missing required evidence is a check failure.
+
+### 4.13 Implementation Adapter Protocol
+
+- **Style:** library API consumed by language-specific implementation adapters
+- **Authentication / Authorization:** Internal verification surface; adapters are not external entry points.
+- **Compatibility Strategy:** Protocol-shaped contract under `tools/conformance/adapter-protocol/`. Breaking changes to the operation, event, cancellation, error envelope, or state-inspection seam require a major-version bump and a coordinated update across every implementation adapter the surface declares in its authority packet.
+- **Error model:** Stable error envelope with `code`, `message`, optional `details`, and optional `cause`; carried as a neutral payload, not as a language-native exception.
+
+The adapter protocol is the neutral seam between the Generic Conformance Runner and any one Implementation Adapter Boundary. It is intentionally minimal so that adding a new language line means writing a new adapter and binding projection, not a new conformance suite. The reference shape below is documented neutrally; concrete TypeScript and Rust adapter shapes live in their respective binding appendices declared by the relevant authority packet.
+
+```text
+ImplementationAdapter (neutral protocol)
+
+  initialize(packetId, planVersion) -> AdapterCapabilities
+  shutdown() -> void
+
+  dispatch(operation, input, controls) -> OperationOutcome
+    OperationOutcome ::=
+      | { kind: "result",  value }
+      | { kind: "error",   error: ErrorEnvelope }
+
+  events(operation, input, controls) -> OrderedEventChannel
+    OrderedEventChannel yields neutral events with stable type names and JSON-encodable payloads
+    OrderedEventChannel terminates with one of: completed, paused, failed
+    OrderedEventChannel honors cancel(reason) and deadlineMs
+
+  inspectState(query) -> StateView | null
+    StateView is a JSON-encodable projection of durable state declared inspectable by the authority packet
+
+  emitEvidence(checkId, key, payload) -> void
+
+ErrorEnvelope ::= { code: string, message: string, details?: JsonValue, cause?: ErrorEnvelope }
+```
+
+- Operations are named by the authority packet, not by a TypeScript or Rust signature. The same operation name resolves to the language-native call inside the adapter.
+- Event channels are ordered, single-consumer, and produce neutral events; per ADR-025 the runner asserts the event sequence rather than the adapter implementing the expected sequence.
+- Cancellation and deadlines are control inputs, not derived from `AbortSignal` or a Rust cancellation token at the protocol level. Adapters bridge to language-native cancellation internally.
+- Byte payloads cross the seam as base64-encoded JSON strings or as opaque JSON values; the adapter is responsible for converting to or from `Uint8Array`, `Buffer`, `Vec<u8>`, or any other language-native byte container.
+- `inspectState` is optional per packet. Packets that do not declare an inspectable state surface omit it; packets that declare it list the queryable views in the manifest.
+
 ## 5. Implementation Guidelines
 
 ### 5.1 Project Structure
@@ -1622,6 +1977,16 @@ testkits live under `implementations/<lang>/testkit/` rather than at the
 boundary root, because a testkit is always language-specific harness code over
 the language-neutral `conformance/` assets.
 
+Per ADR-026, every contract surface that has crossed Epic Y promotion also
+carries one Authority Packet manifest at
+`boundaries/<area>/contracts/<surface>/spec/authority-packet.json` (or the
+equivalent path under `conformance/spec/` or `interop/<channel>/spec/` for
+behavior- or interop-rooted packets). Per Epic Y, conformance plans for a
+boundary live under `boundaries/<area>/conformance/plans/`; the implementation
+adapter protocol lives under `tools/conformance/adapter-protocol/`; and the
+authority-packet and conformance-plan JSON Schemas live under
+`tools/schemas/`.
+
 ### 5.1.1 Structure Rules
 
 - The repository is architecture-first and language-neutral at the top level.
@@ -1636,6 +2001,7 @@ the language-neutral `conformance/` assets.
 - Contract-driven components such as backends, provider surfaces, driver contracts, tool contracts, event vocabulary, conformance suites, and interop seams must have an explicit boundary-owned home before any new implementation package is added.
 - `@tuvren/runtime-api` remains the semantic anchor and compatibility source for shared framework contracts. Focused facade packages remain the preferred public home for event, tool, provider, and driver-specific imports, but compatibility re-exports from `@tuvren/runtime-api` are allowed while the partition settles.
 - Where a stable language-neutral structure exists, TypeScript adopts it first so later languages inherit a real system rather than a permanent TypeScript exception.
+- Per ADR-023, ADR-024, ADR-025, ADR-026, ADR-027, and ADR-028, every cross-implementation semantic surface must own one Authority Packet manifest declaring its authoritative sources, generated artifacts, conformance plans, binding projections, and forbidden authority sources. Implementation-language source trees, generic conformance runner source, and Markdown documents are forbidden authority sources for any cross-implementation semantic; they may project, validate, or describe authority but cannot become it. Generic runners must own only generic mechanics and consume product semantics from conformance plans referenced by an authority packet.
 
 ### 5.2 Coding Standards
 
@@ -1698,6 +2064,7 @@ the language-neutral `conformance/` assets.
 - New backend adapters require updates to backend conformance documentation and compatibility notes.
 - Changes that promote or revise boundary-owned contract, conformance, interop, telemetry, or compatibility-ledger authority require TechSpec updates in the same change.
 - When a shared contract adds a host-owned control or policy seam, the baseline ReAct/runtime path must either wire it through in the same change or document the limitation explicitly in `docs/` and `constitution/`.
+- Adding, removing, or changing an Authority Packet manifest, a referenced Conformance Plan, a generated artifact declared in a manifest, or the Implementation Adapter Protocol requires a TechSpec update in the same change. ADR-023 through ADR-028 are not advisory: a future contributor may not satisfy a cross-implementation semantic claim by editing implementation source, runner source, or Markdown alone.
 
 ### 5.4 Initial Build Sequence
 
@@ -1711,7 +2078,8 @@ the language-neutral `conformance/` assets.
 8. Epic V is closed: TypeScript framework to Rust kernel interop, cross-language telemetry attributes, generated telemetry helpers, and compatibility-ledger generation are stabilized as input evidence for semantic maturity work.
 9. Epic W matures the one-semantic-ecosystem layer before any additional implementation line: build the semantic coverage matrix, promote high-value TypeScript-local semantics into boundary-owned conformance suites, require assertion-bearing evidence, and update compatibility reporting so pass/fail claims name the semantic checks that ran.
 10. Epic X normalizes the boundary tree's path topology: relocate every TypeScript-only asset out of language-neutral slots into the appropriate `implementations/typescript/` subtree, codify the topology rule in `AGENTS.md` and TechSpec ADR-022, and record the closure inventory. Epic X performs no semantic, fixture, or public-API changes.
-11. Add a Rust framework implementation, future concrete drivers, peer backends such as PostgreSQL and MySQL/MariaDB, provider expansions, or additional host protocols only after Epic W proves the artifact-backed semantic system is complete enough to absorb them without drift and Epic X has normalized the boundary tree to language-neutral roots.
+11. Epic Y closes the machine-enforced neutral authority gap: inventory the remaining TypeScript/Rust/Markdown oracle leaks; promote each cross-implementation semantic surface (`core-types`, `event-stream`, `runtime-api`, `driver-api`, callable seams) to a boundary-owned Authority Packet manifest (§4.11) referencing conformance plans (§4.12) consumed by generic runners through the adapter protocol (§4.13); rebase TypeScript packages and align Rust projections onto those packets as binding projections; add CI guardrails (ADR-027) for generated artifact freshness, forbidden authority sources, and forbidden implementation vocabulary (ADR-028); and record the Epic Y closure inventory.
+12. Add a Rust framework implementation, future concrete drivers, peer backends such as PostgreSQL and MySQL/MariaDB, provider expansions, or additional host protocols only after Epic W proves the artifact-backed semantic system is complete enough to absorb them without drift, Epic X has normalized the boundary tree to language-neutral roots, and Epic Y has eliminated implementation-, runner-, and prose-oracle paths from the named cross-implementation surfaces.
 
 ### 5.4.1 ReAct and Multilanguage Epic Partition Status
 
@@ -1722,5 +2090,6 @@ the language-neutral `conformance/` assets.
 - **Epic U — Rust Kernel Baseline:** Closed in current repo reality through `constitution/spikes/epic-u-rust-kernel-baseline-inventory.md`. The repo now has the root Cargo workspace, Rust kernel implementation, runnable Rust gRPC service, Rust conformance runner, and generated Rust telemetry helper while keeping framework ownership TypeScript-first.
 - **Epic V — TypeScript Framework and Rust Kernel Interop Stabilization:** Closed in current repo reality through `constitution/spikes/epic-v-transport-decision-inventory.md` and `constitution/spikes/epic-v-framework-rust-kernel-interop-closure-inventory.md`. The repo now has the TypeScript gRPC remote-kernel helper, the playground kernel switch, real interop-smoke evidence, compatibility-ledger interop entries, and separated cross-language verification lanes.
 - **Epic W — Semantic Ecosystem Maturity:** Closed in current repo reality through `constitution/spikes/epic-w-semantic-coverage-matrix.md` and `constitution/spikes/epic-w-semantic-ecosystem-maturity-closure-inventory.md`. Epic W was not a Rust framework, not a second framework implementation, and not a continuation of the Rust-kernel baseline; it closed the first semantic-authority gap by promoting normative semantics from TypeScript-local tests into boundary-owned conformance suites with named assertions and compatibility evidence.
-- **Epic X — TypeScript Topology Normalization:** Closed in current repo reality through `constitution/spikes/epic-x-typescript-topology-normalization-inventory.md` and `constitution/spikes/epic-x-typescript-topology-normalization-closure-inventory.md`. The repository now places boundary-level testkits and moved contract package guts only under `implementations/typescript/` subtrees, codifies the path-topology rule in `AGENTS.md`, and leaves explicit root-level placeholders for the four surfaces that still lack a neutral source. Authoring those neutral sources (`runtime-api`, `driver-api`, `event-stream`, `core-types`) remains a later epic.
-- **Later driver, backend, provider, language, and host protocol expansion:** Deferred beyond Epic W and Epic X unless the TechSpec is revised. This includes Rust framework work, `LanguageModelV2` compatibility, provider-native tools, AI SDK agent loops/UI transports, LangChain bridge work, first-class Tuvren provider packages, ACP, future non-ReAct drivers, future official backends, and future language lines beyond Rust.
+- **Epic X — TypeScript Topology Normalization:** Closed in current repo reality through `constitution/spikes/epic-x-typescript-topology-normalization-inventory.md` and `constitution/spikes/epic-x-typescript-topology-normalization-closure-inventory.md`. The repository now places boundary-level testkits and moved contract package guts only under `implementations/typescript/` subtrees, codifies the path-topology rule in `AGENTS.md`, and leaves explicit root-level placeholders for the four surfaces that still lack a neutral source. Authoring those neutral sources (`runtime-api`, `driver-api`, `event-stream`, `core-types`) is the entry point for Epic Y.
+- **Epic Y — Machine-Enforced Neutral Authority Closure:** Open in current repo reality. Planning artifact: `constitution/spikes/epic-y-machine-enforced-authority-plan.md`. Goal: eliminate TypeScript, Rust, runner-source, and Markdown as possible cross-implementation oracles by promoting `core-types`, `event-stream`, `runtime-api`, `driver-api`, and the callable seams to boundary-owned Authority Packet manifests (§4.11), executable Conformance Plans (§4.12), and Implementation Adapter projections (§4.13). Adds CI guardrails per ADR-023..028. Out of scope: opening a new implementation language line, widening kernel/framework semantics, or replacing existing TypeScript public package APIs (which become declared binding projections of their packets).
+- **Later driver, backend, provider, language, and host protocol expansion:** Deferred beyond Epic W, Epic X, and Epic Y unless the TechSpec is revised. This includes Rust framework work, `LanguageModelV2` compatibility, provider-native tools, AI SDK agent loops/UI transports, LangChain bridge work, first-class Tuvren provider packages, ACP, future non-ReAct drivers, future official backends, and future language lines beyond Rust.

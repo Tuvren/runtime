@@ -36,6 +36,7 @@ To conserve your context window and improve accuracy, use this lookup table to f
 | **What the kernel and framework behavior mean semantically?** | `../docs/KrakenKernelSpecification.md` and `../docs/KrakenFrameworkSpecification.md` | Read the relevant normative sections directly                                                           |
 | **What closed epic work actually delivered?**                 | `spikes/epic-*-inventory.md` and closure inventories                                 | Read the closure inventory for the affected epic or boundary                                             |
 | **What implementation parity is currently evidenced?**        | `../reports/compatibility/`                                                          | Treat generated matrix and evidence files as measured evidence, not semantic authority                   |
+| **What carries the cross-implementation truth for a surface?** | `boundaries/<area>/contracts/<surface>/spec/authority-packet.json` and the conformance plans it references | Read the manifest first; treat implementation source, runner source, and Markdown as forbidden authority for any cross-implementation semantic |
 
 ---
 
@@ -49,6 +50,7 @@ To conserve your context window and improve accuracy, use this lookup table to f
 6. **Behavioral Authority:** For kernel and framework semantics, treat `../docs/KrakenKernelSpecification.md` and `../docs/KrakenFrameworkSpecification.md` as authoritative behavior sources. The constitution documents govern planning and implementation posture; the docs govern meaning.
 7. **Evidence Discipline:** Boundary-owned `contracts/`, `conformance/`, `interop/`, telemetry outputs, and `../reports/compatibility/` are executable evidence layers. Update them with the human docs when semantics change, but do not let generated artifacts silently become a parallel source of truth.
 8. **Native Toolchain Discipline:** The current repo is multi-language. Bun/TypeScript, Cargo/Rust, Buf/proto, TypeSpec, Weaver, and Nx each have distinct authority. Nx routes targets; it does not replace the native truth for each ecosystem.
+9. **Machine-Enforced Authority Discipline (Epic Y):** Per TechSpec ADR-023, ADR-024, ADR-025, ADR-026, ADR-027, and ADR-028, every cross-implementation semantic surface owns one Authority Packet manifest at `boundaries/<area>/contracts/<surface>/spec/authority-packet.json` (or the equivalent under `conformance/spec/` or `interop/<channel>/spec/`). No implementation-language file, generic conformance runner source file, or Markdown document is cross-implementation authority. The manifest names the authoritative sources; the §4.12 conformance plans carry behavior assertions; the §4.13 implementation adapter protocol is the seam. When a task touches a promoted surface, the authority packet manifest is the answer to "what must be true." When a task touches a deferred surface that lacks a manifest, do not invent an oracle — extend or open the manifest in the same change, or block on Epic Y.
 
 ## Getting Started
 

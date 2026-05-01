@@ -2,9 +2,9 @@
 
 ## 0. Version History & Changelog
 
+- v0.5.0 - Added the machine-authority-packet surface (Authority Packet, Conformance Plan, Implementation Adapter, Generic Conformance Runner), the forbidden-authority-source failure class, and the packet-driven conformance flow that realizes PRD CAP-P0-037 / CAP-P1-038.
 - v0.4.0 - Added the multi-implementation asset boundaries, the cross-language conformance and compatibility flow, and the semantic-authority posture for the post-TypeScript transition line.
 - v0.3.0 - Narrowed shared-core orchestration to a minimal handle/tree primitive, moved ordered pipelines out of core semantics, and aligned approval/cancel responsibilities with the docs-first HITL model.
-- v0.2.0 - Reframed the runtime around shared framework services plus pluggable drivers, with the current execution semantics treated as the initial ReAct-oriented driver.
 - ... [Older history truncated, refer to git logs]
 
 ## 1. Architectural Strategy & Archetype Alignment
@@ -26,6 +26,7 @@
 - **In-process modularity first:** Containers are logical boundaries inside one embeddable runtime system, aligning with solo-dev realism and avoiding premature service decomposition.
 - **Adapter edges at trust boundaries:** Hosts, model providers, and external tools connect through explicit boundary adapters rather than leaking their protocols inward.
 - **Artifact-backed semantic authority:** Human semantic authority lives in the docs and constitution, while machine-readable contract, conformance, and interop assets make those semantics executable across implementations.
+- **Machine-enforced neutral authority:** Every cross-implementation semantic must be carried by a boundary-owned authority packet that pairs neutral machine-readable sources with at least one executable verification path. No implementation language file, generic runner source file, or human-prose document can act as the source of cross-language truth.
 - **History-preserving correction:** Rollback, steering, handoff, and context engineering create new lineage rather than rewriting the past.
 - **Driver plurality without product sprawl:** The architecture must support multiple drivers conceptually, but only one driver needs to be implemented to production depth at a time.
 
@@ -37,6 +38,7 @@
 - **Partially trusted host boundary:** Hosts may start, steer, cancel, and resolve approvals, but they do not become the source of runtime truth.
 - **High-risk tool boundary:** External tool execution is where side effects happen and where approval, staging, and recovery protections matter most.
 - **Trusted semantic assets:** Boundary-owned contract and conformance assets are trusted to carry machine-readable meaning, while generated bindings and reports are evidence rather than primary authority.
+- **Untrusted semantic candidates:** Implementation language source trees, generic runner code, and human-prose documents are untrusted as cross-language semantic sources. They may project, validate, or describe authority, but they may not become it.
 
 ### 1.4 Failure Classes
 
@@ -46,6 +48,8 @@
 - **Driver lock-in risk:** Shared framework services accidentally absorb assumptions that only one driver actually needs.
 - **Boundary translation risk:** Provider-native or host-native representations conflict with Kraken’s canonical model unless normalized at the edge.
 - **Cross-language drift risk:** Human specs, machine-readable artifacts, and implementation lines diverge enough that “same runtime” stops meaning the same thing across languages or processes.
+- **Forbidden authority source risk:** A semantic that should live in a boundary-owned authority packet leaks into an implementation language file, a generic runner's hard-coded assertions, or a Markdown document, quietly making that surface the de facto cross-language oracle.
+- **Generated artifact staleness risk:** Generated artifacts (validators, bindings, conformance plans, transport descriptors) drift from their authority sources and silently change observable meaning without a corresponding authored change.
 
 ## 2. System Containers
 
@@ -169,6 +173,38 @@
 - **Outputs:** Compatibility matrices and health reports for maintainers and CI.
 - **Depends on:** Behavioral Conformance Assets, Interop Transport Boundary.
 
+### Authority Packet Surface
+
+- **Logical Type:** Boundary-owned authority manifest
+- **Responsibility:** For each cross-implementation semantic surface, declare exactly which Contract Authority Assets, Behavioral Conformance Assets, Interop Transport Boundary entries, generated artifacts, conformance plans, and language-binding projections together carry that semantic; declare the forbidden authority sources for the same surface; and declare freshness and compatibility checks the surface must satisfy. The packet is a meta-container whose authority is the act of declaration; it does not host new semantics by itself.
+- **Inputs:** Approved promotions of contract sources, conformance plans, transport projections, telemetry vocabulary, and binding projections; review decisions about what may and may not act as authority for the surface.
+- **Outputs:** A single boundary-owned manifest per surface that names authoritative sources, generated artifacts, allowed binding appendices, forbidden authority sources, and required executable verification paths.
+- **Depends on:** Contract Authority Assets, Behavioral Conformance Assets, Interop Transport Boundary, Conformance Plan Authority.
+
+### Conformance Plan Authority
+
+- **Logical Type:** Boundary-owned executable behavior surface
+- **Responsibility:** Express named semantic checks, fixtures, scenarios, assertions, evidence requirements, and runner applicability as data-owned artifacts that any generic runner can consume. Carry behavior assertions that exceed shape grammar (event ordering, terminality, lifecycle transitions, recovery state, approval pause/resume continuity, structured-output validation) without delegating that authority to runner code.
+- **Inputs:** Approved behavior promotions from human authority, fixture and scenario sources, schema references, and evidence-shape definitions.
+- **Outputs:** Versioned conformance plans referenced by Authority Packet manifests and consumed by Generic Conformance Runner over Implementation Adapter Boundary instances.
+- **Depends on:** Contract Authority Assets, Behavioral Conformance Assets.
+
+### Implementation Adapter Boundary
+
+- **Logical Type:** Language-specific executable seam
+- **Responsibility:** Expose a particular implementation to a Generic Conformance Runner through a neutral surface for operation dispatch, ordered event consumption, cancellation and deadline control, error envelopes, and where applicable durable-state inspection. Each implementation language provides at least one adapter per authority packet it claims to support.
+- **Inputs:** Generic runner invocations driven by a conformance plan; implementation under test; language-binding projections from the relevant authority packet.
+- **Outputs:** Operation results, ordered event streams, error envelopes, evidence emissions, and adapter lifecycle signals consumed by the Generic Conformance Runner.
+- **Depends on:** The implementation under test, the relevant Authority Packet Surface, and the language-binding projections it declares.
+
+### Generic Conformance Runner
+
+- **Logical Type:** Implementation-agnostic verification process
+- **Responsibility:** Load a conformance plan, drive an Implementation Adapter Boundary, validate operation results and event streams against schemas and assertions named in the plan, and emit evidence for the Compatibility Reporting Boundary. The runner owns generic mechanics (adapter startup, dispatch, schema validation, generic assertion operators, ordered-channel consumption, cancellation injection, timeout control, evidence emission) and never hard-codes product semantics, expected event sequences, expected check IDs, or expected error codes outside what the plan supplies.
+- **Inputs:** A conformance plan version, an Implementation Adapter Boundary instance, fixtures and scenarios named by the plan, and evidence shape definitions.
+- **Outputs:** Per-check pass/fail results, captured evidence artifacts, and structured run summaries forwarded to the Compatibility Reporting Boundary.
+- **Depends on:** Conformance Plan Authority, Implementation Adapter Boundary, Behavioral Conformance Assets.
+
 ### 2.1 Communication Relationships
 
 - Host Integration Boundary -> Framework Shared Services: synchronous execution commands and control signals
@@ -185,6 +221,10 @@
 - Language-specific runners -> Behavioral Conformance Assets: execute shared suites without redefining semantics locally
 - Host Integration Boundary / Framework Shared Services <-> Interop Transport Boundary: use transport contracts when a runtime boundary spans processes or languages
 - Behavioral Conformance Assets / Interop Transport Boundary -> Compatibility Reporting Boundary: publish suite and interop results for implementation parity reporting
+- Authority Packet Surface -> Contract Authority Assets / Behavioral Conformance Assets / Interop Transport Boundary / Conformance Plan Authority: declare which sources, plans, and projections together carry one cross-implementation semantic and which sources are forbidden authority for that surface
+- Conformance Plan Authority -> Generic Conformance Runner: deliver versioned, data-owned conformance plans that drive verification mechanics
+- Generic Conformance Runner <-> Implementation Adapter Boundary: dispatch neutral operations, consume ordered event channels, inject cancellation and deadlines, and collect error envelopes and evidence for one implementation under test
+- Generic Conformance Runner -> Compatibility Reporting Boundary: emit per-check evidence keyed by authority packet, conformance plan version, and adapter identity
 
 ### 2.2 Boundary Notes
 
@@ -195,6 +235,8 @@
 - Ordered multi-agent pipelines are not a shared-core semantic. If they remain in scope, they belong above the shared handoff/orchestration primitives as driver-level policy.
 - Contract authority, behavioral conformance, and interop transport are separate containers on purpose; no single artifact type is allowed to silently become the meaning of the runtime.
 - Native language toolchains may differ, but their outputs must still fit the same boundary-owned contract, conformance, and compatibility system.
+- Authority Packet Surface, Conformance Plan Authority, Implementation Adapter Boundary, and Generic Conformance Runner are first-class containers because their absence is the failure mode that lets a TypeScript file, Rust crate, runner source file, or Markdown document quietly become the cross-language oracle.
+- Implementation Adapter Boundary is logically per-language but does not imply a separate process; an adapter may be in-process for the language under test while the Generic Conformance Runner remains language-agnostic.
 
 ## 3. Container Diagram (Mermaid)
 
@@ -218,6 +260,10 @@ System_Boundary(tuvren_runtime, "Tuvren Runtime") {
   Container(conformanceAssets, "Behavioral Conformance Assets", "Behavior Corpus", "Boundary-owned fixtures, schemas, and scenarios shared across implementations")
   Container(interopBoundary, "Interop Transport Boundary", "Cross-Process Contract", "Transport surface for runtime boundaries that span processes or languages")
   Container(compatibilityReporting, "Compatibility Reporting Boundary", "Generated Evidence", "Aggregates suite and interop results into compatibility reports")
+  Container(authorityPacket, "Authority Packet Surface", "Authority Manifest", "Per-surface declaration of authoritative sources, generated artifacts, allowed bindings, forbidden authority sources, and freshness checks")
+  Container(conformancePlan, "Conformance Plan Authority", "Executable Behavior Surface", "Data-owned named checks, fixtures, scenarios, assertions, and evidence requirements consumed by generic runners")
+  Container(implAdapter, "Implementation Adapter Boundary", "Language-Specific Seam", "Per-language adapter exposing operations, ordered events, cancellation, errors, and state inspection to the generic runner")
+  Container(genericRunner, "Generic Conformance Runner", "Verification Process", "Implementation-agnostic process that drives an adapter against a conformance plan and emits per-check evidence")
 }
 System_Ext(modelProviders, "Model Providers", "External generation systems")
 System_Ext(externalTools, "External Tools and Systems", "External side-effecting capabilities")
@@ -246,6 +292,13 @@ Rel(conformanceAssets, compatibilityReporting, "Publishes suite results")
 Rel(interopBoundary, compatibilityReporting, "Publishes interop results")
 Rel(hostBoundary, interopBoundary, "Uses transport when boundaries span processes")
 Rel(frameworkServices, interopBoundary, "Uses transport client/server contracts")
+Rel(authorityPacket, contractAssets, "Declares authoritative contract sources")
+Rel(authorityPacket, conformanceAssets, "Declares authoritative behavioral assets")
+Rel(authorityPacket, interopBoundary, "Declares authoritative transport projections")
+Rel(authorityPacket, conformancePlan, "References versioned conformance plans")
+Rel(conformancePlan, genericRunner, "Supplies named checks and assertions")
+Rel(genericRunner, implAdapter, "Drives operations and consumes events")
+Rel(genericRunner, compatibilityReporting, "Emits per-check evidence")
 ```
 
 ## 4. Critical Execution Flows
@@ -396,6 +449,34 @@ Interop-->>Report: publish interop-smoke evidence
 Report-->>Maintainer: compatibility matrix and remaining parity gaps
 ```
 
+### 4.6 Authority-Packet-Driven Conformance Validation
+
+- **Maps to PRD capability:** CAP-P0-037, CAP-P1-038, CAP-P1-035, CAP-P1-036
+
+```mermaid
+sequenceDiagram
+participant Maintainer as Runtime Implementation Maintainer
+participant Packet as Authority Packet Surface
+participant Plan as Conformance Plan Authority
+participant Runner as Generic Conformance Runner
+participant Adapter as Implementation Adapter Boundary
+participant Impl as Implementation Under Test
+participant Report as Compatibility Reporting Boundary
+
+Maintainer->>Packet: select cross-language semantic surface
+Packet-->>Maintainer: authoritative sources, allowed bindings, forbidden authority sources, freshness checks
+Maintainer->>Plan: load versioned conformance plan referenced by the packet
+Plan-->>Runner: named checks, fixtures, scenarios, assertions, evidence requirements
+Maintainer->>Adapter: provision language-specific adapter for the implementation under test
+Runner->>Adapter: dispatch neutral operations and inject cancellation/deadlines
+Adapter->>Impl: execute the operations through binding projections
+Impl-->>Adapter: ordered events, results, error envelopes, state inspections
+Adapter-->>Runner: forward neutral observations
+Runner->>Runner: validate against schemas, ordering, terminality, and named assertions
+Runner-->>Report: emit per-check evidence keyed by packetId, planVersion, adapterId
+Report-->>Maintainer: pass/fail per check with evidence paths, no implementation oracle traversed
+```
+
 ## 5. Resilience & Cross-Cutting Concerns
 
 - **Security / Identity Strategy:** Host applications authenticate and authorize their own callers before exposing Tuvren Runtime controls; the Kraken engine itself treats host commands, provider responses, and tool outputs as boundary inputs that require validation and normalization.
@@ -425,3 +506,15 @@ Report-->>Maintainer: compatibility matrix and remaining parity gaps
 - **Risk:** Machine-readable artifacts drift away from the human semantic sources in `docs/` and `constitution/`.
 - **Why it matters:** Cross-language parity collapses quickly when schemas, fixtures, or reports become de facto truth without matching the normative specs.
 - **Mitigation or follow-up:** Treat docs and constitution as the human authority chain, require boundary-owned review for artifact changes, and generate compatibility reports from actual suite evidence rather than hand-authored claims.
+
+- **Risk:** A cross-language semantic continues to be defined only by TypeScript source, Rust source, generic runner code, or Markdown prose, making one of those surfaces the silent oracle.
+- **Why it matters:** Future implementations must then chase implementation accidents instead of honoring shared meaning, and "the same runtime" stops surviving the addition of any new language line.
+- **Mitigation or follow-up:** Every cross-language semantic must live in a boundary-owned Authority Packet Surface that names its authoritative sources and forbidden authority sources, with at least one Conformance Plan Authority entry and a Generic Conformance Runner path that can drive any compliant Implementation Adapter Boundary; CI must reject claims that depend only on implementation language source, runner-internal assertions, or prose documents.
+
+- **Risk:** Generic conformance runners absorb product semantics through hard-coded expected event sequences, expected error codes, expected check IDs, or expected lifecycle transitions and quietly become a second oracle in their own right.
+- **Why it matters:** Switching runner implementations or adding a new language line then depends on inheriting hidden runner assumptions rather than reading the conformance plan.
+- **Mitigation or follow-up:** Runners must own only generic mechanics (adapter startup, dispatch, schema validation, generic assertion operators, ordered-channel consumption, cancellation injection, timeout control, evidence emission), and product semantics must arrive only from Conformance Plan Authority artifacts referenced by an Authority Packet Surface.
+
+- **Risk:** Generated artifacts (validators, bindings, transport descriptors, conformance plans) drift from their authority sources and silently change observable meaning.
+- **Why it matters:** Stale generated artifacts are functionally an unreviewed authority change.
+- **Mitigation or follow-up:** Authority Packet Surface manifests must declare freshness checks, and CI must fail when generated artifacts diverge from their authoritative sources.

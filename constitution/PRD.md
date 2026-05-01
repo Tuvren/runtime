@@ -2,9 +2,9 @@
 
 ## 0. Version History & Changelog
 
+- v0.4.0 - Added the machine-enforced neutral authority capabilities, the authority-packet and conformance-plan domain terms, the no-implementation-oracle and no-prose-oracle prohibited patterns, and the runtime-maintainer success criterion that a new implementation must be buildable without reading another language's source as truth.
 - v0.3.0 - Added the multi-implementation portability posture, the runtime implementation maintainer actor, and explicit language-neutral semantic parity capabilities for the post-TypeScript transition line.
 - v0.2.0 - Reframed Tuvren Runtime as a driver-oriented runtime where the framework can host multiple execution drivers over shared kernel primitives, with ReAct as the initial driver.
-- v0.1.0 - Initial PRD synthesized from the existing Kraken kernel/framework specifications and rationale documents.
 - ... [Older history truncated, refer to git logs]
 
 ## 1. Executive Summary & Target Archetype
@@ -22,6 +22,7 @@
 - Tuvren Runtime must be host-embeddable. The product serves applications, services, CLIs, and protocol adapters rather than replacing them.
 - Tuvren Runtime must support a shared runtime foundation that can host more than one execution driver over time rather than treating one agent loop as the entire product ontology.
 - Tuvren Runtime must preserve a language-neutral semantic core so future implementations can share one runtime meaning without turning the first TypeScript line into the permanent oracle.
+- Tuvren Runtime must enforce that cross-implementation meaning lives in boundary-owned machine-readable authority and executable evidence rather than in any single implementation language, runner codebase, or human-prose document.
 
 ### 1.2 Success Criteria
 
@@ -30,6 +31,7 @@
 - A human supervisor can interrupt, approve, reject, or resume sensitive work without corrupting the execution lineage.
 - A multi-agent workflow can delegate, hand off, and continue work while preserving traceability and avoiding ambiguous control transfer.
 - A runtime maintainer can introduce a new implementation language against shared contracts and behavioral fixtures without redefining the product’s semantic model.
+- A runtime maintainer can build and judge a new implementation strictly from boundary-owned machine authority, generated artifacts, executable conformance evidence, and language-binding adapters, without reading another language's implementation, a generic runner's source code, or a Markdown document as the source of cross-language truth.
 
 ### 1.3 Scope Distinctions That Must Remain Stable
 
@@ -38,6 +40,7 @@
 - **History preservation vs. active context shaping:** The active working context may be reduced or rewritten, but previously committed history remains recoverable.
 - **Host control vs. runtime execution:** The host initiates, observes, and influences execution, but the runtime remains responsible for the execution lifecycle itself.
 - **Framework vs. driver:** The framework supplies shared runtime services and contracts, while a driver defines one concrete execution model built on that shared foundation.
+- **Machine authority vs. implementation projection:** Cross-implementation meaning lives in boundary-owned machine authority and executable evidence; an implementation language, generic runner codebase, or human-prose document is a projection of that authority and is never the source of cross-language truth.
 
 ## 2. Ubiquitous Language (Glossary)
 
@@ -65,6 +68,10 @@
 | Handoff             | A controlled transfer of active execution responsibility from one agent configuration to another.                                            | worker result, tool call               |
 | Worker              | A subordinate agent execution used to perform delegated work and return results.                                                             | handoff, branch clone                  |
 | ExecutionHandle     | The host-facing control surface for consuming events and issuing runtime controls.                                                           | adapter, transport                     |
+| Authority Packet    | A boundary-owned bundle that names the machine-readable sources, generated artifacts, conformance evidence, and binding projections that together carry one cross-implementation semantic surface.       | spec doc, README, schema folder        |
+| Conformance Plan    | An executable, data-owned description of the named semantic checks, fixtures, scenarios, assertions, and required evidence that an implementation must satisfy for a given authority packet.             | test suite, runner script              |
+| Implementation Adapter | The language-specific seam that exposes a particular implementation to a generic conformance runner over a neutral operation, event, cancellation, error, and state-inspection surface.                | bespoke test harness, fixture loader   |
+| Generic Runner      | An implementation-agnostic process that consumes a conformance plan plus an implementation adapter and produces evidence; never the home of product semantics itself.                                    | reference implementation, oracle test  |
 
 ## 3. Actors & Personas
 
@@ -309,6 +316,16 @@
 - **Capability:** The product must let implementations prove parity through shared machine-readable contracts and behavioral fixtures instead of relying on one language codebase as the long-term oracle.
 - **Rationale:** Durable multi-language portability needs executable semantic evidence, not only prose promises or reference-implementation folklore.
 
+- **Priority:** P0
+- **Capability ID:** CAP-P0-037
+- **Capability:** The product must guarantee that no single implementation language, runner codebase, or human-prose document can act as the source of cross-implementation semantic truth; every binding cross-language semantic must live in a boundary-owned machine authority packet that pairs machine-readable sources with at least one executable verification path.
+- **Rationale:** Multi-language portability collapses the moment a TypeScript file, Rust crate, generic runner, or Markdown specification becomes the de facto oracle, because future implementations are then forced to chase implementation accidents rather than honor a shared meaning.
+
+- **Priority:** P1
+- **Capability ID:** CAP-P1-038
+- **Capability:** The product must let a new implementation be built and judged against shared meaning by inspecting only authority packets, generated artifacts, conformance plans, fixtures, language-binding adapters, and measured evidence, without reading another language's implementation source, a generic runner's hard-coded assertions, or Markdown prose as the binding semantic source.
+- **Rationale:** Adding a new language line is only an honest portability claim when the work is reproducible from boundary-owned machine authority alone.
+
 ### Epic: Reader and Operator Clarity
 
 - **Priority:** P1
@@ -329,6 +346,7 @@
 - A handoff is not a worker result and not a branch creation; it is a control transfer within the same ongoing work item.
 - Context engineering changes the active working set, not the fact that prior committed history still exists.
 - Semantic neutrality is not toolchain neutrality; implementations may use native package and build workflows while preserving shared runtime meaning at the boundary seams.
+- Authority-packet ownership is not artifact format ownership; an authority packet may pair multiple machine-readable formats (such as logical contract sources, binary grammar, transport projections, telemetry vocabulary, and conformance plans) under one boundary, but no single format silently becomes the meaning of the surface.
 
 ## 5. Non-Functional Constraints
 
@@ -344,6 +362,8 @@
 - The product must not require the core runtime to call back into higher layers in order to satisfy its own durability or recovery obligations.
 - The product must not treat destructive deletion of prior committed history as the normal way to correct or redirect work.
 - The product must not collapse delegation, handoff, approval, and cancellation into one generic control concept.
+- The product must not let any implementation language file, generic runner source file, or human-prose document act as the authoritative source of a cross-implementation semantic.
+- The product must not satisfy a portability or compatibility claim through smoke success, object existence, or runner-internal assertions alone; every such claim must trace to an authority packet plus measured evidence.
 
 ## 6. Boundary Analysis
 
@@ -359,6 +379,7 @@
 - Provider-neutral model integration with canonical streaming and non-streaming behavior
 - Multi-agent orchestration patterns including workers, handoffs, and sequences
 - A language-neutral semantic foundation that can support more than one implementation line over time through shared contracts, conformance artifacts, and compatibility evidence
+- A boundary-owned machine authority surface where every cross-implementation semantic is anchored to authority packets, generated artifacts, conformance plans, and measured evidence rather than to any one language's implementation, runner code, or prose document
 
 ### Out of Scope
 
@@ -371,6 +392,7 @@
 - Garbage-collection policy for historical data or archival branches
 - Domain-specific business tools, vertical workflows, or provider-exclusive capabilities as core product requirements
 - A simultaneous full-framework port across multiple languages before the shared semantic system is artifact-backed and stable
+- Bespoke per-implementation conformance suites that re-encode product semantics inside runner code instead of consuming a shared, data-owned conformance plan
 
 ## 7. Conceptual Diagrams (Mermaid)
 
