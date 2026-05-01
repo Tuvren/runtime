@@ -15,6 +15,8 @@ path alone:
 
 - language-neutral assets live at boundary, contract, conformance, and interop roots
 - language-specific package roots live only under `implementations/<lang>/`
+- boundary-level testkits live only under `boundaries/<area>/implementations/<lang>/testkit/`
+- contract roots may hold neutral `spec/`, `artifacts/`, and explanatory `README.md` files, but TypeScript package manifests and sources belong under sibling `implementations/typescript/` trees
 
 Do not place `package.json`, `Cargo.toml`, `src/`, `dist/`, `test/`,
 `bench/`, `smoke/`, `tsconfig*.json`, generated bindings, or other

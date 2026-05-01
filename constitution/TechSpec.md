@@ -480,7 +480,7 @@ erDiagram
   - by boundary ownership: `boundaries/<area>/contracts/...`, `boundaries/<area>/conformance/...`, `boundaries/<area>/interop/...`
   - by repo-global generated outputs: `reports/compatibility/...`
   - by repo-global observability conventions: `telemetry/...`
-- **Migration Notes:** Existing `boundaries/*/testkit` packages remain helper/facade packages. Compatibility evidence now flows through implementation-specific TypeScript conformance runners over shared conformance assets before Rust or other non-TypeScript implementations become authoritative. Epic W must shrink the gap between TypeScript-local tests and boundary-owned semantic suites before any future framework, driver, backend, provider, or host implementation line is authorized.
+- **Migration Notes:** Existing TypeScript testkit packages now live under `boundaries/<area>/implementations/typescript/testkit/` and remain helper/facade packages. Compatibility evidence now flows through implementation-specific TypeScript conformance runners over shared conformance assets before Rust or other non-TypeScript implementations become authoritative. Epic W must shrink the gap between TypeScript-local tests and boundary-owned semantic suites before any future framework, driver, backend, provider, or host implementation line is authorized.
 
 ## 4. Interface Contract
 
@@ -1660,7 +1660,7 @@ the language-neutral `conformance/` assets.
   - no floating-point values in normative kernel records
   - timestamps are safe-integer epoch milliseconds
 - **Testing Expectations:**
-  - unit tests for pure logic in `shared/contracts/core-types`, `kernel/contracts/protocol`, `kernel/implementations/typescript/backend-memory`, `kernel/implementations/typescript/backend-sqlite`, `framework/implementations/typescript/runtime-core`, and `framework/implementations/typescript/drivers/react`
+  - unit tests for pure logic in `shared/contracts/core-types/implementations/typescript`, `kernel/contracts/protocol/implementations/typescript`, `kernel/implementations/typescript/backend-memory`, `kernel/implementations/typescript/backend-sqlite`, `framework/implementations/typescript/runtime-core`, and `framework/implementations/typescript/drivers/react`
   - golden-byte tests for deterministic CBOR encodings
   - hash identity fixtures for opaque bytes and structured records
   - shared backend contract tests that every official backend must pass

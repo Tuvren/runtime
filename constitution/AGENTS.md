@@ -15,7 +15,7 @@ This project separates concerns into four distinct layers. Understand where your
 
 - `Tasks.md` is the only source of truth for active scope, deferred scope, closed epics, and the current critical path.
 - When no ticket is active, do not invent one from the archived ticket list. Treat user-requested chores, documentation alignment, verification, and review work as maintenance unless the user explicitly asks to open or revise scope.
-- For closed areas, use the relevant `spikes/epic-*-inventory.md` file as the handoff record before changing behavior, validation claims, or follow-up language.
+- For closed areas, use the relevant `spikes/epic-*-inventory.md` or closure-inventory handoff record before changing behavior, validation claims, or follow-up language.
 
 ---
 
@@ -34,7 +34,7 @@ To conserve your context window and improve accuracy, use this lookup table to f
 | **What a specific business/runtime term means?**              | `PRD.md`                                                                             | `Ubiquitous Language (Glossary)`                                                                        |
 | **Whether a feature belongs in scope at all?**                | `PRD.md`                                                                             | `Functional Capabilities`, `Success Criteria`, and `Scope Distinctions That Must Remain Stable`         |
 | **What the kernel and framework behavior mean semantically?** | `../docs/KrakenKernelSpecification.md` and `../docs/KrakenFrameworkSpecification.md` | Read the relevant normative sections directly                                                           |
-| **What closed epic work actually delivered?**                 | `spikes/epic-*-inventory.md`                                                         | Read the closure inventory for the affected epic or boundary                                             |
+| **What closed epic work actually delivered?**                 | `spikes/epic-*-inventory.md` and closure inventories                                 | Read the closure inventory for the affected epic or boundary                                             |
 | **What implementation parity is currently evidenced?**        | `../reports/compatibility/`                                                          | Treat generated matrix and evidence files as measured evidence, not semantic authority                   |
 
 ---
