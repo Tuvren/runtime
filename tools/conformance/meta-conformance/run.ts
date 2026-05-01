@@ -14,10 +14,14 @@
  * limitations under the License.
  */
 
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import type {
   CompiledConformancePlanCheck,
   ConformancePlanCheck,
 } from "../plan-compiler/index.js";
+import { loadConformancePlan } from "../plan-compiler/index.js";
 import {
   type AssertionContext,
   evaluateAssertions,
@@ -234,6 +238,8 @@ for (const testCase of cases) {
   }
 }
 
+await runPlanCompilerCases(failures);
+
 for (let index = 0; index < 1000; index += 1) {
   const syntheticCheck = check(`scale-${index}`, [
     { field: "$.index", kind: "evidenceField", equals: index },
@@ -273,4 +279,52 @@ function check(
     checkId,
     operation: "meta.operation",
   };
+}
+
+async function runPlanCompilerCases(failures: string[]): Promise<void> {
+  const directory = await mkdtemp(join(tmpdir(), "tuvren-meta-plan-"));
+  const duplicateStepPlanPath = join(directory, "duplicate-step.json");
+
+  try {
+    await writeFile(
+      duplicateStepPlanPath,
+      `${JSON.stringify(
+        {
+          applicability: { capabilities: ["meta"] },
+          checks: [
+            {
+              assertions: [{ field: "$.trace", kind: "stateField" }],
+              checkId: "meta.duplicate-step",
+              evidence: ["trace"],
+              operation: "meta.operation",
+              steps: [
+                { operation: "meta.operation", stepId: "repeat" },
+                { operation: "meta.operation", stepId: "repeat" },
+              ],
+            },
+          ],
+          packetId: "tuvren.meta",
+          planId: "tuvren.meta.duplicate-step",
+          planVersion: "0.1.0",
+        },
+        null,
+        2
+      )}\n`
+    );
+
+    try {
+      await loadConformancePlan(duplicateStepPlanPath);
+      failures.push("duplicate trace step ids unexpectedly passed validation");
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+
+      if (!message.includes("repeats stepId repeat")) {
+        failures.push(
+          `duplicate trace step id produced wrong error: ${message}`
+        );
+      }
+    }
+  } finally {
+    await rm(directory, { force: true, recursive: true });
+  }
 }

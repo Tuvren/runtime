@@ -60,6 +60,14 @@ for (const planPath of planPaths) {
         `${planPath} check ${check.check.checkId} uses undeclared operation ${check.check.operation}`
       );
     }
+
+    for (const step of check.check.steps ?? []) {
+      if (operations.size > 0 && !operations.has(step.operation)) {
+        throw new Error(
+          `${planPath} check ${check.check.checkId} step ${step.stepId} uses undeclared operation ${step.operation}`
+        );
+      }
+    }
   }
 }
 

@@ -221,6 +221,18 @@ function validatePlanIntegrity(plan: ConformancePlan, label: string): void {
 
     checkIds.add(check.checkId);
 
+    const stepIds = new Set<string>();
+
+    for (const step of check.steps ?? []) {
+      if (stepIds.has(step.stepId)) {
+        throw new Error(
+          `${label} check ${check.checkId} repeats stepId ${step.stepId}`
+        );
+      }
+
+      stepIds.add(step.stepId);
+    }
+
     if (check.fixture !== undefined && !fixtureIds.has(check.fixture)) {
       throw new Error(
         `${label} check ${check.checkId} references unknown fixture ${check.fixture}`

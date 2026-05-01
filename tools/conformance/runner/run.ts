@@ -122,11 +122,17 @@ async function main(): Promise<void> {
     .sort((left, right) => left.index - right.index)
     .map((result) => result.checkResult);
   const baseSummary = createConformanceEvidenceSummary(checkResults);
+  const nonApplicableCheckIds = selected.nonApplicable.map(
+    (entry) => entry.checkId
+  );
   const summary = {
     ...baseSummary,
-    applicableChecks: selected.applicable.length,
-    nonApplicableChecks: selected.nonApplicable.length,
-    totalChecks: selected.applicable.length + selected.nonApplicable.length,
+    // Sharded evidence reports the applicable checks emitted by this shard,
+    // while retaining global non-applicability because capability exclusions are
+    // not scheduled work and do not belong to any shard.
+    applicableChecks: checkResults.length,
+    nonApplicableChecks: nonApplicableCheckIds.length,
+    totalChecks: checkResults.length + nonApplicableCheckIds.length,
   };
   const evidence: ConformanceEvidence = {
     adapterId: adapterManifest.adapterId,
@@ -135,7 +141,7 @@ async function main(): Promise<void> {
     checkResults,
     implementationId: adapterManifest.implementationId,
     language: adapterManifest.language,
-    nonApplicableCheckIds: selected.nonApplicable.map((entry) => entry.checkId),
+    nonApplicableCheckIds,
     status: summary.failedChecks === 0 ? "pass" : "fail",
     suiteId: adapterManifest.suiteId,
     suiteVersion: adapterManifest.suiteVersion,
@@ -416,6 +422,7 @@ function selectChecks(
   const adapterCapabilities = new Set(manifest.capabilities);
   const requestedCapabilities = new Set(options.capabilities);
   const requestedChecks = new Set(options.checks);
+  const availableCheckIds = new Set<string>();
   const applicable: ScheduledCheck[] = [];
   const nonApplicable: Array<{ checkId: string; planId: string }> = [];
   let index = 0;
@@ -427,6 +434,7 @@ function selectChecks(
       left.check.checkId.localeCompare(right.check.checkId)
     )) {
       const check = compiledCheck.check;
+      availableCheckIds.add(check.checkId);
 
       if (requestedChecks.size > 0 && !requestedChecks.has(check.checkId)) {
         continue;
@@ -460,6 +468,16 @@ function selectChecks(
       });
       index += 1;
     }
+  }
+
+  const unknownRequestedChecks = [...requestedChecks].filter(
+    (checkId) => !availableCheckIds.has(checkId)
+  );
+
+  if (unknownRequestedChecks.length > 0) {
+    throw new Error(
+      `unknown --check value(s): ${unknownRequestedChecks.sort().join(", ")}`
+    );
   }
 
   return {

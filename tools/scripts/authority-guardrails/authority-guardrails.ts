@@ -490,19 +490,34 @@ function collectAssertionLiteralsFromPlanValue(
   }
 
   for (const check of planValue.checks) {
-    if (!(isRecord(check) && Array.isArray(check.assertions))) {
+    if (!isRecord(check)) {
       continue;
     }
 
-    for (const assertion of check.assertions) {
-      if (!isRecord(assertion)) {
-        continue;
-      }
+    collectAssertionLiteralsFromAssertions(check.assertions, literals);
 
-      collectStringLiterals(assertion.equals, literals);
-      collectStringLiterals(assertion.contains, literals);
-      collectStringLiterals(assertion.eventType, literals);
+    for (const step of readPlanSteps(check)) {
+      collectAssertionLiteralsFromAssertions(step.assertions, literals);
     }
+  }
+}
+
+function collectAssertionLiteralsFromAssertions(
+  assertions: unknown,
+  literals: Set<string>
+): void {
+  if (!Array.isArray(assertions)) {
+    return;
+  }
+
+  for (const assertion of assertions) {
+    if (!isRecord(assertion)) {
+      continue;
+    }
+
+    collectStringLiterals(assertion.equals, literals);
+    collectStringLiterals(assertion.contains, literals);
+    collectStringLiterals(assertion.eventType, literals);
   }
 }
 
@@ -515,8 +530,18 @@ function collectOperationNamesFromPlanValue(
   }
 
   for (const check of planValue.checks) {
-    if (isRecord(check) && typeof check.operation === "string") {
+    if (!isRecord(check)) {
+      continue;
+    }
+
+    if (typeof check.operation === "string") {
       operationNames.add(check.operation);
+    }
+
+    for (const step of readPlanSteps(check)) {
+      if (typeof step.operation === "string") {
+        operationNames.add(step.operation);
+      }
     }
   }
 }
@@ -539,11 +564,40 @@ function collectPlanEvidenceOracleShapeFailures(
     failures.push(
       ...collectEvidencePathOracleFailures(check, planLabel),
       ...collectAssertionOracleFailures(check, planLabel),
-      ...collectFixtureSelfCertificationFailures(check, planLabel)
+      ...collectFixtureSelfCertificationFailures(check, planLabel),
+      ...readPlanSteps(check).flatMap((step) =>
+        collectAssertionOracleFailures(
+          {
+            ...step,
+            checkId: `${String(check.checkId)}.${String(step.stepId)}`,
+          },
+          planLabel
+        )
+      ),
+      ...readPlanSteps(check).flatMap((step) =>
+        collectFixtureSelfCertificationFailures(
+          {
+            ...check,
+            ...step,
+            checkId: `${String(check.checkId)}.${String(step.stepId)}`,
+          },
+          planLabel
+        )
+      )
     );
   }
 
   return failures;
+}
+
+function readPlanSteps(
+  check: Record<string, unknown>
+): Record<string, unknown>[] {
+  if (!Array.isArray(check.steps)) {
+    return [];
+  }
+
+  return check.steps.filter(isRecord);
 }
 
 function collectFixtureSelfCertificationFailures(
@@ -996,6 +1050,69 @@ async function runFixtureSelfTests(): Promise<GuardrailFailure[]> {
       check: "guardrail-fixture",
       message:
         "self-certifying fixture plan did not trigger the plan guardrail",
+    });
+  }
+
+  const stepOperationNames = new Set<string>();
+  collectOperationNamesFromPlanValue(
+    {
+      checks: [
+        {
+          assertions: [],
+          checkId: "fixture.step-operation",
+          operation: "runtime.top-level-operation",
+          steps: [
+            {
+              operation: "runtime.step-operation",
+              stepId: "step",
+            },
+          ],
+        },
+      ],
+    },
+    stepOperationNames
+  );
+
+  if (!stepOperationNames.has("runtime.step-operation")) {
+    failures.push({
+      check: "guardrail-fixture",
+      message:
+        "step operation fixture did not collect trace-step operation names",
+    });
+  }
+
+  const stepAssertionLiterals = new Set<string>();
+  collectAssertionLiteralsFromPlanValue(
+    {
+      checks: [
+        {
+          assertions: [],
+          checkId: "fixture.step-assertion",
+          operation: "runtime.top-level-operation",
+          steps: [
+            {
+              assertions: [
+                {
+                  equals: "step-owned-literal",
+                  field: "$.value",
+                  kind: "evidenceField",
+                },
+              ],
+              operation: "runtime.step-operation",
+              stepId: "step",
+            },
+          ],
+        },
+      ],
+    },
+    stepAssertionLiterals
+  );
+
+  if (!stepAssertionLiterals.has("step-owned-literal")) {
+    failures.push({
+      check: "guardrail-fixture",
+      message:
+        "step assertion fixture did not collect trace-step assertion literals",
     });
   }
 

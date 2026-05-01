@@ -55,6 +55,12 @@ export async function serveStdioAdapter(
   adapter: StdioConformanceAdapter
 ): Promise<void> {
   for await (const line of console) {
+    // Bun's console iterator can surface a final empty line for piped EOF; it is
+    // transport noise, not a JSON-RPC frame, so adapters must stay silent.
+    if (line.trim().length === 0) {
+      continue;
+    }
+
     const response = await handleLine(adapter, line);
     process.stdout.write(`${JSON.stringify(response)}\n`);
   }
@@ -64,6 +70,8 @@ async function handleLine(
   adapter: StdioConformanceAdapter,
   line: string
 ): Promise<unknown> {
+  let requestId: number | string | null = null;
+
   try {
     const request = JSON.parse(line) as unknown;
 
@@ -74,6 +82,9 @@ async function handleLine(
       });
     }
 
+    // Once the frame is a valid JSON-RPC request, every host-side error must
+    // echo the request id so the shared runner can correlate failures.
+    requestId = request.id;
     const result = await dispatchMethod(
       adapter,
       request.method,
@@ -85,7 +96,7 @@ async function handleLine(
       result,
     };
   } catch (error: unknown) {
-    return errorResponse(null, createAdapterErrorEnvelope(error));
+    return errorResponse(requestId, createAdapterErrorEnvelope(error));
   }
 }
 
