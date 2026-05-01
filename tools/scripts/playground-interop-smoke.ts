@@ -42,6 +42,22 @@ const PLAYGROUND_DIST_PATH = resolve(
   REPO_ROOT,
   "boundaries/hosts/implementations/typescript/playground/dist/index.js"
 );
+const INTEROP_BUILD_DIRECTORIES: readonly string[] = [
+  "boundaries/shared/contracts/core-types",
+  "boundaries/framework/contracts/runtime-api",
+  "boundaries/framework/contracts/driver-api",
+  "boundaries/providers/contracts/provider-api",
+  "boundaries/kernel/contracts/protocol",
+  "boundaries/kernel/implementations/typescript/backend-memory",
+  "boundaries/kernel/implementations/typescript/backend-sqlite",
+  "boundaries/framework/implementations/typescript/drivers/react",
+  "boundaries/framework/implementations/typescript/stream-core",
+  "boundaries/framework/implementations/typescript/stream-sse",
+  "boundaries/framework/implementations/typescript/stream-agui",
+  "boundaries/providers/implementations/typescript/bridge-ai-sdk",
+  "boundaries/framework/implementations/typescript/runtime-core",
+  "boundaries/hosts/implementations/typescript/playground",
+];
 const WAIT_TIMEOUT_MS = 30_000;
 
 await main();
@@ -84,9 +100,10 @@ async function main(): Promise<void> {
 
 async function ensureInteropArtifacts(): Promise<void> {
   // The authoritative interop smoke owns the exact prerequisites it executes:
-  // generate the governed bindings first, then build the playground bundle the
-  // script loads. Keeping that preparation here prevents the compatibility
-  // ledger from depending on whatever broader Nx fan-out happens to wrap it.
+  // generate the governed bindings first, then emit only the runnable JS
+  // bundles the smoke imports at runtime. This intentionally avoids unrelated
+  // declaration-generation or Nx task-graph fan-out so the lane stays focused
+  // on the real TypeScript-to-Rust execution seam.
   await runRequiredCommand([
     "bun",
     "run",
@@ -95,14 +112,13 @@ async function ensureInteropArtifacts(): Promise<void> {
     "kernel-interop-grpc:codegen",
     "--skipNxCache",
   ]);
-  await runRequiredCommand([
-    "bun",
-    "run",
-    "nx",
-    "run",
-    "host-playground:build",
-    "--skipNxCache",
-  ]);
+
+  for (const directory of INTEROP_BUILD_DIRECTORIES) {
+    await runRequiredCommand(
+      ["bunx", "--bun", "tsup", "--config", "tsup.config.ts"],
+      { cwd: resolve(REPO_ROOT, directory) }
+    );
+  }
 }
 
 async function loadPlaygroundModule(): Promise<PlaygroundInteropModule> {
@@ -129,8 +145,13 @@ function spawnRustKernelService(address: string): ChildProcess {
   return child;
 }
 
-async function runRequiredCommand(command: readonly string[]): Promise<void> {
-  const result = await runCommand(command, { cwd: REPO_ROOT });
+async function runRequiredCommand(
+  command: readonly string[],
+  options?: { cwd?: string }
+): Promise<void> {
+  const result = await runCommand(command, {
+    cwd: options?.cwd ?? REPO_ROOT,
+  });
 
   if (result.code !== 0) {
     throw new Error(`command failed: ${command.join(" ")}`);

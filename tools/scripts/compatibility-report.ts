@@ -404,54 +404,54 @@ function readInteropTelemetrySummary(
   // object instead of assuming stdout is pure JSON from byte zero.
   const parsed = JSON.parse(extractTrailingJsonObject(stdout));
 
-  if (!(isRecord(parsed) && Array.isArray(parsed.reports))) {
+  if (
+    !(
+      isRecord(parsed) &&
+      Array.isArray(parsed.reports) &&
+      Array.isArray(parsed.scenarios)
+    )
+  ) {
     return undefined;
   }
 
+  const expectedScenarios = readExpectedInteropScenarios(parsed.scenarios);
+
+  if (expectedScenarios.length === 0) {
+    return undefined;
+  }
+
+  const expectedScenarioSet = new Set(expectedScenarios);
+  const seenScenarios = new Set<string>();
   const scenarios: InteropTelemetrySummary["scenarios"] = [];
   const observedKeys = new Set<string>();
   let schemaUrl: string | undefined;
 
   for (const report of parsed.reports) {
-    if (!isRecord(report) || typeof report.scenario !== "string") {
-      continue;
-    }
-
-    const telemetry = report.telemetry;
-
-    if (!isRecord(telemetry) || typeof telemetry.schemaUrl !== "string") {
-      continue;
-    }
-
-    if (!Array.isArray(telemetry.observedKeys)) {
-      continue;
-    }
-
-    if (!isRecord(telemetry.attributes)) {
-      continue;
-    }
-
-    schemaUrl ??= telemetry.schemaUrl;
-
-    const scenarioObservedKeys = telemetry.observedKeys.filter(
-      (value): value is string => typeof value === "string"
+    const scenarioReport = readInteropTelemetryScenarioReport(
+      report,
+      expectedScenarioSet,
+      seenScenarios,
+      schemaUrl
     );
 
-    for (const key of scenarioObservedKeys) {
+    if (scenarioReport === undefined) {
+      return undefined;
+    }
+
+    schemaUrl = scenarioReport.schemaUrl;
+
+    for (const key of scenarioReport.observedKeys) {
       observedKeys.add(key);
     }
 
-    scenarios.push({
-      attributes: telemetry.attributes as Record<
-        string,
-        string | string[] | null
-      >,
-      observedKeys: scenarioObservedKeys,
-      scenario: report.scenario,
-    });
+    scenarios.push(scenarioReport.scenario);
   }
 
-  if (schemaUrl === undefined || scenarios.length === 0) {
+  if (
+    schemaUrl === undefined ||
+    scenarios.length !== expectedScenarios.length ||
+    seenScenarios.size !== expectedScenarios.length
+  ) {
     return undefined;
   }
 
@@ -459,6 +459,71 @@ function readInteropTelemetrySummary(
     observedKeys: [...observedKeys].sort(),
     scenarios,
     schemaUrl,
+  };
+}
+
+function readExpectedInteropScenarios(value: unknown[]): string[] {
+  return value.filter((entry): entry is string => typeof entry === "string");
+}
+
+function readInteropTelemetryScenarioReport(
+  report: unknown,
+  expectedScenarioSet: Set<string>,
+  seenScenarios: Set<string>,
+  currentSchemaUrl: string | undefined
+):
+  | {
+      observedKeys: string[];
+      scenario: InteropTelemetrySummary["scenarios"][number];
+      schemaUrl: string;
+    }
+  | undefined {
+  if (
+    !isRecord(report) ||
+    typeof report.scenario !== "string" ||
+    !expectedScenarioSet.has(report.scenario) ||
+    seenScenarios.has(report.scenario)
+  ) {
+    return undefined;
+  }
+
+  const telemetry = report.telemetry;
+
+  if (
+    !isRecord(telemetry) ||
+    typeof telemetry.schemaUrl !== "string" ||
+    !Array.isArray(telemetry.observedKeys) ||
+    !isRecord(telemetry.attributes)
+  ) {
+    return undefined;
+  }
+
+  if (
+    currentSchemaUrl !== undefined &&
+    currentSchemaUrl !== telemetry.schemaUrl
+  ) {
+    // Mixed schema URLs would make the checked-in evidence internally
+    // inconsistent, so reject the whole summary instead of weakening it.
+    return undefined;
+  }
+
+  const observedKeys = telemetry.observedKeys.filter(
+    (value): value is string => typeof value === "string"
+  );
+  const scenario = {
+    attributes: telemetry.attributes as Record<
+      string,
+      string | string[] | null
+    >,
+    observedKeys,
+    scenario: report.scenario,
+  };
+
+  seenScenarios.add(report.scenario);
+  return {
+    observedKeys,
+    scenario,
+    schemaUrl: telemetry.schemaUrl,
   };
 }
 
