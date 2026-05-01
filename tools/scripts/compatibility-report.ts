@@ -327,7 +327,7 @@ async function runInteropTarget(
     `${suiteManifest.suiteId}.${runner.pairId}.json`
   );
   const relativeEvidencePath = relative(REPO_ROOT, evidenceFilePath);
-  const status: "fail" | "pass" = commandResult.code === 0 ? "pass" : "fail";
+  let status: "fail" | "pass" = commandResult.code === 0 ? "pass" : "fail";
   const evidence: {
     boundary: string;
     command: string[];
@@ -357,7 +357,16 @@ async function runInteropTarget(
   } else {
     const telemetry = readInteropTelemetrySummary(commandResult.stdout);
 
-    if (telemetry !== undefined) {
+    if (telemetry === undefined) {
+      // Epic V treats telemetry as part of the measured interop evidence, so a
+      // smoke target that exits 0 but stops emitting the report payload must
+      // fail here instead of silently downgrading the checked-in artifact.
+      evidence.stderr =
+        "interop smoke completed without a parseable telemetry summary";
+      evidence.stdout = commandResult.stdout;
+      status = "fail";
+      evidence.status = status;
+    } else {
       evidence.telemetry = telemetry;
     }
   }
