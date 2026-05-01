@@ -247,6 +247,9 @@ async function runCheck(
     ];
 
     return createCheckResult(check.checkId, assertionResults, {
+      // Adapter-declared operation errors stay isolated from $.result.error,
+      // but persisted evidence still records the native error for diagnosis.
+      ...(outcome.kind === "error" ? { adapterError: outcome.error } : {}),
       adapterId: manifest.adapterId,
       planId: plan.plan.planId,
     });
@@ -283,6 +286,7 @@ async function runTraceCheck(
   const baseInput = createAdapterInput(plan, compiledCheck);
   const instance = await client.createInstance(baseInput);
   const trace: Record<string, AssertionContext> = {};
+  const traceAdapterErrors: Record<string, unknown> = {};
   const assertionResults: AssertionEvaluation[] = [];
 
   try {
@@ -305,6 +309,12 @@ async function runTraceCheck(
         instance
       );
       const context = createAssertionContext(outcome, input);
+      if (outcome.kind === "error") {
+        // Trace-step adapter errors are diagnostic evidence only; plan
+        // assertions still decide pass/fail through runner-owned context.
+        traceAdapterErrors[step.stepId] = outcome.error;
+      }
+
       const extraEvents = await client.events(
         step.operation,
         input,
@@ -363,6 +373,9 @@ async function runTraceCheck(
   return createCheckResult(check.checkId, assertionResults, {
     adapterId: manifest.adapterId,
     planId: plan.plan.planId,
+    ...(Object.keys(traceAdapterErrors).length > 0
+      ? { adapterErrors: traceAdapterErrors }
+      : {}),
     traceStepIds: Object.keys(trace),
   });
 }

@@ -62,7 +62,6 @@
                 "evidencePath": { "type": "string" },
                 "checkIds": {
                   "type": "array",
-                  "minItems": 1,
                   "items": { "type": "string" }
                 },
                 "checkSummary": {
@@ -112,7 +111,6 @@
           "evidencePath": { "type": "string" },
           "checkIds": {
             "type": "array",
-            "minItems": 1,
             "items": { "type": "string" }
           },
           "checkSummary": {

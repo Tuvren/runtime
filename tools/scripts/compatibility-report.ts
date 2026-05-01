@@ -1054,21 +1054,25 @@ function assertCompatibilityResultCheckIds(
 function assertCompatibilityCheckSummary(
   value: CompatibilityCheckSummary
 ): void {
+  const applicableChecks =
+    value.applicableChecks ?? value.failedChecks + value.passedChecks;
   const nonApplicableChecks = value.nonApplicableChecks ?? 0;
 
   if (
     !(
+      Number.isSafeInteger(applicableChecks) &&
       Number.isSafeInteger(value.failedChecks) &&
       Number.isSafeInteger(value.passedChecks) &&
       Number.isSafeInteger(value.totalChecks) &&
       Number.isSafeInteger(nonApplicableChecks)
     ) ||
+    applicableChecks < 0 ||
     value.failedChecks < 0 ||
     value.passedChecks < 0 ||
     nonApplicableChecks < 0 ||
     value.totalChecks <= 0 ||
-    value.failedChecks + value.passedChecks + nonApplicableChecks !==
-      value.totalChecks
+    applicableChecks !== value.failedChecks + value.passedChecks ||
+    applicableChecks + nonApplicableChecks !== value.totalChecks
   ) {
     throw new Error(
       "compatibility matrix check summaries must be internally consistent"

@@ -27,6 +27,13 @@
       ],
       "checkId": "driver-api.error.envelope",
       "details": {
+        "adapterError": {
+          "code": "rust_framework_operation_not_implemented",
+          "details": {
+            "operation": "driver.execute"
+          },
+          "message": "Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet"
+        },
         "adapterId": "rust-framework",
         "planId": "tuvren.framework.driver-api.core"
       },
@@ -46,6 +53,13 @@
       ],
       "checkId": "driver-api.execute.resolution",
       "details": {
+        "adapterError": {
+          "code": "rust_framework_operation_not_implemented",
+          "details": {
+            "operation": "driver.execute"
+          },
+          "message": "Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet"
+        },
         "adapterId": "rust-framework",
         "planId": "tuvren.framework.driver-api.core"
       },
@@ -83,6 +97,13 @@
       ],
       "checkId": "driver-api.resume.approval",
       "details": {
+        "adapterError": {
+          "code": "rust_framework_operation_not_implemented",
+          "details": {
+            "operation": "driver.resume"
+          },
+          "message": "Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet"
+        },
         "adapterId": "rust-framework",
         "planId": "tuvren.framework.driver-api.core"
       },
@@ -116,6 +137,13 @@
       ],
       "checkId": "driver-api.resume.requires-pending-call",
       "details": {
+        "adapterError": {
+          "code": "rust_framework_operation_not_implemented",
+          "details": {
+            "operation": "driver.resume"
+          },
+          "message": "Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet"
+        },
         "adapterId": "rust-framework",
         "planId": "tuvren.framework.driver-api.core"
       },
@@ -163,6 +191,13 @@
       ],
       "checkId": "event-stream.agui.failed-turn-error-projection",
       "details": {
+        "adapterError": {
+          "code": "rust_framework_operation_not_implemented",
+          "details": {
+            "operation": "event-stream.runtime-agui-projection"
+          },
+          "message": "Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet"
+        },
         "adapterId": "rust-framework",
         "planId": "tuvren.framework.event-stream.core"
       },
@@ -210,6 +245,13 @@
       ],
       "checkId": "event-stream.agui.paused-turn-fallback",
       "details": {
+        "adapterError": {
+          "code": "rust_framework_operation_not_implemented",
+          "details": {
+            "operation": "event-stream.runtime-agui-projection"
+          },
+          "message": "Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet"
+        },
         "adapterId": "rust-framework",
         "planId": "tuvren.framework.event-stream.core"
       },
@@ -257,6 +299,13 @@
       ],
       "checkId": "event-stream.agui.projection",
       "details": {
+        "adapterError": {
+          "code": "rust_framework_operation_not_implemented",
+          "details": {
+            "operation": "event-stream.runtime-agui-projection"
+          },
+          "message": "Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet"
+        },
         "adapterId": "rust-framework",
         "planId": "tuvren.framework.event-stream.core"
       },
@@ -285,6 +334,13 @@
       ],
       "checkId": "event-stream.sse.eager-subscription",
       "details": {
+        "adapterError": {
+          "code": "rust_framework_operation_not_implemented",
+          "details": {
+            "operation": "event-stream.runtime-sse-eager-subscription"
+          },
+          "message": "Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet"
+        },
         "adapterId": "rust-framework",
         "planId": "tuvren.framework.event-stream.core"
       },
@@ -332,6 +388,13 @@
       ],
       "checkId": "event-stream.sse.projection",
       "details": {
+        "adapterError": {
+          "code": "rust_framework_operation_not_implemented",
+          "details": {
+            "operation": "event-stream.runtime-sse-projection"
+          },
+          "message": "Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet"
+        },
         "adapterId": "rust-framework",
         "planId": "tuvren.framework.event-stream.core"
       },
@@ -351,6 +414,13 @@
       ],
       "checkId": "react-driver-callable.after-iteration",
       "details": {
+        "adapterError": {
+          "code": "rust_framework_operation_not_implemented",
+          "details": {
+            "operation": "driver.execute"
+          },
+          "message": "Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet"
+        },
         "adapterId": "rust-framework",
         "planId": "tuvren.framework.react-driver.callables"
       },
@@ -370,6 +440,13 @@
       ],
       "checkId": "react-driver-callable.around-model",
       "details": {
+        "adapterError": {
+          "code": "rust_framework_operation_not_implemented",
+          "details": {
+            "operation": "driver.execute"
+          },
+          "message": "Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet"
+        },
         "adapterId": "rust-framework",
         "planId": "tuvren.framework.react-driver.callables"
       },
@@ -389,6 +466,13 @@
       ],
       "checkId": "react-driver-callable.around-tool",
       "details": {
+        "adapterError": {
+          "code": "rust_framework_operation_not_implemented",
+          "details": {
+            "operation": "driver.execute"
+          },
+          "message": "Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet"
+        },
         "adapterId": "rust-framework",
         "planId": "tuvren.framework.react-driver.callables"
       },
@@ -408,6 +492,13 @@
       ],
       "checkId": "react-driver-callable.before-iteration",
       "details": {
+        "adapterError": {
+          "code": "rust_framework_operation_not_implemented",
+          "details": {
+            "operation": "driver.execute"
+          },
+          "message": "Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet"
+        },
         "adapterId": "rust-framework",
         "planId": "tuvren.framework.react-driver.callables"
       },
@@ -429,6 +520,15 @@
       "details": {
         "adapterId": "rust-framework",
         "planId": "tuvren.framework.react-driver.callables",
+        "adapterErrors": {
+          "checkpoint": {
+            "code": "rust_framework_operation_not_implemented",
+            "details": {
+              "operation": "driver.checkpoint"
+            },
+            "message": "Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet"
+          }
+        },
         "traceStepIds": ["checkpoint"]
       },
       "status": "fail"
@@ -474,6 +574,13 @@
       ],
       "checkId": "runtime-callable.approval-resolve",
       "details": {
+        "adapterError": {
+          "code": "rust_framework_operation_not_implemented",
+          "details": {
+            "operation": "runtime.approval-resolve"
+          },
+          "message": "Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet"
+        },
         "adapterId": "rust-framework",
         "planId": "tuvren.framework.runtime-api.callables"
       },
@@ -511,6 +618,13 @@
       ],
       "checkId": "runtime-callable.provider-generate",
       "details": {
+        "adapterError": {
+          "code": "rust_framework_operation_not_implemented",
+          "details": {
+            "operation": "runtime.provider-generate"
+          },
+          "message": "Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet"
+        },
         "adapterId": "rust-framework",
         "planId": "tuvren.framework.runtime-api.callables"
       },
@@ -557,6 +671,13 @@
       ],
       "checkId": "runtime-callable.provider-stream",
       "details": {
+        "adapterError": {
+          "code": "rust_framework_operation_not_implemented",
+          "details": {
+            "operation": "runtime.provider-stream"
+          },
+          "message": "Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet"
+        },
         "adapterId": "rust-framework",
         "planId": "tuvren.framework.runtime-api.callables"
       },
@@ -612,6 +733,13 @@
       ],
       "checkId": "runtime-callable.timeout-retry-cancellation-idempotency",
       "details": {
+        "adapterError": {
+          "code": "rust_framework_operation_not_implemented",
+          "details": {
+            "operation": "runtime.cancel-execution"
+          },
+          "message": "Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet"
+        },
         "adapterId": "rust-framework",
         "planId": "tuvren.framework.runtime-api.callables"
       },
@@ -667,6 +795,13 @@
       ],
       "checkId": "runtime-callable.tool-execute",
       "details": {
+        "adapterError": {
+          "code": "rust_framework_operation_not_implemented",
+          "details": {
+            "operation": "runtime.tool-execute"
+          },
+          "message": "Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet"
+        },
         "adapterId": "rust-framework",
         "planId": "tuvren.framework.runtime-api.callables"
       },
@@ -686,6 +821,13 @@
       ],
       "checkId": "runtime-callable.validation-failure",
       "details": {
+        "adapterError": {
+          "code": "rust_framework_operation_not_implemented",
+          "details": {
+            "operation": "runtime.validate-structured-output"
+          },
+          "message": "Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet"
+        },
         "adapterId": "rust-framework",
         "planId": "tuvren.framework.runtime-api.callables"
       },
@@ -716,6 +858,15 @@
       "details": {
         "adapterId": "rust-framework",
         "planId": "tuvren.framework.runtime-api.lifecycle",
+        "adapterErrors": {
+          "approval": {
+            "code": "rust_framework_operation_not_implemented",
+            "details": {
+              "operation": "runtime.approval-resolve"
+            },
+            "message": "Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet"
+          }
+        },
         "traceStepIds": ["approval"]
       },
       "status": "fail"
@@ -773,6 +924,15 @@
       "details": {
         "adapterId": "rust-framework",
         "planId": "tuvren.framework.runtime-api.lifecycle",
+        "adapterErrors": {
+          "branch": {
+            "code": "rust_framework_operation_not_implemented",
+            "details": {
+              "operation": "runtime.branch-create"
+            },
+            "message": "Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet"
+          }
+        },
         "traceStepIds": ["branch"]
       },
       "status": "fail"
@@ -798,6 +958,15 @@
       "details": {
         "adapterId": "rust-framework",
         "planId": "tuvren.framework.runtime-api.lifecycle",
+        "adapterErrors": {
+          "cancel": {
+            "code": "rust_framework_operation_not_implemented",
+            "details": {
+              "operation": "runtime.cancel-execution"
+            },
+            "message": "Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet"
+          }
+        },
         "traceStepIds": ["cancel"]
       },
       "status": "fail"
@@ -836,6 +1005,15 @@
       "details": {
         "adapterId": "rust-framework",
         "planId": "tuvren.framework.runtime-api.lifecycle",
+        "adapterErrors": {
+          "context": {
+            "code": "rust_framework_operation_not_implemented",
+            "details": {
+              "operation": "runtime.context-transform"
+            },
+            "message": "Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet"
+          }
+        },
         "traceStepIds": ["context"]
       },
       "status": "fail"
@@ -859,6 +1037,13 @@
       ],
       "checkId": "runtime-api.execute-turn.lifecycle",
       "details": {
+        "adapterError": {
+          "code": "rust_framework_operation_not_implemented",
+          "details": {
+            "operation": "runtime.execute-turn"
+          },
+          "message": "Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet"
+        },
         "adapterId": "rust-framework",
         "planId": "tuvren.framework.runtime-api.lifecycle"
       },
@@ -903,6 +1088,15 @@
       "details": {
         "adapterId": "rust-framework",
         "planId": "tuvren.framework.runtime-api.lifecycle",
+        "adapterErrors": {
+          "recovery": {
+            "code": "rust_framework_operation_not_implemented",
+            "details": {
+              "operation": "runtime.recover-result"
+            },
+            "message": "Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet"
+          }
+        },
         "traceStepIds": ["recovery"]
       },
       "status": "fail"
