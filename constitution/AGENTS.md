@@ -1,6 +1,6 @@
 # AI Agent Instruction Manual: System Execution Guide
 
-> **System Context:** This repository is managed via a strict 4-document planning pipeline. As an AI coding agent executing tasks within this project, your role is to implement the specifications exactly as defined. Rely on the documentation in this directory and the authoritative behavioral specifications in `../docs/` to determine architecture, business logic, contracts, and dependencies.
+> **System Context:** This repository is managed via a strict 4-document planning pipeline plus closure inventories for completed epics. As an AI coding agent executing tasks within this project, your role is to implement the specifications exactly as defined. Rely on the documentation in this directory, the closure inventories under `spikes/`, and the authoritative behavioral specifications in `../docs/` to determine architecture, business logic, contracts, and dependencies.
 
 ## The 4-Document Architecture
 
@@ -10,6 +10,12 @@ This project separates concerns into four distinct layers. Understand where your
 2. **`Architecture.md` (The Logical Layer):** Defines the system structure. Contains the logical containers, trust boundaries, resilience posture, and critical execution flows.
 3. **`TechSpec.md` (The Physical Layer):** Defines the concrete implementation. Contains the exact stack versions, canonical record shapes, backend schema details, interface contracts, project structure, and implementation rules.
 4. **`Tasks.md` (The Execution Layer):** Defines the execution logistics. Contains the active scope split, the build order dependency graph, the ticket list, and the Gherkin acceptance criteria for each ticket.
+
+### Planning Posture
+
+- `Tasks.md` is the only source of truth for active scope, deferred scope, closed epics, and the current critical path.
+- When no ticket is active, do not invent one from the archived ticket list. Treat user-requested chores, documentation alignment, verification, and review work as maintenance unless the user explicitly asks to open or revise scope.
+- For closed areas, use the relevant `spikes/epic-*-inventory.md` file as the handoff record before changing behavior, validation claims, or follow-up language.
 
 ---
 
@@ -28,6 +34,8 @@ To conserve your context window and improve accuracy, use this lookup table to f
 | **What a specific business/runtime term means?**              | `PRD.md`                                                                             | `Ubiquitous Language (Glossary)`                                                                        |
 | **Whether a feature belongs in scope at all?**                | `PRD.md`                                                                             | `Functional Capabilities`, `Success Criteria`, and `Scope Distinctions That Must Remain Stable`         |
 | **What the kernel and framework behavior mean semantically?** | `../docs/KrakenKernelSpecification.md` and `../docs/KrakenFrameworkSpecification.md` | Read the relevant normative sections directly                                                           |
+| **What closed epic work actually delivered?**                 | `spikes/epic-*-inventory.md`                                                         | Read the closure inventory for the affected epic or boundary                                             |
+| **What implementation parity is currently evidenced?**        | `../reports/compatibility/`                                                          | Treat generated matrix and evidence files as measured evidence, not semantic authority                   |
 
 ---
 
@@ -36,16 +44,25 @@ To conserve your context window and improve accuracy, use this lookup table to f
 1. **Interface First:** Adhere strictly to the exact types, field names, operations, and contracts defined in `TechSpec.md`. If a task requires a schema field, runtime operation, or contract detail that does not exist upstream, pause and ask the user instead of inventing it.
 2. **Ubiquitous Language:** Use the exact terminology defined in `PRD.md` when naming code concepts. Avoid introducing synonyms for load-bearing terms such as Tuvren Runtime, Thread, Branch, Turn, Run, Step, TurnNode, TurnTree, Staged Result, Context Manifest, Context Engineering, Structured Output, Steering, Approval, Extension, Handoff, Worker, ExecutionHandle, KernelRecord, HashString, and EpochMs. Keep `Kraken Kernel` and `Kraken Framework` for engine semantics, architecture, and internal implementation references; use `Tuvren*` or neutral runtime names for public contract symbols and host-facing vocabulary.
 3. **Definition of Done:** Treat a task as complete only when the implementation satisfies the exact `Given / When / Then` Gherkin acceptance criteria listed for that ticket in `Tasks.md`.
-4. **Scope Containment:** Focus only on the current atomic ticket. Do not implement future tickets early, and do not widen active scope unless the user explicitly revises `Tasks.md`.
+4. **Scope Containment:** Focus only on the current atomic ticket when one is active. When `Tasks.md` says no implementation epic is active, do not promote deferred or archived tickets into active scope unless the user explicitly revises `Tasks.md`.
 5. **Layer Discipline:** Do not repair missing product, architecture, or contract decisions inside code. If the task reveals a missing upstream definition, point back to the correct artifact layer instead of improvising.
 6. **Behavioral Authority:** For kernel and framework semantics, treat `../docs/KrakenKernelSpecification.md` and `../docs/KrakenFrameworkSpecification.md` as authoritative behavior sources. The constitution documents govern planning and implementation posture; the docs govern meaning.
+7. **Evidence Discipline:** Boundary-owned `contracts/`, `conformance/`, `interop/`, telemetry outputs, and `../reports/compatibility/` are executable evidence layers. Update them with the human docs when semantics change, but do not let generated artifacts silently become a parallel source of truth.
+8. **Native Toolchain Discipline:** The current repo is multi-language. Bun/TypeScript, Cargo/Rust, Buf/proto, TypeSpec, Weaver, and Nx each have distinct authority. Nx routes targets; it does not replace the native truth for each ecosystem.
 
 ## Getting Started
 
-To begin implementation:
+To begin implementation when a ticket is active:
 
 1. Locate the current Ticket ID in `Tasks.md`.
 2. Read that ticket's dependencies and Gherkin acceptance criteria.
 3. Load the corresponding implementation and contract sections from `TechSpec.md`.
 4. Load `PRD.md`, `Architecture.md`, or the authoritative specs in `../docs/` only as needed to resolve terminology, boundaries, or behavioral semantics.
 5. Implement only what is necessary to satisfy the current ticket's documented acceptance criteria.
+
+To handle maintenance when no ticket is active:
+
+1. Confirm the current planning posture in `Tasks.md` and the current-state language in `TechSpec.md`.
+2. Read any relevant closure inventory under `spikes/`.
+3. Make the smallest alignment change that keeps docs, implementation, generated artifacts, and evidence claims consistent.
+4. Run the narrowest relevant validation lane, then broaden only when the change justifies it.

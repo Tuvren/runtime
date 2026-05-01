@@ -2,14 +2,15 @@
 
 ## Project Structure & Module Organization
 
-This is an architecture-first TypeScript monorepo. Runtime code lives under `boundaries/`:
+This is an architecture-first, multi-language runtime monorepo. TypeScript is still the first authoritative framework implementation line, but the current repository also contains a Rust kernel implementation, gRPC kernel interop, boundary-owned conformance assets, telemetry generation, and compatibility reporting. Runtime code and semantic assets live under `boundaries/`:
 
-- `boundaries/framework/` for shared runtime contracts and implementations
-- `boundaries/kernel/` for kernel contracts, backends, and `testkit`
-- `boundaries/providers/` for provider-facing contracts
+- `boundaries/framework/` for shared runtime contracts, TypeScript framework implementations, stream adapters, the ReAct driver, framework conformance assets, and Rust-kernel interop scenarios
+- `boundaries/kernel/` for kernel contracts, TypeScript backends, Rust kernel crates, gRPC interop definitions, kernel conformance assets, and `testkit`
+- `boundaries/providers/` for provider-facing contracts, the AI SDK bridge, provider conformance assets, and provider `testkit`
+- `boundaries/hosts/` for private host harnesses such as the TypeScript playground
 - `boundaries/shared/` for truly cross-boundary primitives
 
-Working plans live in `constitution/`. Engine-level specs live in `docs/`. Shared fixtures and scenario assets live in `tests/`. Tooling scripts live in `tools/`.
+Working plans live in `constitution/`. Engine-level specs live in `docs/`. Shared legacy fixtures and scenario assets live in `tests/`; newer executable compatibility assets live under each boundary's `conformance/` or `interop/` roots. Tooling scripts live in `tools/`. Repo-level telemetry and compatibility evidence live in `telemetry/` and `reports/compatibility/`.
 
 ## Source of Truth
 
@@ -18,6 +19,9 @@ Align behavior changes with `docs/` and implementation changes with `constitutio
 - Read `docs/KrakenKernelSpecification.md` before changing kernel behavior
 - Read `docs/KrakenFrameworkSpecification.md` before changing framework behavior
 - Use `constitution/TechSpec.md` and `constitution/Tasks.md` to keep implementation and active scope aligned
+- Read current epic status, deferred scope, and active critical path from `constitution/Tasks.md` instead of repeating that state in agent guidance
+- Treat `constitution/spikes/` closure inventories as durable handoff records for closed epics when touching areas they established
+- Keep boundary-owned `contracts/`, `conformance/`, `interop/`, generated artifacts, and `reports/compatibility/` aligned with the human specs when a change affects their semantics
 - When a constitution-scoped epic is fully closed in repo reality, update the matching `constitution/Tasks.md` and `constitution/TechSpec.md` status language in the same change and add or refresh any closure inventory under `constitution/spikes/` that future epics depend on
 - When a shared contract adds a host-owned control or policy seam (for example `loopPolicy` or handoff helpers), either wire it through the baseline ReAct/runtime path in the same change or explicitly document the limitation in `docs/` and `constitution/`
 
@@ -28,14 +32,19 @@ Do not invent behavior, contracts, or scope that conflict with those sources.
 - `bun run lint` checks formatting and lint rules with Biome
 - `bun run format` applies Biome fixes
 - `bun run typecheck` runs Nx typechecks across the workspace
+- `bun run conformance` runs the active TypeScript and Rust conformance runners
+- `bun run codegen` regenerates TypeSpec, telemetry, compatibility, and kernel interop artifacts
+- `bun run interop-smoke` runs the governed interop smoke lanes, including Rust-kernel paths
+- `bun run verify` runs the repo-global verification script across TypeScript, Rust, codegen, conformance, and interop lanes
+- `bun run release-check` runs the release-oriented verification wrapper and reports Bun/Node runtime drift
 - `bun run nx run <project>:test` runs a package test target, for example `bun run nx run framework-runtime-api:test`
 - `bun run nx graph` opens the Nx project graph
 
-Use `bun` for package management and runtime entry points. Use Nx targets for package-scoped work instead of ad hoc inner-package scripts.
+Use `bun` for package management and TypeScript runtime entry points. Use Nx targets for package-scoped work when they exist, but keep the native command authoritative inside its ecosystem.
 
 ### Tooling Authority Guardrail
 
-- Treat the current `devenv + native toolchains + Nx` stack as transitional.
+- Treat the current `devenv + native toolchains + Nx` stack as transitional and coordination-oriented.
 - Native tools remain authoritative inside their ecosystems: Cargo for Rust workspace truth, Buf for `.proto` governance, Bun/TypeScript manifests and `tsconfig` for TypeScript package truth, and generator CLIs such as TypeSpec or Weaver for their artifact families.
 - Nx may provide local ergonomics, target routing, generators, and developer UX wrappers, but it must not become the canonical cross-language monorepo graph, contract authority, artifact-validity authority, or CI truth source.
 - When adding or changing cross-language build, test, codegen, or interop lanes, prefer making the native command the real source of truth and Nx the wrapper around it rather than encoding unique validity rules only in Nx metadata.
@@ -51,13 +60,29 @@ Name boundaries matter:
 
 If a change makes ordinary library consumers type `Kraken*`, treat that as a boundary check.
 
+Cross-language boundary discipline matters too:
+
+- Keep host/framework controls such as `ExecutionHandle`, cancellation, steering, approval resolution, and stream fanout above the kernel transport seam.
+- Keep kernel interop protocol-only and data-only. Do not widen `boundaries/kernel/interop/grpc/proto/` into framework or host semantics.
+- Generated TypeScript and Rust helpers must derive from the owned sources instead of becoming parallel hand-authored contracts.
+
 ## Testing Guidelines
 
-Tests use Bun (`bun test`) and, for some Node-bound targets, package-specific Nx commands. Keep test files near the package they verify under `test/`, and run the narrowest relevant target first before broadening to workspace checks.
+Tests use Bun (`bun test`) for TypeScript packages, Cargo for Rust crates, and Nx as the repo-facing wrapper where targets exist. Keep package-local tests near the package they verify under `test/`, and keep shared behavioral assets under boundary-owned `conformance/` or `interop/` roots.
+
+Run the narrowest relevant target first before broadening:
+
+- TypeScript package checks: `bun run nx run <project>:test`, `:typecheck`, or `:build`
+- Rust checks: the relevant Cargo command or Rust Nx target for `kernel-rust-kernel`, `kernel-rust-grpc-service`, or `kernel-rust-conformance-runner`
+- Contract/codegen changes: `bun run codegen` or the specific `:codegen` target
+- Cross-language changes: `bun run interop-smoke` or the specific `kernel-interop-grpc`, `kernel-rust-grpc-service`, or `host-playground` interop target
+- Release confidence: `bun run verify` before claiming broad workspace readiness
 
 ## Pull Request Follow-Up
 
 When review feedback changes behavior, validation scope, docs, or follow-up context, update the PR body before merge so it reflects the final branch rather than the initial submission.
+
+Before closing a PR that touches this file, remove or rephrase any guidance that only describes the temporary branch state. `AGENTS.md` should remain durable operating guidance, not a snapshot of the PR.
 
 ## Review-Learned Guardrails
 
