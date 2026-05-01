@@ -18,7 +18,8 @@ import { readdir, readFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import Ajv2020 from "ajv/dist/2020.js";
-import { assertOperationOutcome } from "./index.js";
+import { type AdapterControls, assertOperationOutcome } from "./index.js";
+import { handleStdioAdapterLine } from "./stdio-host.js";
 
 const PROTOCOL_DIR = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(PROTOCOL_DIR, "../../..");
@@ -76,6 +77,7 @@ assertOperationOutcome(
   },
   "error sample"
 );
+await assertStdioHostControlRoundtrip();
 
 console.log("adapter protocol validation passed");
 
@@ -128,6 +130,55 @@ function createSample(definitionName: string): unknown {
       };
     default:
       throw new Error(`unknown adapter protocol sample ${definitionName}`);
+  }
+}
+
+async function assertStdioHostControlRoundtrip(): Promise<void> {
+  let observedControls: AdapterControls | undefined;
+  const response = await handleStdioAdapterLine(
+    {
+      dispatch(_operation, _input, controls) {
+        observedControls = controls;
+        return Promise.resolve({
+          kind: "result",
+          value: { ok: true },
+        });
+      },
+      initialize() {
+        return Promise.resolve({
+          adapterId: "sample-adapter",
+          capabilities: ["sample.capability"],
+          packetId: "tuvren.sample.packet",
+          planVersion: "0.1.0",
+        });
+      },
+    },
+    JSON.stringify({
+      id: 1,
+      jsonrpc: "2.0",
+      method: "dispatch",
+      params: {
+        controls: {
+          cancel: { reason: "sample cancellation" },
+          cancelAfterEvent: "turn.start",
+          deadlineMs: 1000,
+        },
+        input: {},
+        operation: "sample.operation",
+      },
+    })
+  );
+
+  if (!(isRecord(response) && "result" in response)) {
+    throw new Error("stdio host failed to return a JSON-RPC result frame");
+  }
+
+  if (
+    observedControls?.cancel?.reason !== "sample cancellation" ||
+    observedControls.cancelAfterEvent !== "turn.start" ||
+    observedControls.deadlineMs !== 1000
+  ) {
+    throw new Error("stdio host failed to preserve adapter controls");
   }
 }
 

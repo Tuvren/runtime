@@ -132,14 +132,19 @@ export class JsonRpcAdapterClient {
     operation: string,
     input: unknown,
     controls: AdapterControls,
-    instance?: unknown
+    instance?: unknown,
+    timeoutMs?: number
   ): Promise<OperationOutcome> {
-    const value = await this.request("dispatch", {
-      controls,
-      input,
-      instance,
-      operation,
-    });
+    const value = await this.request(
+      "dispatch",
+      {
+        controls,
+        input,
+        instance,
+        operation,
+      },
+      timeoutMs
+    );
 
     if (!isOperationOutcome(value)) {
       throw new Error("adapter dispatch returned invalid OperationOutcome");
@@ -152,14 +157,19 @@ export class JsonRpcAdapterClient {
     operation: string,
     input: unknown,
     controls: AdapterControls,
-    instance?: unknown
+    instance?: unknown,
+    timeoutMs?: number
   ): Promise<unknown[]> {
-    const value = await this.request("events", {
-      controls,
-      input,
-      instance,
-      operation,
-    });
+    const value = await this.request(
+      "events",
+      {
+        controls,
+        input,
+        instance,
+        operation,
+      },
+      timeoutMs
+    );
 
     if (value === null || value === undefined) {
       return [];
@@ -172,8 +182,12 @@ export class JsonRpcAdapterClient {
     return value;
   }
 
-  async inspectState(query: unknown, instance?: unknown): Promise<unknown> {
-    return await this.request("inspectState", { instance, query });
+  async inspectState(
+    query: unknown,
+    instance?: unknown,
+    timeoutMs?: number
+  ): Promise<unknown> {
+    return await this.request("inspectState", { instance, query }, timeoutMs);
   }
 
   async destroyInstance(instance: unknown): Promise<void> {
@@ -201,16 +215,22 @@ export class JsonRpcAdapterClient {
     }
   }
 
-  private request(method: string, params: unknown): Promise<unknown> {
+  private request(
+    method: string,
+    params: unknown,
+    timeoutMs = this.timeoutMs
+  ): Promise<unknown> {
     const id = this.nextId;
     this.nextId += 1;
     const payload = `${JSON.stringify({ id, jsonrpc: "2.0", method, params })}\n`;
 
     return new Promise((resolve, reject) => {
+      // Plan deadlines bound host protocol requests too; adapters still receive
+      // controls.deadlineMs so native cancellation semantics remain observable.
       const timer = setTimeout(() => {
         this.pending.delete(id);
         reject(new Error(`adapter request timed out: ${method}`));
-      }, this.timeoutMs);
+      }, timeoutMs);
       this.pending.set(id, { reject, resolve, timer });
       this.child.stdin.write(payload, "utf8", (error) => {
         if (error !== null && error !== undefined) {

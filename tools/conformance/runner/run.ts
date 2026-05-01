@@ -225,17 +225,34 @@ async function runCheck(
 
     const input = createAdapterInput(plan, compiledCheck);
     const controls = createAdapterControls(compiledCheck);
-    const outcome = await client.dispatch(check.operation, input, controls);
+    const timeoutMs = controls.deadlineMs;
+    const outcome = await client.dispatch(
+      check.operation,
+      input,
+      controls,
+      undefined,
+      timeoutMs
+    );
     const context = createAssertionContext(outcome, input);
-    const extraEvents = await client.events(check.operation, input, controls);
+    const extraEvents = await client.events(
+      check.operation,
+      input,
+      controls,
+      undefined,
+      timeoutMs
+    );
 
     if (context.events === undefined && extraEvents.length > 0) {
       context.events = extraEvents;
     }
 
-    const inspectedState = await client.inspectState({
-      operation: check.operation,
-    });
+    const inspectedState = await client.inspectState(
+      {
+        operation: check.operation,
+      },
+      undefined,
+      timeoutMs
+    );
 
     if (inspectedState !== null && inspectedState !== undefined) {
       context.state = inspectedState;
@@ -302,11 +319,13 @@ async function runTraceCheck(
         ...createAdapterControls(compiledCheck),
         ...(step.controls ?? {}),
       };
+      const timeoutMs = controls.deadlineMs;
       const outcome = await client.dispatch(
         step.operation,
         input,
         controls,
-        instance
+        instance,
+        timeoutMs
       );
       const context = createAssertionContext(outcome, input);
       if (outcome.kind === "error") {
@@ -319,7 +338,8 @@ async function runTraceCheck(
         step.operation,
         input,
         controls,
-        instance
+        instance,
+        timeoutMs
       );
 
       if (context.events === undefined && extraEvents.length > 0) {
@@ -331,7 +351,8 @@ async function runTraceCheck(
           ? undefined
           : await client.inspectState(
               resolveStepRefs(step.inspectState, { ...baseInput, trace }),
-              instance
+              instance,
+              timeoutMs
             );
 
       if (inspectedState !== undefined && inspectedState !== null) {

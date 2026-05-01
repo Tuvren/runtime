@@ -61,12 +61,12 @@ export async function serveStdioAdapter(
       continue;
     }
 
-    const response = await handleLine(adapter, line);
+    const response = await handleStdioAdapterLine(adapter, line);
     process.stdout.write(`${JSON.stringify(response)}\n`);
   }
 }
 
-async function handleLine(
+export async function handleStdioAdapterLine(
   adapter: StdioConformanceAdapter,
   line: string
 ): Promise<unknown> {
@@ -172,9 +172,16 @@ function readControls(value: unknown): AdapterControls {
   }
 
   const controls: {
+    cancel?: {
+      reason: string;
+    };
     cancelAfterEvent?: string;
     deadlineMs?: number;
   } = {};
+
+  if (isRecord(value.cancel) && typeof value.cancel.reason === "string") {
+    controls.cancel = { reason: value.cancel.reason };
+  }
 
   if (typeof value.cancelAfterEvent === "string") {
     controls.cancelAfterEvent = value.cancelAfterEvent;
