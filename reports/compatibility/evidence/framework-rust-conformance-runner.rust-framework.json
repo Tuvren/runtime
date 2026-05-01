@@ -5,7 +5,6 @@
       "assertionResults": [
         {
           "assertionId": "driver-callable.before-iteration.1.evidenceField",
-          "message": "rust_framework_operation_not_implemented: Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet",
           "status": "fail"
         }
       ],
@@ -17,7 +16,7 @@
             "details": {
               "operation": "driver.execute",
               "receivedControlKeys": [],
-              "receivedInputKeys": ["checkId", "input", "scenario"]
+              "receivedInputKeys": ["checkInput", "scenario"]
             },
             "message": "Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet"
           },
@@ -30,7 +29,18 @@
           "planVersion": "0.1.0"
         },
         "controls": {},
-        "operation": "driver.execute"
+        "operation": "driver.execute",
+        "result": {
+          "error": {
+            "code": "rust_framework_operation_not_implemented",
+            "details": {
+              "operation": "driver.execute",
+              "receivedControlKeys": [],
+              "receivedInputKeys": ["checkInput", "scenario"]
+            },
+            "message": "Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet"
+          }
+        }
       },
       "status": "fail"
     },
@@ -38,7 +48,6 @@
       "assertionResults": [
         {
           "assertionId": "driver-callable.around-model.1.evidenceField",
-          "message": "rust_framework_operation_not_implemented: Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet",
           "status": "fail"
         }
       ],
@@ -50,7 +59,7 @@
             "details": {
               "operation": "driver.execute",
               "receivedControlKeys": [],
-              "receivedInputKeys": ["checkId", "input", "scenario"]
+              "receivedInputKeys": ["checkInput", "scenario"]
             },
             "message": "Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet"
           },
@@ -63,7 +72,18 @@
           "planVersion": "0.1.0"
         },
         "controls": {},
-        "operation": "driver.execute"
+        "operation": "driver.execute",
+        "result": {
+          "error": {
+            "code": "rust_framework_operation_not_implemented",
+            "details": {
+              "operation": "driver.execute",
+              "receivedControlKeys": [],
+              "receivedInputKeys": ["checkInput", "scenario"]
+            },
+            "message": "Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet"
+          }
+        }
       },
       "status": "fail"
     },
@@ -71,7 +91,6 @@
       "assertionResults": [
         {
           "assertionId": "driver-callable.around-tool.1.evidenceField",
-          "message": "rust_framework_operation_not_implemented: Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet",
           "status": "fail"
         }
       ],
@@ -83,7 +102,7 @@
             "details": {
               "operation": "driver.execute",
               "receivedControlKeys": [],
-              "receivedInputKeys": ["checkId", "input", "scenario"]
+              "receivedInputKeys": ["checkInput", "scenario"]
             },
             "message": "Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet"
           },
@@ -96,7 +115,18 @@
           "planVersion": "0.1.0"
         },
         "controls": {},
-        "operation": "driver.execute"
+        "operation": "driver.execute",
+        "result": {
+          "error": {
+            "code": "rust_framework_operation_not_implemented",
+            "details": {
+              "operation": "driver.execute",
+              "receivedControlKeys": [],
+              "receivedInputKeys": ["checkInput", "scenario"]
+            },
+            "message": "Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet"
+          }
+        }
       },
       "status": "fail"
     },
@@ -104,7 +134,6 @@
       "assertionResults": [
         {
           "assertionId": "driver-callable.after-iteration.1.evidenceField",
-          "message": "rust_framework_operation_not_implemented: Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet",
           "status": "fail"
         }
       ],
@@ -116,7 +145,7 @@
             "details": {
               "operation": "driver.execute",
               "receivedControlKeys": [],
-              "receivedInputKeys": ["checkId", "input", "scenario"]
+              "receivedInputKeys": ["checkInput", "scenario"]
             },
             "message": "Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet"
           },
@@ -129,7 +158,18 @@
           "planVersion": "0.1.0"
         },
         "controls": {},
-        "operation": "driver.execute"
+        "operation": "driver.execute",
+        "result": {
+          "error": {
+            "code": "rust_framework_operation_not_implemented",
+            "details": {
+              "operation": "driver.execute",
+              "receivedControlKeys": [],
+              "receivedInputKeys": ["checkInput", "scenario"]
+            },
+            "message": "Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet"
+          }
+        }
       },
       "status": "fail"
     },
@@ -137,7 +177,6 @@
       "assertionResults": [
         {
           "assertionId": "driver-callable.checkpoint.1.evidenceField",
-          "message": "rust_framework_operation_not_implemented: Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet",
           "status": "fail"
         }
       ],
@@ -149,7 +188,7 @@
             "details": {
               "operation": "driver.checkpoint",
               "receivedControlKeys": [],
-              "receivedInputKeys": ["checkId", "input", "scenario"]
+              "receivedInputKeys": ["checkInput", "scenario"]
             },
             "message": "Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet"
           },
@@ -162,7 +201,18 @@
           "planVersion": "0.1.0"
         },
         "controls": {},
-        "operation": "driver.checkpoint"
+        "operation": "driver.checkpoint",
+        "result": {
+          "error": {
+            "code": "rust_framework_operation_not_implemented",
+            "details": {
+              "operation": "driver.checkpoint",
+              "receivedControlKeys": [],
+              "receivedInputKeys": ["checkInput", "scenario"]
+            },
+            "message": "Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet"
+          }
+        }
       },
       "status": "fail"
     },
@@ -170,7 +220,6 @@
       "assertionResults": [
         {
           "assertionId": "driver-api.execute.resolution.1.evidenceField",
-          "message": "rust_framework_operation_not_implemented: Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet",
           "status": "fail"
         }
       ],
@@ -182,7 +231,7 @@
             "details": {
               "operation": "driver.execute",
               "receivedControlKeys": [],
-              "receivedInputKeys": ["checkId", "input", "scenario"]
+              "receivedInputKeys": ["checkInput", "scenario"]
             },
             "message": "Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet"
           },
@@ -195,7 +244,18 @@
           "planVersion": "0.1.0"
         },
         "controls": {},
-        "operation": "driver.execute"
+        "operation": "driver.execute",
+        "result": {
+          "error": {
+            "code": "rust_framework_operation_not_implemented",
+            "details": {
+              "operation": "driver.execute",
+              "receivedControlKeys": [],
+              "receivedInputKeys": ["checkInput", "scenario"]
+            },
+            "message": "Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet"
+          }
+        }
       },
       "status": "fail"
     },
@@ -203,7 +263,6 @@
       "assertionResults": [
         {
           "assertionId": "driver-api.resume.approval.1.evidenceField",
-          "message": "rust_framework_operation_not_implemented: Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet",
           "status": "fail"
         }
       ],
@@ -215,7 +274,7 @@
             "details": {
               "operation": "driver.resume",
               "receivedControlKeys": [],
-              "receivedInputKeys": ["checkId", "input", "scenario"]
+              "receivedInputKeys": ["checkInput", "scenario"]
             },
             "message": "Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet"
           },
@@ -228,7 +287,18 @@
           "planVersion": "0.1.0"
         },
         "controls": {},
-        "operation": "driver.resume"
+        "operation": "driver.resume",
+        "result": {
+          "error": {
+            "code": "rust_framework_operation_not_implemented",
+            "details": {
+              "operation": "driver.resume",
+              "receivedControlKeys": [],
+              "receivedInputKeys": ["checkInput", "scenario"]
+            },
+            "message": "Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet"
+          }
+        }
       },
       "status": "fail"
     },
@@ -236,8 +306,7 @@
       "assertionResults": [
         {
           "assertionId": "driver-api.error.envelope.1.errorEnvelope",
-          "message": "rust_framework_operation_not_implemented: Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet",
-          "status": "fail"
+          "status": "pass"
         }
       ],
       "checkId": "driver-api.error.envelope",
@@ -248,7 +317,7 @@
             "details": {
               "operation": "driver.execute-error",
               "receivedControlKeys": [],
-              "receivedInputKeys": ["checkId", "input", "scenario"]
+              "receivedInputKeys": ["checkInput"]
             },
             "message": "Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet"
           },
@@ -261,42 +330,38 @@
           "planVersion": "0.1.0"
         },
         "controls": {},
-        "operation": "driver.execute-error"
+        "operation": "driver.execute-error",
+        "result": {
+          "error": {
+            "code": "rust_framework_operation_not_implemented",
+            "details": {
+              "operation": "driver.execute-error",
+              "receivedControlKeys": [],
+              "receivedInputKeys": ["checkInput"]
+            },
+            "message": "Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet"
+          }
+        }
       },
-      "status": "fail"
+      "status": "pass"
     },
     {
       "assertionResults": [
         {
           "assertionId": "event-stream.completed-turn.sequence.1.eventSequence",
-          "message": "rust_framework_operation_not_implemented: Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet",
-          "status": "fail"
+          "status": "pass"
         },
         {
           "assertionId": "event-stream.completed-turn.sequence.2.terminalEvent",
-          "message": "rust_framework_operation_not_implemented: Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet",
-          "status": "fail"
+          "status": "pass"
         },
         {
           "assertionId": "event-stream.completed-turn.sequence.3.ordering",
-          "message": "rust_framework_operation_not_implemented: Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet",
-          "status": "fail"
+          "status": "pass"
         }
       ],
       "checkId": "event-stream.completed-turn.sequence",
       "details": {
-        "adapterOutcome": {
-          "error": {
-            "code": "rust_framework_operation_not_implemented",
-            "details": {
-              "operation": "event-stream.fixture-events",
-              "receivedControlKeys": [],
-              "receivedInputKeys": ["checkId", "input", "scenario"]
-            },
-            "message": "Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet"
-          },
-          "kind": "error"
-        },
         "authority": {
           "packetId": "tuvren.framework.event-stream",
           "planId": "tuvren.framework.event-stream.core",
@@ -304,37 +369,40 @@
           "planVersion": "0.1.0"
         },
         "controls": {},
+        "eventTypes": [
+          "turn.start",
+          "iteration.start",
+          "message.start",
+          "text.delta",
+          "text.done",
+          "tool_call.start",
+          "tool_call.args_delta",
+          "tool_call.done",
+          "tool.start",
+          "tool.result",
+          "state.snapshot",
+          "custom",
+          "message.done",
+          "iteration.end",
+          "turn.end"
+        ],
         "operation": "event-stream.fixture-events"
       },
-      "status": "fail"
+      "status": "pass"
     },
     {
       "assertionResults": [
         {
           "assertionId": "event-stream.failed-turn.terminal.1.eventSequence",
-          "message": "rust_framework_operation_not_implemented: Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet",
-          "status": "fail"
+          "status": "pass"
         },
         {
           "assertionId": "event-stream.failed-turn.terminal.2.terminalEvent",
-          "message": "rust_framework_operation_not_implemented: Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet",
-          "status": "fail"
+          "status": "pass"
         }
       ],
       "checkId": "event-stream.failed-turn.terminal",
       "details": {
-        "adapterOutcome": {
-          "error": {
-            "code": "rust_framework_operation_not_implemented",
-            "details": {
-              "operation": "event-stream.fixture-events",
-              "receivedControlKeys": [],
-              "receivedInputKeys": ["checkId", "input", "scenario"]
-            },
-            "message": "Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet"
-          },
-          "kind": "error"
-        },
         "authority": {
           "packetId": "tuvren.framework.event-stream",
           "planId": "tuvren.framework.event-stream.core",
@@ -342,37 +410,24 @@
           "planVersion": "0.1.0"
         },
         "controls": {},
+        "eventTypes": ["turn.start", "error", "turn.end"],
         "operation": "event-stream.fixture-events"
       },
-      "status": "fail"
+      "status": "pass"
     },
     {
       "assertionResults": [
         {
           "assertionId": "event-stream.paused-turn.approval.1.eventSequence",
-          "message": "rust_framework_operation_not_implemented: Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet",
-          "status": "fail"
+          "status": "pass"
         },
         {
           "assertionId": "event-stream.paused-turn.approval.2.terminalEvent",
-          "message": "rust_framework_operation_not_implemented: Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet",
-          "status": "fail"
+          "status": "pass"
         }
       ],
       "checkId": "event-stream.paused-turn.approval",
       "details": {
-        "adapterOutcome": {
-          "error": {
-            "code": "rust_framework_operation_not_implemented",
-            "details": {
-              "operation": "event-stream.fixture-events",
-              "receivedControlKeys": [],
-              "receivedInputKeys": ["checkId", "input", "scenario"]
-            },
-            "message": "Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet"
-          },
-          "kind": "error"
-        },
         "authority": {
           "packetId": "tuvren.framework.event-stream",
           "planId": "tuvren.framework.event-stream.core",
@@ -380,25 +435,23 @@
           "planVersion": "0.1.0"
         },
         "controls": {},
+        "eventTypes": ["turn.start", "approval.requested", "turn.end"],
         "operation": "event-stream.fixture-events"
       },
-      "status": "fail"
+      "status": "pass"
     },
     {
       "assertionResults": [
         {
           "assertionId": "event-stream.sse.projection.1.evidenceField",
-          "message": "rust_framework_operation_not_implemented: Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet",
           "status": "fail"
         },
         {
           "assertionId": "event-stream.sse.projection.2.evidenceField",
-          "message": "rust_framework_operation_not_implemented: Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet",
           "status": "fail"
         },
         {
           "assertionId": "event-stream.sse.projection.3.evidenceField",
-          "message": "rust_framework_operation_not_implemented: Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet",
           "status": "fail"
         }
       ],
@@ -410,7 +463,7 @@
             "details": {
               "operation": "event-stream.sse-projection",
               "receivedControlKeys": [],
-              "receivedInputKeys": ["checkId", "input", "scenario"]
+              "receivedInputKeys": ["checkInput", "fixture"]
             },
             "message": "Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet"
           },
@@ -423,7 +476,18 @@
           "planVersion": "0.1.0"
         },
         "controls": {},
-        "operation": "event-stream.sse-projection"
+        "operation": "event-stream.sse-projection",
+        "result": {
+          "error": {
+            "code": "rust_framework_operation_not_implemented",
+            "details": {
+              "operation": "event-stream.sse-projection",
+              "receivedControlKeys": [],
+              "receivedInputKeys": ["checkInput", "fixture"]
+            },
+            "message": "Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet"
+          }
+        }
       },
       "status": "fail"
     },
@@ -431,12 +495,10 @@
       "assertionResults": [
         {
           "assertionId": "event-stream.sse.eager-subscription.1.evidenceField",
-          "message": "rust_framework_operation_not_implemented: Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet",
           "status": "fail"
         },
         {
           "assertionId": "event-stream.sse.eager-subscription.2.evidenceField",
-          "message": "rust_framework_operation_not_implemented: Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet",
           "status": "fail"
         }
       ],
@@ -448,7 +510,7 @@
             "details": {
               "operation": "event-stream.sse-eager-subscription",
               "receivedControlKeys": [],
-              "receivedInputKeys": ["checkId", "input", "scenario"]
+              "receivedInputKeys": ["checkInput", "fixture"]
             },
             "message": "Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet"
           },
@@ -461,7 +523,18 @@
           "planVersion": "0.1.0"
         },
         "controls": {},
-        "operation": "event-stream.sse-eager-subscription"
+        "operation": "event-stream.sse-eager-subscription",
+        "result": {
+          "error": {
+            "code": "rust_framework_operation_not_implemented",
+            "details": {
+              "operation": "event-stream.sse-eager-subscription",
+              "receivedControlKeys": [],
+              "receivedInputKeys": ["checkInput", "fixture"]
+            },
+            "message": "Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet"
+          }
+        }
       },
       "status": "fail"
     },
@@ -469,17 +542,14 @@
       "assertionResults": [
         {
           "assertionId": "event-stream.agui.projection.1.evidenceField",
-          "message": "rust_framework_operation_not_implemented: Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet",
           "status": "fail"
         },
         {
           "assertionId": "event-stream.agui.projection.2.evidenceField",
-          "message": "rust_framework_operation_not_implemented: Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet",
           "status": "fail"
         },
         {
           "assertionId": "event-stream.agui.projection.3.evidenceField",
-          "message": "rust_framework_operation_not_implemented: Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet",
           "status": "fail"
         }
       ],
@@ -491,7 +561,7 @@
             "details": {
               "operation": "event-stream.agui-projection",
               "receivedControlKeys": [],
-              "receivedInputKeys": ["checkId", "input", "scenario"]
+              "receivedInputKeys": ["checkInput", "fixture"]
             },
             "message": "Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet"
           },
@@ -504,7 +574,18 @@
           "planVersion": "0.1.0"
         },
         "controls": {},
-        "operation": "event-stream.agui-projection"
+        "operation": "event-stream.agui-projection",
+        "result": {
+          "error": {
+            "code": "rust_framework_operation_not_implemented",
+            "details": {
+              "operation": "event-stream.agui-projection",
+              "receivedControlKeys": [],
+              "receivedInputKeys": ["checkInput", "fixture"]
+            },
+            "message": "Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet"
+          }
+        }
       },
       "status": "fail"
     },
@@ -512,12 +593,10 @@
       "assertionResults": [
         {
           "assertionId": "event-stream.agui.failed-turn-error-projection.1.evidenceField",
-          "message": "rust_framework_operation_not_implemented: Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet",
           "status": "fail"
         },
         {
           "assertionId": "event-stream.agui.failed-turn-error-projection.2.evidenceField",
-          "message": "rust_framework_operation_not_implemented: Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet",
           "status": "fail"
         }
       ],
@@ -529,7 +608,7 @@
             "details": {
               "operation": "event-stream.agui-projection",
               "receivedControlKeys": [],
-              "receivedInputKeys": ["checkId", "input", "scenario"]
+              "receivedInputKeys": ["checkInput", "fixture"]
             },
             "message": "Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet"
           },
@@ -542,7 +621,18 @@
           "planVersion": "0.1.0"
         },
         "controls": {},
-        "operation": "event-stream.agui-projection"
+        "operation": "event-stream.agui-projection",
+        "result": {
+          "error": {
+            "code": "rust_framework_operation_not_implemented",
+            "details": {
+              "operation": "event-stream.agui-projection",
+              "receivedControlKeys": [],
+              "receivedInputKeys": ["checkInput", "fixture"]
+            },
+            "message": "Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet"
+          }
+        }
       },
       "status": "fail"
     },
@@ -550,22 +640,18 @@
       "assertionResults": [
         {
           "assertionId": "event-stream.agui.paused-turn-fallback.1.evidenceField",
-          "message": "rust_framework_operation_not_implemented: Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet",
           "status": "fail"
         },
         {
           "assertionId": "event-stream.agui.paused-turn-fallback.2.evidenceField",
-          "message": "rust_framework_operation_not_implemented: Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet",
           "status": "fail"
         },
         {
           "assertionId": "event-stream.agui.paused-turn-fallback.3.evidenceField",
-          "message": "rust_framework_operation_not_implemented: Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet",
           "status": "fail"
         },
         {
           "assertionId": "event-stream.agui.paused-turn-fallback.4.evidenceField",
-          "message": "rust_framework_operation_not_implemented: Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet",
           "status": "fail"
         }
       ],
@@ -577,7 +663,7 @@
             "details": {
               "operation": "event-stream.agui-projection",
               "receivedControlKeys": [],
-              "receivedInputKeys": ["checkId", "input", "scenario"]
+              "receivedInputKeys": ["checkInput", "fixture"]
             },
             "message": "Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet"
           },
@@ -590,7 +676,18 @@
           "planVersion": "0.1.0"
         },
         "controls": {},
-        "operation": "event-stream.agui-projection"
+        "operation": "event-stream.agui-projection",
+        "result": {
+          "error": {
+            "code": "rust_framework_operation_not_implemented",
+            "details": {
+              "operation": "event-stream.agui-projection",
+              "receivedControlKeys": [],
+              "receivedInputKeys": ["checkInput", "fixture"]
+            },
+            "message": "Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet"
+          }
+        }
       },
       "status": "fail"
     },
@@ -598,17 +695,14 @@
       "assertionResults": [
         {
           "assertionId": "runtime-callable.provider-generate.1.evidenceField",
-          "message": "rust_framework_operation_not_implemented: Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet",
           "status": "fail"
         },
         {
           "assertionId": "runtime-callable.provider-generate.2.evidenceField",
-          "message": "rust_framework_operation_not_implemented: Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet",
           "status": "fail"
         },
         {
           "assertionId": "runtime-callable.provider-generate.3.evidenceField",
-          "message": "rust_framework_operation_not_implemented: Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet",
           "status": "fail"
         }
       ],
@@ -620,7 +714,7 @@
             "details": {
               "operation": "runtime.provider-generate",
               "receivedControlKeys": [],
-              "receivedInputKeys": ["checkId", "input", "scenario"]
+              "receivedInputKeys": ["checkInput", "scenario"]
             },
             "message": "Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet"
           },
@@ -633,7 +727,18 @@
           "planVersion": "0.1.0"
         },
         "controls": {},
-        "operation": "runtime.provider-generate"
+        "operation": "runtime.provider-generate",
+        "result": {
+          "error": {
+            "code": "rust_framework_operation_not_implemented",
+            "details": {
+              "operation": "runtime.provider-generate",
+              "receivedControlKeys": [],
+              "receivedInputKeys": ["checkInput", "scenario"]
+            },
+            "message": "Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet"
+          }
+        }
       },
       "status": "fail"
     },
@@ -641,22 +746,18 @@
       "assertionResults": [
         {
           "assertionId": "runtime-callable.provider-stream.1.evidenceField",
-          "message": "rust_framework_operation_not_implemented: Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet",
           "status": "fail"
         },
         {
           "assertionId": "runtime-callable.provider-stream.2.evidenceField",
-          "message": "rust_framework_operation_not_implemented: Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet",
           "status": "fail"
         },
         {
           "assertionId": "runtime-callable.provider-stream.3.evidenceField",
-          "message": "rust_framework_operation_not_implemented: Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet",
           "status": "fail"
         },
         {
           "assertionId": "runtime-callable.provider-stream.4.evidenceField",
-          "message": "rust_framework_operation_not_implemented: Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet",
           "status": "fail"
         }
       ],
@@ -668,7 +769,7 @@
             "details": {
               "operation": "runtime.provider-stream",
               "receivedControlKeys": [],
-              "receivedInputKeys": ["checkId", "input", "scenario"]
+              "receivedInputKeys": ["checkInput", "scenario"]
             },
             "message": "Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet"
           },
@@ -681,7 +782,18 @@
           "planVersion": "0.1.0"
         },
         "controls": {},
-        "operation": "runtime.provider-stream"
+        "operation": "runtime.provider-stream",
+        "result": {
+          "error": {
+            "code": "rust_framework_operation_not_implemented",
+            "details": {
+              "operation": "runtime.provider-stream",
+              "receivedControlKeys": [],
+              "receivedInputKeys": ["checkInput", "scenario"]
+            },
+            "message": "Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet"
+          }
+        }
       },
       "status": "fail"
     },
@@ -689,27 +801,22 @@
       "assertionResults": [
         {
           "assertionId": "runtime-callable.tool-execute.1.evidenceField",
-          "message": "rust_framework_operation_not_implemented: Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet",
           "status": "fail"
         },
         {
           "assertionId": "runtime-callable.tool-execute.2.evidenceField",
-          "message": "rust_framework_operation_not_implemented: Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet",
           "status": "fail"
         },
         {
           "assertionId": "runtime-callable.tool-execute.3.evidenceField",
-          "message": "rust_framework_operation_not_implemented: Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet",
           "status": "fail"
         },
         {
           "assertionId": "runtime-callable.tool-execute.4.stateField",
-          "message": "rust_framework_operation_not_implemented: Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet",
           "status": "fail"
         },
         {
           "assertionId": "runtime-callable.tool-execute.5.stateField",
-          "message": "rust_framework_operation_not_implemented: Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet",
           "status": "fail"
         }
       ],
@@ -721,7 +828,7 @@
             "details": {
               "operation": "runtime.tool-execute",
               "receivedControlKeys": [],
-              "receivedInputKeys": ["checkId", "input", "scenario"]
+              "receivedInputKeys": ["checkInput", "scenario"]
             },
             "message": "Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet"
           },
@@ -734,7 +841,18 @@
           "planVersion": "0.1.0"
         },
         "controls": {},
-        "operation": "runtime.tool-execute"
+        "operation": "runtime.tool-execute",
+        "result": {
+          "error": {
+            "code": "rust_framework_operation_not_implemented",
+            "details": {
+              "operation": "runtime.tool-execute",
+              "receivedControlKeys": [],
+              "receivedInputKeys": ["checkInput", "scenario"]
+            },
+            "message": "Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet"
+          }
+        }
       },
       "status": "fail"
     },
@@ -742,22 +860,18 @@
       "assertionResults": [
         {
           "assertionId": "runtime-callable.approval-resolve.1.evidenceField",
-          "message": "rust_framework_operation_not_implemented: Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet",
           "status": "fail"
         },
         {
           "assertionId": "runtime-callable.approval-resolve.2.evidenceField",
-          "message": "rust_framework_operation_not_implemented: Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet",
           "status": "fail"
         },
         {
           "assertionId": "runtime-callable.approval-resolve.3.evidenceField",
-          "message": "rust_framework_operation_not_implemented: Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet",
           "status": "fail"
         },
         {
           "assertionId": "runtime-callable.approval-resolve.4.evidenceField",
-          "message": "rust_framework_operation_not_implemented: Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet",
           "status": "fail"
         }
       ],
@@ -769,7 +883,7 @@
             "details": {
               "operation": "runtime.approval-resolve",
               "receivedControlKeys": [],
-              "receivedInputKeys": ["checkId", "input", "scenario"]
+              "receivedInputKeys": ["checkInput", "scenario"]
             },
             "message": "Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet"
           },
@@ -782,7 +896,18 @@
           "planVersion": "0.1.0"
         },
         "controls": {},
-        "operation": "runtime.approval-resolve"
+        "operation": "runtime.approval-resolve",
+        "result": {
+          "error": {
+            "code": "rust_framework_operation_not_implemented",
+            "details": {
+              "operation": "runtime.approval-resolve",
+              "receivedControlKeys": [],
+              "receivedInputKeys": ["checkInput", "scenario"]
+            },
+            "message": "Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet"
+          }
+        }
       },
       "status": "fail"
     },
@@ -790,7 +915,6 @@
       "assertionResults": [
         {
           "assertionId": "runtime-callable.validation-failure.1.evidenceField",
-          "message": "rust_framework_operation_not_implemented: Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet",
           "status": "fail"
         }
       ],
@@ -802,7 +926,7 @@
             "details": {
               "operation": "runtime.validate-structured-output",
               "receivedControlKeys": [],
-              "receivedInputKeys": ["checkId", "input", "scenario"]
+              "receivedInputKeys": ["checkInput", "scenario"]
             },
             "message": "Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet"
           },
@@ -815,7 +939,18 @@
           "planVersion": "0.1.0"
         },
         "controls": {},
-        "operation": "runtime.validate-structured-output"
+        "operation": "runtime.validate-structured-output",
+        "result": {
+          "error": {
+            "code": "rust_framework_operation_not_implemented",
+            "details": {
+              "operation": "runtime.validate-structured-output",
+              "receivedControlKeys": [],
+              "receivedInputKeys": ["checkInput", "scenario"]
+            },
+            "message": "Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet"
+          }
+        }
       },
       "status": "fail"
     },
@@ -823,12 +958,10 @@
       "assertionResults": [
         {
           "assertionId": "runtime-callable.timeout-retry-cancellation-idempotency.1.evidenceField",
-          "message": "rust_framework_operation_not_implemented: Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet",
           "status": "fail"
         },
         {
           "assertionId": "runtime-callable.timeout-retry-cancellation-idempotency.2.evidenceField",
-          "message": "rust_framework_operation_not_implemented: Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet",
           "status": "fail"
         }
       ],
@@ -840,7 +973,7 @@
             "details": {
               "operation": "runtime.cancel-execution",
               "receivedControlKeys": ["cancelAfterEvent", "deadlineMs"],
-              "receivedInputKeys": ["checkId", "input", "scenario"]
+              "receivedInputKeys": ["checkInput"]
             },
             "message": "Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet"
           },
@@ -856,7 +989,18 @@
           "cancelAfterEvent": "turn.start",
           "deadlineMs": 1000
         },
-        "operation": "runtime.cancel-execution"
+        "operation": "runtime.cancel-execution",
+        "result": {
+          "error": {
+            "code": "rust_framework_operation_not_implemented",
+            "details": {
+              "operation": "runtime.cancel-execution",
+              "receivedControlKeys": ["cancelAfterEvent", "deadlineMs"],
+              "receivedInputKeys": ["checkInput"]
+            },
+            "message": "Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet"
+          }
+        }
       },
       "status": "fail"
     },
@@ -864,7 +1008,6 @@
       "assertionResults": [
         {
           "assertionId": "runtime-api.execute-turn.lifecycle.1.evidenceField",
-          "message": "rust_framework_operation_not_implemented: Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet",
           "status": "fail"
         }
       ],
@@ -876,7 +1019,7 @@
             "details": {
               "operation": "runtime.execute-turn",
               "receivedControlKeys": [],
-              "receivedInputKeys": ["checkId", "input", "scenario"]
+              "receivedInputKeys": ["checkInput", "scenario"]
             },
             "message": "Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet"
           },
@@ -889,7 +1032,18 @@
           "planVersion": "0.1.0"
         },
         "controls": {},
-        "operation": "runtime.execute-turn"
+        "operation": "runtime.execute-turn",
+        "result": {
+          "error": {
+            "code": "rust_framework_operation_not_implemented",
+            "details": {
+              "operation": "runtime.execute-turn",
+              "receivedControlKeys": [],
+              "receivedInputKeys": ["checkInput", "scenario"]
+            },
+            "message": "Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet"
+          }
+        }
       },
       "status": "fail"
     },
@@ -897,7 +1051,6 @@
       "assertionResults": [
         {
           "assertionId": "runtime-api.cancel-execution.failure.1.errorEnvelope",
-          "message": "rust_framework_operation_not_implemented: Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet",
           "status": "fail"
         }
       ],
@@ -909,7 +1062,7 @@
             "details": {
               "operation": "runtime.cancel-execution",
               "receivedControlKeys": ["deadlineMs"],
-              "receivedInputKeys": ["checkId", "input", "scenario"]
+              "receivedInputKeys": ["checkInput"]
             },
             "message": "Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet"
           },
@@ -924,7 +1077,18 @@
         "controls": {
           "deadlineMs": 1000
         },
-        "operation": "runtime.cancel-execution"
+        "operation": "runtime.cancel-execution",
+        "result": {
+          "error": {
+            "code": "rust_framework_operation_not_implemented",
+            "details": {
+              "operation": "runtime.cancel-execution",
+              "receivedControlKeys": ["deadlineMs"],
+              "receivedInputKeys": ["checkInput"]
+            },
+            "message": "Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet"
+          }
+        }
       },
       "status": "fail"
     },
@@ -932,12 +1096,10 @@
       "assertionResults": [
         {
           "assertionId": "runtime-api.approval-resolve.paused-resume.1.evidenceField",
-          "message": "rust_framework_operation_not_implemented: Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet",
           "status": "fail"
         },
         {
           "assertionId": "runtime-api.approval-resolve.paused-resume.2.evidenceField",
-          "message": "rust_framework_operation_not_implemented: Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet",
           "status": "fail"
         }
       ],
@@ -949,7 +1111,7 @@
             "details": {
               "operation": "runtime.approval-resolve",
               "receivedControlKeys": [],
-              "receivedInputKeys": ["checkId", "input", "scenario"]
+              "receivedInputKeys": ["checkInput", "scenario"]
             },
             "message": "Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet"
           },
@@ -962,7 +1124,18 @@
           "planVersion": "0.1.0"
         },
         "controls": {},
-        "operation": "runtime.approval-resolve"
+        "operation": "runtime.approval-resolve",
+        "result": {
+          "error": {
+            "code": "rust_framework_operation_not_implemented",
+            "details": {
+              "operation": "runtime.approval-resolve",
+              "receivedControlKeys": [],
+              "receivedInputKeys": ["checkInput", "scenario"]
+            },
+            "message": "Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet"
+          }
+        }
       },
       "status": "fail"
     },
@@ -970,12 +1143,10 @@
       "assertionResults": [
         {
           "assertionId": "runtime-api.branch-create.recovery.1.stateField",
-          "message": "rust_framework_operation_not_implemented: Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet",
           "status": "fail"
         },
         {
           "assertionId": "runtime-api.branch-create.recovery.2.stateField",
-          "message": "rust_framework_operation_not_implemented: Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet",
           "status": "fail"
         }
       ],
@@ -987,7 +1158,7 @@
             "details": {
               "operation": "runtime.branch-create",
               "receivedControlKeys": [],
-              "receivedInputKeys": ["checkId", "input", "scenario"]
+              "receivedInputKeys": ["checkInput", "scenario"]
             },
             "message": "Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet"
           },
@@ -1000,7 +1171,18 @@
           "planVersion": "0.1.0"
         },
         "controls": {},
-        "operation": "runtime.branch-create"
+        "operation": "runtime.branch-create",
+        "result": {
+          "error": {
+            "code": "rust_framework_operation_not_implemented",
+            "details": {
+              "operation": "runtime.branch-create",
+              "receivedControlKeys": [],
+              "receivedInputKeys": ["checkInput", "scenario"]
+            },
+            "message": "Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet"
+          }
+        }
       },
       "status": "fail"
     },
@@ -1008,17 +1190,14 @@
       "assertionResults": [
         {
           "assertionId": "runtime-api.context-transform.shared-summary.1.evidenceField",
-          "message": "rust_framework_operation_not_implemented: Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet",
           "status": "fail"
         },
         {
           "assertionId": "runtime-api.context-transform.shared-summary.2.evidenceField",
-          "message": "rust_framework_operation_not_implemented: Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet",
           "status": "fail"
         },
         {
           "assertionId": "runtime-api.context-transform.shared-summary.3.evidenceField",
-          "message": "rust_framework_operation_not_implemented: Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet",
           "status": "fail"
         }
       ],
@@ -1030,7 +1209,7 @@
             "details": {
               "operation": "runtime.context-transform",
               "receivedControlKeys": [],
-              "receivedInputKeys": ["checkId", "input", "scenario"]
+              "receivedInputKeys": ["checkInput", "scenario"]
             },
             "message": "Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet"
           },
@@ -1043,7 +1222,18 @@
           "planVersion": "0.1.0"
         },
         "controls": {},
-        "operation": "runtime.context-transform"
+        "operation": "runtime.context-transform",
+        "result": {
+          "error": {
+            "code": "rust_framework_operation_not_implemented",
+            "details": {
+              "operation": "runtime.context-transform",
+              "receivedControlKeys": [],
+              "receivedInputKeys": ["checkInput", "scenario"]
+            },
+            "message": "Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet"
+          }
+        }
       },
       "status": "fail"
     },
@@ -1051,17 +1241,14 @@
       "assertionResults": [
         {
           "assertionId": "runtime-api.recover-result.staged-result.1.evidenceField",
-          "message": "rust_framework_operation_not_implemented: Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet",
           "status": "fail"
         },
         {
           "assertionId": "runtime-api.recover-result.staged-result.2.evidenceField",
-          "message": "rust_framework_operation_not_implemented: Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet",
           "status": "fail"
         },
         {
           "assertionId": "runtime-api.recover-result.staged-result.3.evidenceField",
-          "message": "rust_framework_operation_not_implemented: Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet",
           "status": "fail"
         }
       ],
@@ -1073,7 +1260,7 @@
             "details": {
               "operation": "runtime.recover-result",
               "receivedControlKeys": [],
-              "receivedInputKeys": ["checkId", "input", "scenario"]
+              "receivedInputKeys": ["checkInput", "scenario"]
             },
             "message": "Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet"
           },
@@ -1086,26 +1273,30 @@
           "planVersion": "0.1.0"
         },
         "controls": {},
-        "operation": "runtime.recover-result"
+        "operation": "runtime.recover-result",
+        "result": {
+          "error": {
+            "code": "rust_framework_operation_not_implemented",
+            "details": {
+              "operation": "runtime.recover-result",
+              "receivedControlKeys": [],
+              "receivedInputKeys": ["checkInput", "scenario"]
+            },
+            "message": "Rust framework, Runtime API, Event Stream, and ReAct Driver implementation path is not implemented yet"
+          }
+        }
       },
       "status": "fail"
     }
   ],
-  "command": [
-    "bun",
-    "run",
-    "nx",
-    "run",
-    "framework-rust-conformance-runner:conformance",
-    "--skipNxCache"
-  ],
-  "exitCode": 0,
+  "command": ["cargo", "run", "-p", "tuvren-framework-rust-conformance-runner"],
+  "exitCode": 1,
   "implementationId": "rust-framework",
   "project": "framework-rust-conformance-runner",
   "status": "fail",
   "summary": {
-    "failedChecks": 28,
-    "passedChecks": 0,
+    "failedChecks": 24,
+    "passedChecks": 4,
     "totalChecks": 28
   },
   "suiteId": "tuvren.framework.promoted-authority",

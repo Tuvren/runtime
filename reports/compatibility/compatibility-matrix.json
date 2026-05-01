@@ -162,8 +162,8 @@
             "runtime-api.recover-result.staged-result"
           ],
           "checkSummary": {
-            "failedChecks": 28,
-            "passedChecks": 0,
+            "failedChecks": 24,
+            "passedChecks": 4,
             "totalChecks": 28
           },
           "evidencePath": "reports/compatibility/evidence/framework-rust-conformance-runner.rust-framework.json",

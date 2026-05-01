@@ -14,17 +14,15 @@
  * limitations under the License.
  */
 
-import { readFile } from "node:fs/promises";
+import { readdir, readFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { EventSchemas } from "@ag-ui/core";
-import {
-  assertTuvrenStreamEvent,
-  type TuvrenStreamEvent,
-} from "@tuvren/event-stream";
 import { toAgUiEvents } from "@tuvren/stream-agui";
 import { teeTuvrenStreamEvents } from "@tuvren/stream-core";
 import { toSseFrames } from "@tuvren/stream-sse";
+import type { AnySchema, ValidateFunction } from "ajv";
+import Ajv2020 from "ajv/dist/2020.js";
 import {
   type AssertionContext,
   type CompiledConformancePlan,
@@ -55,10 +53,19 @@ const FRAMEWORK_AUTHORITY_PACKET_PATHS: readonly string[] = [
   "boundaries/framework/contracts/runtime-api/spec/authority-packet.json",
   "boundaries/framework/contracts/driver-api/spec/authority-packet.json",
 ];
+const STREAM_EVENT_SCHEMA_DIRECTORY = resolve(
+  REPO_ROOT,
+  "boundaries/framework/contracts/event-stream/artifacts/json-schema"
+);
+const STREAM_EVENT_SCHEMA_PATH = resolve(
+  STREAM_EVENT_SCHEMA_DIRECTORY,
+  "TuvrenStreamEvent.json"
+);
 const IMPLEMENTATION_ID = "typescript-framework";
 const LANGUAGE = "typescript";
 const SUITE_ID = "tuvren.framework.promoted-authority";
 const SUITE_VERSION = "0.1.0";
+const streamEventValidator = await createStreamEventValidator();
 
 interface AuthorityPacketManifest {
   conformancePlans: readonly AuthorityPacketPlanReference[];
@@ -79,6 +86,10 @@ interface CheckRunContext {
 type OperationHandler = (
   context: CheckRunContext
 ) => AssertionContext | Promise<AssertionContext>;
+type TuvrenStreamEvent =
+  Parameters<typeof toSseFrames>[0] extends AsyncIterable<infer Event>
+    ? Event
+    : never;
 
 const OPERATION_HANDLERS: Readonly<Record<string, OperationHandler>> = {
   "event-stream.agui-projection": createAgUiProjectionContext,
@@ -174,6 +185,47 @@ function readAuthorityPacketManifestValue(
     conformancePlans,
     packetId: value.packetId,
   };
+}
+
+async function createStreamEventValidator(): Promise<
+  ValidateFunction<unknown>
+> {
+  const ajv = new Ajv2020({ allErrors: true, strict: false });
+  const schemaFileNames = await readdir(STREAM_EVENT_SCHEMA_DIRECTORY);
+
+  for (const schemaFileName of schemaFileNames.sort()) {
+    if (!schemaFileName.endsWith(".json")) {
+      continue;
+    }
+
+    const schemaPath = resolve(STREAM_EVENT_SCHEMA_DIRECTORY, schemaFileName);
+    const parsedSchema: unknown = JSON.parse(
+      await readFile(schemaPath, "utf8")
+    );
+    const schema = readJsonSchema(parsedSchema, schemaPath);
+
+    ajv.addSchema(schema);
+  }
+
+  const validate = ajv.getSchema(
+    "https://tuvren.dev/schemas/framework/event-stream/TuvrenStreamEvent.json"
+  );
+
+  if (validate === undefined) {
+    throw new Error(
+      `${STREAM_EVENT_SCHEMA_PATH} did not register the stream event schema`
+    );
+  }
+
+  return validate;
+}
+
+function readJsonSchema(value: unknown, label: string): AnySchema {
+  if (typeof value === "boolean" || isRecord(value)) {
+    return value;
+  }
+
+  throw new Error(`${label} must contain a JSON Schema object or boolean`);
 }
 
 function readPlanReferences(
@@ -423,7 +475,7 @@ function readFixtureEvents(
   }
 
   for (const [index, event] of value.entries()) {
-    assertTuvrenStreamEvent(event, `${check.checkId}.events[${index}]`);
+    assertStreamEventFromSchema(event, `${check.checkId}.events[${index}]`);
   }
 
   return value;
@@ -479,8 +531,23 @@ function createFixtureEventStream(
 
 function cloneTuvrenStreamEvent(event: TuvrenStreamEvent): TuvrenStreamEvent {
   const cloned = structuredClone(event);
-  assertTuvrenStreamEvent(cloned, "cloned stream event");
+  assertStreamEventFromSchema(cloned, "cloned stream event");
   return cloned;
+}
+
+function assertStreamEventFromSchema(
+  value: unknown,
+  label: string
+): asserts value is TuvrenStreamEvent {
+  if (streamEventValidator(value)) {
+    return;
+  }
+
+  throw new Error(
+    `${label} failed generated event-stream JSON Schema validation: ${streamEventValidator.errors
+      ?.map((error) => `${error.instancePath || "/"} ${error.message ?? ""}`)
+      .join("; ")}`
+  );
 }
 
 async function waitForAsyncTurn(): Promise<void> {

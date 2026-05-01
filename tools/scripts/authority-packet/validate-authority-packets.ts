@@ -348,6 +348,23 @@ function validateVerificationPaths(
       `${verificationPath.kind} verification target`
     );
   }
+
+  const conformanceVerificationTargets = new Set(
+    manifest.verificationPaths
+      .filter(
+        (verificationPath) => verificationPath.kind === "conformance-plan"
+      )
+      .map((verificationPath) => verificationPath.target)
+  );
+
+  for (const plan of manifest.conformancePlans ?? []) {
+    if (!conformanceVerificationTargets.has(plan.path)) {
+      failures.push({
+        manifestPath,
+        message: `conformance plan ${plan.path} is not listed as an executable verification path`,
+      });
+    }
+  }
 }
 
 function requireExistingPath(

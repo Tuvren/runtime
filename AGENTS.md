@@ -45,6 +45,7 @@ Do not invent behavior, contracts, or scope that conflict with those sources.
 - `bun run format` applies Biome fixes
 - `bun run typecheck` runs Nx typechecks across the workspace
 - `bun run conformance` runs the active TypeScript and Rust conformance runners
+- `bun run compatibility:evidence` refreshes the checked-in compatibility matrix and evidence files, including known red TDD lanes, without treating red evidence as a passing verification gate
 - `bun run codegen` regenerates TypeSpec, telemetry, compatibility, and kernel interop artifacts
 - `bun run interop-smoke` runs the governed interop smoke lanes, including Rust-kernel paths
 - `bun run verify` runs the repo-global verification script across TypeScript, Rust, codegen, conformance, and interop lanes
@@ -89,6 +90,12 @@ Run the narrowest relevant target first before broadening:
 - Contract/codegen changes: `bun run codegen` or the specific `:codegen` target
 - Cross-language changes: `bun run interop-smoke` or the specific `kernel-interop-grpc`, `kernel-rust-grpc-service`, or `host-playground` interop target
 - Release confidence: `bun run verify` before claiming broad workspace readiness
+
+Conformance status is part of the contract, not just command output. If a
+runner emits structured evidence with `status: "fail"`, the normal
+`conformance`, `codegen`, and `verify` gates must fail; use
+`bun run compatibility:evidence` only when intentionally refreshing checked-in
+evidence for an implementation lane that is expected to remain red.
 
 ## Pull Request Follow-Up
 

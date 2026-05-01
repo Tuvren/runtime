@@ -16,6 +16,7 @@
 
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, relative, resolve } from "node:path";
+import process from "node:process";
 import { fileURLToPath } from "node:url";
 import type { AnySchema } from "ajv";
 import Ajv2020 from "ajv/dist/2020.js";
@@ -103,7 +104,7 @@ interface CompatibilitySuite {
 }
 
 interface ConformanceRunner {
-  allowFailingEvidence?: boolean;
+  command?: string[];
   implementationId: string;
   language: string;
   manifestPath?: string;
@@ -134,6 +135,9 @@ const COMPATIBILITY_METADATA = {
   generatedAtMs: 0,
   sourceRevision: "checked-in-workspace",
 } as const;
+// Evidence refresh can intentionally record known red lanes, but the default
+// compatibility codegen path remains a pass/fail gate for verification.
+const ALLOW_FAILING_EVIDENCE_FLAG = "--allow-failing-evidence";
 
 const CONFORMANCE_RUNNERS: readonly ConformanceRunner[] = [
   {
@@ -161,10 +165,9 @@ const CONFORMANCE_RUNNERS: readonly ConformanceRunner[] = [
     project: "kernel-rust-conformance-runner",
   },
   {
-    // Rust framework conformance is an active TDD lane: the Rust runner must
-    // execute and publish failing evidence until that implementation exists,
-    // but compatibility codegen should still be able to refresh the matrix.
-    allowFailingEvidence: true,
+    // This lane is expected to emit red evidence today; running Cargo directly
+    // keeps the structured JSON parseable after the process exits nonzero.
+    command: ["cargo", "run", "-p", "tuvren-framework-rust-conformance-runner"],
     implementationId: "rust-framework",
     language: "rust",
     project: "framework-rust-conformance-runner",
@@ -184,6 +187,9 @@ const INTEROP_RUNNERS: readonly InteropRunner[] = [
 await main();
 
 async function main(): Promise<void> {
+  const allowFailingEvidence = process.argv.includes(
+    ALLOW_FAILING_EVIDENCE_FLAG
+  );
   // Checked-in evidence must describe only the currently measured suite set,
   // so codegen clears the directory before regenerating the authoritative
   // suite-specific artifacts.
@@ -224,10 +230,7 @@ async function main(): Promise<void> {
       version: TRANSITION_IMPLEMENTATION_VERSION,
     });
 
-    if (
-      result.matrixResult.status === "fail" &&
-      runner.allowFailingEvidence !== true
-    ) {
+    if (result.matrixResult.status === "fail") {
       hasFailure = true;
     }
   }
@@ -275,7 +278,7 @@ async function main(): Promise<void> {
   // regeneration.
   await formatGeneratedOutputs();
 
-  if (hasFailure) {
+  if (hasFailure && !allowFailingEvidence) {
     throw new Error("one or more conformance targets failed");
   }
 }
@@ -296,12 +299,14 @@ async function runConformanceTarget(
   // The compatibility matrix is meant to be measured evidence, not replayed
   // cached console output, so each conformance lane is forced to execute.
   const command = [
-    "bun",
-    "run",
-    "nx",
-    "run",
-    `${runner.project}:conformance`,
-    "--skipNxCache",
+    ...(runner.command ?? [
+      "bun",
+      "run",
+      "nx",
+      "run",
+      `${runner.project}:conformance`,
+      "--skipNxCache",
+    ]),
   ];
   const commandResult = await runCommand(command, {
     captureOutput: true,

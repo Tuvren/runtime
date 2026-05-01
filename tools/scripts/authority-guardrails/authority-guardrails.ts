@@ -67,6 +67,7 @@ const RUNNER_SOURCE_ROOTS = [
   // Kernel/provider runners stay out of this guardrail until a later epic gives
   // those surfaces authority packets instead of legacy suite manifests.
   "boundaries/framework/implementations/typescript/conformance-runner/src",
+  "boundaries/framework/implementations/rust/conformance-runner/src",
 ];
 const FRAMEWORK_TYPESCRIPT_ROOT =
   "boundaries/framework/implementations/typescript";

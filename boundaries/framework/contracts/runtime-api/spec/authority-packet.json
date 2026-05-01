@@ -54,6 +54,7 @@
     "boundaries/framework/contracts/runtime-api/implementations/typescript",
     "boundaries/framework/implementations/typescript/runtime-core",
     "boundaries/framework/implementations/typescript/conformance-runner",
+    "boundaries/framework/implementations/rust/conformance-runner",
     "boundaries/framework/contracts/runtime-api/README.md",
     "boundaries/framework/contracts/runtime-api/spec/README.md",
     "docs",
@@ -67,6 +68,10 @@
     {
       "kind": "conformance-plan",
       "target": "boundaries/framework/conformance/plans/runtime-api-lifecycle.json"
+    },
+    {
+      "kind": "conformance-plan",
+      "target": "boundaries/framework/conformance/plans/runtime-api-callables.json"
     },
     {
       "kind": "freshness-check",
