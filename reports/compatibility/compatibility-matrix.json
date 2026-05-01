@@ -1,4 +1,5 @@
 {
+  "generatedAtMs": 1777595746044,
   "implementations": [
     {
       "implementationId": "typescript-framework",
@@ -38,9 +39,31 @@
         }
       ],
       "version": "unreleased-workspace"
+    },
+    {
+      "implementationId": "rust-kernel",
+      "language": "rust",
+      "results": [
+        {
+          "evidencePath": "reports/compatibility/evidence/tuvren.kernel.protocol-seed.rust-kernel.json",
+          "status": "pass",
+          "suiteId": "tuvren.kernel.protocol-seed",
+          "suiteVersion": "0.1.0"
+        }
+      ],
+      "version": "unreleased-workspace"
     }
   ],
-  "interop": [],
+  "interop": [
+    {
+      "evidencePath": "reports/compatibility/evidence/tuvren.framework.kernel-interop-smoke.typescript-framework__rust-kernel.json",
+      "pairId": "typescript-framework__rust-kernel",
+      "status": "pass",
+      "suiteId": "tuvren.framework.kernel-interop-smoke",
+      "suiteVersion": "0.1.0"
+    }
+  ],
+  "sourceRevision": "2746edcff186d08d9355f7ad0ce35981a2c35bdc-dirty",
   "suites": [
     {
       "boundary": "framework",
@@ -55,6 +78,11 @@
     {
       "boundary": "providers",
       "suiteId": "tuvren.providers.api-fixtures",
+      "suiteVersion": "0.1.0"
+    },
+    {
+      "boundary": "framework",
+      "suiteId": "tuvren.framework.kernel-interop-smoke",
       "suiteVersion": "0.1.0"
     }
   ]
