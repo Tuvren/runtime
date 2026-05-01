@@ -70,6 +70,12 @@ const cases: readonly MetaCase[] = [
     id: "errorEnvelope exact matching",
   },
   {
+    check: check("error-envelope-message", [{ kind: "errorEnvelope" }]),
+    context: { result: { error: { code: "stable_error" } } },
+    expected: "fail",
+    id: "errorEnvelope requires message",
+  },
+  {
     check: check("contains-array", [
       { field: "$.types", kind: "evidenceField", contains: "turn.end" },
     ]),
@@ -303,6 +309,7 @@ function check(
 async function runPlanCompilerCases(failures: string[]): Promise<void> {
   const directory = await mkdtemp(join(tmpdir(), "tuvren-meta-plan-"));
   const duplicateStepPlanPath = join(directory, "duplicate-step.json");
+  const stepEvidencePlanPath = join(directory, "step-evidence.json");
 
   try {
     await writeFile(
@@ -340,6 +347,58 @@ async function runPlanCompilerCases(failures: string[]): Promise<void> {
       if (!message.includes("repeats stepId repeat")) {
         failures.push(
           `duplicate trace step id produced wrong error: ${message}`
+        );
+      }
+    }
+
+    await writeFile(
+      stepEvidencePlanPath,
+      `${JSON.stringify(
+        {
+          applicability: { capabilities: ["meta"] },
+          checks: [
+            {
+              assertions: [
+                {
+                  field: "$.trace.observe.evidence.value",
+                  kind: "evidenceField",
+                },
+              ],
+              checkId: "meta.step-evidence",
+              operation: "meta.operation",
+              steps: [
+                {
+                  assertions: [
+                    { field: "$.value", kind: "evidenceField" },
+                    { field: "$.phase", kind: "stateField" },
+                    { kind: "errorEnvelope", path: "$.result.error" },
+                  ],
+                  operation: "meta.operation",
+                  stepId: "observe",
+                },
+              ],
+            },
+          ],
+          packetId: "tuvren.meta",
+          planId: "tuvren.meta.step-evidence",
+          planVersion: "0.1.0",
+        },
+        null,
+        2
+      )}\n`
+    );
+
+    const stepPlan = await loadConformancePlan(stepEvidencePlanPath);
+    const requiredEvidence = stepPlan.checks[0]?.requiredEvidence ?? [];
+
+    for (const expectedPath of [
+      "trace.observe.evidence.value",
+      "trace.observe.result.error",
+      "trace.observe.state.phase",
+    ]) {
+      if (!requiredEvidence.includes(expectedPath)) {
+        failures.push(
+          `step assertion required evidence omitted ${expectedPath}`
         );
       }
     }

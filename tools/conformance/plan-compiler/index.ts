@@ -252,23 +252,65 @@ function expandRequiredEvidence(
 ): readonly string[] {
   const evidence = new Set(check.evidence ?? []);
 
-  for (const assertion of [
-    ...check.assertions,
-    ...(check.steps ?? []).flatMap((step) => step.assertions ?? []),
-  ]) {
-    const path = assertion.field ?? assertion.path;
+  for (const assertion of check.assertions) {
+    const path = assertionRequiredEvidencePath(assertion);
 
-    if (
-      path !== undefined &&
-      (assertion.kind === "evidenceField" ||
-        assertion.kind === "stateField" ||
-        assertion.kind === "errorEnvelope")
-    ) {
-      evidence.add(normalizeEvidencePath(path));
+    if (path !== undefined) {
+      evidence.add(path);
+    }
+  }
+
+  for (const step of check.steps ?? []) {
+    for (const assertion of step.assertions ?? []) {
+      const path = stepAssertionRequiredEvidencePath(step.stepId, assertion);
+
+      if (path !== undefined) {
+        evidence.add(path);
+      }
     }
   }
 
   return [...evidence].sort();
+}
+
+function assertionRequiredEvidencePath(
+  assertion: ConformancePlanAssertion
+): string | undefined {
+  switch (assertion.kind) {
+    case "evidenceField":
+    case "stateField":
+      return assertion.field === undefined
+        ? undefined
+        : normalizeEvidencePath(assertion.field);
+    case "errorEnvelope":
+      return normalizeEvidencePath(assertion.path ?? "$.result.error");
+    default:
+      return undefined;
+  }
+}
+
+function stepAssertionRequiredEvidencePath(
+  stepId: string,
+  assertion: ConformancePlanAssertion
+): string | undefined {
+  const path = assertionRequiredEvidencePath(assertion);
+
+  if (path === undefined) {
+    return undefined;
+  }
+
+  switch (assertion.kind) {
+    case "evidenceField":
+      // Step assertions run against a step-local context, but required evidence
+      // is checked against the final trace context after the lifecycle finishes.
+      return `trace.${stepId}.evidence.${path}`;
+    case "stateField":
+      return `trace.${stepId}.state.${path}`;
+    case "errorEnvelope":
+      return `trace.${stepId}.${path}`;
+    default:
+      return undefined;
+  }
 }
 
 function normalizeEvidencePath(path: string): string {

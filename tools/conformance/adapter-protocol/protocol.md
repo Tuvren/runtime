@@ -8,7 +8,9 @@ assertions, required evidence, check IDs, and pass/fail decisions come only from
 authority packets and their conformance plans.
 
 ```text
-JSON-RPC 2.0 over line-delimited stdio:
+JSON-RPC 2.0 request/response framing over line-delimited stdio. The `error`
+member intentionally carries the Tuvren `ErrorEnvelope` shape below rather than
+third-party JSON-RPC numeric error objects:
 
 initialize({ packetId, planVersion }) -> AdapterCapabilities
 createInstance({ input }) -> InstanceHandle | null

@@ -60,6 +60,16 @@ interface JsonRpcErrorResponse {
 
 type JsonRpcResponse = JsonRpcErrorResponse | JsonRpcSuccessResponse;
 
+export class JsonRpcAdapterError extends Error {
+  readonly envelope: AdapterErrorEnvelope;
+
+  constructor(envelope: AdapterErrorEnvelope) {
+    super(`${envelope.code}: ${envelope.message}`);
+    this.name = "JsonRpcAdapterError";
+    this.envelope = envelope;
+  }
+}
+
 export class JsonRpcAdapterClient {
   private readonly child: ChildProcessWithoutNullStreams;
   private readonly lines: Interface;
@@ -273,9 +283,7 @@ export class JsonRpcAdapterClient {
     this.pending.delete(parsed.id);
 
     if ("error" in parsed) {
-      pending.reject(
-        new Error(`${parsed.error.code}: ${parsed.error.message}`)
-      );
+      pending.reject(new JsonRpcAdapterError(parsed.error));
       return;
     }
 

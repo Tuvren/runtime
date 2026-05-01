@@ -1,6 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://tuvren.dev/schemas/conformance/adapter-protocol.schema.json",
+  "description": "Tuvren conformance adapter frames use JSON-RPC 2.0 request/response framing over stdio. The error member intentionally carries AdapterErrorEnvelope diagnostics, not third-party JSON-RPC numeric error objects.",
   "type": "object",
   "additionalProperties": false,
   "properties": {

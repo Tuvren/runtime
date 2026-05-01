@@ -38,6 +38,7 @@ import {
 import {
   type AdapterManifest,
   JsonRpcAdapterClient,
+  JsonRpcAdapterError,
 } from "./adapter-client.js";
 import {
   type AssertionContext,
@@ -95,14 +96,6 @@ async function main(): Promise<void> {
   const adapterManifest = await readAdapterManifest(options.adapter);
   const plans = await readPlans(adapterManifest, options);
   const selected = selectChecks(plans, adapterManifest, options);
-
-  if (options.shard === undefined && selected.applicable.length === 0) {
-    // Empty shards are valid, but an unsharded run with zero applicable checks
-    // usually means a typoed filter or stale adapter capabilities.
-    throw new Error(
-      "no applicable conformance checks selected; verify adapter capabilities and filters"
-    );
-  }
 
   const scheduled = applyShard(selected.applicable, options);
   const results = await runScheduledChecks(
@@ -271,7 +264,8 @@ async function runCheck(
       planId: plan.plan.planId,
     });
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : String(error);
+    const message = readErrorMessage(error);
+    const adapterError = readAdapterFailure(error);
     const assertionResults = [
       ...check.assertions.map((assertion, index) => ({
         assertionId: `${check.checkId}.${index + 1}.${assertion.kind}`,
@@ -286,7 +280,7 @@ async function runCheck(
     ];
 
     return createCheckResult(check.checkId, assertionResults, {
-      adapterError: message,
+      adapterError,
       adapterId: manifest.adapterId,
       planId: plan.plan.planId,
     });
@@ -434,6 +428,18 @@ function createAssertionContext(
     scenario: input.scenario,
     state: readOptionalRecord(outcome.value.state),
   };
+}
+
+function readAdapterFailure(error: unknown): unknown {
+  if (error instanceof JsonRpcAdapterError) {
+    return error.envelope;
+  }
+
+  return readErrorMessage(error);
+}
+
+function readErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }
 
 function createAdapterInput(

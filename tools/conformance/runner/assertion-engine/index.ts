@@ -186,7 +186,12 @@ function assertErrorEnvelope(
 ): boolean {
   const value = readPath(context, assertion.path ?? "$.result.error");
 
-  if (!isRecord(value) || typeof value.code !== "string") {
+  if (
+    !isRecord(value) ||
+    typeof value.code !== "string" ||
+    value.code.length === 0 ||
+    typeof value.message !== "string"
+  ) {
     return false;
   }
 
