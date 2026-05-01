@@ -60,7 +60,7 @@
     ]
   },
   "driver-provider-failure": {
-    "operation": "driver.execute-error",
+    "operation": "driver.execute",
     "providerResponses": [
       {
         "finishReason": "error",

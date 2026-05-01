@@ -7,11 +7,6 @@
       "results": [
         {
           "checkIds": [
-            "driver-callable.before-iteration",
-            "driver-callable.around-model",
-            "driver-callable.around-tool",
-            "driver-callable.after-iteration",
-            "driver-callable.checkpoint",
             "driver-api.execute.resolution",
             "driver-api.resume.approval",
             "driver-api.resume.requires-pending-call",
@@ -21,6 +16,11 @@
             "event-stream.agui.projection",
             "event-stream.agui.failed-turn-error-projection",
             "event-stream.agui.paused-turn-fallback",
+            "react-driver-callable.before-iteration",
+            "react-driver-callable.around-model",
+            "react-driver-callable.around-tool",
+            "react-driver-callable.after-iteration",
+            "react-driver-callable.checkpoint",
             "runtime-callable.provider-generate",
             "runtime-callable.provider-stream",
             "runtime-callable.tool-execute",
@@ -130,11 +130,6 @@
       "results": [
         {
           "checkIds": [
-            "driver-callable.before-iteration",
-            "driver-callable.around-model",
-            "driver-callable.around-tool",
-            "driver-callable.after-iteration",
-            "driver-callable.checkpoint",
             "driver-api.execute.resolution",
             "driver-api.resume.approval",
             "driver-api.resume.requires-pending-call",
@@ -144,6 +139,11 @@
             "event-stream.agui.projection",
             "event-stream.agui.failed-turn-error-projection",
             "event-stream.agui.paused-turn-fallback",
+            "react-driver-callable.before-iteration",
+            "react-driver-callable.around-model",
+            "react-driver-callable.around-tool",
+            "react-driver-callable.after-iteration",
+            "react-driver-callable.checkpoint",
             "runtime-callable.provider-generate",
             "runtime-callable.provider-stream",
             "runtime-callable.tool-execute",

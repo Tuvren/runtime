@@ -107,6 +107,11 @@ validation, not in compatibility evidence for an implementation lane.
 Promoted plans must not assert implementation-owned error-code literals such as
 driver- or runner-specific prefixes unless a neutral contract artifact owns that
 code first.
+Treat each conformance plan `evidence` entry as required evidence. A check that
+passes its assertions but omits required evidence is still failing conformance.
+Keep driver-neutral plans and concrete-driver plans separate: ReAct loop counts,
+hook sequencing, and other ReAct-specific behavior belong under the ReAct driver
+authority packet/plan family, not under the neutral `driver-api` packet.
 
 ## Pull Request Follow-Up
 

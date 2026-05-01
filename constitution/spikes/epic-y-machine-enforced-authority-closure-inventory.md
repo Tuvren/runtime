@@ -9,14 +9,15 @@ Epic Y is closed in current repo reality.
 | `tuvren.shared.core-types` | `boundaries/shared/contracts/core-types/spec/authority-packet.json` | TypeSpec core payload and error-envelope source | JSON Schema artifacts plus freshness declaration |
 | `tuvren.framework.event-stream` | `boundaries/framework/contracts/event-stream/spec/authority-packet.json` | TypeSpec stream-event source and `event-stream-core` conformance plan | JSON Schema artifacts plus plan validation |
 | `tuvren.framework.runtime-api` | `boundaries/framework/contracts/runtime-api/spec/authority-packet.json` | TypeSpec runtime operation source plus lifecycle/callable plans | JSON Schema artifacts plus plan validation |
-| `tuvren.framework.driver-api` | `boundaries/framework/contracts/driver-api/spec/authority-packet.json` | TypeSpec driver operation source plus core/callable plans | JSON Schema artifacts plus plan validation |
+| `tuvren.framework.driver-api` | `boundaries/framework/contracts/driver-api/spec/authority-packet.json` | TypeSpec driver operation source plus neutral core plan | JSON Schema artifacts plus plan validation |
+| `tuvren.framework.react-driver` | `boundaries/framework/contracts/react-driver/spec/authority-packet.json` | ReAct driver callable conformance plan | Plan validation |
 
 ## Binding Projections
 
 - TypeScript packages remain public API projections: `@tuvren/core-types`,
   `@tuvren/event-stream`, `@tuvren/runtime-api`, and `@tuvren/driver-api`.
-- `@tuvren/runtime-core` and `@tuvren/react-driver` are declared projection
-  consumers for the runtime-api and driver-api packets.
+- `@tuvren/runtime-core` is a projection consumer for the runtime-api packet,
+  and `@tuvren/react-driver` is a projection for the ReAct driver packet.
 - Binding appendices live under each promoted surface's `spec/bindings/`
   directory. Language-native `Promise`, `AsyncIterable`, `AbortSignal`,
   byte-buffer, class, and trait shapes belong there rather than in authority

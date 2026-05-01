@@ -1,16 +1,16 @@
 {
-  "planId": "tuvren.framework.driver-api.callables",
+  "planId": "tuvren.framework.react-driver.callables",
   "planVersion": "0.1.0",
-  "packetId": "tuvren.framework.driver-api",
+  "packetId": "tuvren.framework.react-driver",
   "applicability": {
-    "capabilities": ["framework.driver-api"]
+    "capabilities": ["framework.react-driver"]
   },
   "scenarios": {
     "driver-api-scenarios": "../scenarios/driver-api-scenarios.json"
   },
   "checks": [
     {
-      "checkId": "driver-callable.before-iteration",
+      "checkId": "react-driver-callable.before-iteration",
       "operation": "driver.execute",
       "scenario": "driver-api-scenarios",
       "input": { "scenarioPath": "$.driver-hook-turn" },
@@ -24,7 +24,7 @@
       "evidence": ["hooks.beforeIteration"]
     },
     {
-      "checkId": "driver-callable.around-model",
+      "checkId": "react-driver-callable.around-model",
       "operation": "driver.execute",
       "scenario": "driver-api-scenarios",
       "input": { "scenarioPath": "$.driver-hook-turn" },
@@ -38,7 +38,7 @@
       "evidence": ["hooks.aroundModel"]
     },
     {
-      "checkId": "driver-callable.around-tool",
+      "checkId": "react-driver-callable.around-tool",
       "operation": "driver.execute",
       "scenario": "driver-api-scenarios",
       "input": { "scenarioPath": "$.driver-hook-turn" },
@@ -52,7 +52,7 @@
       "evidence": ["hooks.aroundTool"]
     },
     {
-      "checkId": "driver-callable.after-iteration",
+      "checkId": "react-driver-callable.after-iteration",
       "operation": "driver.execute",
       "scenario": "driver-api-scenarios",
       "input": { "scenarioPath": "$.driver-hook-turn" },
@@ -66,7 +66,7 @@
       "evidence": ["hooks.afterIteration"]
     },
     {
-      "checkId": "driver-callable.checkpoint",
+      "checkId": "react-driver-callable.checkpoint",
       "operation": "driver.checkpoint",
       "scenario": "driver-api-scenarios",
       "input": { "scenarioPath": "$.driver-checkpoint-turn" },

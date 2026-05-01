@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -164,6 +164,8 @@ struct PlanCheck {
     operation: String,
     #[serde(default)]
     scenario: Option<String>,
+    #[serde(default)]
+    evidence: Vec<String>,
 }
 
 fn empty_controls() -> Value {
@@ -280,7 +282,7 @@ fn run_plan_check(
 }
 
 fn evaluate_assertions(check: &PlanCheck, context: &AssertionContext) -> Vec<AssertionResult> {
-    check
+    let mut results = check
         .assertions
         .iter()
         .enumerate()
@@ -305,11 +307,14 @@ fn evaluate_assertions(check: &PlanCheck, context: &AssertionContext) -> Vec<Ass
                 },
             }
         })
-        .collect()
+        .collect::<Vec<_>>();
+
+    results.extend(evaluate_required_evidence(check, context));
+    results
 }
 
 fn failed_assertions(check: &PlanCheck, message: &str) -> Vec<AssertionResult> {
-    check
+    let mut results = check
         .assertions
         .iter()
         .enumerate()
@@ -318,7 +323,93 @@ fn failed_assertions(check: &PlanCheck, message: &str) -> Vec<AssertionResult> {
             message: Some(message.to_string()),
             status: "fail",
         })
+        .collect::<Vec<_>>();
+
+    for path in expanded_required_evidence(check) {
+        results.push(AssertionResult {
+            assertion_id: format!("{}.requiredEvidence.{}", check.check_id, path),
+            message: Some(message.to_string()),
+            status: "fail",
+        });
+    }
+
+    results
+}
+
+fn evaluate_required_evidence(
+    check: &PlanCheck,
+    context: &AssertionContext,
+) -> Vec<AssertionResult> {
+    expanded_required_evidence(check)
+        .into_iter()
+        .map(|path| {
+            let present = has_required_evidence(context, &path);
+
+            AssertionResult {
+                assertion_id: format!("{}.requiredEvidence.{}", check.check_id, path),
+                message: if present {
+                    None
+                } else {
+                    Some(format!("missing required evidence {path}"))
+                },
+                status: if present { "pass" } else { "fail" },
+            }
+        })
         .collect()
+}
+
+fn has_required_evidence(context: &AssertionContext, path: &str) -> bool {
+    let json_path = format!("$.{path}");
+
+    if context
+        .evidence
+        .as_ref()
+        .is_some_and(|evidence| read_path(evidence, &json_path).is_some())
+    {
+        return true;
+    }
+
+    if context
+        .state
+        .as_ref()
+        .is_some_and(|state| read_path(state, &json_path).is_some())
+    {
+        return true;
+    }
+
+    if let Some(events) = &context.events
+        && read_path(&json!({ "events": events }), &json_path).is_some()
+    {
+        return true;
+    }
+
+    context
+        .result
+        .as_ref()
+        .is_some_and(|result| read_path(&json!({ "result": result }), &json_path).is_some())
+}
+
+fn expanded_required_evidence(check: &PlanCheck) -> BTreeSet<String> {
+    let mut evidence = check.evidence.iter().cloned().collect::<BTreeSet<_>>();
+
+    for assertion in &check.assertions {
+        let path = assertion.field.as_ref().or(assertion.path.as_ref());
+
+        if let Some(path) = path
+            && matches!(
+                assertion.kind.as_str(),
+                "evidenceField" | "stateField" | "errorEnvelope"
+            )
+        {
+            evidence.insert(normalize_evidence_path(path));
+        }
+    }
+
+    evidence
+}
+
+fn normalize_evidence_path(path: &str) -> String {
+    path.strip_prefix("$.").unwrap_or(path).to_string()
 }
 
 fn create_check_run_context(

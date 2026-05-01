@@ -274,8 +274,6 @@ export class TypeScriptFrameworkAdapter implements ImplementationAdapter {
         return runRecoverResult(input);
       case "driver.execute":
         return runDriverExecute(input);
-      case "driver.execute-error":
-        return runDriverExecuteError(input);
       case "driver.resume":
         return runDriverResume(input);
       case "driver.checkpoint":
@@ -1185,19 +1183,23 @@ async function runRecoverResult(input: unknown): Promise<AdapterProjection> {
 
 async function runDriverExecute(input: unknown): Promise<AdapterProjection> {
   const scenario = readOperationScenario(input, "driver.execute");
-  const prompt = readStringProperty(
-    scenario,
-    "prompt",
-    "driver.execute.prompt"
-  );
   const providerResponses = readModelResponseArrayProperty(
     scenario,
     "providerResponses",
     "driver.execute.providerResponses"
   );
-  const toolName = readFirstToolCallName(
+  const toolName = readFirstToolCallNameOptional(
     providerResponses,
     "driver.execute.providerResponses"
+  );
+  if (toolName === undefined) {
+    return runDirectDriverExecute(providerResponses);
+  }
+
+  const prompt = readStringProperty(
+    scenario,
+    "prompt",
+    "driver.execute.prompt"
   );
   const toolResult = readProperty(
     scenario,
@@ -1273,15 +1275,9 @@ async function runDriverExecute(input: unknown): Promise<AdapterProjection> {
   };
 }
 
-async function runDriverExecuteError(
-  input: unknown
+async function runDirectDriverExecute(
+  providerResponses: readonly TuvrenModelResponse[]
 ): Promise<AdapterProjection> {
-  const scenario = readOperationScenario(input, "driver.execute-error");
-  const providerResponses = readModelResponseArrayProperty(
-    scenario,
-    "providerResponses",
-    "driver.execute-error.providerResponses"
-  );
   const driver = createReActDriver({
     providerCallMode: "generate",
   }).create();
@@ -1294,7 +1290,7 @@ async function runDriverExecuteError(
     })
   );
 
-  assertDriverExecutionResult(result, "driver error result");
+  assertDriverExecutionResult(result, "driver execute result");
 
   return {
     evidence: {
@@ -1900,6 +1896,19 @@ function readFirstToolCallName(
   responses: readonly TuvrenModelResponse[],
   label: string
 ): string {
+  const toolCallName = readFirstToolCallNameOptional(responses, label);
+
+  if (toolCallName !== undefined) {
+    return toolCallName;
+  }
+
+  throw new Error(`${label} must contain a tool_call part`);
+}
+
+function readFirstToolCallNameOptional(
+  responses: readonly TuvrenModelResponse[],
+  _label: string
+): string | undefined {
   for (const response of responses) {
     for (const part of response.parts) {
       if (part.type === "tool_call") {
@@ -1908,7 +1917,7 @@ function readFirstToolCallName(
     }
   }
 
-  throw new Error(`${label} must contain a tool_call part`);
+  return undefined;
 }
 
 function readProviderStreamChunks(

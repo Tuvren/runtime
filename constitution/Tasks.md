@@ -32,7 +32,7 @@
 
 - Epic V is closed. Epic W starts from the measured compatibility evidence and the Epic V closure inventories, but it is not Rust framework work. Epic W must mature the semantic ecosystem itself: coverage matrix, assertion-bearing conformance suites, promoted TypeScript-local semantics, and compatibility evidence precise enough for future implementations to consume without treating TypeScript as the oracle.
 - Epic W and Epic X are closed. Epic X completed the structural normalization that relocated TS-only assets out of language-neutral boundary slots without changing semantics, conformance suites, fixtures, public package APIs, or generated artifacts.
-- Epic Y is closed. The four promoted surfaces (`runtime-api`, `driver-api`, `event-stream`, `core-types`) plus callable seams now resolve cross-implementation authority through packets, plans, generated artifacts, and guardrails. Epic Y did not add Rust framework work, a new driver, a new backend, or a new host protocol.
+- Epic Y is closed. The promoted neutral surfaces (`runtime-api`, `driver-api`, `event-stream`, `core-types`) plus the ReAct-driver plan family now resolve cross-implementation authority through packets, plans, generated artifacts, and guardrails. Epic Y did not add Rust framework work, a new driver, a new backend, or a new host protocol.
 
 ### Planning Heuristic
 

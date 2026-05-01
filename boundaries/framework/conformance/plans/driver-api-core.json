@@ -71,7 +71,7 @@
     },
     {
       "checkId": "driver-api.error.envelope",
-      "operation": "driver.execute-error",
+      "operation": "driver.execute",
       "scenario": "driver-api-scenarios",
       "input": { "scenarioPath": "$.driver-provider-failure" },
       "assertions": [

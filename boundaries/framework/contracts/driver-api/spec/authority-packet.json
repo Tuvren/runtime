@@ -15,10 +15,6 @@
     {
       "path": "boundaries/framework/conformance/plans/driver-api-core.json",
       "format": "conformance-plan"
-    },
-    {
-      "path": "boundaries/framework/conformance/plans/driver-api-callables.json",
-      "format": "conformance-plan"
     }
   ],
   "generatedArtifacts": [
@@ -33,16 +29,10 @@
       "planId": "tuvren.framework.driver-api.core",
       "planVersion": "0.1.0",
       "path": "boundaries/framework/conformance/plans/driver-api-core.json"
-    },
-    {
-      "planId": "tuvren.framework.driver-api.callables",
-      "planVersion": "0.1.0",
-      "path": "boundaries/framework/conformance/plans/driver-api-callables.json"
     }
   ],
   "bindingProjections": {
-    "typescript": "boundaries/framework/contracts/driver-api/implementations/typescript",
-    "typescript-react-driver": "boundaries/framework/implementations/typescript/drivers/react"
+    "typescript": "boundaries/framework/contracts/driver-api/implementations/typescript"
   },
   "bindingAppendices": [
     {
@@ -72,10 +62,6 @@
     {
       "kind": "conformance-plan",
       "target": "boundaries/framework/conformance/plans/driver-api-core.json"
-    },
-    {
-      "kind": "conformance-plan",
-      "target": "boundaries/framework/conformance/plans/driver-api-callables.json"
     },
     {
       "kind": "freshness-check",

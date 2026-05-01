@@ -27,6 +27,7 @@ const FRAMEWORK_PACKET_PATHS: readonly string[] = [
   "boundaries/framework/contracts/event-stream/spec/authority-packet.json",
   "boundaries/framework/contracts/runtime-api/spec/authority-packet.json",
   "boundaries/framework/contracts/driver-api/spec/authority-packet.json",
+  "boundaries/framework/contracts/react-driver/spec/authority-packet.json",
 ];
 
 interface AuthorityPacketManifest {
@@ -58,7 +59,7 @@ describe("framework TypeScript conformance runner", () => {
 
     // This test intentionally checks runner coverage mechanics only. Product
     // expectations are asserted by the boundary-owned plans loaded above.
-    expect(compiledPlans.length).toBe(FRAMEWORK_PACKET_PATHS.length + 2);
+    expect(compiledPlans.length).toBe(planPaths.size);
     expect(compiledPlans.every((plan) => plan.plan.checks.length > 0)).toBe(
       true
     );

@@ -19,7 +19,9 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   type AssertionContext,
+  type AssertionEvaluation,
   type CompiledConformancePlan,
+  type CompiledConformancePlanCheck,
   type ConformancePlanCheck,
   evaluateAssertions,
   loadConformancePlan,
@@ -46,6 +48,7 @@ const FRAMEWORK_AUTHORITY_PACKET_PATHS: readonly string[] = [
   "boundaries/framework/contracts/event-stream/spec/authority-packet.json",
   "boundaries/framework/contracts/runtime-api/spec/authority-packet.json",
   "boundaries/framework/contracts/driver-api/spec/authority-packet.json",
+  "boundaries/framework/contracts/react-driver/spec/authority-packet.json",
 ];
 const IMPLEMENTATION_ID = "typescript-framework";
 const LANGUAGE = "typescript";
@@ -64,7 +67,7 @@ interface AuthorityPacketPlanReference {
 
 interface CheckRunContext {
   adapter: ImplementationAdapter;
-  check: ConformancePlanCheck;
+  check: CompiledConformancePlanCheck;
   plan: CompiledConformancePlan;
 }
 
@@ -84,7 +87,7 @@ async function main(): Promise<void> {
     for (const plan of plans) {
       await adapter.initialize(plan.plan.packetId, plan.plan.planVersion);
 
-      for (const check of plan.plan.checks) {
+      for (const check of plan.checks) {
         checkResults.push(await runPlanCheck(adapter, plan, check));
       }
     }
@@ -200,13 +203,21 @@ function readPlanReference(
 async function runPlanCheck(
   adapter: ImplementationAdapter,
   plan: CompiledConformancePlan,
-  check: ConformancePlanCheck
+  compiledCheck: CompiledConformancePlanCheck
 ): Promise<ConformanceCheckResult> {
-  const result = await createAdapterOperationContext({ adapter, check, plan });
+  const result = await createAdapterOperationContext({
+    adapter,
+    check: compiledCheck,
+    plan,
+  });
+  const assertionResults = [
+    ...evaluateAssertions(compiledCheck.check, result.assertionContext),
+    ...evaluateRequiredEvidence(compiledCheck, result.assertionContext),
+  ];
 
   return createCheckResult(
-    check.checkId,
-    evaluateAssertions(check, result.assertionContext),
+    compiledCheck.check.checkId,
+    assertionResults,
     result.details
   );
 }
@@ -216,21 +227,25 @@ async function createAdapterOperationContext({
   check,
   plan,
 }: CheckRunContext): Promise<CheckRunResult> {
-  const input = createAdapterInput(plan, check);
-  const controls = createAdapterControls(check);
-  const outcome = await adapter.dispatch(check.operation, input, controls);
+  const input = createAdapterInput(plan, check.check);
+  const controls = createAdapterControls(check.check);
+  const outcome = await adapter.dispatch(
+    check.check.operation,
+    input,
+    controls
+  );
   const adapterEvents = await collectStreamValues(
-    adapter.events(check.operation, input, controls)
+    adapter.events(check.check.operation, input, controls)
   );
   const inspectedState =
     adapter.inspectState === undefined
       ? undefined
       : await adapter.inspectState({
-          checkId: check.checkId,
-          operation: check.operation,
+          checkId: check.check.checkId,
+          operation: check.check.operation,
         });
 
-  await adapter.emitEvidence(check.checkId, "adapter.events", {
+  await adapter.emitEvidence(check.check.checkId, "adapter.events", {
     count: adapterEvents.length,
   });
 
@@ -243,6 +258,45 @@ async function createAdapterOperationContext({
     assertionContext,
     details: createDetails(assertionContext, outcome),
   };
+}
+
+function evaluateRequiredEvidence(
+  compiledCheck: CompiledConformancePlanCheck,
+  context: AssertionContext
+): AssertionEvaluation[] {
+  return compiledCheck.requiredEvidence.map((path) => {
+    const present = hasRequiredEvidence(context, path);
+
+    return {
+      assertionId: `${compiledCheck.check.checkId}.requiredEvidence.${path}`,
+      ...(present ? {} : { message: `missing required evidence ${path}` }),
+      status: present ? "pass" : "fail",
+    };
+  });
+}
+
+function hasRequiredEvidence(context: AssertionContext, path: string): boolean {
+  const jsonPath = `$.${path}`;
+
+  if (readPath(context.evidence, jsonPath) !== undefined) {
+    return true;
+  }
+
+  if (readPath(context.state, jsonPath) !== undefined) {
+    return true;
+  }
+
+  if (
+    context.events !== undefined &&
+    readPath({ events: context.events }, jsonPath) !== undefined
+  ) {
+    return true;
+  }
+
+  return (
+    context.result !== undefined &&
+    readPath({ result: context.result }, jsonPath) !== undefined
+  );
 }
 
 function createAdapterInput(

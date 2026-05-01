@@ -30,11 +30,7 @@
       "assertions": [
         {
           "kind": "errorEnvelope",
-          "path": "$.result.error",
-          "equals": {
-            "code": "runtime_execution_cancelled",
-            "message": "execution cancelled"
-          }
+          "path": "$.result.error"
         }
       ],
       "evidence": ["result.error.code"]
