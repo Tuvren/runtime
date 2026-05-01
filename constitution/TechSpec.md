@@ -2,6 +2,7 @@
 
 ## 0. Version History & Changelog
 
+- v0.7.0 - Opened Epic X TypeScript Topology Normalization with ADR-022, target-state structure rules that ban language-specific build manifests outside `implementations/<lang>/`, an updated project-structure diagram that shows contract `implementations/typescript/` subtrees, and partition-status placeholders for the Epic X tickets. No logical-architecture changes; physical realization only.
 - v0.6.9 - Closed Epic W in current repo reality with the semantic coverage matrix, assertion-bearing conformance suites, structured runner evidence, check-level compatibility reporting, and the Epic W closure inventory.
 - v0.6.8 - Reframed Epic W as Semantic Ecosystem Maturity: close the remaining TypeScript-local semantic authority gaps before authorizing any additional implementation line such as a Rust framework.
 - v0.6.7 - Closed Epic V in current repo reality with the TypeScript gRPC remote-kernel helper, Rust-kernel playground interop matrix, compatibility-ledger interop evidence, and Epic V transport plus closure inventories.
@@ -35,6 +36,7 @@
 
 - **Current repository reality:** The repository already contains the workspace scaffold, `@tuvren/core-types`, `@tuvren/kernel-protocol`, `@tuvren/backend-memory`, `@tuvren/backend-sqlite`, `@tuvren/kernel-testkit`, `@tuvren/runtime-api`, `@tuvren/driver-api`, `@tuvren/event-stream`, `@tuvren/tool-contracts`, `@tuvren/provider-api`, `@tuvren/runtime-core`, the ReAct Driver baseline with implementation-proven loop completion, streaming/provider semantics, shared runtime-core tool/approval integration, and the reusable `createGrpcRuntimeKernel()` helper for the governed Rust-kernel transport seam, `@tuvren/provider-bridge-ai-sdk` as the first concrete provider bridge, the host stream adapter line `@tuvren/stream-core`, `@tuvren/stream-sse`, and `@tuvren/stream-agui`, the private playground host harness `@tuvren/playground-host` with `kernelMode` runtime selection plus `kernelGrpcBaseUrl`, playground-owned aimock E2E validation lanes for the local OpenAI, Anthropic, and Gemini provider HTTP boundaries, an opt-in Gemini validation lane for real provider calls through `@ai-sdk/google`, the hardening testkits `@tuvren/provider-testkit` and `@tuvren/framework-testkit`, release and portability scripts under `tools/scripts`, the checked-in Epic Q portability matrix, the Epic Q release-hardening closure inventory, repo-global `telemetry/` and `reports/compatibility/` roots, boundary-owned `conformance/` roots for the framework, kernel, and providers, TypeSpec-authored tool/provider contract sources plus reviewed JSON Schema/OpenAPI artifacts, kernel CDDL grammar, implementation-scoped TypeScript conformance runners, kernel-only proto authority under `boundaries/kernel/interop/grpc/proto/`, root `buf.yaml` / `buf.gen.yaml`, the `kernel-interop-grpc` Nx target surface, Devenv-provisioned Buf/protoc generator tooling, generated TypeScript telemetry and kernel-interop helpers under the consuming framework implementation tree, root Cargo workspace files, the Rust kernel core, Rust conformance runner, Rust gRPC service, generated Rust telemetry helper under the Rust kernel tree, a real TS-framework-to-Rust-kernel interop suite manifest under `boundaries/framework/interop/rust-kernel/`, and a measured compatibility matrix whose checked-in payload uses deterministic sentinel `generatedAtMs` / `sourceRevision` values plus scrubbed interop telemetry attributes while still preserving the substantive `rust-kernel` and `typescript-framework__rust-kernel` evidence entries.
 - **Current semantic-evidence posture:** The current `boundaries/*/testkit` packages remain helper/facade packages for TypeScript tests, but semantic evidence now flows through assertion-bearing TypeScript and Rust conformance runners plus measured cross-language interop evidence with named checks. Epic W closed the first semantic-authority gap by promoting kernel, framework, provider, stream, and framework-to-kernel interop semantics into boundary-owned suites and check-level compatibility reporting. Remaining deep TypeScript-local runtime-core, driver, backend, and provider-family specifics are now explicit deferred or implementation-specific entries in the Epic W coverage matrix instead of hidden semantic authority.
+- **Current topology posture:** Several TypeScript-only directories still occupy language-neutral boundary slots in current repo reality. `boundaries/{kernel,framework,providers}/testkit/` exposes TypeScript packages where a sibling `implementations/typescript/testkit/` should hold them, and `boundaries/<area>/contracts/<contract>/` directories still carry TypeScript package guts (`package.json`, `src/`, `dist/`, `tsup.config.ts`, `tsconfig*.json`, `node_modules/`, `test/`, `smoke/`, `bench/`) at the contract root alongside language-neutral specifications and artifacts. Epic X is the active line that resolves this drift before another implementation line lands.
 - **Target implementation state:** The package layout and interfaces defined below are the intended implementation target for the first authoritative TypeScript line plus the post-Epic-Q multi-language transition foundation.
 - **Drift rule:** The future codebase must conform to this TechSpec. The TechSpec must not be treated as a loose commentary on whatever structure happens to emerge.
 
@@ -186,6 +188,16 @@
 - **Context:** Epic R established the rule "one semantic ecosystem, then multiple implementations." Epics S-V created the artifact homes, initial conformance runners, Rust kernel baseline, and TS-framework-to-Rust-kernel interop proof, but current repo reality still leaves many normative framework, driver, provider, stream, backend, and error semantics asserted primarily by TypeScript implementation tests. Starting a Rust framework from that posture would risk turning `runtime-core` behavior into the hidden oracle.
 - **Decision:** Epic W is the Semantic Ecosystem Maturity line. It must inventory the semantic coverage gap, promote high-value TypeScript-local semantics into boundary-owned conformance suites, add assertion-bearing suite manifests and evidence, and update compatibility reporting so implementations are judged against named semantic checks. Epic W does not authorize a Rust framework, another language implementation, a new driver, new official backend, or new host protocol.
 - **Consequences:** New implementation work waits behind a stronger semantic gate. The TypeScript implementation remains the first producer of mature conformance evidence, but it does not retain special semantic authority. Future implementation-line activation must cite Epic W evidence instead of relying on broad Epic R/S/V labels.
+
+### ADR-022 Path Topology Reveals Language Ownership In Boundaries
+
+- **Status:** accepted
+- **Context:** ADR-020 set the rule that TypeScript adopts the language-neutral structure first. In current repo reality, several TypeScript-only directories still occupy language-neutral boundary slots: `boundaries/{kernel,framework,providers}/testkit/` exposes TypeScript packages where a sibling `implementations/typescript/` subtree should hold them, and `boundaries/<area>/contracts/<contract>/` directories carry TypeScript package guts (`package.json`, `src/`, `dist/`, `tsup.config.ts`, `tsconfig*.json`, `node_modules/`, `test/`, `smoke/`, `bench/`) at the contract root alongside language-neutral specifications and artifacts. A reader cannot tell language ownership from path alone, which is the exact failure mode Architecture.md `6` warned about and ADR-020 declared the project would fix before another implementation line becomes authoritative. The Rust kernel is already authoritative through Epic U, so this normalization is overdue cleanup, not new architecture.
+- **Decision:** Every directory under `boundaries/` belongs to exactly one of two classes, distinguishable by path:
+  - language-neutral assets at boundary, contract, conformance, and interop roots — JSON fixtures, JSON Schema validators, suite manifests, CDDL grammar, TypeSpec sources, generated JSON Schema or OpenAPI artifacts, `.proto` files, scenario manifests, semantic README files;
+  - language-specific assets exclusively under `boundaries/<area>/[contracts/<contract>/]implementations/<lang>/` — `package.json`, `Cargo.toml`, `tsup.config.ts`, `tsconfig*.json`, `src/`, `dist/`, `test/`, `bench/`, `smoke/`, `node_modules/`, `target/`, generated language bindings, and any other language-tooling output.
+  No language-specific build manifest, source directory, or generated binding may live at a boundary, contract, conformance, or interop root. Epic X performs the initial physical relocation. Surfaces that lack a language-neutral source today (`runtime-api`, `driver-api`, `event-stream`, `core-types`) keep their TypeScript implementation under `implementations/typescript/` and carry only README placeholders at the contract root until a later epic authors a neutral source.
+- **Consequences:** Reviewers can reject misplaced TypeScript-only files on path evidence alone. Future epics that add a Rust crate, a Go module, or a new TypeScript package must place their build artifacts under `implementations/<lang>/` from day one. Existing TypeScript package names stay stable across the relocation because consumers depend on workspace handles rather than directory paths, so no public API change is required. The constitution carries this rule alongside ADR-020 to make path topology auditable independently of semantic-authority decisions.
 
 ### 2.1 Compatibility Record
 
@@ -1510,13 +1522,23 @@ the multi-language transition foundation:
 │   ├── framework/
 │   │   ├── contracts/
 │   │   │   ├── driver-api/
+│   │   │   │   ├── spec/                     # neutral source when authored, placeholder otherwise
+│   │   │   │   ├── artifacts/                # neutral generated artifacts
+│   │   │   │   ├── README.md                 # neutral semantic notes
+│   │   │   │   └── implementations/
+│   │   │   │       └── typescript/           # TS package guts: package.json, src, dist, test, ...
 │   │   │   ├── event-stream/
+│   │   │   │   └── implementations/
+│   │   │   │       └── typescript/
 │   │   │   ├── runtime-api/
+│   │   │   │   └── implementations/
+│   │   │   │       └── typescript/
 │   │   │   └── tool-contracts/
 │   │   │       ├── spec/
+│   │   │       │   └── typespec/
 │   │   │       ├── artifacts/
-│   │   │       ├── src/
-│   │   │       └── test/
+│   │   │       └── implementations/
+│   │   │           └── typescript/
 │   │   ├── implementations/
 │   │   │   ├── typescript/
 │   │   │   │   ├── drivers/
@@ -1525,29 +1547,33 @@ the multi-language transition foundation:
 │   │   │   │   ├── stream-core/
 │   │   │   │   ├── stream-sse/
 │   │   │   │   ├── stream-agui/
-│   │   │   │   └── conformance-runner/
+│   │   │   │   ├── conformance-runner/
+│   │   │   │   └── testkit/                  # framework testkit moved here from boundary root
 │   │   │   └── rust/
 │   │   │       └── conformance-runner/
-│   │   └── conformance/
-│   │       ├── schemas/
-│   │       ├── fixtures/
-│   │       └── scenarios/
+│   │   ├── conformance/                      # neutral fixtures, schemas, scenarios
+│   │   │   ├── schemas/
+│   │   │   ├── fixtures/
+│   │   │   └── scenarios/
+│   │   └── interop/                          # neutral cross-language scenarios when present
+│   │       └── rust-kernel/
 │   ├── kernel/
 │   │   ├── contracts/
 │   │   │   └── protocol/
 │   │   │       ├── spec/
 │   │   │       │   └── cddl/
 │   │   │       ├── artifacts/
-│   │   │       ├── src/
-│   │   │       └── test/
+│   │   │       └── implementations/
+│   │   │           └── typescript/
 │   │   ├── interop/
 │   │   │   └── grpc/
-│   │   │       └── proto/
+│   │   │       └── proto/                    # neutral .proto authority
 │   │   ├── implementations/
 │   │   │   ├── typescript/
 │   │   │   │   ├── backend-memory/
 │   │   │   │   ├── backend-sqlite/
-│   │   │   │   └── conformance-runner/
+│   │   │   │   ├── conformance-runner/
+│   │   │   │   └── testkit/                  # kernel testkit moved here from boundary root
 │   │   │   └── rust/
 │   │   │       ├── kernel/
 │   │   │       ├── grpc-service/
@@ -1562,11 +1588,13 @@ the multi-language transition foundation:
 │   │   │       ├── spec/
 │   │   │       │   └── typespec/
 │   │   │       ├── artifacts/
-│   │   │       ├── src/
-│   │   │       └── test/
+│   │   │       └── implementations/
+│   │   │           └── typescript/
 │   │   ├── implementations/
 │   │   │   ├── typescript/
-│   │   │   │   └── bridge-ai-sdk/
+│   │   │   │   ├── bridge-ai-sdk/
+│   │   │   │   ├── conformance-runner/
+│   │   │   │   └── testkit/                  # provider testkit moved here from boundary root
 │   │   │   └── rust/
 │   │   └── conformance/
 │   │       ├── schemas/
@@ -1575,10 +1603,10 @@ the multi-language transition foundation:
 │   ├── shared/
 │   │   └── contracts/
 │   │       └── core-types/
-│   │           ├── spec/
+│   │           ├── spec/                     # placeholder until a neutral source is authored
 │   │           ├── artifacts/
-│   │           ├── src/
-│   │           └── test/
+│   │           └── implementations/
+│   │               └── typescript/
 │   └── hosts/
 │       └── implementations/
 │           └── typescript/
@@ -1586,9 +1614,15 @@ the multi-language transition foundation:
 └── tests/                   # transitional until normative assets are migrated
 ```
 
-Each contract package in the target tree adopts the same conceptual
-`spec/`, `artifacts/`, `src/`, and `test/` shape once it is promoted to an
-authored machine-readable source.
+Every contract directory carries language-neutral assets (`spec/`,
+`artifacts/`, `README.md`) at its root and houses each language implementation
+under a sibling `implementations/<lang>/` subtree. A contract surface that has
+not yet authored a neutral source still keeps its TypeScript implementation
+under `implementations/typescript/`, and its `spec/` directory remains a
+placeholder until a later epic authors the neutral source. Boundary-level
+testkits live under `implementations/<lang>/testkit/` rather than at the
+boundary root, because a testkit is always language-specific harness code over
+the language-neutral `conformance/` assets.
 
 ### 5.1.1 Structure Rules
 
@@ -1598,6 +1632,7 @@ authored machine-readable source.
 - The current repo-root `tests/` tree is a deliberate transitional exception to that top-level posture until its normative assets are migrated into boundary-owned `conformance/` trees.
 - Each architectural boundary owns its own `contracts/`, `implementations/`, `conformance/`, and `interop/` trees when those concerns exist for that boundary.
 - Language-specific code lives under `implementations/<language>/...`, and any checked-in generated language bindings belong under the consuming implementation tree rather than a shared root generated directory.
+- Per ADR-022, every directory under `boundaries/` is either language-neutral (at boundary, contract, conformance, or interop roots) or language-specific (exclusively under `implementations/<language>/...`). No language-specific build manifest, source directory, or generated binding may live at a boundary, contract, conformance, or interop root. This rule covers `package.json`, `Cargo.toml`, `tsup.config.ts`, `tsconfig*.json`, `src/`, `dist/`, `test/`, `bench/`, `smoke/`, `node_modules/`, `target/`, and any other language-tooling output. Boundary-level testkits live under `boundaries/<area>/implementations/<language>/testkit/`, never at the boundary root.
 - Nx manages orchestration and target naming. Nx does not define the repo ontology and must delegate actual work to the native toolchain for the language or artifact family involved.
 - `shared/` must remain small and contain only truly cross-boundary primitives. It must not become a semantic dumping ground or a backdoor TypeScript convenience layer.
 - Contract-driven components such as backends, provider surfaces, driver contracts, tool contracts, event vocabulary, conformance suites, and interop seams must have an explicit boundary-owned home before any new implementation package is added.
@@ -1677,7 +1712,8 @@ authored machine-readable source.
 7. Epic U is closed: root Cargo workspace files and the first Rust implementation now exist only under the kernel boundary: kernel core, gRPC service, and conformance runner.
 8. Epic V is closed: TypeScript framework to Rust kernel interop, cross-language telemetry attributes, generated telemetry helpers, and compatibility-ledger generation are stabilized as input evidence for semantic maturity work.
 9. Epic W matures the one-semantic-ecosystem layer before any additional implementation line: build the semantic coverage matrix, promote high-value TypeScript-local semantics into boundary-owned conformance suites, require assertion-bearing evidence, and update compatibility reporting so pass/fail claims name the semantic checks that ran.
-10. Add a Rust framework implementation, future concrete drivers, peer backends such as PostgreSQL and MySQL/MariaDB, provider expansions, or additional host protocols only after Epic W proves the artifact-backed semantic system is complete enough to absorb them without drift.
+10. Epic X normalizes the boundary tree's path topology: relocate every TypeScript-only asset out of language-neutral slots into the appropriate `implementations/typescript/` subtree, codify the topology rule in `AGENTS.md` and TechSpec ADR-022, and record the closure inventory. Epic X performs no semantic, fixture, or public-API changes.
+11. Add a Rust framework implementation, future concrete drivers, peer backends such as PostgreSQL and MySQL/MariaDB, provider expansions, or additional host protocols only after Epic W proves the artifact-backed semantic system is complete enough to absorb them without drift and Epic X has normalized the boundary tree to language-neutral roots.
 
 ### 5.4.1 ReAct and Multilanguage Epic Partition Status
 
@@ -1688,4 +1724,5 @@ authored machine-readable source.
 - **Epic U — Rust Kernel Baseline:** Closed in current repo reality through `constitution/spikes/epic-u-rust-kernel-baseline-inventory.md`. The repo now has the root Cargo workspace, Rust kernel implementation, runnable Rust gRPC service, Rust conformance runner, and generated Rust telemetry helper while keeping framework ownership TypeScript-first.
 - **Epic V — TypeScript Framework and Rust Kernel Interop Stabilization:** Closed in current repo reality through `constitution/spikes/epic-v-transport-decision-inventory.md` and `constitution/spikes/epic-v-framework-rust-kernel-interop-closure-inventory.md`. The repo now has the TypeScript gRPC remote-kernel helper, the playground kernel switch, real interop-smoke evidence, compatibility-ledger interop entries, and separated cross-language verification lanes.
 - **Epic W — Semantic Ecosystem Maturity:** Closed in current repo reality through `constitution/spikes/epic-w-semantic-coverage-matrix.md` and `constitution/spikes/epic-w-semantic-ecosystem-maturity-closure-inventory.md`. Epic W was not a Rust framework, not a second framework implementation, and not a continuation of the Rust-kernel baseline; it closed the first semantic-authority gap by promoting normative semantics from TypeScript-local tests into boundary-owned conformance suites with named assertions and compatibility evidence.
-- **Later driver, backend, provider, language, and host protocol expansion:** Deferred beyond Epic W unless the TechSpec is revised. This includes Rust framework work, `LanguageModelV2` compatibility, provider-native tools, AI SDK agent loops/UI transports, LangChain bridge work, first-class Tuvren provider packages, ACP, future non-ReAct drivers, future official backends, and future language lines beyond Rust.
+- **Epic X — TypeScript Topology Normalization:** Active in current repo reality. Planning artifact: `constitution/spikes/epic-x-typescript-topology-normalization-plan.md`. Epic X relocates TypeScript-only assets out of the language-neutral slots in `boundaries/` so the path topology reveals language ownership without opening files, codifies the rule in ADR-022 and `AGENTS.md`, and records a closure inventory. Authoring neutral specs for the surfaces that lack one today (`runtime-api`, `driver-api`, `event-stream`, `core-types`) is explicitly out of Epic X scope and remains deferred for a later epic.
+- **Later driver, backend, provider, language, and host protocol expansion:** Deferred beyond Epic W and Epic X unless the TechSpec is revised. This includes Rust framework work, `LanguageModelV2` compatibility, provider-native tools, AI SDK agent loops/UI transports, LangChain bridge work, first-class Tuvren provider packages, ACP, future non-ReAct drivers, future official backends, and future language lines beyond Rust.
