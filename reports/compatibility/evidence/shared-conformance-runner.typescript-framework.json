@@ -1,5 +1,13 @@
 {
+  "adapterId": "typescript-framework",
   "boundary": "framework",
+  "capabilities": [
+    "framework.driver-api",
+    "framework.event-stream",
+    "framework.react-driver",
+    "framework.runtime-api",
+    "trace.lifecycle"
+  ],
   "checkResults": [
     {
       "assertionResults": [
@@ -832,6 +840,7 @@
   ],
   "exitCode": 0,
   "implementationId": "typescript-framework",
+  "nonApplicableCheckIds": [],
   "project": "framework-typescript-conformance-runner",
   "status": "pass",
   "summary": {

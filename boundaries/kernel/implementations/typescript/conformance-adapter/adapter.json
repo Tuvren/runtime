@@ -16,6 +16,6 @@
   "authorityPackets": [
     "boundaries/kernel/contracts/protocol/spec/authority-packet.json"
   ],
-  "suiteId": "tuvren.kernel.protocol-seed",
-  "suiteVersion": "0.2.0"
+  "suiteId": "tuvren.kernel.protocol",
+  "suiteVersion": "0.1.0"
 }

@@ -67,8 +67,8 @@
           },
           "evidencePath": "reports/compatibility/evidence/shared-conformance-runner.typescript-kernel.json",
           "status": "pass",
-          "suiteId": "tuvren.kernel.protocol-seed",
-          "suiteVersion": "0.2.0"
+          "suiteId": "tuvren.kernel.protocol",
+          "suiteVersion": "0.1.0"
         }
       ],
       "version": "unreleased-workspace"
@@ -93,8 +93,8 @@
           },
           "evidencePath": "reports/compatibility/evidence/shared-conformance-runner.typescript-providers.json",
           "status": "pass",
-          "suiteId": "tuvren.providers.api-fixtures",
-          "suiteVersion": "0.2.0"
+          "suiteId": "tuvren.providers.provider-api",
+          "suiteVersion": "0.1.0"
         }
       ],
       "version": "unreleased-workspace"
@@ -211,17 +211,12 @@
     },
     {
       "boundary": "kernel",
-      "suiteId": "tuvren.kernel.protocol-seed",
-      "suiteVersion": "0.2.0"
+      "suiteId": "tuvren.kernel.protocol",
+      "suiteVersion": "0.1.0"
     },
     {
       "boundary": "providers",
-      "suiteId": "tuvren.providers.api-fixtures",
-      "suiteVersion": "0.2.0"
-    },
-    {
-      "boundary": "kernel",
-      "suiteId": "tuvren.kernel.protocol",
+      "suiteId": "tuvren.providers.provider-api",
       "suiteVersion": "0.1.0"
     },
     {

@@ -252,7 +252,10 @@ function expandRequiredEvidence(
 ): readonly string[] {
   const evidence = new Set(check.evidence ?? []);
 
-  for (const assertion of check.assertions) {
+  for (const assertion of [
+    ...check.assertions,
+    ...(check.steps ?? []).flatMap((step) => step.assertions ?? []),
+  ]) {
     const path = assertion.field ?? assertion.path;
 
     if (

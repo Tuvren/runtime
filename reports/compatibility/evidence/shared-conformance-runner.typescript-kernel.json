@@ -1,5 +1,7 @@
 {
+  "adapterId": "typescript-kernel",
   "boundary": "kernel",
+  "capabilities": ["kernel.protocol"],
   "checkResults": [
     {
       "assertionResults": [
@@ -70,6 +72,13 @@
   ],
   "exitCode": 0,
   "implementationId": "typescript-kernel",
+  "nonApplicableCheckIds": [
+    "kernel.lineage.cross_thread_rejection",
+    "kernel.logical.branch_list",
+    "kernel.logical.diff_paths",
+    "kernel.logical.recovery_state",
+    "kernel.turn.lateral_head_guard"
+  ],
   "project": "kernel-typescript-conformance-runner",
   "status": "pass",
   "summary": {
@@ -79,6 +88,6 @@
     "applicableChecks": 2,
     "nonApplicableChecks": 5
   },
-  "suiteId": "tuvren.kernel.protocol-seed",
-  "suiteVersion": "0.2.0"
+  "suiteId": "tuvren.kernel.protocol",
+  "suiteVersion": "0.1.0"
 }

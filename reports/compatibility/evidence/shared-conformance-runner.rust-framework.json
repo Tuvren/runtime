@@ -1,5 +1,12 @@
 {
+  "adapterId": "rust-framework",
   "boundary": "framework",
+  "capabilities": [
+    "framework.driver-api",
+    "framework.event-stream",
+    "framework.react-driver",
+    "framework.runtime-api"
+  ],
   "checkResults": [
     {
       "assertionResults": [
@@ -909,6 +916,7 @@
   ],
   "exitCode": 1,
   "implementationId": "rust-framework",
+  "nonApplicableCheckIds": [],
   "project": "framework-rust-conformance-runner",
   "status": "fail",
   "summary": {

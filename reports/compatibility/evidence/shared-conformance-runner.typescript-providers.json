@@ -1,5 +1,7 @@
 {
+  "adapterId": "typescript-providers",
   "boundary": "providers",
+  "capabilities": ["providers.ai-sdk-bridge", "providers.provider-api"],
   "checkResults": [
     {
       "assertionResults": [
@@ -134,6 +136,7 @@
   ],
   "exitCode": 0,
   "implementationId": "typescript-providers",
+  "nonApplicableCheckIds": [],
   "project": "providers-typescript-conformance-runner",
   "status": "pass",
   "summary": {
@@ -143,6 +146,6 @@
     "applicableChecks": 4,
     "nonApplicableChecks": 0
   },
-  "suiteId": "tuvren.providers.api-fixtures",
-  "suiteVersion": "0.2.0"
+  "suiteId": "tuvren.providers.provider-api",
+  "suiteVersion": "0.1.0"
 }

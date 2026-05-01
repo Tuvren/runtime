@@ -1,5 +1,7 @@
 {
+  "adapterId": "rust-kernel",
   "boundary": "kernel",
+  "capabilities": ["kernel.logical", "kernel.protocol"],
   "checkResults": [
     {
       "assertionResults": [
@@ -180,6 +182,7 @@
   ],
   "exitCode": 0,
   "implementationId": "rust-kernel",
+  "nonApplicableCheckIds": [],
   "project": "kernel-rust-conformance-runner",
   "status": "pass",
   "summary": {

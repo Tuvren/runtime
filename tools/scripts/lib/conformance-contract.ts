@@ -152,7 +152,8 @@ export function assertConformanceEvidence(
   const nonApplicableCheckIds =
     readOptionalStringArray(
       value.nonApplicableCheckIds,
-      `${label}.nonApplicableCheckIds`
+      `${label}.nonApplicableCheckIds`,
+      false
     ) ?? [];
   const expectedSummary = createConformanceEvidenceSummary(checkResults);
 
@@ -499,13 +500,14 @@ function readAssertionResult(
 
 function readOptionalStringArray(
   value: unknown,
-  label: string
+  label: string,
+  requireNonEmpty = true
 ): string[] | undefined {
   if (value === undefined) {
     return undefined;
   }
 
-  return readStringArray(value, label, true);
+  return readStringArray(value, label, requireNonEmpty);
 }
 
 function readStringArray(

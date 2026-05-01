@@ -74,6 +74,24 @@ interface CompatibilityCheckSummary {
   totalChecks: number;
 }
 
+interface CompatibilityConformanceEvidence {
+  adapterId?: string;
+  boundary: string;
+  capabilities?: readonly string[];
+  checkResults: readonly ConformanceCheckResult[];
+  command: string[];
+  exitCode: number;
+  implementationId: string;
+  nonApplicableCheckIds?: readonly string[];
+  project: string;
+  status: "fail" | "pass";
+  stderr?: string;
+  stdout?: string;
+  suiteId: string;
+  suiteVersion: string;
+  summary: CompatibilityCheckSummary;
+}
+
 interface InteropTelemetrySummary {
   observedKeys: string[];
   scenarios: Array<{
@@ -187,8 +205,8 @@ const CONFORMANCE_RUNNERS: readonly ConformanceRunner[] = [
     project: "kernel-rust-conformance-runner",
   },
   {
-    // This lane is expected to emit red evidence today; running Cargo directly
-    // keeps the structured JSON parseable after the process exits nonzero.
+    // This lane is expected to emit red evidence today; the shared runner keeps
+    // the structured JSON parseable after the process exits nonzero.
     command: [
       "bun",
       "tools/conformance/runner/run.ts",
@@ -372,25 +390,15 @@ async function runConformanceTarget(
     commandResult.code === 0 && evidencePayload.status === "pass"
       ? "pass"
       : "fail";
-  const evidence: {
-    boundary: string;
-    checkResults: ConformanceCheckResult[];
-    command: string[];
-    exitCode: number;
-    implementationId: string;
-    project: string;
-    status: "fail" | "pass";
-    summary: CompatibilityCheckSummary;
-    stderr?: string;
-    stdout?: string;
-    suiteId: string;
-    suiteVersion: string;
-  } = {
+  const evidence: CompatibilityConformanceEvidence = {
+    adapterId: evidencePayload.adapterId,
     boundary: evidencePayload.boundary,
+    capabilities: evidencePayload.capabilities,
     checkResults: evidencePayload.checkResults,
     command: sanitizeEvidenceCommand(command),
     exitCode: commandResult.code,
     implementationId: runner.implementationId,
+    nonApplicableCheckIds: evidencePayload.nonApplicableCheckIds,
     project: runner.project,
     status,
     summary: evidencePayload.summary,
@@ -985,7 +993,6 @@ function assertCompatibilityMatrix(
 
     for (const result of implementation.results) {
       if (
-        result.checkIds.length === 0 ||
         result.evidencePath.length === 0 ||
         result.suiteId.length === 0 ||
         result.suiteVersion.length === 0
@@ -996,12 +1003,16 @@ function assertCompatibilityMatrix(
       }
 
       assertCompatibilityCheckSummary(result.checkSummary);
+      assertCompatibilityResultCheckIds(
+        result.checkIds,
+        result.checkSummary,
+        "compatibility matrix implementation results"
+      );
     }
   }
 
   for (const interopResult of value.interop) {
     if (
-      interopResult.checkIds.length === 0 ||
       interopResult.evidencePath.length === 0 ||
       interopResult.pairId.length === 0 ||
       interopResult.suiteId.length === 0 ||
@@ -1013,7 +1024,31 @@ function assertCompatibilityMatrix(
     }
 
     assertCompatibilityCheckSummary(interopResult.checkSummary);
+    assertCompatibilityResultCheckIds(
+      interopResult.checkIds,
+      interopResult.checkSummary,
+      "compatibility matrix interop results"
+    );
   }
+}
+
+function assertCompatibilityResultCheckIds(
+  checkIds: readonly string[],
+  summary: CompatibilityCheckSummary,
+  label: string
+): void {
+  if (checkIds.length > 0) {
+    return;
+  }
+
+  if (
+    summary.totalChecks === (summary.nonApplicableChecks ?? 0) &&
+    (summary.applicableChecks ?? 0) === 0
+  ) {
+    return;
+  }
+
+  throw new Error(`${label} must contain check ids for applicable checks`);
 }
 
 function assertCompatibilityCheckSummary(
