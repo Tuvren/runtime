@@ -8,10 +8,10 @@
   "include": ["src/**/*.ts"],
   "references": [
     {
-      "path": "../../../../shared/contracts/core-types/tsconfig.lib.json"
+      "path": "../../../../shared/contracts/core-types/implementations/typescript/tsconfig.lib.json"
     },
     {
-      "path": "../../../contracts/provider-api/tsconfig.lib.json"
+      "path": "../../../contracts/provider-api/implementations/typescript/tsconfig.lib.json"
     }
   ]
 }

@@ -8,10 +8,10 @@
     "outDir": "./dist",
     "paths": {
       "@tuvren/core-types": [
-        "../../../../shared/contracts/core-types/dist/index.d.ts"
+        "../../../../shared/contracts/core-types/implementations/typescript/dist/index.d.ts"
       ],
       "@tuvren/kernel-protocol": [
-        "../../../contracts/protocol/dist/index.d.ts"
+        "../../../contracts/protocol/implementations/typescript/dist/index.d.ts"
       ],
       "@tuvren/backend-sqlite": ["./src/index.ts"]
     },

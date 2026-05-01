@@ -35,7 +35,7 @@ import {
   readConformanceSuiteManifest,
   selectImplementationChecks,
 } from "../../../../../../tools/scripts/lib/conformance-runner.js";
-import { kernelProtocolDeterministicFixtures } from "../../../../testkit/src/lib/kernel-conformance-fixtures.ts";
+import { kernelProtocolDeterministicFixtures } from "../../testkit/src/lib/kernel-conformance-fixtures.ts";
 
 const KERNEL_MANIFEST_PATH = resolve(
   dirname(fileURLToPath(import.meta.url)),

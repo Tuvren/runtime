@@ -5,10 +5,20 @@
 This is an architecture-first, multi-language runtime monorepo. TypeScript is still the first authoritative framework implementation line, but the current repository also contains a Rust kernel implementation, gRPC kernel interop, boundary-owned conformance assets, telemetry generation, and compatibility reporting. Runtime code and semantic assets live under `boundaries/`:
 
 - `boundaries/framework/` for shared runtime contracts, TypeScript framework implementations, stream adapters, the ReAct driver, framework conformance assets, and Rust-kernel interop scenarios
-- `boundaries/kernel/` for kernel contracts, TypeScript backends, Rust kernel crates, gRPC interop definitions, kernel conformance assets, and `testkit`
-- `boundaries/providers/` for provider-facing contracts, the AI SDK bridge, provider conformance assets, and provider `testkit`
+- `boundaries/kernel/` for kernel contracts, TypeScript kernel implementations, Rust kernel crates, gRPC interop definitions, and kernel conformance assets
+- `boundaries/providers/` for provider-facing contracts, TypeScript provider implementations, the AI SDK bridge, and provider conformance assets
 - `boundaries/hosts/` for private host harnesses such as the TypeScript playground
 - `boundaries/shared/` for truly cross-boundary primitives
+
+Within `boundaries/`, path topology must reveal language ownership through the
+path alone:
+
+- language-neutral assets live at boundary, contract, conformance, and interop roots
+- language-specific package roots live only under `implementations/<lang>/`
+
+Do not place `package.json`, `Cargo.toml`, `src/`, `dist/`, `test/`,
+`bench/`, `smoke/`, `tsconfig*.json`, generated bindings, or other
+language-tooling output at a boundary root or contract root.
 
 Working plans live in `constitution/`. Engine-level specs live in `docs/`. Shared legacy fixtures and scenario assets live in `tests/`; newer executable compatibility assets live under each boundary's `conformance/` or `interop/` roots. Tooling scripts live in `tools/`. Repo-level telemetry and compatibility evidence live in `telemetry/` and `reports/compatibility/`.
 

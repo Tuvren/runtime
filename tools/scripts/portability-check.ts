@@ -29,56 +29,67 @@ interface DocumentedPackageSurface {
   reason: string;
 }
 
+// These checks intentionally execute from the implementation roots that own
+// each TypeScript package after Epic X. The public package handles stay
+// stable, but the filesystem roots moved so portability validation follows the
+// actual package manifests rather than the contract or boundary roots.
 const PORTABLE_PACKAGE_SURFACES: readonly PortablePackageSurface[] = [
   {
     classification: "Bun-and-Node validated",
     packageName: "@tuvren/core-types",
-    packageRoot: "boundaries/shared/contracts/core-types",
+    packageRoot:
+      "boundaries/shared/contracts/core-types/implementations/typescript",
   },
   {
     classification: "Bun-and-Node validated",
     packageName: "@tuvren/kernel-protocol",
-    packageRoot: "boundaries/kernel/contracts/protocol",
+    packageRoot:
+      "boundaries/kernel/contracts/protocol/implementations/typescript",
   },
   {
     classification: "Bun-and-Node validated",
     packageName: "@tuvren/kernel-testkit",
-    packageRoot: "boundaries/kernel/testkit",
+    packageRoot: "boundaries/kernel/implementations/typescript/testkit",
   },
   {
     classification: "Bun-and-Node validated",
     packageName: "@tuvren/provider-api",
-    packageRoot: "boundaries/providers/contracts/provider-api",
+    packageRoot:
+      "boundaries/providers/contracts/provider-api/implementations/typescript",
   },
   {
     classification: "Bun-and-Node validated",
     packageName: "@tuvren/provider-testkit",
-    packageRoot: "boundaries/providers/testkit",
+    packageRoot: "boundaries/providers/implementations/typescript/testkit",
   },
   {
     classification: "Bun-and-Node validated",
     packageName: "@tuvren/runtime-api",
-    packageRoot: "boundaries/framework/contracts/runtime-api",
+    packageRoot:
+      "boundaries/framework/contracts/runtime-api/implementations/typescript",
   },
   {
     classification: "Bun-and-Node validated",
     packageName: "@tuvren/driver-api",
-    packageRoot: "boundaries/framework/contracts/driver-api",
+    packageRoot:
+      "boundaries/framework/contracts/driver-api/implementations/typescript",
   },
   {
     classification: "Bun-and-Node validated",
     packageName: "@tuvren/event-stream",
-    packageRoot: "boundaries/framework/contracts/event-stream",
+    packageRoot:
+      "boundaries/framework/contracts/event-stream/implementations/typescript",
   },
   {
     classification: "Bun-and-Node validated",
     packageName: "@tuvren/tool-contracts",
-    packageRoot: "boundaries/framework/contracts/tool-contracts",
+    packageRoot:
+      "boundaries/framework/contracts/tool-contracts/implementations/typescript",
   },
   {
     classification: "Bun-and-Node validated",
     packageName: "@tuvren/framework-testkit",
-    packageRoot: "boundaries/framework/testkit",
+    packageRoot: "boundaries/framework/implementations/typescript/testkit",
   },
   {
     classification: "Bun-and-Node validated",

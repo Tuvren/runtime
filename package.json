@@ -7,9 +7,8 @@
     "better-sqlite3"
   ],
   "workspaces": [
-    "boundaries/*/contracts/*",
+    "boundaries/*/contracts/*/implementations/*",
     "boundaries/*/implementations/*/*",
-    "boundaries/*/testkit",
     "boundaries/framework/implementations/typescript/drivers/*"
   ],
   "scripts": {

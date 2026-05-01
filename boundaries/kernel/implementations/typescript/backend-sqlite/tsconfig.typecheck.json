@@ -6,10 +6,12 @@
     "allowImportingTsExtensions": true,
     "paths": {
       "@tuvren/core-types": [
-        "../../../../shared/contracts/core-types/src/index.ts"
+        "../../../../shared/contracts/core-types/implementations/typescript/src/index.ts"
       ],
-      "@tuvren/kernel-protocol": ["../../../contracts/protocol/src/index.ts"],
-      "@tuvren/kernel-testkit": ["../../../testkit/src/index.ts"],
+      "@tuvren/kernel-protocol": [
+        "../../../contracts/protocol/implementations/typescript/src/index.ts"
+      ],
+      "@tuvren/kernel-testkit": ["../testkit/src/index.ts"],
       "@tuvren/backend-sqlite": ["./src/index.ts"]
     },
     "types": ["bun", "node"]
@@ -18,8 +20,8 @@
     "bench/**/*.ts",
     "src/**/*.ts",
     "test/**/*.ts",
-    "../../../contracts/protocol/src/**/*.ts",
-    "../../../testkit/src/**/*.ts",
-    "../../../../shared/contracts/core-types/src/**/*.ts"
+    "../../../contracts/protocol/implementations/typescript/src/**/*.ts",
+    "../testkit/src/**/*.ts",
+    "../../../../shared/contracts/core-types/implementations/typescript/src/**/*.ts"
   ]
 }

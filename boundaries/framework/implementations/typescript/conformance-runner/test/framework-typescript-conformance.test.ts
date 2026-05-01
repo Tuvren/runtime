@@ -23,7 +23,7 @@ import Ajv2020 from "ajv/dist/2020.js";
 import {
   type FrameworkStreamTestFixtureSet,
   frameworkStreamTestFixtures,
-} from "../../../../testkit/src/index.ts";
+} from "../../testkit/src/index.ts";
 
 const FRAMEWORK_SUITE_MANIFEST = new URL(
   "../../../../conformance/scenarios/suite-manifest.json",

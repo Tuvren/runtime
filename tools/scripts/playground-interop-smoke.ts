@@ -42,12 +42,16 @@ const PLAYGROUND_DIST_PATH = resolve(
   REPO_ROOT,
   "boundaries/hosts/implementations/typescript/playground/dist/index.js"
 );
+// Epic X moved the TypeScript contract package roots under
+// implementations/typescript while leaving neutral specs and generated
+// artifacts at the contract roots, so the smoke builds runnable JS from the
+// implementation roots after codegen refreshes the contract-root artifacts.
 const INTEROP_BUILD_DIRECTORIES: readonly string[] = [
-  "boundaries/shared/contracts/core-types",
-  "boundaries/framework/contracts/runtime-api",
-  "boundaries/framework/contracts/driver-api",
-  "boundaries/providers/contracts/provider-api",
-  "boundaries/kernel/contracts/protocol",
+  "boundaries/shared/contracts/core-types/implementations/typescript",
+  "boundaries/framework/contracts/runtime-api/implementations/typescript",
+  "boundaries/framework/contracts/driver-api/implementations/typescript",
+  "boundaries/providers/contracts/provider-api/implementations/typescript",
+  "boundaries/kernel/contracts/protocol/implementations/typescript",
   "boundaries/kernel/implementations/typescript/backend-memory",
   "boundaries/kernel/implementations/typescript/backend-sqlite",
   "boundaries/framework/implementations/typescript/drivers/react",

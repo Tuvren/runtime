@@ -6,25 +6,29 @@
     "allowImportingTsExtensions": true,
     "paths": {
       "@tuvren/core-types": [
-        "../../../../shared/contracts/core-types/src/index.ts"
+        "../../../../shared/contracts/core-types/implementations/typescript/src/index.ts"
       ],
-      "@tuvren/runtime-api": ["../../../contracts/runtime-api/src/index.ts"],
+      "@tuvren/runtime-api": [
+        "../../../contracts/runtime-api/implementations/typescript/src/index.ts"
+      ],
       "@tuvren/runtime-api/events": [
-        "../../../contracts/runtime-api/src/events.ts"
+        "../../../contracts/runtime-api/implementations/typescript/src/events.ts"
       ],
       "@tuvren/runtime-api/execution": [
-        "../../../contracts/runtime-api/src/execution.ts"
+        "../../../contracts/runtime-api/implementations/typescript/src/execution.ts"
       ],
       "@tuvren/runtime-api/provider": [
-        "../../../contracts/runtime-api/src/provider.ts"
+        "../../../contracts/runtime-api/implementations/typescript/src/provider.ts"
       ],
       "@tuvren/runtime-api/tools": [
-        "../../../contracts/runtime-api/src/tools.ts"
+        "../../../contracts/runtime-api/implementations/typescript/src/tools.ts"
       ],
-      "@tuvren/driver-api": ["../../../contracts/driver-api/src/index.ts"],
-      "@tuvren/framework-testkit": ["../../../testkit/src/index.ts"],
+      "@tuvren/driver-api": [
+        "../../../contracts/driver-api/implementations/typescript/src/index.ts"
+      ],
+      "@tuvren/framework-testkit": ["../testkit/src/index.ts"],
       "@tuvren/kernel-protocol": [
-        "../../../../kernel/contracts/protocol/src/index.ts"
+        "../../../../kernel/contracts/protocol/implementations/typescript/src/index.ts"
       ],
       "@tuvren/runtime-core": ["./src/index.ts"],
       "@tuvren/stream-core": ["../stream-core/src/index.ts"],
@@ -37,11 +41,11 @@
     "bench/**/*.ts",
     "src/**/*.ts",
     "test/**/*.ts",
-    "../../../testkit/src/**/*.ts",
-    "../../../contracts/runtime-api/src/**/*.ts",
-    "../../../contracts/driver-api/src/**/*.ts",
-    "../../../../kernel/contracts/protocol/src/**/*.ts",
-    "../../../../shared/contracts/core-types/src/**/*.ts",
+    "../testkit/src/**/*.ts",
+    "../../../contracts/runtime-api/implementations/typescript/src/**/*.ts",
+    "../../../contracts/driver-api/implementations/typescript/src/**/*.ts",
+    "../../../../kernel/contracts/protocol/implementations/typescript/src/**/*.ts",
+    "../../../../shared/contracts/core-types/implementations/typescript/src/**/*.ts",
     "../stream-core/src/**/*.ts",
     "../stream-sse/src/**/*.ts",
     "../stream-agui/src/**/*.ts"

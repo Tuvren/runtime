@@ -8,24 +8,28 @@
     "outDir": "./dist",
     "paths": {
       "@tuvren/core-types": [
-        "../../../../shared/contracts/core-types/dist/index.d.ts"
+        "../../../../shared/contracts/core-types/implementations/typescript/dist/index.d.ts"
       ],
-      "@tuvren/runtime-api": ["../../../contracts/runtime-api/dist/index.d.ts"],
+      "@tuvren/runtime-api": [
+        "../../../contracts/runtime-api/implementations/typescript/dist/index.d.ts"
+      ],
       "@tuvren/runtime-api/events": [
-        "../../../contracts/runtime-api/dist/events.d.ts"
+        "../../../contracts/runtime-api/implementations/typescript/dist/events.d.ts"
       ],
       "@tuvren/runtime-api/execution": [
-        "../../../contracts/runtime-api/dist/execution.d.ts"
+        "../../../contracts/runtime-api/implementations/typescript/dist/execution.d.ts"
       ],
       "@tuvren/runtime-api/provider": [
-        "../../../contracts/runtime-api/dist/provider.d.ts"
+        "../../../contracts/runtime-api/implementations/typescript/dist/provider.d.ts"
       ],
       "@tuvren/runtime-api/tools": [
-        "../../../contracts/runtime-api/dist/tools.d.ts"
+        "../../../contracts/runtime-api/implementations/typescript/dist/tools.d.ts"
       ],
-      "@tuvren/driver-api": ["../../../contracts/driver-api/dist/index.d.ts"],
+      "@tuvren/driver-api": [
+        "../../../contracts/driver-api/implementations/typescript/dist/index.d.ts"
+      ],
       "@tuvren/kernel-protocol": [
-        "../../../../kernel/contracts/protocol/dist/index.d.ts"
+        "../../../../kernel/contracts/protocol/implementations/typescript/dist/index.d.ts"
       ],
       "@tuvren/runtime-core": ["./src/index.ts"]
     },

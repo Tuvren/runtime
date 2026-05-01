@@ -2,25 +2,23 @@
 
 ## 0. Version History & Changelog
 
+- v0.9.2 - Closed Epic X in current repo reality with the topology inventory, relocated TypeScript testkit and contract package roots, implementation-root workspace rewires, path-topology guardrails, and the Epic X closure inventory.
 - v0.9.1 - Opened Epic X TypeScript Topology Normalization to relocate TS-only assets out of the language-neutral boundary slots so the repository tree reveals language ownership through path alone before another implementation line lands.
 - v0.9.0 - Closed Epic W in current repo reality with the semantic coverage matrix, assertion-bearing conformance suites, structured runner evidence, check-level compatibility reporting, and the Epic W closure inventory.
-- v0.8.9 - Activated Epic W as Semantic Ecosystem Maturity with a conformance coverage matrix, assertion-bearing suite contract, semantic conformance promotion, and compatibility-evidence hardening before any new implementation line.
-- v0.8.8 - Closed Epic V in current repo reality with the TypeScript gRPC remote-kernel helper, Rust-kernel playground interop matrix, compatibility-ledger interop evidence, and Epic V transport plus closure inventories.
-- v0.8.7 - Closed Epic U in current repo reality with the root Cargo workspace, Devenv Rust toolchain, Rust kernel core, Rust conformance runner, Rust gRPC service, and generated Rust telemetry helper.
 - ... [Older history truncated, refer to git logs]
 
 ## 1. Executive Summary & Active Critical Path
 
-- **Total Active Story Points:** 12
-- **Critical Path:** Epic X TypeScript Topology Normalization. KRT-X001 -> KRT-X002 -> KRT-X003 -> KRT-X004 -> KRT-X005.
-- **Planning Assumptions:** Epics A-W are closed in current repo reality. Epic X is now active as a structural follow-up to Epic W: it relocates TS-only assets out of the language-neutral slots in `boundaries/` so the tree topology stops implying TypeScript ownership of contract or testkit roots before another implementation line becomes authoritative. Epic X is not a re-opening of Epic W semantic decisions and does not author new neutral specs for surfaces that lack one today. Epic U closure evidence lives in `constitution/spikes/epic-u-rust-kernel-baseline-inventory.md`, Epic V closure evidence lives in `constitution/spikes/epic-v-transport-decision-inventory.md` plus `constitution/spikes/epic-v-framework-rust-kernel-interop-closure-inventory.md`, and Epic W closure evidence now lives in `constitution/spikes/epic-w-semantic-coverage-matrix.md` plus `constitution/spikes/epic-w-semantic-ecosystem-maturity-closure-inventory.md`. TechSpec v0.6.9 keeps the baseline AI SDK bridge on `LanguageModelV3` / `ProviderV3` from `@ai-sdk/provider@3.0.8`, pins the AG-UI adapter to `@ag-ui/core@0.0.52`, preserves the existing `ProviderStreamChunk` seam while documenting the current tool-call metadata continuity requirements, treats tee-based fanout above `ExecutionHandle.events()` as the sanctioned multi-consumer host path when every required tee branch subscribes before the first pull, records SQLite playground validation as a Node-backed path because `@tuvren/backend-sqlite` uses `better-sqlite3`, keeps the playground-owned automated aimock provider lanes across OpenAI, Anthropic, and Gemini as local validation rather than a public provider contract, records the manual Gemini lane as an opt-in local proof rather than default automation, treats Buf `FILE` compatibility as the default interop gate from the first `.proto` merge, and treats the compatibility matrix as a conservative near-public readiness signal with named check summaries rather than suite-only smoke claims.
+- **Total Active Story Points:** 0
+- **Critical Path:** No implementation epic is active.
+- **Planning Assumptions:** Epics A-X are closed in current repo reality. Epic X closed as a structural follow-up to Epic W: TypeScript-only assets now live under `implementations/typescript/` subtrees, the boundary tree reveals language ownership through path alone, and future implementation-line work must start from both the Epic W semantic evidence and the Epic X topology normalization rather than reopening either line by accident.
 
 ### Brownfield Continuity Note
 
 - The current codebase already contains the workspace scaffold, shared core types, kernel protocol package, memory backend, SQLite backend, kernel testkit, shared framework contract packages, provider contract package, `runtime-core`, and the ReAct Driver foundation package.
 - Current repository reality includes closed Epic K, L, M, N, O, and P behavior with explicit closure artifacts in `constitution/spikes/epic-k-react-loop-cancellation-inventory.md`, `constitution/spikes/epic-l-parity-inventory.md`, `constitution/spikes/epic-m-tool-approval-gap-inventory.md`, `constitution/spikes/epic-n-ai-sdk-bridge-inventory.md`, `constitution/spikes/epic-o-stream-adapter-inventory.md`, and `constitution/spikes/epic-p-playground-host-inventory.md`.
 - `KRT-Q001` is now closed in current repo reality through `constitution/spikes/epic-q-hardening-gap-inventory.md`, which inventories the extraction targets, release-check targets, portability matrix, deferred Deno work, and remaining hardening gaps for the rest of Epic Q.
-- The Epic Q target packages now exist under `boundaries/framework/testkit` and `boundaries/providers/testkit`, with release/verification scripts under `tools/scripts`.
+- The Epic Q target packages now live under `boundaries/framework/implementations/typescript/testkit` and `boundaries/providers/implementations/typescript/testkit`, with release and verification scripts under `tools/scripts`.
 - The private playground host now also owns automated aimock E2E validation lanes that exercise `@tuvren/provider-bridge-ai-sdk` through local OpenAI-, Anthropic-, and Gemini-compatible HTTP mock provider boundaries without provider credentials, covering streamed text, structured output, tool continuation, approval pause/resume, provider metadata, cancellation, provider failure, malformed responses, and unmatched fixtures.
 - The private playground host now also exposes an opt-in `host-playground:scenario-gemini` lane that exercises the same bridge through `@ai-sdk/google@3.0.64` and real Gemini credentials for streaming, metadata, structured output, multi-step streamed tool continuity, and approval resume behavior without moving live-provider cost and flake into default verification.
 - Those Epic Q testkit packages are now helper/facade packages; compatibility evidence flows through implementation-scoped TypeScript conformance runners over shared boundary-owned assets.
@@ -33,7 +31,7 @@
 ### Sequential Scope Rule
 
 - Epic V is closed. Epic W starts from the measured compatibility evidence and the Epic V closure inventories, but it is not Rust framework work. Epic W must mature the semantic ecosystem itself: coverage matrix, assertion-bearing conformance suites, promoted TypeScript-local semantics, and compatibility evidence precise enough for future implementations to consume without treating TypeScript as the oracle.
-- Epic W is closed. Epic X is a structural normalization that relocates TS-only assets out of language-neutral boundary slots without changing semantics, conformance suites, fixtures, public package APIs, or generated artifacts. Authoring neutral specs for surfaces that lack one today (`runtime-api`, `driver-api`, `event-stream`, `core-types`) is explicitly out of Epic X scope and remains deferred for a later epic.
+- Epic W and Epic X are closed. Epic X completed the structural normalization that relocated TS-only assets out of language-neutral boundary slots without changing semantics, conformance suites, fixtures, public package APIs, or generated artifacts. Authoring neutral specs for surfaces that still lack one today (`runtime-api`, `driver-api`, `event-stream`, `core-types`) remains deferred for a later epic.
 
 ### Planning Heuristic
 
@@ -49,9 +47,9 @@
 
 ### Current Active Scope
 
-- Epic X TypeScript Topology Normalization is active. The plan lives in `constitution/spikes/epic-x-typescript-topology-normalization-plan.md` and the ticket list under `4.` Epic X below is the authoritative ticket surface.
+- No implementation epic is active. Epic X is closed in current repo reality through `constitution/spikes/epic-x-typescript-topology-normalization-inventory.md` and `constitution/spikes/epic-x-typescript-topology-normalization-closure-inventory.md`.
 - Epic W is closed in current repo reality through `constitution/spikes/epic-w-semantic-coverage-matrix.md` and `constitution/spikes/epic-w-semantic-ecosystem-maturity-closure-inventory.md`.
-- Future implementation-line work must start from the named semantic evidence captured there instead of reopening TypeScript-local semantic authority by default. Epic X must close before any future epic that would add another language implementation surface inside `boundaries/`.
+- Future implementation-line work must start from the named semantic evidence captured there and the normalized Epic X topology instead of reopening TypeScript-local semantic authority or filesystem drift by default.
 
 ### Future / Deferred Scope
 
@@ -598,7 +596,10 @@ And no public or planning claim implies that a new implementation can start with
 
 ### Epic X - TypeScript Topology Normalization (TTN)
 
-- Active in current repo reality. Planning artifact: `constitution/spikes/epic-x-typescript-topology-normalization-plan.md`.
+- Closed in current repo reality. Planning artifact: `constitution/spikes/epic-x-typescript-topology-normalization-plan.md`.
+- Closure artifacts:
+  - `constitution/spikes/epic-x-typescript-topology-normalization-inventory.md`
+  - `constitution/spikes/epic-x-typescript-topology-normalization-closure-inventory.md`
 - Goal: relocate every TypeScript-only asset out of the language-neutral slots in `boundaries/` so the path topology reveals language ownership without opening files. No semantic changes, no public API renames, no new neutral specs.
 - Out of scope: authoring TypeSpec or CDDL for surfaces that lack a neutral source today (`runtime-api`, `driver-api`, `event-stream`, `core-types`); renaming TypeScript packages; moving Rust crates; changing fixtures, suites, or generated artifacts.
 
@@ -606,7 +607,7 @@ And no public or planning claim implies that a new implementation can start with
 
 - **Type:** Spike
 - **Effort:** 1
-- **Status:** Pending.
+- **Status:** Closed in current repo reality.
 - **Dependencies:** KRT-W006
 - **Capability / Contract Mapping:** PRD `CAP-P1-035`; Architecture `1.4`, `6`; TechSpec `1.1.2`, `5.1`
 - **Description:** Confirm the directory list, package list, Nx project list, and consumer list named in the Epic X plan against live repo state, and freeze them as inputs to the relocation tickets.
@@ -624,7 +625,7 @@ And the inventory is committed alongside the plan as a frozen input to the reloc
 
 - **Type:** Chore
 - **Effort:** 3
-- **Status:** Pending.
+- **Status:** Closed in current repo reality.
 - **Dependencies:** KRT-X001
 - **Capability / Contract Mapping:** PRD `CAP-P1-035`; Architecture `1.4`, `2`, `6`; TechSpec `1.1.2`, `5.1`
 - **Description:** Move the kernel, framework, and provider testkit packages out of `boundaries/<area>/testkit/` into `boundaries/<area>/implementations/typescript/testkit/`, update Nx project metadata, regenerate workspace symlinks, and verify all consumer build/typecheck/test/conformance lanes still pass.
@@ -643,7 +644,7 @@ And no fixture, suite manifest, or public package API has been modified
 
 - **Type:** Chore
 - **Effort:** 5
-- **Status:** Pending.
+- **Status:** Closed in current repo reality.
 - **Dependencies:** KRT-X002
 - **Capability / Contract Mapping:** PRD `CAP-P1-035`; Architecture `1.4`, `2`, `6`; TechSpec `1.1.2`, `5.1`
 - **Description:** Move the TypeScript package guts of every contract package (`kernel-protocol`, `runtime-api`, `driver-api`, `event-stream`, `tool-contracts`, `provider-api`, `core-types`) into a sibling `implementations/typescript/` directory while leaving language-neutral `spec/`, `artifacts/`, and README assets at the contract root. Update Nx project metadata and verify all build/typecheck/test/conformance lanes.
@@ -662,7 +663,7 @@ And no public package API, fixture, suite manifest, or generated artifact has be
 
 - **Type:** Chore
 - **Effort:** 2
-- **Status:** Pending.
+- **Status:** Closed in current repo reality.
 - **Dependencies:** KRT-X003
 - **Capability / Contract Mapping:** PRD `CAP-P1-035`; Architecture `1.4`, `6`; TechSpec `1.1.2`, `5.1`
 - **Description:** Codify the path-topology rule so the gaps cannot re-emerge. Update `AGENTS.md` boundary-discipline guidance, add a TechSpec ADR pinning the rule, and update Architecture.md `6` to mark the cross-language drift mitigation as enforced through Epic X.
@@ -680,7 +681,7 @@ And Architecture.md section 6 notes that the cross-language drift mitigation is 
 
 - **Type:** Chore
 - **Effort:** 1
-- **Status:** Pending.
+- **Status:** Closed in current repo reality.
 - **Dependencies:** KRT-X004
 - **Capability / Contract Mapping:** PRD `CAP-P1-035`; Architecture `6`; TechSpec `1.1.2`, `5.1`, `5.4.1`
 - **Description:** Record what Epic X delivered, which gaps it closed, which it deliberately deferred, and the planning-doc status updates needed for the next epic.

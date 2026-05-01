@@ -8,10 +8,10 @@
     "outDir": "./dist",
     "paths": {
       "@tuvren/core-types": [
-        "../../../../shared/contracts/core-types/dist/index.d.ts"
+        "../../../../shared/contracts/core-types/implementations/typescript/dist/index.d.ts"
       ],
       "@tuvren/event-stream": [
-        "../../../contracts/event-stream/dist/index.d.ts"
+        "../../../contracts/event-stream/implementations/typescript/dist/index.d.ts"
       ],
       "@tuvren/stream-core": ["../stream-core/dist/index.d.ts"]
     },

@@ -14,22 +14,22 @@
         "../../../../kernel/implementations/typescript/backend-sqlite/dist/index.d.ts"
       ],
       "@tuvren/core-types": [
-        "../../../../shared/contracts/core-types/dist/index.d.ts"
+        "../../../../shared/contracts/core-types/implementations/typescript/dist/index.d.ts"
       ],
       "@tuvren/driver-react": [
         "../../../../framework/implementations/typescript/drivers/react/dist/index.d.ts"
       ],
       "@tuvren/event-stream": [
-        "../../../../framework/contracts/event-stream/dist/index.d.ts"
+        "../../../../framework/contracts/event-stream/implementations/typescript/dist/index.d.ts"
       ],
       "@tuvren/kernel-protocol": [
-        "../../../../kernel/contracts/protocol/dist/index.d.ts"
+        "../../../../kernel/contracts/protocol/implementations/typescript/dist/index.d.ts"
       ],
       "@tuvren/provider-bridge-ai-sdk": [
         "../../../../providers/implementations/typescript/bridge-ai-sdk/dist/index.d.ts"
       ],
       "@tuvren/runtime-api": [
-        "../../../../framework/contracts/runtime-api/dist/index.d.ts"
+        "../../../../framework/contracts/runtime-api/implementations/typescript/dist/index.d.ts"
       ],
       "@tuvren/runtime-core": [
         "../../../../framework/implementations/typescript/runtime-core/dist/index.d.ts"
