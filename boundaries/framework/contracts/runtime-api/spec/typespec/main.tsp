@@ -30,6 +30,13 @@ model TextPart {
   providerMetadata?: Metadata;
 }
 
+model ReasoningPart {
+  type: "reasoning";
+  text: string;
+  redacted: boolean;
+  providerMetadata?: Metadata;
+}
+
 model ToolCallPart {
   type: "tool_call";
   callId: NonEmptyString;
@@ -47,6 +54,19 @@ model ToolResultPart {
   providerMetadata?: Metadata;
 }
 
+model ByteSequence {
+  encoding: "base64";
+  data: string;
+}
+
+model FilePart {
+  type: "file";
+  mediaType: NonEmptyString;
+  filename?: string;
+  data: ByteSequence;
+  providerMetadata?: Metadata;
+}
+
 model StructuredPart {
   type: "structured";
   data: unknown;
@@ -56,16 +76,42 @@ model StructuredPart {
 
 union ContentPart {
   text: TextPart,
+  reasoning: ReasoningPart,
   toolCall: ToolCallPart,
   toolResult: ToolResultPart,
+  file: FilePart,
   structured: StructuredPart,
 }
 
-model TuvrenMessage {
-  role: "system" | "user" | "assistant" | "tool";
-  content?: string;
-  parts?: ContentPart[];
+model SystemMessage {
+  role: "system";
+  content: string;
+}
+
+model UserMessage {
+  role: "user";
+  @minItems(1)
+  parts: ContentPart[];
+}
+
+model AssistantMessage {
+  role: "assistant";
+  @minItems(1)
+  parts: ContentPart[];
   providerMetadata?: Metadata;
+}
+
+model ToolMessage {
+  role: "tool";
+  @minItems(1)
+  parts: ToolResultPart[];
+}
+
+union TuvrenMessage {
+  system: SystemMessage,
+  user: UserMessage,
+  assistant: AssistantMessage,
+  tool: ToolMessage,
 }
 
 model ProviderUsage {

@@ -9,77 +9,75 @@
     {
       "checkId": "runtime-callable.provider-generate",
       "operation": "runtime.provider-generate",
-      "input": { "evidence": { "callable": "provider-generate" } },
       "assertions": [
         {
           "kind": "evidenceField",
-          "field": "$.callable",
-          "equals": "provider-generate"
+          "field": "$.callables.providerGenerate",
+          "equals": true
         }
       ],
-      "evidence": ["callable"]
+      "evidence": ["callables.providerGenerate"]
     },
     {
       "checkId": "runtime-callable.provider-stream",
       "operation": "runtime.provider-stream",
-      "input": { "evidence": { "callable": "provider-stream" } },
       "assertions": [
         {
           "kind": "evidenceField",
-          "field": "$.callable",
-          "equals": "provider-stream"
+          "field": "$.callables.providerStream",
+          "equals": true
         }
       ],
-      "evidence": ["callable"]
+      "evidence": ["callables.providerStream"]
     },
     {
       "checkId": "runtime-callable.tool-execute",
       "operation": "runtime.tool-execute",
-      "input": { "evidence": { "callable": "tool-execute" } },
       "assertions": [
         {
           "kind": "evidenceField",
-          "field": "$.callable",
-          "equals": "tool-execute"
+          "field": "$.callables.toolExecute",
+          "equals": true
         }
       ],
-      "evidence": ["callable"]
+      "evidence": ["callables.toolExecute"]
     },
     {
       "checkId": "runtime-callable.approval-resolve",
       "operation": "runtime.approval-resolve",
-      "input": { "evidence": { "callable": "approval-resolve" } },
       "assertions": [
         {
           "kind": "evidenceField",
-          "field": "$.callable",
-          "equals": "approval-resolve"
+          "field": "$.callables.approvalResolve",
+          "equals": true
         }
       ],
-      "evidence": ["callable"]
+      "evidence": ["callables.approvalResolve"]
     },
     {
       "checkId": "runtime-callable.validation-failure",
       "operation": "runtime.validate-structured-output",
-      "input": { "evidence": { "callable": "validation-failure" } },
       "assertions": [
         {
           "kind": "evidenceField",
-          "field": "$.callable",
-          "equals": "validation-failure"
+          "field": "$.callables.validationFailure",
+          "equals": true
         }
       ],
-      "evidence": ["callable"]
+      "evidence": ["callables.validationFailure"]
     },
     {
       "checkId": "runtime-callable.timeout-retry-cancellation-idempotency",
       "operation": "runtime.cancel-execution",
-      "input": { "evidence": { "controls": "honored" } },
       "controls": { "deadlineMs": 1000, "cancelAfterEvent": "turn.start" },
       "assertions": [
-        { "kind": "evidenceField", "field": "$.controls", "equals": "honored" }
+        {
+          "kind": "evidenceField",
+          "field": "$.controls.honored",
+          "equals": true
+        }
       ],
-      "evidence": ["controls"]
+      "evidence": ["controls.honored"]
     }
   ]
 }

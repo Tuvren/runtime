@@ -9,59 +9,62 @@
     {
       "checkId": "driver-callable.before-iteration",
       "operation": "driver.execute",
-      "input": { "evidence": { "hook": "before-iteration" } },
       "assertions": [
         {
           "kind": "evidenceField",
-          "field": "$.hook",
-          "equals": "before-iteration"
+          "field": "$.hooks.beforeIteration",
+          "equals": true
         }
       ],
-      "evidence": ["hook"]
+      "evidence": ["hooks.beforeIteration"]
     },
     {
       "checkId": "driver-callable.around-model",
       "operation": "driver.execute",
-      "input": { "evidence": { "hook": "around-model" } },
       "assertions": [
-        { "kind": "evidenceField", "field": "$.hook", "equals": "around-model" }
+        {
+          "kind": "evidenceField",
+          "field": "$.hooks.aroundModel",
+          "equals": true
+        }
       ],
-      "evidence": ["hook"]
+      "evidence": ["hooks.aroundModel"]
     },
     {
       "checkId": "driver-callable.around-tool",
       "operation": "driver.execute",
-      "input": { "evidence": { "hook": "around-tool" } },
       "assertions": [
-        { "kind": "evidenceField", "field": "$.hook", "equals": "around-tool" }
+        {
+          "kind": "evidenceField",
+          "field": "$.hooks.aroundTool",
+          "equals": true
+        }
       ],
-      "evidence": ["hook"]
+      "evidence": ["hooks.aroundTool"]
     },
     {
       "checkId": "driver-callable.after-iteration",
       "operation": "driver.execute",
-      "input": { "evidence": { "hook": "after-iteration" } },
       "assertions": [
         {
           "kind": "evidenceField",
-          "field": "$.hook",
-          "equals": "after-iteration"
+          "field": "$.hooks.afterIteration",
+          "equals": true
         }
       ],
-      "evidence": ["hook"]
+      "evidence": ["hooks.afterIteration"]
     },
     {
       "checkId": "driver-callable.checkpoint",
       "operation": "driver.checkpoint",
-      "input": { "evidence": { "checkpoint": "emitted" } },
       "assertions": [
         {
           "kind": "evidenceField",
-          "field": "$.checkpoint",
-          "equals": "emitted"
+          "field": "$.checkpoint.emitted",
+          "equals": true
         }
       ],
-      "evidence": ["checkpoint"]
+      "evidence": ["checkpoint.emitted"]
     }
   ]
 }

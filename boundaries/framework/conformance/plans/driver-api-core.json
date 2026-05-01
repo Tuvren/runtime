@@ -9,48 +9,34 @@
     {
       "checkId": "driver-api.execute.resolution",
       "operation": "driver.execute",
-      "input": { "evidence": { "driver": { "resolution": "declared" } } },
       "assertions": [
         {
           "kind": "evidenceField",
-          "field": "$.driver.resolution",
-          "equals": "declared"
+          "field": "$.driver.executed",
+          "equals": true
         }
       ],
-      "evidence": ["driver.resolution"]
+      "evidence": ["driver.executed"]
     },
     {
       "checkId": "driver-api.resume.approval",
       "operation": "driver.resume",
-      "input": { "evidence": { "driver": { "resume": "approval-aware" } } },
       "assertions": [
         {
           "kind": "evidenceField",
-          "field": "$.driver.resume",
-          "equals": "approval-aware"
+          "field": "$.driver.resumed",
+          "equals": true
         }
       ],
-      "evidence": ["driver.resume"]
+      "evidence": ["driver.resumed"]
     },
     {
       "checkId": "driver-api.error.envelope",
-      "operation": "driver.execute",
-      "input": {
-        "result": {
-          "error": {
-            "code": "driver_execution_failed",
-            "message": "driver execution failed"
-          }
-        }
-      },
+      "operation": "driver.execute-error",
       "assertions": [
         {
           "kind": "errorEnvelope",
-          "path": "$.result.error",
-          "equals": {
-            "code": "driver_execution_failed",
-            "message": "driver execution failed"
-          }
+          "path": "$.result.error"
         }
       ],
       "evidence": ["result.error.code"]

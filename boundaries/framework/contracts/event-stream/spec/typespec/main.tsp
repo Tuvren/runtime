@@ -95,7 +95,6 @@ model ReasoningDeltaEvent extends BaseEvent {
 model ReasoningDoneEvent extends BaseEvent {
   type: "reasoning.done";
   messageId: NonEmptyString;
-  text: string;
 }
 
 model FileDoneEvent extends BaseEvent {

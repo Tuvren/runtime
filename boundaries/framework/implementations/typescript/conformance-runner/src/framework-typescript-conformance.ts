@@ -39,6 +39,12 @@ import {
   createConformanceEvidenceSummary,
 } from "../../../../../../tools/scripts/lib/conformance-contract.js";
 import { emitConformanceEvidence } from "../../../../../../tools/scripts/lib/conformance-runner.js";
+import {
+  type AdapterControls,
+  type ImplementationAdapter,
+  type OperationOutcome,
+  TypeScriptFrameworkAdapter,
+} from "./adapter-scaffold.ts";
 
 const REPO_ROOT = resolve(
   dirname(fileURLToPath(import.meta.url)),
@@ -65,6 +71,7 @@ interface AuthorityPacketPlanReference {
 }
 
 interface CheckRunContext {
+  adapter: ImplementationAdapter;
   check: ConformancePlanCheck;
   plan: CompiledConformancePlan;
 }
@@ -85,11 +92,18 @@ await main();
 async function main(): Promise<void> {
   const plans = await readFrameworkPlans();
   const checkResults: ConformanceCheckResult[] = [];
+  const adapter = new TypeScriptFrameworkAdapter();
 
-  for (const plan of plans) {
-    for (const check of plan.plan.checks) {
-      checkResults.push(await runPlanCheck(plan, check));
+  try {
+    for (const plan of plans) {
+      await adapter.initialize(plan.plan.packetId, plan.plan.planVersion);
+
+      for (const check of plan.plan.checks) {
+        checkResults.push(await runPlanCheck(adapter, plan, check));
+      }
     }
+  } finally {
+    await adapter.shutdown();
   }
 
   const summary = createConformanceEvidenceSummary(checkResults);
@@ -198,14 +212,15 @@ function readPlanReference(
 }
 
 async function runPlanCheck(
+  adapter: ImplementationAdapter,
   plan: CompiledConformancePlan,
   check: ConformancePlanCheck
 ): Promise<ConformanceCheckResult> {
   const handler = OPERATION_HANDLERS[check.operation];
   const context =
     handler === undefined
-      ? createPlanDeclaredContext({ check, plan })
-      : await handler({ check, plan });
+      ? await createAdapterOperationContext({ adapter, check, plan })
+      : await handler({ adapter, check, plan });
   const details = createDetails(context);
 
   return createCheckResult(
@@ -291,80 +306,74 @@ async function createAgUiProjectionContext({
   };
 }
 
-function createPlanDeclaredContext({
+async function createAdapterOperationContext({
+  adapter,
   check,
   plan,
-}: CheckRunContext): AssertionContext {
-  const operationContext = readOperationContext(check.input);
-  const scenarioContext = readScenarioContext(plan, check);
+}: CheckRunContext): Promise<AssertionContext> {
+  const input = createAdapterInput(plan, check);
+  const controls = createAdapterControls(check);
+  const outcome = await adapter.dispatch(check.operation, input, controls);
+  const adapterEvents = await collectStreamValues(
+    adapter.events(check.operation, input, controls)
+  );
+  const inspectedState =
+    adapter.inspectState === undefined
+      ? undefined
+      : await adapter.inspectState({
+          checkId: check.checkId,
+          operation: check.operation,
+        });
 
-  return mergeAssertionContexts(scenarioContext, operationContext);
+  await adapter.emitEvidence(check.checkId, "adapter.events", {
+    count: adapterEvents.length,
+  });
+
+  return createAdapterAssertionContext(outcome, inspectedState);
 }
 
-function readOperationContext(input: unknown): AssertionContext {
-  if (!isRecord(input)) {
-    return {};
-  }
-
-  return {
-    evidence: readOptionalRecord(input.evidence),
-    result: input.result,
-    state: readOptionalRecord(input.state),
-  };
-}
-
-function readScenarioContext(
+function createAdapterInput(
   plan: CompiledConformancePlan,
   check: ConformancePlanCheck
-): AssertionContext {
-  if (check.scenario === undefined) {
+): Record<string, unknown> {
+  // Scenarios flow into adapter inputs only. Expected evidence, results,
+  // and state remain plan assertions so the runner cannot prove itself.
+  const input: Record<string, unknown> = {
+    checkInput: check.input,
+  };
+
+  if (check.scenario !== undefined) {
+    input.scenario = plan.scenarios.get(check.scenario);
+  }
+
+  return input;
+}
+
+function createAdapterControls(check: ConformancePlanCheck): AdapterControls {
+  if (check.controls === undefined) {
     return {};
   }
 
-  const scenario = plan.scenarios.get(check.scenario);
-  const scenarioPath = readInputString(check.input, "scenarioPath");
-  const value = readPath(scenario, scenarioPath);
-
-  if (!isRecord(value)) {
-    throw new Error(`${check.checkId} scenario path must resolve to an object`);
-  }
-
   return {
-    evidence: readOptionalRecord(value.expectedEvidence),
-    result: value.expectedResult,
-    state: readOptionalRecord(value.expectedState),
+    cancelAfterEvent: check.controls.cancelAfterEvent,
   };
 }
 
-function mergeAssertionContexts(
-  left: AssertionContext,
-  right: AssertionContext
+function createAdapterAssertionContext(
+  outcome: OperationOutcome,
+  inspectedState: unknown
 ): AssertionContext {
-  return {
-    evidence: mergeRecords(left.evidence, right.evidence),
-    result: right.result ?? left.result,
-    state: mergeRecords(
-      readOptionalRecord(left.state),
-      readOptionalRecord(right.state)
-    ),
-  };
-}
-
-function mergeRecords(
-  left: Record<string, unknown> | undefined,
-  right: Record<string, unknown> | undefined
-): Record<string, unknown> | undefined {
-  if (left === undefined) {
-    return right;
-  }
-
-  if (right === undefined) {
-    return left;
+  if (!isRecord(outcome.result)) {
+    return {
+      result: outcome.result,
+      state: inspectedState ?? undefined,
+    };
   }
 
   return {
-    ...left,
-    ...right,
+    evidence: readOptionalRecord(outcome.result.evidence),
+    result: outcome.result.result,
+    state: inspectedState ?? readOptionalRecord(outcome.result.state),
   };
 }
 

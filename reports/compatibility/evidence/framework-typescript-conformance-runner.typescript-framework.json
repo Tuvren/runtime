@@ -10,7 +10,28 @@
       ],
       "checkId": "driver-callable.before-iteration",
       "details": {
-        "hook": "before-iteration"
+        "driver": {
+          "executed": true
+        },
+        "hooks": {
+          "afterIteration": true,
+          "aroundModel": true,
+          "aroundTool": true,
+          "beforeIteration": true
+        },
+        "state": {
+          "hookCounts": {
+            "afterIteration": 2,
+            "aroundModel": 2,
+            "aroundTool": 1,
+            "beforeIteration": 2
+          },
+          "adapter": {
+            "adapterEvents": 1,
+            "initialized": true,
+            "status": "completed"
+          }
+        }
       },
       "status": "pass"
     },
@@ -23,7 +44,28 @@
       ],
       "checkId": "driver-callable.around-model",
       "details": {
-        "hook": "around-model"
+        "driver": {
+          "executed": true
+        },
+        "hooks": {
+          "afterIteration": true,
+          "aroundModel": true,
+          "aroundTool": true,
+          "beforeIteration": true
+        },
+        "state": {
+          "hookCounts": {
+            "afterIteration": 2,
+            "aroundModel": 2,
+            "aroundTool": 1,
+            "beforeIteration": 2
+          },
+          "adapter": {
+            "adapterEvents": 1,
+            "initialized": true,
+            "status": "completed"
+          }
+        }
       },
       "status": "pass"
     },
@@ -36,7 +78,28 @@
       ],
       "checkId": "driver-callable.around-tool",
       "details": {
-        "hook": "around-tool"
+        "driver": {
+          "executed": true
+        },
+        "hooks": {
+          "afterIteration": true,
+          "aroundModel": true,
+          "aroundTool": true,
+          "beforeIteration": true
+        },
+        "state": {
+          "hookCounts": {
+            "afterIteration": 2,
+            "aroundModel": 2,
+            "aroundTool": 1,
+            "beforeIteration": 2
+          },
+          "adapter": {
+            "adapterEvents": 1,
+            "initialized": true,
+            "status": "completed"
+          }
+        }
       },
       "status": "pass"
     },
@@ -49,7 +112,28 @@
       ],
       "checkId": "driver-callable.after-iteration",
       "details": {
-        "hook": "after-iteration"
+        "driver": {
+          "executed": true
+        },
+        "hooks": {
+          "afterIteration": true,
+          "aroundModel": true,
+          "aroundTool": true,
+          "beforeIteration": true
+        },
+        "state": {
+          "hookCounts": {
+            "afterIteration": 2,
+            "aroundModel": 2,
+            "aroundTool": 1,
+            "beforeIteration": 2
+          },
+          "adapter": {
+            "adapterEvents": 1,
+            "initialized": true,
+            "status": "completed"
+          }
+        }
       },
       "status": "pass"
     },
@@ -62,7 +146,16 @@
       ],
       "checkId": "driver-callable.checkpoint",
       "details": {
-        "checkpoint": "emitted"
+        "checkpoint": {
+          "emitted": true
+        },
+        "state": {
+          "adapter": {
+            "adapterEvents": 1,
+            "initialized": true,
+            "status": "completed"
+          }
+        }
       },
       "status": "pass"
     },
@@ -76,7 +169,26 @@
       "checkId": "driver-api.execute.resolution",
       "details": {
         "driver": {
-          "resolution": "declared"
+          "executed": true
+        },
+        "hooks": {
+          "afterIteration": true,
+          "aroundModel": true,
+          "aroundTool": true,
+          "beforeIteration": true
+        },
+        "state": {
+          "hookCounts": {
+            "afterIteration": 2,
+            "aroundModel": 2,
+            "aroundTool": 1,
+            "beforeIteration": 2
+          },
+          "adapter": {
+            "adapterEvents": 1,
+            "initialized": true,
+            "status": "completed"
+          }
         }
       },
       "status": "pass"
@@ -91,7 +203,14 @@
       "checkId": "driver-api.resume.approval",
       "details": {
         "driver": {
-          "resume": "approval-aware"
+          "resumed": true
+        },
+        "state": {
+          "adapter": {
+            "adapterEvents": 1,
+            "initialized": true,
+            "status": "completed"
+          }
         }
       },
       "status": "pass"
@@ -107,8 +226,15 @@
       "details": {
         "result": {
           "error": {
-            "code": "driver_execution_failed",
+            "code": "driver_execute_error",
             "message": "driver execution failed"
+          }
+        },
+        "state": {
+          "adapter": {
+            "adapterEvents": 1,
+            "initialized": true,
+            "status": "failed"
           }
         }
       },
@@ -838,7 +964,16 @@
       ],
       "checkId": "runtime-callable.provider-generate",
       "details": {
-        "callable": "provider-generate"
+        "callables": {
+          "providerGenerate": true
+        },
+        "state": {
+          "adapter": {
+            "adapterEvents": 1,
+            "initialized": true,
+            "status": "completed"
+          }
+        }
       },
       "status": "pass"
     },
@@ -851,7 +986,16 @@
       ],
       "checkId": "runtime-callable.provider-stream",
       "details": {
-        "callable": "provider-stream"
+        "callables": {
+          "providerStream": true
+        },
+        "state": {
+          "adapter": {
+            "adapterEvents": 1,
+            "initialized": true,
+            "status": "completed"
+          }
+        }
       },
       "status": "pass"
     },
@@ -864,7 +1008,49 @@
       ],
       "checkId": "runtime-callable.tool-execute",
       "details": {
-        "callable": "tool-execute"
+        "callables": {
+          "toolExecute": true
+        },
+        "state": {
+          "toolExecution": {
+            "status": {
+              "activeAgent": "typescript-conformance-agent",
+              "iterationCount": 2,
+              "manifest": {
+                "byRole": {
+                  "tool": 1,
+                  "user": 1,
+                  "system": 0,
+                  "assistant": 2
+                },
+                "toolCalls": {
+                  "total": 1,
+                  "byName": {
+                    "search": 1
+                  }
+                },
+                "extensions": {},
+                "toolResults": {
+                  "total": 1,
+                  "byName": {
+                    "search": 1
+                  }
+                },
+                "messageCount": 4,
+                "tokenEstimate": 20,
+                "turnBoundaries": [0],
+                "lastUserMessageIndex": 0,
+                "lastAssistantMessageIndex": 3
+              },
+              "phase": "completed"
+            }
+          },
+          "adapter": {
+            "adapterEvents": 1,
+            "initialized": true,
+            "status": "completed"
+          }
+        }
       },
       "status": "pass"
     },
@@ -877,7 +1063,19 @@
       ],
       "checkId": "runtime-callable.approval-resolve",
       "details": {
-        "callable": "approval-resolve"
+        "approval": {
+          "continued": true
+        },
+        "callables": {
+          "approvalResolve": true
+        },
+        "state": {
+          "adapter": {
+            "adapterEvents": 1,
+            "initialized": true,
+            "status": "completed"
+          }
+        }
       },
       "status": "pass"
     },
@@ -890,7 +1088,16 @@
       ],
       "checkId": "runtime-callable.validation-failure",
       "details": {
-        "callable": "validation-failure"
+        "callables": {
+          "validationFailure": true
+        },
+        "state": {
+          "adapter": {
+            "adapterEvents": 1,
+            "initialized": true,
+            "status": "completed"
+          }
+        }
       },
       "status": "pass"
     },
@@ -903,7 +1110,25 @@
       ],
       "checkId": "runtime-callable.timeout-retry-cancellation-idempotency",
       "details": {
-        "controls": "honored"
+        "controls": {
+          "honored": true
+        },
+        "runtime": {
+          "failed": true
+        },
+        "result": {
+          "error": {
+            "code": "runtime_execution_cancelled",
+            "message": "execution cancelled"
+          }
+        },
+        "state": {
+          "adapter": {
+            "adapterEvents": 1,
+            "initialized": true,
+            "status": "failed"
+          }
+        }
       },
       "status": "pass"
     },
@@ -917,7 +1142,15 @@
       "checkId": "runtime-api.execute-turn.lifecycle",
       "details": {
         "runtime": {
-          "lifecycle": "completed"
+          "completed": true,
+          "eventCount": 13
+        },
+        "state": {
+          "adapter": {
+            "adapterEvents": 1,
+            "initialized": true,
+            "status": "completed"
+          }
         }
       },
       "status": "pass"
@@ -931,10 +1164,23 @@
       ],
       "checkId": "runtime-api.cancel-execution.failure",
       "details": {
+        "controls": {
+          "honored": true
+        },
+        "runtime": {
+          "failed": true
+        },
         "result": {
           "error": {
             "code": "runtime_execution_cancelled",
             "message": "execution cancelled"
+          }
+        },
+        "state": {
+          "adapter": {
+            "adapterEvents": 1,
+            "initialized": true,
+            "status": "failed"
           }
         }
       },
@@ -950,7 +1196,17 @@
       "checkId": "runtime-api.approval-resolve.paused-resume",
       "details": {
         "approval": {
-          "resolution": "continued"
+          "continued": true
+        },
+        "callables": {
+          "approvalResolve": true
+        },
+        "state": {
+          "adapter": {
+            "adapterEvents": 1,
+            "initialized": true,
+            "status": "completed"
+          }
         }
       },
       "status": "pass"
@@ -966,7 +1222,12 @@
       "details": {
         "state": {
           "branch": {
-            "status": "created"
+            "created": true
+          },
+          "adapter": {
+            "adapterEvents": 1,
+            "initialized": true,
+            "status": "completed"
           }
         }
       },

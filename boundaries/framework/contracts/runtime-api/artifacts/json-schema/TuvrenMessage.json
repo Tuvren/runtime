@@ -1,43 +1,18 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://tuvren.dev/schemas/framework/runtime-api/TuvrenMessage.json",
-  "type": "object",
-  "properties": {
-    "role": {
-      "anyOf": [
-        {
-          "type": "string",
-          "const": "system"
-        },
-        {
-          "type": "string",
-          "const": "user"
-        },
-        {
-          "type": "string",
-          "const": "assistant"
-        },
-        {
-          "type": "string",
-          "const": "tool"
-        }
-      ]
+  "anyOf": [
+    {
+      "$ref": "https://tuvren.dev/schemas/framework/runtime-api/SystemMessage.json"
     },
-    "content": {
-      "type": "string"
+    {
+      "$ref": "https://tuvren.dev/schemas/framework/runtime-api/UserMessage.json"
     },
-    "parts": {
-      "type": "array",
-      "items": {
-        "$ref": "https://tuvren.dev/schemas/framework/runtime-api/ContentPart.json"
-      }
+    {
+      "$ref": "https://tuvren.dev/schemas/framework/runtime-api/AssistantMessage.json"
     },
-    "providerMetadata": {
-      "$ref": "https://tuvren.dev/schemas/framework/runtime-api/Metadata.json"
+    {
+      "$ref": "https://tuvren.dev/schemas/framework/runtime-api/ToolMessage.json"
     }
-  },
-  "required": ["role"],
-  "unevaluatedProperties": {
-    "not": {}
-  }
+  ]
 }

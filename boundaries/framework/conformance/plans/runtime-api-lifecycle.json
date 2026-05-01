@@ -17,23 +17,15 @@
       "assertions": [
         {
           "kind": "evidenceField",
-          "field": "$.runtime.lifecycle",
-          "equals": "completed"
+          "field": "$.runtime.completed",
+          "equals": true
         }
       ],
-      "evidence": ["runtime.lifecycle"]
+      "evidence": ["runtime.completed"]
     },
     {
       "checkId": "runtime-api.cancel-execution.failure",
       "operation": "runtime.cancel-execution",
-      "input": {
-        "result": {
-          "error": {
-            "code": "runtime_execution_cancelled",
-            "message": "execution cancelled"
-          }
-        }
-      },
       "controls": { "deadlineMs": 1000 },
       "assertions": [
         {
@@ -55,11 +47,11 @@
       "assertions": [
         {
           "kind": "evidenceField",
-          "field": "$.approval.resolution",
-          "equals": "continued"
+          "field": "$.approval.continued",
+          "equals": true
         }
       ],
-      "evidence": ["approval.resolution"]
+      "evidence": ["approval.continued"]
     },
     {
       "checkId": "runtime-api.branch-create.recovery",
@@ -69,11 +61,11 @@
       "assertions": [
         {
           "kind": "stateField",
-          "field": "$.branch.status",
-          "equals": "created"
+          "field": "$.branch.created",
+          "equals": true
         }
       ],
-      "evidence": ["branch.status"]
+      "evidence": ["branch.created"]
     }
   ]
 }

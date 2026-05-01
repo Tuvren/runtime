@@ -9,12 +9,9 @@
     },
     "messageId": {
       "$ref": "https://tuvren.dev/schemas/framework/event-stream/NonEmptyString.json"
-    },
-    "text": {
-      "type": "string"
     }
   },
-  "required": ["type", "messageId", "text"],
+  "required": ["type", "messageId"],
   "allOf": [
     {
       "$ref": "https://tuvren.dev/schemas/framework/event-stream/BaseEvent.json"
