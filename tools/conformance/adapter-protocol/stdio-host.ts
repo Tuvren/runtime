@@ -171,7 +171,10 @@ function readControls(value: unknown): AdapterControls {
     return {};
   }
 
-  const controls: AdapterControls = {};
+  const controls: {
+    cancelAfterEvent?: string;
+    deadlineMs?: number;
+  } = {};
 
   if (typeof value.cancelAfterEvent === "string") {
     controls.cancelAfterEvent = value.cancelAfterEvent;

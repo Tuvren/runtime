@@ -15,10 +15,12 @@
  */
 
 import {
+  assertStagedResult,
   decodeDeterministicKernelRecord,
   hashKernelRecord,
   hashOpaqueObjectBytes,
   hashTurnNodeIdentity,
+  type StagedResult,
 } from "@tuvren/kernel-protocol";
 import type {
   AdapterCapabilities,
@@ -91,7 +93,7 @@ async function deterministicHashing(
     "turnNodeIdentityRecord"
   );
   const turnNodeHash = await hashTurnNodeIdentity({
-    consumedStagedResults: readArray(
+    consumedStagedResults: readStagedResults(
       turnNodeIdentityRecord.consumedStagedResults,
       "consumedStagedResults"
     ),
@@ -190,6 +192,18 @@ function readArray(value: unknown, label: string): unknown[] {
   }
 
   return value;
+}
+
+function readStagedResults(value: unknown, label: string): StagedResult[] {
+  const results = readArray(value, label);
+  const stagedResults: StagedResult[] = [];
+
+  for (const [index, result] of results.entries()) {
+    assertStagedResult(result, `${label}[${index}]`);
+    stagedResults.push(result);
+  }
+
+  return stagedResults;
 }
 
 function readNumberArray(value: unknown, label: string): number[] {

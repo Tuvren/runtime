@@ -95,6 +95,15 @@ async function main(): Promise<void> {
   const adapterManifest = await readAdapterManifest(options.adapter);
   const plans = await readPlans(adapterManifest, options);
   const selected = selectChecks(plans, adapterManifest, options);
+
+  if (options.shard === undefined && selected.applicable.length === 0) {
+    // Empty shards are valid, but an unsharded run with zero applicable checks
+    // usually means a typoed filter or stale adapter capabilities.
+    throw new Error(
+      "no applicable conformance checks selected; verify adapter capabilities and filters"
+    );
+  }
+
   const scheduled = applyShard(selected.applicable, options);
   const results = await runScheduledChecks(
     adapterManifest,
@@ -203,7 +212,12 @@ async function runCheck(
       plan.plan.packetId,
       plan.plan.planVersion
     );
-    validateAdapterHandshake(capabilities, manifest);
+    validateAdapterHandshake(
+      capabilities,
+      manifest,
+      plan.plan.packetId,
+      plan.plan.planVersion
+    );
 
     if (Array.isArray(check.steps) && check.steps.length > 0) {
       return await runTraceCheck(client, manifest, plan, compiledCheck);
@@ -435,11 +449,22 @@ function createAdapterControls(
 
 function validateAdapterHandshake(
   capabilities: AdapterCapabilities,
-  manifest: AdapterManifest
+  manifest: AdapterManifest,
+  packetId: string,
+  planVersion: string
 ): void {
   if (capabilities.adapterId !== manifest.adapterId) {
     throw new Error(
       `adapter initialize returned adapterId ${capabilities.adapterId}, expected ${manifest.adapterId}`
+    );
+  }
+
+  if (
+    capabilities.packetId !== packetId ||
+    capabilities.planVersion !== planVersion
+  ) {
+    throw new Error(
+      `adapter initialize echoed ${capabilities.packetId}@${capabilities.planVersion}, expected ${packetId}@${planVersion}`
     );
   }
 
@@ -500,6 +525,7 @@ function selectChecks(
   const adapterCapabilities = new Set(manifest.capabilities);
   const requestedCapabilities = new Set(options.capabilities);
   const requestedChecks = new Set(options.checks);
+  const availableCapabilities = new Set<string>();
   const availableCheckIds = new Set<string>();
   const applicable: ScheduledCheck[] = [];
   const nonApplicable: Array<{ checkId: string; planId: string }> = [];
@@ -522,6 +548,11 @@ function selectChecks(
         ...plan.plan.applicability.capabilities,
         ...(check.capabilities ?? []),
       ];
+
+      for (const capability of requiredCapabilities) {
+        availableCapabilities.add(capability);
+      }
+
       const hasCapabilities = requiredCapabilities.every((capability) =>
         adapterCapabilities.has(capability)
       );
@@ -555,6 +586,16 @@ function selectChecks(
   if (unknownRequestedChecks.length > 0) {
     throw new Error(
       `unknown --check value(s): ${unknownRequestedChecks.sort().join(", ")}`
+    );
+  }
+
+  const unknownRequestedCapabilities = [...requestedCapabilities].filter(
+    (capability) => !availableCapabilities.has(capability)
+  );
+
+  if (unknownRequestedCapabilities.length > 0) {
+    throw new Error(
+      `unknown --capability value(s): ${unknownRequestedCapabilities.sort().join(", ")}`
     );
   }
 

@@ -4,8 +4,31 @@
     "allowImportingTsExtensions": true,
     "composite": false,
     "noEmit": true,
+    "paths": {
+      "@ai-sdk/provider": ["./node_modules/@ai-sdk/provider"],
+      "@tuvren/core-types": [
+        "../../../../../boundaries/shared/contracts/core-types/implementations/typescript/src/index.ts"
+      ],
+      "@tuvren/provider-api": [
+        "../../../../../boundaries/providers/contracts/provider-api/implementations/typescript/src/index.ts"
+      ],
+      "@tuvren/provider-testkit": [
+        "../../../../../boundaries/providers/implementations/typescript/testkit/src/index.ts"
+      ],
+      "@tuvren/provider-bridge-ai-sdk": [
+        "../../../../../boundaries/providers/implementations/typescript/bridge-ai-sdk/src/index.ts"
+      ],
+      "@tuvren/runtime-api": [
+        "../../../../../boundaries/framework/contracts/runtime-api/implementations/typescript/src/index.ts"
+      ]
+    },
     "rootDir": "../../../../../",
     "types": ["bun"]
   },
-  "include": ["src/**/*.ts", "test/**/*.ts", "../testkit/src/**/*.ts"]
+  "include": [
+    "src/**/*.ts",
+    "test/**/*.ts",
+    "../testkit/src/**/*.ts",
+    "../conformance-adapter/src/**/*.ts"
+  ]
 }

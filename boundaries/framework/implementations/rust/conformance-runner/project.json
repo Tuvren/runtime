@@ -9,7 +9,7 @@
       "executor": "nx:run-commands",
       "options": {
         "cwd": ".",
-        "command": "cargo build -p tuvren-framework-rust-conformance-runner"
+        "command": "cargo build -p tuvren-framework-rust-conformance-runner -p tuvren-framework-rust-conformance-adapter"
       }
     },
     "conformance": {
@@ -23,14 +23,14 @@
       "executor": "nx:run-commands",
       "options": {
         "cwd": ".",
-        "command": "cargo fmt --package tuvren-framework-rust-conformance-runner -- --check && cargo clippy -p tuvren-framework-rust-conformance-runner --all-targets -- -D warnings"
+        "command": "cargo fmt --package tuvren-framework-rust-conformance-runner -- --check && cargo fmt --package tuvren-framework-rust-conformance-adapter -- --check && cargo clippy -p tuvren-framework-rust-conformance-runner --all-targets -- -D warnings && cargo clippy -p tuvren-framework-rust-conformance-adapter --all-targets -- -D warnings"
       }
     },
     "test": {
       "executor": "nx:run-commands",
       "options": {
         "cwd": ".",
-        "command": "cargo test -p tuvren-framework-rust-conformance-runner"
+        "command": "cargo test -p tuvren-framework-rust-conformance-runner -p tuvren-framework-rust-conformance-adapter"
       }
     }
   }

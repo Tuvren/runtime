@@ -122,7 +122,10 @@ async function generateMapping(): Promise<Record<string, unknown>> {
     evidence: {
       generate: {
         providerMetadataKeys: Object.keys(providerMetadata),
-        responseFormatName: capturedOptions?.responseFormat?.name,
+        responseFormatName:
+          capturedOptions?.responseFormat?.type === "json"
+            ? capturedOptions.responseFormat.name
+            : undefined,
         responseFormatType: capturedOptions?.responseFormat?.type,
         responsePartTypes: response.parts.map((part) => part.type),
       },
