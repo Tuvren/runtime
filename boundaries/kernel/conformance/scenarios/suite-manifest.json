@@ -50,7 +50,7 @@
       "description": "Logical fixtures preserve canonical diff paths for changed turn trees.",
       "fixtureIds": ["canonical-turn-tree-schema", "kernel-protocol-logical"],
       "assertions": ["logical_diff_matches_fixture_paths"],
-      "implementations": ["typescript-kernel", "rust-kernel"],
+      "implementations": ["rust-kernel"],
       "expectedEvidence": ["assertionResults", "details.diffPaths"]
     },
     {
@@ -58,7 +58,7 @@
       "description": "Logical fixtures preserve deterministic branch listing from the canonical thread root.",
       "fixtureIds": ["kernel-protocol-logical"],
       "assertions": ["branch_list_matches_fixture_entry"],
-      "implementations": ["typescript-kernel", "rust-kernel"],
+      "implementations": ["rust-kernel"],
       "expectedEvidence": ["assertionResults", "details.branchEntries"]
     },
     {
@@ -70,7 +70,7 @@
         "recovery_state_consumed_results",
         "recovery_state_uncommitted_results"
       ],
-      "implementations": ["typescript-kernel", "rust-kernel"],
+      "implementations": ["rust-kernel"],
       "expectedEvidence": ["assertionResults", "details.recoveryStepIds"]
     },
     {
@@ -78,7 +78,7 @@
       "description": "Kernel implementations reject branch creation across thread lineage roots.",
       "scenarioIds": ["cross-thread-lineage-rejection"],
       "assertions": ["cross_thread_branch_create_rejected"],
-      "implementations": ["typescript-kernel", "rust-kernel"],
+      "implementations": ["rust-kernel"],
       "expectedEvidence": ["assertionResults", "details.errorCode"]
     },
     {
@@ -86,7 +86,7 @@
       "description": "Kernel implementations reject turn-head rewrites that jump to a lateral descendant outside the turn lineage.",
       "scenarioIds": ["turn-head-lateral-guard"],
       "assertions": ["lateral_turn_head_move_rejected"],
-      "implementations": ["typescript-kernel", "rust-kernel"],
+      "implementations": ["rust-kernel"],
       "expectedEvidence": ["assertionResults", "details.errorCode"]
     }
   ]

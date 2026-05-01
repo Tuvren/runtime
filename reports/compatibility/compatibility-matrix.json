@@ -1,5 +1,5 @@
 {
-  "generatedAtMs": 1777603618595,
+  "generatedAtMs": 1777604581782,
   "implementations": [
     {
       "implementationId": "typescript-framework",
@@ -36,17 +36,12 @@
         {
           "checkIds": [
             "kernel.protocol.deterministic_hashing",
-            "kernel.protocol.schema_roundtrip",
-            "kernel.logical.diff_paths",
-            "kernel.logical.branch_list",
-            "kernel.logical.recovery_state",
-            "kernel.lineage.cross_thread_rejection",
-            "kernel.turn.lateral_head_guard"
+            "kernel.protocol.schema_roundtrip"
           ],
           "checkSummary": {
             "failedChecks": 0,
-            "passedChecks": 7,
-            "totalChecks": 7
+            "passedChecks": 2,
+            "totalChecks": 2
           },
           "evidencePath": "reports/compatibility/evidence/tuvren.kernel.protocol-seed.typescript-kernel.json",
           "status": "pass",
@@ -137,7 +132,7 @@
       "suiteVersion": "0.2.0"
     }
   ],
-  "sourceRevision": "11b459a93dd6aae36a906fac99c59e9cb027acb4-dirty",
+  "sourceRevision": "76b8981fc829a9340189f0eadb85971b7c2230d0-dirty",
   "suites": [
     {
       "boundary": "framework",

@@ -382,7 +382,7 @@ fn run_branch_list_check(suite: &FixtureSuite) -> Result<CheckResult, KernelErro
         "kernel.logical.branch_list",
         vec![create_assertion_result(
             "branch_list_matches_fixture_entry",
-            branch_entries.len() == 1 && branch_entries[0].0 == branch_head.0,
+            branch_entries.len() == 1 && branch_entries[0] == branch_head,
             None,
         )],
         Some(json!({ "branchEntries": branch_entries })),

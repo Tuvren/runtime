@@ -521,7 +521,13 @@ function readInteropTelemetrySummary(
 function readInteropScenarioReport(
   stdout: string
 ): InteropScenarioReport | undefined {
-  const parsed = JSON.parse(extractTrailingJsonObject(stdout));
+  let parsed: unknown;
+
+  try {
+    parsed = JSON.parse(extractTrailingJsonObject(stdout));
+  } catch {
+    return undefined;
+  }
 
   if (
     !(
@@ -694,9 +700,8 @@ function readConformanceEvidence(
     return undefined;
   }
 
-  const parsed = JSON.parse(extractTrailingJsonObject(stdout));
-
   try {
+    const parsed = JSON.parse(extractTrailingJsonObject(stdout));
     assertConformanceEvidence(parsed, "runner evidence");
     return parsed;
   } catch {
@@ -761,7 +766,8 @@ function createInteropCheckResults(
       // scenario report. We keep that fan-in explicit here so the checked-in
       // evidence matches the boundary-owned check catalog rather than the
       // playground script's current scenario granularity.
-      const scenarioReports = (check.scenarioIds ?? [])
+      const expectedScenarioIds = check.scenarioIds ?? [];
+      const scenarioReports = expectedScenarioIds
         .map((scenarioId) => reportByScenario.get(scenarioId))
         .filter(
           (
@@ -769,21 +775,36 @@ function createInteropCheckResults(
           ): scenarioReport is InteropScenarioReport["reports"][number] =>
             scenarioReport !== undefined
         );
-      const assertionResults = check.assertions.map((assertionId) =>
-        createAssertionResult(
-          assertionId,
+      const missingScenarioIds = expectedScenarioIds.filter(
+        (scenarioId) => !reportByScenario.has(scenarioId)
+      );
+      const assertionResults = check.assertions.map((assertionId) => {
+        const passed =
+          missingScenarioIds.length === 0 &&
           scenarioReports.every(
             (scenarioReport) => scenarioReport.checks[assertionId] === true
-          ),
-          scenarioReports.some(
+          );
+        let message: string | undefined;
+
+        if (missingScenarioIds.length > 0) {
+          message = `interop scenario report is missing required scenarios: ${missingScenarioIds.join(", ")}`;
+        } else if (
+          // Missing manifest-declared scenarios must fail the whole check.
+          // Otherwise `every()` on an empty subset would let a vanished
+          // smoke lane produce a false green compatibility artifact.
+          !scenarioReports.some(
             (scenarioReport) => scenarioReport.checks[assertionId] === true
           )
-            ? undefined
-            : "interop scenario report did not mark this assertion as passing"
-        )
-      );
+        ) {
+          message =
+            "interop scenario report did not mark this assertion as passing";
+        }
+
+        return createAssertionResult(assertionId, passed, message);
+      });
 
       return createCheckResult(check.checkId, assertionResults, {
+        missingScenarioIds,
         scenario: check.scenarioIds ?? [],
         telemetry: scenarioReports.map((scenarioReport) => ({
           observedKeys: scenarioReport.telemetry.observedKeys,
