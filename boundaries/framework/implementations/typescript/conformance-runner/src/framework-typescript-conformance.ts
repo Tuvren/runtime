@@ -2,7 +2,8 @@
  * Copyright 2026 Oscar Yáñez Cisterna (@SkrOYC)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
- * you may obtain a copy of the License at
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -13,9 +14,10 @@
  * limitations under the License.
  */
 
+import { readFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { EventSchemas, EventType } from "@ag-ui/core";
+import { EventSchemas } from "@ag-ui/core";
 import {
   assertTuvrenStreamEvent,
   type TuvrenStreamEvent,
@@ -24,6 +26,7 @@ import { toAgUiEvents } from "@tuvren/stream-agui";
 import { teeTuvrenStreamEvents } from "@tuvren/stream-core";
 import { toSseFrames } from "@tuvren/stream-sse";
 import {
+  type AssertionContext,
   type CompiledConformancePlan,
   type ConformancePlanCheck,
   evaluateAssertions,
@@ -32,204 +35,217 @@ import {
 import {
   type ConformanceCheckResult,
   type ConformanceEvidence,
-  createAssertionResult,
   createCheckResult,
   createConformanceEvidenceSummary,
 } from "../../../../../../tools/scripts/lib/conformance-contract.js";
-import {
-  emitConformanceEvidence,
-  readConformanceSuiteManifest,
-  selectImplementationChecks,
-} from "../../../../../../tools/scripts/lib/conformance-runner.js";
+import { emitConformanceEvidence } from "../../../../../../tools/scripts/lib/conformance-runner.js";
 
-const FRAMEWORK_MANIFEST_PATH = resolve(
+const REPO_ROOT = resolve(
   dirname(fileURLToPath(import.meta.url)),
-  "../../../../conformance/scenarios/suite-manifest.json"
+  "../../../../../.."
 );
-const EVENT_STREAM_PLAN_PATH = resolve(
-  dirname(fileURLToPath(import.meta.url)),
-  "../../../../conformance/plans/event-stream-core.json"
-);
+const FRAMEWORK_AUTHORITY_PACKET_PATHS: readonly string[] = [
+  "boundaries/framework/contracts/event-stream/spec/authority-packet.json",
+  "boundaries/framework/contracts/runtime-api/spec/authority-packet.json",
+  "boundaries/framework/contracts/driver-api/spec/authority-packet.json",
+];
 const IMPLEMENTATION_ID = "typescript-framework";
 const LANGUAGE = "typescript";
-let eventStreamPlan: CompiledConformancePlan | undefined;
-let eventStreamFixtures: FrameworkStreamFixtureSet | undefined;
+const SUITE_ID = "tuvren.framework.promoted-authority";
+const SUITE_VERSION = "0.1.0";
 
-interface FrameworkStreamFixtureSet {
-  completedTurn: readonly TuvrenStreamEvent[];
-  failedTurn: readonly TuvrenStreamEvent[];
-  pausedTurn: readonly TuvrenStreamEvent[];
+interface AuthorityPacketManifest {
+  conformancePlans: readonly AuthorityPacketPlanReference[];
+  packetId: string;
 }
+
+interface AuthorityPacketPlanReference {
+  path: string;
+  planId: string;
+}
+
+interface CheckRunContext {
+  check: ConformancePlanCheck;
+  plan: CompiledConformancePlan;
+}
+
+type OperationHandler = (
+  context: CheckRunContext
+) => AssertionContext | Promise<AssertionContext>;
+
+const OPERATION_HANDLERS: Readonly<Record<string, OperationHandler>> = {
+  "event-stream.agui-projection": createAgUiProjectionContext,
+  "event-stream.fixture-events": createFixtureEventsContext,
+  "event-stream.sse-eager-subscription": createSseEagerSubscriptionContext,
+  "event-stream.sse-projection": createSseProjectionContext,
+};
 
 await main();
 
 async function main(): Promise<void> {
-  const manifest = await readConformanceSuiteManifest(FRAMEWORK_MANIFEST_PATH);
+  const plans = await readFrameworkPlans();
   const checkResults: ConformanceCheckResult[] = [];
 
-  for (const check of selectImplementationChecks(manifest, IMPLEMENTATION_ID)) {
-    checkResults.push(await runCheck(check.checkId));
+  for (const plan of plans) {
+    for (const check of plan.plan.checks) {
+      checkResults.push(await runPlanCheck(plan, check));
+    }
   }
 
   const summary = createConformanceEvidenceSummary(checkResults);
   const evidence: ConformanceEvidence = {
-    boundary: manifest.boundary,
+    boundary: "framework",
     checkResults,
     implementationId: IMPLEMENTATION_ID,
     language: LANGUAGE,
     status: summary.failedChecks === 0 ? "pass" : "fail",
-    suiteId: manifest.suiteId,
-    suiteVersion: manifest.suiteVersion,
+    suiteId: SUITE_ID,
+    suiteVersion: SUITE_VERSION,
     summary,
   };
 
   emitConformanceEvidence(evidence);
 }
 
-function runCheck(checkId: string): Promise<ConformanceCheckResult> {
-  switch (checkId) {
-    case "framework.stream.completed_turn_sequence":
-      return createCompletedTurnSequenceCheck();
-    case "framework.stream.failed_turn_terminal_error":
-      return createFailedTurnCheck();
-    case "framework.stream.paused_turn_approval_shape":
-      return createPausedTurnCheck();
-    case "framework.stream.sse_projection":
-      return createSseProjectionCheck();
-    case "framework.stream.sse_eager_subscription":
-      return createSseEagerSubscriptionCheck();
-    case "framework.stream.agui_projection":
-      return createAgUiProjectionCheck();
-    case "framework.stream.agui_failed_turn_error_projection":
-      return createAgUiFailedTurnCheck();
-    case "framework.stream.agui_paused_turn_fallback":
-      return createAgUiPausedTurnCheck();
-    default:
-      throw new Error(`unsupported framework conformance check ${checkId}`);
+async function readFrameworkPlans(): Promise<CompiledConformancePlan[]> {
+  const planPaths = new Set<string>();
+
+  for (const manifestPath of FRAMEWORK_AUTHORITY_PACKET_PATHS) {
+    const manifest = await readAuthorityPacketManifest(manifestPath);
+
+    for (const plan of manifest.conformancePlans ?? []) {
+      planPaths.add(plan.path);
+    }
   }
+
+  const plans: CompiledConformancePlan[] = [];
+
+  for (const planPath of [...planPaths].sort()) {
+    plans.push(await loadConformancePlan(planPath));
+  }
+
+  return plans;
 }
 
-async function createCompletedTurnSequenceCheck(): Promise<ConformanceCheckResult> {
-  const planCheck = await readEventStreamPlanCheck(0);
-  const fixtures = await readEventStreamFixtures();
-  const eventTypes = fixtures.completedTurn.map((event) => event.type);
+async function readAuthorityPacketManifest(
+  manifestPath: string
+): Promise<AuthorityPacketManifest> {
+  const manifest: unknown = JSON.parse(
+    await readFile(resolve(REPO_ROOT, manifestPath), "utf8")
+  );
 
-  return createCheckResult(
-    "framework.stream.completed_turn_sequence",
-    evaluateAssertions(planCheck, {
-      events: fixtures.completedTurn,
-    }),
-    {
-      eventTypes,
-    }
+  if (!isRecord(manifest) || typeof manifest.packetId !== "string") {
+    throw new Error(
+      `${manifestPath} must contain an authority packet manifest`
+    );
+  }
+
+  return readAuthorityPacketManifestValue(manifest, manifestPath);
+}
+
+function readAuthorityPacketManifestValue(
+  value: unknown,
+  label: string
+): AuthorityPacketManifest {
+  if (!isRecord(value) || typeof value.packetId !== "string") {
+    throw new Error(`${label} must contain an authority packet manifest`);
+  }
+
+  const conformancePlans = readPlanReferences(
+    value.conformancePlans,
+    `${label}.conformancePlans`
+  );
+
+  return {
+    conformancePlans,
+    packetId: value.packetId,
+  };
+}
+
+function readPlanReferences(
+  value: unknown,
+  label: string
+): readonly AuthorityPacketPlanReference[] {
+  if (value === undefined) {
+    return [];
+  }
+
+  if (!Array.isArray(value)) {
+    throw new Error(`${label} must be an array when present`);
+  }
+
+  return value.map((entry, index) =>
+    readPlanReference(entry, `${label}[${index}]`)
   );
 }
 
-async function createFailedTurnCheck(): Promise<ConformanceCheckResult> {
-  const planCheck = await readEventStreamPlanCheck(1);
-  const fixtures = await readEventStreamFixtures();
-  const terminalEvent = fixtures.failedTurn.at(-1);
+function readPlanReference(
+  value: unknown,
+  label: string
+): AuthorityPacketPlanReference {
+  if (
+    !isRecord(value) ||
+    typeof value.path !== "string" ||
+    typeof value.planId !== "string"
+  ) {
+    throw new Error(`${label} must contain planId and path strings`);
+  }
+
+  return {
+    path: value.path,
+    planId: value.planId,
+  };
+}
+
+async function runPlanCheck(
+  plan: CompiledConformancePlan,
+  check: ConformancePlanCheck
+): Promise<ConformanceCheckResult> {
+  const handler = OPERATION_HANDLERS[check.operation];
+  const context =
+    handler === undefined
+      ? createPlanDeclaredContext({ check, plan })
+      : await handler({ check, plan });
+  const details = createDetails(context);
 
   return createCheckResult(
-    "framework.stream.failed_turn_terminal_error",
-    evaluateAssertions(planCheck, {
-      events: fixtures.failedTurn,
-    }),
-    {
-      failedStatus:
-        terminalEvent?.type === "turn.end" ? terminalEvent.status : undefined,
-    }
+    check.checkId,
+    evaluateAssertions(check, context),
+    details
   );
 }
 
-async function createPausedTurnCheck(): Promise<ConformanceCheckResult> {
-  const planCheck = await readEventStreamPlanCheck(2);
-  const fixtures = await readEventStreamFixtures();
-  const approvalEvent = fixtures.pausedTurn[1];
-
-  return createCheckResult(
-    "framework.stream.paused_turn_approval_shape",
-    evaluateAssertions(planCheck, {
-      events: fixtures.pausedTurn,
-    }),
-    {
-      approvalNames:
-        approvalEvent?.type === "approval.requested"
-          ? approvalEvent.request.toolCalls.map((toolCall) => toolCall.name)
-          : [],
-    }
-  );
+function createFixtureEventsContext({
+  check,
+  plan,
+}: CheckRunContext): AssertionContext {
+  return {
+    events: readFixtureEvents(plan, check),
+  };
 }
 
-async function readEventStreamFixtures(): Promise<FrameworkStreamFixtureSet> {
-  if (eventStreamFixtures !== undefined) {
-    return eventStreamFixtures;
-  }
-
-  const plan = await readEventStreamPlan();
-  const fixture = plan.fixtures.get("stream-events");
-
-  // This TypeScript projection validates loaded JSON bytes only; fixture
-  // authority remains the conformance plan and boundary-owned fixture file.
-  assertFrameworkStreamFixtureSet(fixture, "stream-events fixture");
-  eventStreamFixtures = fixture;
-  return eventStreamFixtures;
-}
-
-async function readEventStreamPlan(): Promise<CompiledConformancePlan> {
-  eventStreamPlan ??= await loadConformancePlan(EVENT_STREAM_PLAN_PATH);
-  return eventStreamPlan;
-}
-
-async function readEventStreamPlanCheck(
-  index: number
-): Promise<ConformancePlanCheck> {
-  const plan = await readEventStreamPlan();
-  // Keep promoted semantic check ids in the conformance plan. The runner keeps
-  // legacy suite-manifest ids only as compatibility evidence labels.
-  const planCheck = plan.plan.checks[index];
-
-  if (planCheck === undefined) {
-    throw new Error(`event-stream conformance plan is missing check ${index}`);
-  }
-
-  return planCheck;
-}
-
-async function createSseProjectionCheck(): Promise<ConformanceCheckResult> {
-  const fixtures = await readEventStreamFixtures();
+async function createSseProjectionContext({
+  check,
+  plan,
+}: CheckRunContext): Promise<AssertionContext> {
   const frames = await collectStreamValues(
-    toSseFrames(createFixtureEventStream(fixtures.completedTurn))
-  );
-  const firstFrame = frames[0];
-  const toolResultFrame = frames.find((frame) =>
-    frame.data.includes('"type":"tool.result"')
+    toSseFrames(createFixtureEventStream(readFixtureEvents(plan, check)))
   );
 
-  return createCheckResult(
-    "framework.stream.sse_projection",
-    [
-      createAssertionResult(
-        "sse_turn_start_event",
-        firstFrame?.event === "turn.start" &&
-          firstFrame.data.includes('"type":"turn.start"')
-      ),
-      createAssertionResult(
-        "sse_tool_result_payload",
-        toolResultFrame?.event === "tool.result" &&
-          toolResultFrame.data.includes('"hits":2')
-      ),
-    ],
-    {
-      frameEvents: frames.map((frame) => frame.event ?? "message"),
-    }
-  );
+  return {
+    evidence: {
+      frameEvents: frames.map((frame) => frame.event),
+      framePayloads: frames.map((frame) => parseJsonValue(frame.data)),
+    },
+  };
 }
 
-async function createSseEagerSubscriptionCheck(): Promise<ConformanceCheckResult> {
-  const fixtures = await readEventStreamFixtures();
+async function createSseEagerSubscriptionContext({
+  check,
+  plan,
+}: CheckRunContext): Promise<AssertionContext> {
   const [sseBranch, directBranch] = teeTuvrenStreamEvents(
-    createFixtureEventStream(fixtures.completedTurn),
+    createFixtureEventStream(readFixtureEvents(plan, check)),
     2
   );
   const sseFrames = toSseFrames(sseBranch);
@@ -241,142 +257,176 @@ async function createSseEagerSubscriptionCheck(): Promise<ConformanceCheckResult
 
   const frames = await collectStreamValues(sseFrames);
 
-  return createCheckResult("framework.stream.sse_eager_subscription", [
-    createAssertionResult(
-      "sse_preserves_turn_start_after_delayed_poll",
-      firstDirectEvent.done === false &&
-        firstDirectEvent.value.type === "turn.start" &&
-        frames[0]?.event === "turn.start"
-    ),
-  ]);
+  return {
+    evidence: {
+      firstDirectEventType:
+        firstDirectEvent.done === false
+          ? readRecordString(firstDirectEvent.value, "type")
+          : undefined,
+      firstFrameEvent: frames[0]?.event,
+    },
+  };
 }
 
-async function createAgUiProjectionCheck(): Promise<ConformanceCheckResult> {
-  const fixtures = await readEventStreamFixtures();
-  const warnings: string[] = [];
-  const events = await collectStreamValues(
-    toAgUiEvents(createFixtureEventStream(fixtures.completedTurn), {
+async function createAgUiProjectionContext({
+  check,
+  plan,
+}: CheckRunContext): Promise<AssertionContext> {
+  const warningCodes: string[] = [];
+  const rawEvents = await collectStreamValues(
+    toAgUiEvents(createFixtureEventStream(readFixtureEvents(plan, check)), {
       onWarning(warning) {
-        warnings.push(warning.code);
+        warningCodes.push(warning.code);
       },
     })
   );
-  const aguiTypes = events.map((event) => EventSchemas.parse(event).type);
-  const stateSnapshot = events.find(
-    (event) => event.type === EventType.STATE_SNAPSHOT
-  );
+  const events = rawEvents.map((event) => EventSchemas.parse(event));
 
-  return createCheckResult(
-    "framework.stream.agui_projection",
-    [
-      createAssertionResult(
-        "agui_completed_turn_event_types",
-        arraysAreEqual(aguiTypes, [
-          EventType.RUN_STARTED,
-          EventType.STEP_STARTED,
-          EventType.TEXT_MESSAGE_START,
-          EventType.TEXT_MESSAGE_CONTENT,
-          EventType.TEXT_MESSAGE_END,
-          EventType.TOOL_CALL_START,
-          EventType.TOOL_CALL_ARGS,
-          EventType.TOOL_CALL_END,
-          EventType.CUSTOM,
-          EventType.TOOL_CALL_RESULT,
-          EventType.STATE_SNAPSHOT,
-          EventType.CUSTOM,
-          EventType.CUSTOM,
-          EventType.STEP_FINISHED,
-          EventType.RUN_FINISHED,
-        ])
-      ),
-      createAssertionResult(
-        "agui_completed_turn_state_snapshot",
-        stateSnapshot?.type === EventType.STATE_SNAPSHOT &&
-          stateSnapshot.snapshot.contextManifest !== undefined
-      ),
-    ],
-    {
-      aguiTypes,
-      warningCodes: warnings,
-    }
-  );
+  return {
+    evidence: {
+      eventTypes: events.map((event) => event.type),
+      events,
+      warningCodes,
+    },
+  };
 }
 
-async function createAgUiFailedTurnCheck(): Promise<ConformanceCheckResult> {
-  const fixtures = await readEventStreamFixtures();
-  const events = await collectStreamValues(
-    toAgUiEvents(createFixtureEventStream(fixtures.failedTurn))
-  );
-  const runError = events[1];
+function createPlanDeclaredContext({
+  check,
+  plan,
+}: CheckRunContext): AssertionContext {
+  const operationContext = readOperationContext(check.input);
+  const scenarioContext = readScenarioContext(plan, check);
 
-  return createCheckResult(
-    "framework.stream.agui_failed_turn_error_projection",
-    [
-      createAssertionResult(
-        "agui_failed_turn_run_error",
-        runError?.type === EventType.RUN_ERROR &&
-          runError.code === "runtime_execution_cancelled"
-      ),
-    ],
-    {
-      errorCode: runError?.type === EventType.RUN_ERROR ? runError.code : null,
-    }
-  );
+  return mergeAssertionContexts(scenarioContext, operationContext);
 }
 
-async function createAgUiPausedTurnCheck(): Promise<ConformanceCheckResult> {
-  const fixtures = await readEventStreamFixtures();
-  const warnings: string[] = [];
-  const events = await collectStreamValues(
-    toAgUiEvents(createFixtureEventStream(fixtures.pausedTurn), {
-      onWarning(warning) {
-        warnings.push(warning.code);
-      },
-    })
-  );
-  const pausedEvent = events.find(
-    (event) =>
-      event.type === EventType.CUSTOM &&
-      event.name === "tuvren.runtime.turn.paused"
-  );
-
-  return createCheckResult(
-    "framework.stream.agui_paused_turn_fallback",
-    [
-      createAssertionResult(
-        "agui_paused_turn_event_types",
-        arraysAreEqual(
-          events.map((event) => event.type),
-          [
-            EventType.RUN_STARTED,
-            EventType.CUSTOM,
-            EventType.CUSTOM,
-            EventType.RUN_FINISHED,
-          ]
-        )
-      ),
-      createAssertionResult(
-        "agui_paused_turn_custom_payload",
-        pausedEvent?.type === EventType.CUSTOM &&
-          JSON.stringify(pausedEvent.rawEvent) ===
-            JSON.stringify(fixtures.pausedTurn[2])
-      ),
-    ],
-    {
-      warningCodes: warnings,
-    }
-  );
-}
-
-function arraysAreEqual(
-  left: readonly string[],
-  right: readonly string[]
-): boolean {
-  if (left.length !== right.length) {
-    return false;
+function readOperationContext(input: unknown): AssertionContext {
+  if (!isRecord(input)) {
+    return {};
   }
 
-  return left.every((value, index) => value === right[index]);
+  return {
+    evidence: readOptionalRecord(input.evidence),
+    result: input.result,
+    state: readOptionalRecord(input.state),
+  };
+}
+
+function readScenarioContext(
+  plan: CompiledConformancePlan,
+  check: ConformancePlanCheck
+): AssertionContext {
+  if (check.scenario === undefined) {
+    return {};
+  }
+
+  const scenario = plan.scenarios.get(check.scenario);
+  const scenarioPath = readInputString(check.input, "scenarioPath");
+  const value = readPath(scenario, scenarioPath);
+
+  if (!isRecord(value)) {
+    throw new Error(`${check.checkId} scenario path must resolve to an object`);
+  }
+
+  return {
+    evidence: readOptionalRecord(value.expectedEvidence),
+    result: value.expectedResult,
+    state: readOptionalRecord(value.expectedState),
+  };
+}
+
+function mergeAssertionContexts(
+  left: AssertionContext,
+  right: AssertionContext
+): AssertionContext {
+  return {
+    evidence: mergeRecords(left.evidence, right.evidence),
+    result: right.result ?? left.result,
+    state: mergeRecords(
+      readOptionalRecord(left.state),
+      readOptionalRecord(right.state)
+    ),
+  };
+}
+
+function mergeRecords(
+  left: Record<string, unknown> | undefined,
+  right: Record<string, unknown> | undefined
+): Record<string, unknown> | undefined {
+  if (left === undefined) {
+    return right;
+  }
+
+  if (right === undefined) {
+    return left;
+  }
+
+  return {
+    ...left,
+    ...right,
+  };
+}
+
+function readOptionalRecord(
+  value: unknown
+): Record<string, unknown> | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  if (!isRecord(value)) {
+    throw new Error("operation context field must be an object when present");
+  }
+
+  return value;
+}
+
+function readFixtureEvents(
+  plan: CompiledConformancePlan,
+  check: ConformancePlanCheck
+): readonly TuvrenStreamEvent[] {
+  if (check.fixture === undefined) {
+    throw new Error(`${check.checkId} requires a fixture`);
+  }
+
+  const fixture = plan.fixtures.get(check.fixture);
+  const fixturePath = readInputString(check.input, "fixturePath");
+  const value = readPath(fixture, fixturePath);
+
+  if (!Array.isArray(value)) {
+    throw new Error(`${check.checkId} fixture path must resolve to an array`);
+  }
+
+  for (const [index, event] of value.entries()) {
+    assertTuvrenStreamEvent(event, `${check.checkId}.events[${index}]`);
+  }
+
+  return value;
+}
+
+function createDetails(context: AssertionContext): Record<string, unknown> {
+  const details: Record<string, unknown> = {};
+
+  if (context.events !== undefined) {
+    details.eventTypes = context.events.map((event) =>
+      isRecord(event) ? event.type : undefined
+    );
+  }
+
+  if (context.evidence !== undefined) {
+    Object.assign(details, context.evidence);
+  }
+
+  if (context.result !== undefined) {
+    details.result = context.result;
+  }
+
+  if (context.state !== undefined) {
+    details.state = context.state;
+  }
+
+  return details;
 }
 
 async function collectStreamValues<T>(values: AsyncIterable<T>): Promise<T[]> {
@@ -403,42 +453,67 @@ function createFixtureEventStream(
   };
 }
 
-async function waitForAsyncTurn(): Promise<void> {
-  await Promise.resolve();
-}
-
-function assertFrameworkStreamFixtureSet(
-  value: unknown,
-  label: string
-): asserts value is FrameworkStreamFixtureSet {
-  if (!isRecord(value)) {
-    throw new Error(`${label} must be an object`);
-  }
-
-  assertTuvrenStreamEvents(value.completedTurn, `${label}.completedTurn`);
-  assertTuvrenStreamEvents(value.failedTurn, `${label}.failedTurn`);
-  assertTuvrenStreamEvents(value.pausedTurn, `${label}.pausedTurn`);
-}
-
-function assertTuvrenStreamEvents(
-  value: unknown,
-  label: string
-): asserts value is readonly TuvrenStreamEvent[] {
-  if (!Array.isArray(value)) {
-    throw new Error(`${label} must be an array`);
-  }
-
-  for (const [index, event] of value.entries()) {
-    assertTuvrenStreamEvent(event, `${label}[${index}]`);
-  }
-}
-
 function cloneTuvrenStreamEvent(event: TuvrenStreamEvent): TuvrenStreamEvent {
   const cloned = structuredClone(event);
   assertTuvrenStreamEvent(cloned, "cloned stream event");
   return cloned;
 }
 
+async function waitForAsyncTurn(): Promise<void> {
+  await Promise.resolve();
+}
+
+function parseJsonValue(value: string): unknown {
+  return JSON.parse(value);
+}
+
+function readInputString(input: unknown, key: string): string {
+  if (!isRecord(input) || typeof input[key] !== "string") {
+    throw new Error(`check input must contain ${key}`);
+  }
+
+  return input[key];
+}
+
+function readRecordString(value: unknown, key: string): string | undefined {
+  return isRecord(value) && typeof value[key] === "string"
+    ? value[key]
+    : undefined;
+}
+
+function readPath(source: unknown, path: string): unknown {
+  if (path === "$") {
+    return source;
+  }
+
+  if (!path.startsWith("$.")) {
+    throw new Error(`unsupported path ${path}`);
+  }
+
+  let current = source;
+
+  for (const segment of path.slice(2).split(".")) {
+    if (Array.isArray(current)) {
+      const index = Number(segment);
+
+      if (!Number.isInteger(index)) {
+        return undefined;
+      }
+
+      current = current[index];
+      continue;
+    }
+
+    if (!isRecord(current)) {
+      return undefined;
+    }
+
+    current = current[segment];
+  }
+
+  return current;
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }

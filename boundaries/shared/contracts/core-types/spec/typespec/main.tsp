@@ -8,10 +8,10 @@ namespace Tuvren.Shared.CoreTypes;
 scalar NonEmptyString extends string;
 
 @doc("Milliseconds since Unix epoch.")
-scalar EpochMs extends int64;
+scalar EpochMs extends safeint;
 
 @doc("Stable lowercase hash string projected across authority packets.")
-@pattern("^[a-z0-9:_-]+$")
+@pattern("^[0-9a-f]{64}$")
 scalar HashString extends string;
 
 @doc("Opaque JSON object used for metadata maps.")

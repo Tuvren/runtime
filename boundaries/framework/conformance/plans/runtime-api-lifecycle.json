@@ -3,7 +3,7 @@
   "planVersion": "0.1.0",
   "packetId": "tuvren.framework.runtime-api",
   "applicability": {
-    "adapters": ["typescript-framework"]
+    "capabilities": ["framework.runtime-api"]
   },
   "scenarios": {
     "runtime-api-scenarios": "../scenarios/runtime-api-scenarios.json"
@@ -26,6 +26,14 @@
     {
       "checkId": "runtime-api.cancel-execution.failure",
       "operation": "runtime.cancel-execution",
+      "input": {
+        "result": {
+          "error": {
+            "code": "runtime_execution_cancelled",
+            "message": "execution cancelled"
+          }
+        }
+      },
       "controls": { "deadlineMs": 1000 },
       "assertions": [
         {

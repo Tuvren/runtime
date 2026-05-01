@@ -3,12 +3,13 @@
   "planVersion": "0.1.0",
   "packetId": "tuvren.framework.driver-api",
   "applicability": {
-    "adapters": ["typescript-framework"]
+    "capabilities": ["framework.driver-api"]
   },
   "checks": [
     {
       "checkId": "driver-callable.before-iteration",
       "operation": "driver.execute",
+      "input": { "evidence": { "hook": "before-iteration" } },
       "assertions": [
         {
           "kind": "evidenceField",
@@ -21,6 +22,7 @@
     {
       "checkId": "driver-callable.around-model",
       "operation": "driver.execute",
+      "input": { "evidence": { "hook": "around-model" } },
       "assertions": [
         { "kind": "evidenceField", "field": "$.hook", "equals": "around-model" }
       ],
@@ -29,6 +31,7 @@
     {
       "checkId": "driver-callable.around-tool",
       "operation": "driver.execute",
+      "input": { "evidence": { "hook": "around-tool" } },
       "assertions": [
         { "kind": "evidenceField", "field": "$.hook", "equals": "around-tool" }
       ],
@@ -37,6 +40,7 @@
     {
       "checkId": "driver-callable.after-iteration",
       "operation": "driver.execute",
+      "input": { "evidence": { "hook": "after-iteration" } },
       "assertions": [
         {
           "kind": "evidenceField",
@@ -49,6 +53,7 @@
     {
       "checkId": "driver-callable.checkpoint",
       "operation": "driver.checkpoint",
+      "input": { "evidence": { "checkpoint": "emitted" } },
       "assertions": [
         {
           "kind": "evidenceField",

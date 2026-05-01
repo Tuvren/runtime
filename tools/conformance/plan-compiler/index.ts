@@ -57,7 +57,7 @@ export interface ConformancePlanCheck {
 
 export interface ConformancePlan {
   applicability: {
-    adapters: string[];
+    capabilities: string[];
   };
   checks: ConformancePlanCheck[];
   fixtures?: Record<string, string>;

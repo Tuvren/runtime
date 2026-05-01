@@ -36,6 +36,8 @@ import type {
 } from "@tuvren/kernel-protocol";
 import { encodeDeterministicKernelRecord } from "@tuvren/kernel-protocol";
 
+// Binding-local probes only: kernel protocol authority remains in neutral
+// conformance fixtures/specs, not in this TypeScript test harness.
 const orderedPathHashes = [
   "5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f",
   "6a6a6a6a6a6a6a6a6a6a6a6a6a6a6a6a6a6a6a6a6a6a6a6a6a6a6a6a6a6a6a6a",

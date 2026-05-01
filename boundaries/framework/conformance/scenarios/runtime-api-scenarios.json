@@ -2,19 +2,25 @@
   "completed-turn": {
     "operation": "runtime.execute-turn",
     "expectedEvidence": {
-      "runtime.lifecycle": "completed"
+      "runtime": {
+        "lifecycle": "completed"
+      }
     }
   },
   "paused-turn-resume": {
     "operation": "runtime.approval-resolve",
     "expectedEvidence": {
-      "approval.resolution": "continued"
+      "approval": {
+        "resolution": "continued"
+      }
     }
   },
   "branch-from-completed-head": {
     "operation": "runtime.branch-create",
     "expectedState": {
-      "branch.status": "created"
+      "branch": {
+        "status": "created"
+      }
     }
   }
 }

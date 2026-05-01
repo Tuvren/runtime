@@ -3,7 +3,7 @@
   "planVersion": "0.1.0",
   "packetId": "tuvren.framework.event-stream",
   "applicability": {
-    "adapters": ["typescript-framework"]
+    "capabilities": ["framework.event-stream"]
   },
   "fixtures": {
     "stream-events": "../fixtures/stream-events.json"
@@ -86,6 +86,159 @@
         }
       ],
       "evidence": ["assertionResults", "details.approvalNames"]
+    },
+    {
+      "checkId": "event-stream.sse.projection",
+      "operation": "event-stream.sse-projection",
+      "fixture": "stream-events",
+      "input": { "fixturePath": "$.completedTurn" },
+      "assertions": [
+        {
+          "kind": "evidenceField",
+          "field": "$.frameEvents",
+          "equals": [
+            "turn.start",
+            "iteration.start",
+            "message.start",
+            "text.delta",
+            "text.done",
+            "tool_call.start",
+            "tool_call.args_delta",
+            "tool_call.done",
+            "tool.start",
+            "tool.result",
+            "state.snapshot",
+            "custom",
+            "message.done",
+            "iteration.end",
+            "turn.end"
+          ]
+        },
+        {
+          "kind": "evidenceField",
+          "field": "$.framePayloads.0.type",
+          "equals": "turn.start"
+        },
+        {
+          "kind": "evidenceField",
+          "field": "$.framePayloads.9.output.hits",
+          "equals": 2
+        }
+      ],
+      "evidence": ["frameEvents", "framePayloads"]
+    },
+    {
+      "checkId": "event-stream.sse.eager-subscription",
+      "operation": "event-stream.sse-eager-subscription",
+      "fixture": "stream-events",
+      "input": { "fixturePath": "$.completedTurn" },
+      "assertions": [
+        {
+          "kind": "evidenceField",
+          "field": "$.firstDirectEventType",
+          "equals": "turn.start"
+        },
+        {
+          "kind": "evidenceField",
+          "field": "$.firstFrameEvent",
+          "equals": "turn.start"
+        }
+      ],
+      "evidence": ["firstDirectEventType", "firstFrameEvent"]
+    },
+    {
+      "checkId": "event-stream.agui.projection",
+      "operation": "event-stream.agui-projection",
+      "fixture": "stream-events",
+      "input": { "fixturePath": "$.completedTurn" },
+      "assertions": [
+        {
+          "kind": "evidenceField",
+          "field": "$.eventTypes",
+          "equals": [
+            "RUN_STARTED",
+            "STEP_STARTED",
+            "TEXT_MESSAGE_START",
+            "TEXT_MESSAGE_CONTENT",
+            "TEXT_MESSAGE_END",
+            "TOOL_CALL_START",
+            "TOOL_CALL_ARGS",
+            "TOOL_CALL_END",
+            "CUSTOM",
+            "TOOL_CALL_RESULT",
+            "STATE_SNAPSHOT",
+            "CUSTOM",
+            "CUSTOM",
+            "STEP_FINISHED",
+            "RUN_FINISHED"
+          ]
+        },
+        {
+          "kind": "evidenceField",
+          "field": "$.events.10.snapshot.contextManifest.messageCount",
+          "equals": 3
+        },
+        {
+          "kind": "evidenceField",
+          "field": "$.warningCodes",
+          "equals": [
+            "agui_tool_execution_custom_fallback",
+            "agui_message_done_custom_fallback"
+          ]
+        }
+      ],
+      "evidence": ["eventTypes", "events", "warningCodes"]
+    },
+    {
+      "checkId": "event-stream.agui.failed-turn-error-projection",
+      "operation": "event-stream.agui-projection",
+      "fixture": "stream-events",
+      "input": { "fixturePath": "$.failedTurn" },
+      "assertions": [
+        {
+          "kind": "evidenceField",
+          "field": "$.eventTypes",
+          "equals": ["RUN_STARTED", "RUN_ERROR"]
+        },
+        {
+          "kind": "evidenceField",
+          "field": "$.events.1.code",
+          "equals": "runtime_execution_cancelled"
+        }
+      ],
+      "evidence": ["eventTypes", "events"]
+    },
+    {
+      "checkId": "event-stream.agui.paused-turn-fallback",
+      "operation": "event-stream.agui-projection",
+      "fixture": "stream-events",
+      "input": { "fixturePath": "$.pausedTurn" },
+      "assertions": [
+        {
+          "kind": "evidenceField",
+          "field": "$.eventTypes",
+          "equals": ["RUN_STARTED", "CUSTOM", "CUSTOM", "RUN_FINISHED"]
+        },
+        {
+          "kind": "evidenceField",
+          "field": "$.events.2.rawEvent.type",
+          "equals": "turn.end"
+        },
+        {
+          "kind": "evidenceField",
+          "field": "$.events.2.rawEvent.status",
+          "equals": "paused"
+        },
+        {
+          "kind": "evidenceField",
+          "field": "$.warningCodes",
+          "equals": [
+            "agui_approval_custom_fallback",
+            "agui_paused_turn_coerced_to_run_finished"
+          ]
+        }
+      ],
+      "evidence": ["eventTypes", "events", "warningCodes"]
     }
   ]
 }

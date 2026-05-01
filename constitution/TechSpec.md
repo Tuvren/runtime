@@ -1690,7 +1690,7 @@ The manifest lives at `boundaries/<area>/contracts/<surface>/spec/authority-pack
 
 - **Style:** boundary-owned JSON document validated by JSON Schema 2020-12
 - **Authentication / Authorization:** None. Plans are reviewed source under normal repo policy.
-- **Compatibility Strategy:** Plans use `planVersion` independent of npm/crate versions. Adding new checks or new applicable adapters is minor; removing a check or tightening an existing assertion is major.
+- **Compatibility Strategy:** Plans use `planVersion` independent of npm/crate versions. Adding new checks or new applicable capabilities is minor; removing a check or tightening an existing assertion is major.
 - **Error model:** Plan-loading failures, schema validation failures against the plan schema, and unresolved `$ref`s to fixtures or scenarios stop CI before any adapter executes.
 
 A conformance plan is data-owned per ADR-025. Plans live alongside the surface they verify under `boundaries/<area>/conformance/plans/<plan-id>.json` (or under a sibling `interop/<channel>/plans/` directory for interop-rooted plans). Plans validate against `tools/schemas/conformance-plan.schema.json`.
@@ -1714,10 +1714,10 @@ A conformance plan is data-owned per ADR-025. Plans live alongside the surface t
     "packetId": { "type": "string", "minLength": 1 },
     "applicability": {
       "type": "object",
-      "required": ["adapters"],
+      "required": ["capabilities"],
       "additionalProperties": false,
       "properties": {
-        "adapters": {
+        "capabilities": {
           "type": "array",
           "minItems": 1,
           "items": { "type": "string", "minLength": 1 }
@@ -1794,7 +1794,7 @@ A conformance plan is data-owned per ADR-025. Plans live alongside the surface t
 
 - `operation` is a neutral operation name resolved by the Implementation Adapter Protocol (§4.13). The plan never names a TypeScript function or a Rust trait method directly; it names the neutral operation declared by the authority packet.
 - `assertions[].kind` covers shape (`schemaValid`, `errorEnvelope`), behavior (`eventSequence`, `terminalEvent`, `ordering`, `noEvent`), durable state (`stateField`), and evidence (`evidenceField`). Generic runners implement these kinds; product-specific assertion logic must be expressed through these operators rather than added as runner-side bespoke code.
-- `controls` covers cancellation injection and deadlines; additional generic mechanics may be added through `applicability.adapters`-aware adapter capabilities rather than by hard-coding new control semantics in runner source.
+- `controls` covers cancellation injection and deadlines; additional generic mechanics may be added through capability selectors and adapter-declared capabilities rather than by hard-coding new control semantics in runner source.
 - `evidence[]` lists the evidence artifact paths the runner must emit for the Compatibility Reporting Boundary; missing required evidence is a check failure.
 
 ### 4.13 Implementation Adapter Protocol

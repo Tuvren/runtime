@@ -10,10 +10,10 @@
     "packetId": { "type": "string", "minLength": 1 },
     "applicability": {
       "type": "object",
-      "required": ["adapters"],
+      "required": ["capabilities"],
       "additionalProperties": false,
       "properties": {
-        "adapters": {
+        "capabilities": {
           "type": "array",
           "minItems": 1,
           "items": { "type": "string", "minLength": 1 }

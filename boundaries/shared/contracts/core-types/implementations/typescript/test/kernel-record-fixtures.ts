@@ -19,6 +19,8 @@ import type { KernelRecord } from "@tuvren/core-types";
 import { assertKernelRecord } from "@tuvren/core-types";
 import { Encoder } from "cbor-x";
 
+// Binding-local probes only: shared core-types authority lives in the packet
+// TypeSpec and generated schemas, not in these TypeScript test values.
 const deterministicEncoderOptions = {
   tagUint8Array: false,
   useTag259ForMaps: false,

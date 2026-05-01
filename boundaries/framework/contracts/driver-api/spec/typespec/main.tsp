@@ -7,7 +7,7 @@ namespace Tuvren.Framework.DriverApi;
 @pattern(".*\\S.*", "Must contain non-whitespace content.")
 scalar NonEmptyString extends string;
 
-scalar EpochMs extends int64;
+scalar EpochMs extends safeint;
 
 model Metadata is Record<unknown>;
 

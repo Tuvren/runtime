@@ -30,6 +30,8 @@ import type {
   TuvrenToolDefinition,
 } from "@tuvren/runtime-api";
 
+// Binding-local harness only: cross-implementation runtime-api authority lives
+// in the packet TypeSpec and conformance plans, not in these TypeScript values.
 function emptyEvents<T>(): AsyncIterable<T> {
   return (async function* () {
     yield* [];

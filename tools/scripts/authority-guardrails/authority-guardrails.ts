@@ -61,12 +61,13 @@ const FIXTURE_ROOT = resolve(
   REPO_ROOT,
   "tools/scripts/authority-guardrails/__fixtures__"
 );
+const ROOT_TESTS_ROOT = resolve(REPO_ROOT, "tests");
 const RUNNER_SOURCE_ROOTS = [
   // Epic Y only promotes framework surfaces to packet-driven conformance.
   // Kernel/provider runners stay out of this guardrail until a later epic gives
   // those surfaces authority packets instead of legacy suite manifests.
   "boundaries/framework/implementations/typescript/conformance-runner/src",
-] as const;
+];
 const FRAMEWORK_TYPESCRIPT_ROOT =
   "boundaries/framework/implementations/typescript";
 const TYPESCRIPT_OWNED_CONFORMANCE_PATTERNS: readonly RegExp[] = [
@@ -79,6 +80,8 @@ const TYPESCRIPT_OWNED_FRAMEWORK_FIXTURE_PATTERNS: readonly RegExp[] = [
   /\bFrameworkStreamTestFixtureSet\b/u,
   /framework-conformance-fixtures/u,
 ];
+const ROOT_TUVREN_IMPORT_PATTERN = /@tuvren\//u;
+const RUNNER_AGUI_EVENT_ENUM_PATTERN = /\bEventType\.[A-Z_]+\b/u;
 const FORBIDDEN_VOCABULARY_PATTERNS: readonly RegExp[] = [
   /\bPromise\b/u,
   /\bAsyncIterable\b/u,
@@ -87,6 +90,11 @@ const FORBIDDEN_VOCABULARY_PATTERNS: readonly RegExp[] = [
   /\bBuffer\b/u,
   /\bVec<u8>\b/u,
 ];
+const GENERIC_RUNNER_LITERAL_ALLOWLIST = new Set([
+  "completed",
+  "failed",
+  "paused",
+]);
 
 await main();
 
@@ -96,6 +104,7 @@ async function main(): Promise<void> {
     ...checkFreshnessDeclarations(manifests),
     ...(await checkFreshnessDrift(manifests)),
     ...(await checkForbiddenAuthorityEvidence(manifests)),
+    ...(await checkRootTypescriptFixtures()),
     ...(await checkTypescriptOwnedConformanceSources()),
     ...(await checkTypescriptOwnedFrameworkFixtures()),
     ...(await checkRunnerOracleLiterals(manifests)),
@@ -122,7 +131,7 @@ async function loadAuthorityPackets(): Promise<AuthorityPacketManifest[]> {
   const manifests: AuthorityPacketManifest[] = [];
 
   for (const manifestPath of manifestPaths) {
-    const value = JSON.parse(await readFile(manifestPath, "utf8")) as unknown;
+    const value: unknown = JSON.parse(await readFile(manifestPath, "utf8"));
 
     if (isAuthorityPacketManifest(value)) {
       manifests.push(value);
@@ -251,12 +260,38 @@ async function checkRunnerOracleLiterals(
 ): Promise<GuardrailFailure[]> {
   const failures: GuardrailFailure[] = [];
   const planCheckIds = await collectPlanCheckIds(manifests);
+  const planAssertionLiterals = await collectPlanAssertionLiterals(manifests);
 
   for (const runnerRoot of RUNNER_SOURCE_ROOTS) {
     const sourcePaths = await findSourceFiles(resolve(REPO_ROOT, runnerRoot));
 
     for (const sourcePath of sourcePaths) {
-      failures.push(...(await checkRunnerSourceFile(sourcePath, planCheckIds)));
+      failures.push(
+        ...(await checkRunnerSourceFile(
+          sourcePath,
+          planCheckIds,
+          planAssertionLiterals
+        ))
+      );
+    }
+  }
+
+  return failures;
+}
+
+async function checkRootTypescriptFixtures(): Promise<GuardrailFailure[]> {
+  const sourcePaths = await findSourceFiles(ROOT_TESTS_ROOT);
+  const failures: GuardrailFailure[] = [];
+
+  for (const sourcePath of sourcePaths) {
+    const source = await readFile(sourcePath, "utf8");
+    const sourceLabel = relative(REPO_ROOT, sourcePath);
+
+    if (ROOT_TUVREN_IMPORT_PATTERN.test(source)) {
+      failures.push({
+        check: "root-typescript-fixture",
+        message: `${sourceLabel} imports a Tuvren TypeScript package; root tests must not own reusable contract or conformance fixtures`,
+      });
     }
   }
 
@@ -349,15 +384,33 @@ async function collectPlanCheckIds(
 
   for (const manifest of manifests) {
     for (const plan of manifest.conformancePlans ?? []) {
-      const planValue = JSON.parse(
+      const planValue: unknown = JSON.parse(
         await readFile(resolve(REPO_ROOT, plan.path), "utf8")
-      ) as unknown;
+      );
 
       collectCheckIdsFromPlanValue(planValue, planCheckIds);
     }
   }
 
   return planCheckIds;
+}
+
+async function collectPlanAssertionLiterals(
+  manifests: readonly AuthorityPacketManifest[]
+): Promise<Set<string>> {
+  const literals = new Set<string>();
+
+  for (const manifest of manifests) {
+    for (const plan of manifest.conformancePlans ?? []) {
+      const planValue: unknown = JSON.parse(
+        await readFile(resolve(REPO_ROOT, plan.path), "utf8")
+      );
+
+      collectAssertionLiteralsFromPlanValue(planValue, literals);
+    }
+  }
+
+  return literals;
 }
 
 function collectCheckIdsFromPlanValue(
@@ -375,22 +428,72 @@ function collectCheckIdsFromPlanValue(
   }
 }
 
+function collectAssertionLiteralsFromPlanValue(
+  planValue: unknown,
+  literals: Set<string>
+): void {
+  if (!(isRecord(planValue) && Array.isArray(planValue.checks))) {
+    return;
+  }
+
+  for (const check of planValue.checks) {
+    if (!(isRecord(check) && Array.isArray(check.assertions))) {
+      continue;
+    }
+
+    for (const assertion of check.assertions) {
+      if (!isRecord(assertion)) {
+        continue;
+      }
+
+      collectStringLiterals(assertion.equals, literals);
+      collectStringLiterals(assertion.contains, literals);
+      collectStringLiterals(assertion.eventType, literals);
+    }
+  }
+}
+
+function collectStringLiterals(value: unknown, literals: Set<string>): void {
+  if (typeof value === "string") {
+    if (value.length >= 3 && !GENERIC_RUNNER_LITERAL_ALLOWLIST.has(value)) {
+      literals.add(value);
+    }
+    return;
+  }
+
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      collectStringLiterals(item, literals);
+    }
+    return;
+  }
+
+  if (isRecord(value)) {
+    for (const item of Object.values(value)) {
+      collectStringLiterals(item, literals);
+    }
+  }
+}
+
 async function checkRunnerSourceFile(
   sourcePath: string,
-  planCheckIds: ReadonlySet<string>
+  planCheckIds: ReadonlySet<string>,
+  planAssertionLiterals: ReadonlySet<string>
 ): Promise<GuardrailFailure[]> {
   const source = await readFile(sourcePath, "utf8");
   return checkRunnerSourceText(
     source,
     relative(REPO_ROOT, sourcePath),
-    planCheckIds
+    planCheckIds,
+    planAssertionLiterals
   );
 }
 
 function checkRunnerSourceText(
   source: string,
   sourceLabel: string,
-  planCheckIds: ReadonlySet<string>
+  planCheckIds: ReadonlySet<string>,
+  planAssertionLiterals: ReadonlySet<string>
 ): GuardrailFailure[] {
   const failures: GuardrailFailure[] = [];
 
@@ -401,6 +504,22 @@ function checkRunnerSourceText(
         message: `${sourceLabel} embeds conformance-plan check id ${checkId}; runner source must load plan data instead`,
       });
     }
+  }
+
+  for (const literal of planAssertionLiterals) {
+    if (source.includes(JSON.stringify(literal))) {
+      failures.push({
+        check: "runner-oracle",
+        message: `${sourceLabel} embeds conformance-plan assertion literal ${literal}; runner source must load semantic expectations from plans`,
+      });
+    }
+  }
+
+  if (RUNNER_AGUI_EVENT_ENUM_PATTERN.test(source)) {
+    failures.push({
+      check: "runner-oracle",
+      message: `${sourceLabel} embeds AG-UI semantic event enum constants; runner source must read expected event names from plans`,
+    });
   }
 
   if (source.includes("AUTHORITY_ORACLE_FIXTURE")) {
@@ -416,12 +535,12 @@ function checkRunnerSourceText(
 async function runFixtureSelfTests(): Promise<GuardrailFailure[]> {
   const failures: GuardrailFailure[] = [];
 
-  const freshnessFixture = JSON.parse(
+  const freshnessFixture: unknown = JSON.parse(
     await readFile(
       resolve(FIXTURE_ROOT, "freshness-drift/authority-packet.json"),
       "utf8"
     )
-  ) as unknown;
+  );
 
   if (
     !isAuthorityPacketManifest(freshnessFixture) ||
@@ -467,7 +586,8 @@ async function runFixtureSelfTests(): Promise<GuardrailFailure[]> {
   const runnerFailures = checkRunnerSourceText(
     runnerFixture,
     "fixture runner",
-    new Set()
+    new Set(),
+    new Set(["turn.start"])
   );
 
   if (runnerFailures.length === 0) {
