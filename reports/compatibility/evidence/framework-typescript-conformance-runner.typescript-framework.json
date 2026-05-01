@@ -11,13 +11,23 @@
       "checkId": "driver-callable.before-iteration",
       "details": {
         "driver": {
-          "executed": true
+          "phase": "completed"
         },
         "hooks": {
-          "afterIteration": true,
-          "aroundModel": true,
-          "aroundTool": true,
-          "beforeIteration": true
+          "afterIteration": 2,
+          "aroundModel": 2,
+          "aroundTool": 1,
+          "beforeIteration": 2
+        },
+        "provider": {
+          "generate": {
+            "callCount": 2
+          }
+        },
+        "tool": {
+          "execution": {
+            "callCount": 1
+          }
         },
         "state": {
           "hookCounts": {
@@ -45,13 +55,23 @@
       "checkId": "driver-callable.around-model",
       "details": {
         "driver": {
-          "executed": true
+          "phase": "completed"
         },
         "hooks": {
-          "afterIteration": true,
-          "aroundModel": true,
-          "aroundTool": true,
-          "beforeIteration": true
+          "afterIteration": 2,
+          "aroundModel": 2,
+          "aroundTool": 1,
+          "beforeIteration": 2
+        },
+        "provider": {
+          "generate": {
+            "callCount": 2
+          }
+        },
+        "tool": {
+          "execution": {
+            "callCount": 1
+          }
         },
         "state": {
           "hookCounts": {
@@ -79,13 +99,23 @@
       "checkId": "driver-callable.around-tool",
       "details": {
         "driver": {
-          "executed": true
+          "phase": "completed"
         },
         "hooks": {
-          "afterIteration": true,
-          "aroundModel": true,
-          "aroundTool": true,
-          "beforeIteration": true
+          "afterIteration": 2,
+          "aroundModel": 2,
+          "aroundTool": 1,
+          "beforeIteration": 2
+        },
+        "provider": {
+          "generate": {
+            "callCount": 2
+          }
+        },
+        "tool": {
+          "execution": {
+            "callCount": 1
+          }
         },
         "state": {
           "hookCounts": {
@@ -113,13 +143,23 @@
       "checkId": "driver-callable.after-iteration",
       "details": {
         "driver": {
-          "executed": true
+          "phase": "completed"
         },
         "hooks": {
-          "afterIteration": true,
-          "aroundModel": true,
-          "aroundTool": true,
-          "beforeIteration": true
+          "afterIteration": 2,
+          "aroundModel": 2,
+          "aroundTool": 1,
+          "beforeIteration": 2
+        },
+        "provider": {
+          "generate": {
+            "callCount": 2
+          }
+        },
+        "tool": {
+          "execution": {
+            "callCount": 1
+          }
         },
         "state": {
           "hookCounts": {
@@ -147,7 +187,10 @@
       "checkId": "driver-callable.checkpoint",
       "details": {
         "checkpoint": {
-          "emitted": true
+          "manifestPathCount": 4
+        },
+        "runtime": {
+          "phase": "completed"
         },
         "state": {
           "adapter": {
@@ -169,13 +212,23 @@
       "checkId": "driver-api.execute.resolution",
       "details": {
         "driver": {
-          "executed": true
+          "phase": "completed"
         },
         "hooks": {
-          "afterIteration": true,
-          "aroundModel": true,
-          "aroundTool": true,
-          "beforeIteration": true
+          "afterIteration": 2,
+          "aroundModel": 2,
+          "aroundTool": 1,
+          "beforeIteration": 2
+        },
+        "provider": {
+          "generate": {
+            "callCount": 2
+          }
+        },
+        "tool": {
+          "execution": {
+            "callCount": 1
+          }
         },
         "state": {
           "hookCounts": {
@@ -203,7 +256,7 @@
       "checkId": "driver-api.resume.approval",
       "details": {
         "driver": {
-          "resumed": true
+          "resolutionType": "end_turn"
         },
         "state": {
           "adapter": {
@@ -960,12 +1013,37 @@
         {
           "assertionId": "runtime-callable.provider-generate.1.evidenceField",
           "status": "pass"
+        },
+        {
+          "assertionId": "runtime-callable.provider-generate.2.evidenceField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "runtime-callable.provider-generate.3.evidenceField",
+          "status": "pass"
         }
       ],
       "checkId": "runtime-callable.provider-generate",
       "details": {
-        "callables": {
-          "providerGenerate": true
+        "provider": {
+          "generate": {
+            "callCount": 1,
+            "eventTypes": [
+              "message.start",
+              "text.delta",
+              "text.done",
+              "message.done"
+            ],
+            "response": {
+              "finishReason": "stop",
+              "parts": [
+                {
+                  "type": "text",
+                  "text": "generated from shared scenario"
+                }
+              ]
+            }
+          }
         },
         "state": {
           "adapter": {
@@ -982,12 +1060,42 @@
         {
           "assertionId": "runtime-callable.provider-stream.1.evidenceField",
           "status": "pass"
+        },
+        {
+          "assertionId": "runtime-callable.provider-stream.2.evidenceField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "runtime-callable.provider-stream.3.evidenceField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "runtime-callable.provider-stream.4.evidenceField",
+          "status": "pass"
         }
       ],
       "checkId": "runtime-callable.provider-stream",
       "details": {
-        "callables": {
-          "providerStream": true
+        "provider": {
+          "stream": {
+            "callCount": 1,
+            "chunkTypes": ["text_delta", "finish"],
+            "emittedEventTypes": [
+              "message.start",
+              "text.delta",
+              "text.done",
+              "message.done"
+            ],
+            "response": {
+              "finishReason": "stop",
+              "parts": [
+                {
+                  "text": "streamed from shared scenario",
+                  "type": "text"
+                }
+              ]
+            }
+          }
         },
         "state": {
           "adapter": {
@@ -1004,12 +1112,41 @@
         {
           "assertionId": "runtime-callable.tool-execute.1.evidenceField",
           "status": "pass"
+        },
+        {
+          "assertionId": "runtime-callable.tool-execute.2.evidenceField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "runtime-callable.tool-execute.3.evidenceField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "runtime-callable.tool-execute.4.stateField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "runtime-callable.tool-execute.5.stateField",
+          "status": "pass"
         }
       ],
       "checkId": "runtime-callable.tool-execute",
       "details": {
-        "callables": {
-          "toolExecute": true
+        "tool": {
+          "execution": {
+            "callCount": 1,
+            "inputs": [
+              {
+                "query": "shared docs"
+              }
+            ],
+            "outputs": [
+              {
+                "ok": true,
+                "source": "shared scenario"
+              }
+            ]
+          }
         },
         "state": {
           "toolExecution": {
@@ -1037,7 +1174,7 @@
                   }
                 },
                 "messageCount": 4,
-                "tokenEstimate": 20,
+                "tokenEstimate": 38,
                 "turnBoundaries": [0],
                 "lastUserMessageIndex": 0,
                 "lastAssistantMessageIndex": 3
@@ -1059,15 +1196,36 @@
         {
           "assertionId": "runtime-callable.approval-resolve.1.evidenceField",
           "status": "pass"
+        },
+        {
+          "assertionId": "runtime-callable.approval-resolve.2.evidenceField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "runtime-callable.approval-resolve.3.evidenceField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "runtime-callable.approval-resolve.4.evidenceField",
+          "status": "pass"
         }
       ],
       "checkId": "runtime-callable.approval-resolve",
       "details": {
         "approval": {
-          "continued": true
+          "decisions": [
+            {
+              "callId": "call-email",
+              "type": "approve"
+            }
+          ],
+          "pausedPhase": "paused",
+          "resumedPhase": "completed"
         },
-        "callables": {
-          "approvalResolve": true
+        "tool": {
+          "execution": {
+            "executedNames": ["search", "email"]
+          }
         },
         "state": {
           "adapter": {
@@ -1088,8 +1246,11 @@
       ],
       "checkId": "runtime-callable.validation-failure",
       "details": {
-        "callables": {
-          "validationFailure": true
+        "validation": {
+          "error": {
+            "message": "structured output validation failed"
+          },
+          "resolutionType": "fail"
         },
         "state": {
           "adapter": {
@@ -1106,15 +1267,21 @@
         {
           "assertionId": "runtime-callable.timeout-retry-cancellation-idempotency.1.evidenceField",
           "status": "pass"
+        },
+        {
+          "assertionId": "runtime-callable.timeout-retry-cancellation-idempotency.2.evidenceField",
+          "status": "pass"
         }
       ],
       "checkId": "runtime-callable.timeout-retry-cancellation-idempotency",
       "details": {
         "controls": {
-          "honored": true
+          "cancelAfterEvent": "turn.start",
+          "deadlineMs": 1000
         },
         "runtime": {
-          "failed": true
+          "iterationCount": 2,
+          "phase": "failed"
         },
         "result": {
           "error": {
@@ -1142,8 +1309,8 @@
       "checkId": "runtime-api.execute-turn.lifecycle",
       "details": {
         "runtime": {
-          "completed": true,
-          "eventCount": 13
+          "eventCount": 13,
+          "phase": "completed"
         },
         "state": {
           "adapter": {
@@ -1165,10 +1332,11 @@
       "checkId": "runtime-api.cancel-execution.failure",
       "details": {
         "controls": {
-          "honored": true
+          "deadlineMs": 1000
         },
         "runtime": {
-          "failed": true
+          "iterationCount": 2,
+          "phase": "failed"
         },
         "result": {
           "error": {
@@ -1191,15 +1359,28 @@
         {
           "assertionId": "runtime-api.approval-resolve.paused-resume.1.evidenceField",
           "status": "pass"
+        },
+        {
+          "assertionId": "runtime-api.approval-resolve.paused-resume.2.evidenceField",
+          "status": "pass"
         }
       ],
       "checkId": "runtime-api.approval-resolve.paused-resume",
       "details": {
         "approval": {
-          "continued": true
+          "decisions": [
+            {
+              "callId": "call-email",
+              "type": "approve"
+            }
+          ],
+          "pausedPhase": "paused",
+          "resumedPhase": "completed"
         },
-        "callables": {
-          "approvalResolve": true
+        "tool": {
+          "execution": {
+            "executedNames": ["search", "email"]
+          }
         },
         "state": {
           "adapter": {
@@ -1216,13 +1397,120 @@
         {
           "assertionId": "runtime-api.branch-create.recovery.1.stateField",
           "status": "pass"
+        },
+        {
+          "assertionId": "runtime-api.branch-create.recovery.2.stateField",
+          "status": "pass"
         }
       ],
       "checkId": "runtime-api.branch-create.recovery",
       "details": {
         "state": {
           "branch": {
-            "created": true
+            "createdBranchId": "0b1b62c6-f37b-446b-8bed-49bc880d7fb5",
+            "createdHeadTurnNodeHash": "59968d93c8a85042e36db0214b7c0aa71d22e3d9453c9441e9c408bc799e89a3",
+            "sourceBranchId": "6fe1ca24-a29f-458d-8adb-5395efcea975",
+            "sourceHeadTurnNodeHash": "59968d93c8a85042e36db0214b7c0aa71d22e3d9453c9441e9c408bc799e89a3"
+          },
+          "adapter": {
+            "adapterEvents": 1,
+            "initialized": true,
+            "status": "completed"
+          }
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "assertionResults": [
+        {
+          "assertionId": "runtime-api.context-transform.shared-summary.1.evidenceField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "runtime-api.context-transform.shared-summary.2.evidenceField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "runtime-api.context-transform.shared-summary.3.evidenceField",
+          "status": "pass"
+        }
+      ],
+      "checkId": "runtime-api.context-transform.shared-summary",
+      "details": {
+        "context": {
+          "messageCount": 3,
+          "summaryText": "Shared context engineering summary."
+        },
+        "runtime": {
+          "phase": "completed"
+        },
+        "state": {
+          "context": {
+            "manifest": {
+              "context.manifest": "5cd1a1349eecc3c0153029d60a021af2fce3e2ca92dbad14b6cbd06a9712f959",
+              "runtime.status": "954a679c205c84fccfac68cae2621adb2abecd1caf996c4e4d8238ae9d9682bd",
+              "turn.lineage": "848a9aa7d60584f1ba0db3b49488dbd468a5d032b7f00879f395764a6d33d71f",
+              "messages": [
+                "a2e1b2370ab9694f2123578d17dadfc923b962ac71c8284e9578bbff849d2f30",
+                "c2ca208b35360aece95b6e5e845e8e75c795810b7b89e382461a037b7a4528b4",
+                "bce6748d3151b8690f137df9097e0bf9bcadc1f2c649d090b5fa65848e3a5fa6"
+              ]
+            }
+          },
+          "adapter": {
+            "adapterEvents": 1,
+            "initialized": true,
+            "status": "completed"
+          }
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "assertionResults": [
+        {
+          "assertionId": "runtime-api.recover-result.staged-result.1.evidenceField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "runtime-api.recover-result.staged-result.2.evidenceField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "runtime-api.recover-result.staged-result.3.evidenceField",
+          "status": "pass"
+        }
+      ],
+      "checkId": "runtime-api.recover-result.staged-result",
+      "details": {
+        "recovery": {
+          "firstObjectType": "message",
+          "firstTaskId": "tool-search",
+          "lastTurnNodeHash": "59968d93c8a85042e36db0214b7c0aa71d22e3d9453c9441e9c408bc799e89a3",
+          "uncommittedStagedResults": 1
+        },
+        "state": {
+          "recovery": {
+            "consumedStagedResults": [],
+            "lastCompletedStepId": null,
+            "lastTurnNodeHash": "59968d93c8a85042e36db0214b7c0aa71d22e3d9453c9441e9c408bc799e89a3",
+            "stepSequence": [
+              {
+                "deterministic": false,
+                "id": "tool-search",
+                "sideEffects": false
+              }
+            ],
+            "uncommittedStagedResults": [
+              {
+                "objectHash": "94657fc60d114e7fd781129f0cf4f2288ea5f3dbaf55e4847efe16bc5045568b",
+                "objectType": "message",
+                "status": "completed",
+                "taskId": "tool-search",
+                "timestamp": 1
+              }
+            ]
           },
           "adapter": {
             "adapterEvents": 1,
@@ -1248,8 +1536,8 @@
   "status": "pass",
   "summary": {
     "failedChecks": 0,
-    "passedChecks": 26,
-    "totalChecks": 26
+    "passedChecks": 28,
+    "totalChecks": 28
   },
   "suiteId": "tuvren.framework.promoted-authority",
   "suiteVersion": "0.1.0"

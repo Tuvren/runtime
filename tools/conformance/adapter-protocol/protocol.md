@@ -1,9 +1,10 @@
 # Implementation Adapter Protocol
 
 The Implementation Adapter Protocol is the neutral seam between a Generic
-Conformance Runner and one implementation under test. It is not a public host
-API and it is not authority for product semantics; operation names and expected
-behavior come from the authority packet and its conformance plans.
+Conformance Runner and one implementation under test. The machine contract is
+`protocol.schema.json`; this prose explains the contract but does not replace
+it. Product semantics, operation inputs, and expected evidence come from the
+authority packet and its conformance plans.
 
 ```text
 initialize(packetId, planVersion) -> AdapterCapabilities
@@ -17,7 +18,8 @@ dispatch(operation, input, controls) -> OperationOutcome
 events(operation, input, controls) -> OrderedEventChannel
   OrderedEventChannel yields neutral JSON events in order.
   OrderedEventChannel terminates with completed, paused, or failed.
-  OrderedEventChannel honors cancel(reason) and deadlineMs controls.
+  OrderedEventChannel honors cancel.reason, cancelAfterEvent, and deadlineMs
+  controls.
 
 inspectState(query) -> StateView | null
 emitEvidence(checkId, key, payload) -> void

@@ -17,7 +17,14 @@ use serde_json::{Value, json};
 
 #[derive(Clone, Debug, Default)]
 pub struct AdapterControls {
-    pub cancelled: bool,
+    pub cancel: Option<AdapterCancelControl>,
+    pub cancel_after_event: Option<String>,
+    pub deadline_ms: Option<u64>,
+}
+
+#[derive(Clone, Debug)]
+pub struct AdapterCancelControl {
+    pub reason: String,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -29,9 +36,23 @@ pub struct AdapterCapabilities {
 }
 
 #[derive(Clone, Debug, Serialize)]
-pub struct OperationOutcome {
-    pub result: Value,
-    pub status: &'static str,
+#[serde(tag = "kind")]
+pub enum OperationOutcome {
+    #[serde(rename = "result")]
+    Result { value: Value },
+    #[serde(rename = "error")]
+    Error { error: AdapterErrorEnvelope },
+}
+
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AdapterErrorEnvelope {
+    pub code: String,
+    pub message: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub details: Option<Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cause: Option<Box<AdapterErrorEnvelope>>,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -74,9 +95,8 @@ impl ImplementationAdapter for ReferenceRustAdapter {
         controls: AdapterControls,
     ) -> Result<OperationOutcome, String> {
         reject_if_cancelled(&controls)?;
-        Ok(OperationOutcome {
-            result: json!({ "input": input, "operation": operation }),
-            status: "completed",
+        Ok(OperationOutcome::Result {
+            value: json!({ "input": input, "operation": operation }),
         })
     }
 
@@ -122,8 +142,8 @@ impl ImplementationAdapter for ReferenceRustAdapter {
 fn reject_if_cancelled(controls: &AdapterControls) -> Result<(), String> {
     // Cancellation is adapter mechanics. The plan still owns when cancellation
     // should be injected and what semantic outcome must be asserted.
-    if controls.cancelled {
-        return Err("adapter operation cancelled".to_string());
+    if let Some(cancel) = &controls.cancel {
+        return Err(cancel.reason.clone());
     }
 
     Ok(())

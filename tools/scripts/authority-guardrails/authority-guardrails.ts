@@ -82,6 +82,7 @@ const TYPESCRIPT_OWNED_FRAMEWORK_FIXTURE_PATTERNS: readonly RegExp[] = [
 ];
 const ROOT_TUVREN_IMPORT_PATTERN = /@tuvren\//u;
 const RUNNER_AGUI_EVENT_ENUM_PATTERN = /\bEventType\.[A-Z_]+\b/u;
+const CALLABLES_NAMESPACE_PATTERN = /\bcallables\b/u;
 const FORBIDDEN_VOCABULARY_PATTERNS: readonly RegExp[] = [
   /\bPromise\b/u,
   /\bAsyncIterable\b/u,
@@ -92,6 +93,9 @@ const FORBIDDEN_VOCABULARY_PATTERNS: readonly RegExp[] = [
 ];
 const GENERIC_RUNNER_LITERAL_ALLOWLIST = new Set([
   "completed",
+  "end_turn",
+  "error",
+  "fail",
   "failed",
   "paused",
 ]);
@@ -107,6 +111,7 @@ async function main(): Promise<void> {
     ...(await checkRootTypescriptFixtures()),
     ...(await checkTypescriptOwnedConformanceSources()),
     ...(await checkTypescriptOwnedFrameworkFixtures()),
+    ...(await checkPlanEvidenceOracleShapes(manifests)),
     ...(await checkRunnerOracleLiterals(manifests)),
     ...(await checkForbiddenVocabulary(manifests)),
     ...(await runFixtureSelfTests()),
@@ -260,6 +265,7 @@ async function checkRunnerOracleLiterals(
 ): Promise<GuardrailFailure[]> {
   const failures: GuardrailFailure[] = [];
   const planCheckIds = await collectPlanCheckIds(manifests);
+  const planOperationNames = await collectPlanOperationNames(manifests);
   const planAssertionLiterals = await collectPlanAssertionLiterals(manifests);
 
   for (const runnerRoot of RUNNER_SOURCE_ROOTS) {
@@ -270,8 +276,28 @@ async function checkRunnerOracleLiterals(
         ...(await checkRunnerSourceFile(
           sourcePath,
           planCheckIds,
+          planOperationNames,
           planAssertionLiterals
         ))
+      );
+    }
+  }
+
+  return failures;
+}
+
+async function checkPlanEvidenceOracleShapes(
+  manifests: readonly AuthorityPacketManifest[]
+): Promise<GuardrailFailure[]> {
+  const failures: GuardrailFailure[] = [];
+
+  for (const manifest of manifests) {
+    for (const plan of manifest.conformancePlans ?? []) {
+      const planValue: unknown = JSON.parse(
+        await readFile(resolve(REPO_ROOT, plan.path), "utf8")
+      );
+      failures.push(
+        ...collectPlanEvidenceOracleShapeFailures(planValue, plan.path)
       );
     }
   }
@@ -413,6 +439,24 @@ async function collectPlanAssertionLiterals(
   return literals;
 }
 
+async function collectPlanOperationNames(
+  manifests: readonly AuthorityPacketManifest[]
+): Promise<Set<string>> {
+  const operationNames = new Set<string>();
+
+  for (const manifest of manifests) {
+    for (const plan of manifest.conformancePlans ?? []) {
+      const planValue: unknown = JSON.parse(
+        await readFile(resolve(REPO_ROOT, plan.path), "utf8")
+      );
+
+      collectOperationNamesFromPlanValue(planValue, operationNames);
+    }
+  }
+
+  return operationNames;
+}
+
 function collectCheckIdsFromPlanValue(
   planValue: unknown,
   planCheckIds: Set<string>
@@ -453,6 +497,111 @@ function collectAssertionLiteralsFromPlanValue(
   }
 }
 
+function collectOperationNamesFromPlanValue(
+  planValue: unknown,
+  operationNames: Set<string>
+): void {
+  if (!(isRecord(planValue) && Array.isArray(planValue.checks))) {
+    return;
+  }
+
+  for (const check of planValue.checks) {
+    if (isRecord(check) && typeof check.operation === "string") {
+      operationNames.add(check.operation);
+    }
+  }
+}
+
+function collectPlanEvidenceOracleShapeFailures(
+  planValue: unknown,
+  planLabel: string
+): GuardrailFailure[] {
+  const failures: GuardrailFailure[] = [];
+
+  if (!(isRecord(planValue) && Array.isArray(planValue.checks))) {
+    return failures;
+  }
+
+  for (const check of planValue.checks) {
+    if (!isRecord(check)) {
+      continue;
+    }
+
+    failures.push(
+      ...collectEvidencePathOracleFailures(check, planLabel),
+      ...collectAssertionOracleFailures(check, planLabel)
+    );
+  }
+
+  return failures;
+}
+
+function collectEvidencePathOracleFailures(
+  check: Record<string, unknown>,
+  planLabel: string
+): GuardrailFailure[] {
+  if (!Array.isArray(check.evidence)) {
+    return [];
+  }
+
+  return check.evidence
+    .filter(
+      (evidencePath): evidencePath is string =>
+        typeof evidencePath === "string" && isBooleanOraclePath(evidencePath)
+    )
+    .map((evidencePath) => ({
+      check: "plan-oracle-shape",
+      message: `${planLabel} check ${String(check.checkId)} declares boolean-oracle evidence path ${evidencePath}`,
+    }));
+}
+
+function collectAssertionOracleFailures(
+  check: Record<string, unknown>,
+  planLabel: string
+): GuardrailFailure[] {
+  if (!Array.isArray(check.assertions)) {
+    return [];
+  }
+
+  return check.assertions.flatMap((assertion) =>
+    isRecord(assertion)
+      ? collectSingleAssertionOracleFailures(assertion, check, planLabel)
+      : []
+  );
+}
+
+function collectSingleAssertionOracleFailures(
+  assertion: Record<string, unknown>,
+  check: Record<string, unknown>,
+  planLabel: string
+): GuardrailFailure[] {
+  const assertionKind = assertion.kind;
+
+  if (assertionKind !== "evidenceField" && assertionKind !== "stateField") {
+    return [];
+  }
+
+  const failures: GuardrailFailure[] = [];
+  const field =
+    typeof assertion.field === "string" ? assertion.field : undefined;
+
+  if (field !== undefined && isBooleanOraclePath(field)) {
+    failures.push({
+      check: "plan-oracle-shape",
+      message: `${planLabel} check ${String(check.checkId)} asserts boolean-oracle field ${field}`,
+    });
+  }
+
+  if (typeof assertion.equals === "boolean") {
+    failures.push({
+      check: "plan-oracle-shape",
+      message: `${planLabel} check ${String(check.checkId)} asserts bare boolean evidence/state; promoted plans must assert raw observed values`,
+    });
+  }
+
+  return failures;
+}
+
 function collectStringLiterals(value: unknown, literals: Set<string>): void {
   if (typeof value === "string") {
     if (value.length >= 3 && !GENERIC_RUNNER_LITERAL_ALLOWLIST.has(value)) {
@@ -478,6 +627,7 @@ function collectStringLiterals(value: unknown, literals: Set<string>): void {
 async function checkRunnerSourceFile(
   sourcePath: string,
   planCheckIds: ReadonlySet<string>,
+  planOperationNames: ReadonlySet<string>,
   planAssertionLiterals: ReadonlySet<string>
 ): Promise<GuardrailFailure[]> {
   const source = await readFile(sourcePath, "utf8");
@@ -485,6 +635,7 @@ async function checkRunnerSourceFile(
     source,
     relative(REPO_ROOT, sourcePath),
     planCheckIds,
+    planOperationNames,
     planAssertionLiterals
   );
 }
@@ -493,26 +644,28 @@ function checkRunnerSourceText(
   source: string,
   sourceLabel: string,
   planCheckIds: ReadonlySet<string>,
+  planOperationNames: ReadonlySet<string>,
   planAssertionLiterals: ReadonlySet<string>
 ): GuardrailFailure[] {
-  const failures: GuardrailFailure[] = [];
+  const failures: GuardrailFailure[] = [
+    ...collectRunnerCheckIdFailures(source, sourceLabel, planCheckIds),
+    ...collectRunnerAssertionLiteralFailures(
+      source,
+      sourceLabel,
+      planAssertionLiterals
+    ),
+    ...collectRunnerOperationLiteralFailures(
+      source,
+      sourceLabel,
+      planOperationNames
+    ),
+  ];
 
-  for (const checkId of planCheckIds) {
-    if (source.includes(checkId)) {
-      failures.push({
-        check: "runner-oracle",
-        message: `${sourceLabel} embeds conformance-plan check id ${checkId}; runner source must load plan data instead`,
-      });
-    }
-  }
-
-  for (const literal of planAssertionLiterals) {
-    if (source.includes(JSON.stringify(literal))) {
-      failures.push({
-        check: "runner-oracle",
-        message: `${sourceLabel} embeds conformance-plan assertion literal ${literal}; runner source must load semantic expectations from plans`,
-      });
-    }
+  if (CALLABLES_NAMESPACE_PATTERN.test(source)) {
+    failures.push({
+      check: "runner-oracle",
+      message: `${sourceLabel} embeds callables boolean-evidence namespace; promoted plans must assert raw observations`,
+    });
   }
 
   if (RUNNER_AGUI_EVENT_ENUM_PATTERN.test(source)) {
@@ -530,6 +683,103 @@ function checkRunnerSourceText(
   }
 
   return failures;
+}
+
+function collectRunnerCheckIdFailures(
+  source: string,
+  sourceLabel: string,
+  planCheckIds: ReadonlySet<string>
+): GuardrailFailure[] {
+  const failures: GuardrailFailure[] = [];
+
+  for (const checkId of planCheckIds) {
+    if (source.includes(checkId)) {
+      failures.push({
+        check: "runner-oracle",
+        message: `${sourceLabel} embeds conformance-plan check id ${checkId}; runner source must load plan data instead`,
+      });
+    }
+  }
+
+  return failures;
+}
+
+function collectRunnerAssertionLiteralFailures(
+  source: string,
+  sourceLabel: string,
+  planAssertionLiterals: ReadonlySet<string>
+): GuardrailFailure[] {
+  const failures: GuardrailFailure[] = [];
+
+  for (const literal of planAssertionLiterals) {
+    if (source.includes(JSON.stringify(literal))) {
+      failures.push({
+        check: "runner-oracle",
+        message: `${sourceLabel} embeds conformance-plan assertion literal ${literal}; runner source must load semantic expectations from plans`,
+      });
+    }
+  }
+
+  return failures;
+}
+
+function collectRunnerOperationLiteralFailures(
+  source: string,
+  sourceLabel: string,
+  planOperationNames: ReadonlySet<string>
+): GuardrailFailure[] {
+  const failures: GuardrailFailure[] = [];
+  const lines = source.split("\n");
+
+  for (const operationName of planOperationNames) {
+    const quotedOperation = JSON.stringify(operationName);
+
+    for (const [index, line] of lines.entries()) {
+      if (
+        line.includes(quotedOperation) &&
+        !isAllowedOperationRoutingLine(
+          line,
+          quotedOperation,
+          lines[index - 2] ?? "",
+          lines[index - 1] ?? "",
+          lines[index + 1] ?? ""
+        )
+      ) {
+        failures.push({
+          check: "runner-oracle",
+          message: `${sourceLabel}:${index + 1} embeds promoted operation ${operationName} outside generic routing/scenario validation`,
+        });
+      }
+    }
+  }
+
+  return failures;
+}
+
+function isAllowedOperationRoutingLine(
+  line: string,
+  quotedOperation: string,
+  twoLinesBefore: string,
+  previousLine: string,
+  nextLine: string
+): boolean {
+  return (
+    line.includes(`case ${quotedOperation}:`) ||
+    line.includes(`${quotedOperation}:`) ||
+    line.includes(`readOperationScenario(input, ${quotedOperation})`) ||
+    (line.includes(quotedOperation) &&
+      (previousLine.includes("readOperationScenario(") ||
+        twoLinesBefore.includes("readOperationScenario(")) &&
+      nextLine.includes(")"))
+  );
+}
+
+function isBooleanOraclePath(path: string): boolean {
+  return (
+    path === "$.callables" ||
+    path.startsWith("$.callables.") ||
+    path.startsWith("callables.")
+  );
 }
 
 async function runFixtureSelfTests(): Promise<GuardrailFailure[]> {
@@ -587,6 +837,7 @@ async function runFixtureSelfTests(): Promise<GuardrailFailure[]> {
     runnerFixture,
     "fixture runner",
     new Set(),
+    new Set(["runtime.fixture-operation"]),
     new Set(["turn.start"])
   );
 
@@ -594,6 +845,33 @@ async function runFixtureSelfTests(): Promise<GuardrailFailure[]> {
     failures.push({
       check: "guardrail-fixture",
       message: "runner-oracle fixture did not trigger the runner guardrail",
+    });
+  }
+
+  const booleanOraclePlanFailures = collectPlanEvidenceOracleShapeFailures(
+    {
+      checks: [
+        {
+          assertions: [
+            {
+              equals: true,
+              field: "$.callables.providerGenerate",
+              kind: "evidenceField",
+            },
+          ],
+          checkId: "fixture.boolean-oracle",
+          evidence: ["callables.providerGenerate"],
+        },
+      ],
+    },
+    "fixture boolean-oracle plan"
+  );
+
+  if (booleanOraclePlanFailures.length === 0) {
+    failures.push({
+      check: "guardrail-fixture",
+      message:
+        "boolean-oracle fixture did not trigger the plan-shape guardrail",
     });
   }
 

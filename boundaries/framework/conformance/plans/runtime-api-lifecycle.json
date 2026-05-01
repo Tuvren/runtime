@@ -17,11 +17,11 @@
       "assertions": [
         {
           "kind": "evidenceField",
-          "field": "$.runtime.completed",
-          "equals": true
+          "field": "$.runtime.phase",
+          "equals": "completed"
         }
       ],
-      "evidence": ["runtime.completed"]
+      "evidence": ["runtime.phase", "runtime.eventCount"]
     },
     {
       "checkId": "runtime-api.cancel-execution.failure",
@@ -47,11 +47,16 @@
       "assertions": [
         {
           "kind": "evidenceField",
-          "field": "$.approval.continued",
-          "equals": true
+          "field": "$.approval.pausedPhase",
+          "equals": "paused"
+        },
+        {
+          "kind": "evidenceField",
+          "field": "$.approval.resumedPhase",
+          "equals": "completed"
         }
       ],
-      "evidence": ["approval.continued"]
+      "evidence": ["approval.pausedPhase", "approval.resumedPhase"]
     },
     {
       "checkId": "runtime-api.branch-create.recovery",
@@ -61,11 +66,78 @@
       "assertions": [
         {
           "kind": "stateField",
-          "field": "$.branch.created",
-          "equals": true
+          "field": "$.branch.createdHeadTurnNodeHash",
+          "matches": "^[a-f0-9]{64}$"
+        },
+        {
+          "kind": "stateField",
+          "field": "$.branch.sourceHeadTurnNodeHash",
+          "matches": "^[a-f0-9]{64}$"
         }
       ],
-      "evidence": ["branch.created"]
+      "evidence": [
+        "branch.createdBranchId",
+        "branch.sourceBranchId",
+        "branch.createdHeadTurnNodeHash",
+        "branch.sourceHeadTurnNodeHash"
+      ]
+    },
+    {
+      "checkId": "runtime-api.context-transform.shared-summary",
+      "operation": "runtime.context-transform",
+      "scenario": "runtime-api-scenarios",
+      "input": { "scenarioPath": "$.context-transform-append-summary" },
+      "assertions": [
+        {
+          "kind": "evidenceField",
+          "field": "$.context.messageCount",
+          "equals": 3
+        },
+        {
+          "kind": "evidenceField",
+          "field": "$.context.summaryText",
+          "equals": "Shared context engineering summary."
+        },
+        {
+          "kind": "evidenceField",
+          "field": "$.runtime.phase",
+          "equals": "completed"
+        }
+      ],
+      "evidence": [
+        "context.messageCount",
+        "context.summaryText",
+        "runtime.phase"
+      ]
+    },
+    {
+      "checkId": "runtime-api.recover-result.staged-result",
+      "operation": "runtime.recover-result",
+      "scenario": "runtime-api-scenarios",
+      "input": { "scenarioPath": "$.recover-staged-result" },
+      "assertions": [
+        {
+          "kind": "evidenceField",
+          "field": "$.recovery.uncommittedStagedResults",
+          "equals": 1
+        },
+        {
+          "kind": "evidenceField",
+          "field": "$.recovery.firstTaskId",
+          "equals": "tool-search"
+        },
+        {
+          "kind": "evidenceField",
+          "field": "$.recovery.firstObjectType",
+          "equals": "message"
+        }
+      ],
+      "evidence": [
+        "recovery.uncommittedStagedResults",
+        "recovery.firstTaskId",
+        "recovery.firstObjectType",
+        "recovery.lastTurnNodeHash"
+      ]
     }
   ]
 }

@@ -1,7 +1,8 @@
 # TypeScript Adapter Binding
 
-The TypeScript binding projects the neutral adapter protocol into TypeScript
-without making TypeScript the semantic authority.
+The TypeScript binding projects `../protocol.schema.json` into TypeScript
+without making TypeScript the semantic authority. Shared code in
+`../index.ts` owns the protocol interfaces and runtime outcome guard.
 
 ```ts
 export interface ImplementationAdapter {
@@ -23,7 +24,10 @@ export interface ImplementationAdapter {
 ```
 
 `AbortSignal`, `Promise`, and `AsyncIterable` are TypeScript binding details.
-Conformance plans name neutral operations and assertion kinds.
+Neutral controls are still the schema-owned `cancel`, `cancelAfterEvent`, and
+`deadlineMs` fields; adapters may bridge those controls to `AbortSignal`
+internally. Conformance plans name neutral operations, scenario inputs, expected
+evidence fields, and assertion kinds.
 
 Reference scaffold:
 `boundaries/framework/implementations/typescript/conformance-runner/src/adapter-scaffold.ts`.

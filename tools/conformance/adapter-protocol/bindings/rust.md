@@ -1,6 +1,6 @@
 # Rust Adapter Binding
 
-The Rust binding projects the neutral adapter protocol into Rust without making
+The Rust binding projects `../protocol.schema.json` into Rust without making
 Rust traits or structs the semantic authority.
 
 ```rust
@@ -18,8 +18,10 @@ trait ImplementationAdapter {
 }
 ```
 
-Stream, cancellation, and byte-buffer details are Rust binding concerns. The
-conformance plan remains the source of operation expectations.
+Stream, cancellation-token, and byte-buffer details are Rust binding concerns.
+Neutral controls are still the schema-owned `cancel`, `cancel_after_event`, and
+`deadline_ms` fields after Rust naming projection. The conformance plan remains
+the source of operation inputs and expectations.
 
 Reference scaffold:
 `boundaries/kernel/implementations/rust/conformance-runner/src/adapter_scaffold.rs`.

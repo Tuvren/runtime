@@ -22,16 +22,31 @@ import type {
 import { assertDriverExecutionResult } from "@tuvren/driver-api";
 import type { ProviderStreamChunk, TuvrenProvider } from "@tuvren/provider-api";
 import type {
+  ApprovalDecision,
   ContextManifest,
   InputSignal,
+  StructuredOutputRequest,
   ToolCallPart,
   ToolRegistry,
   TuvrenExtension,
+  TuvrenJsonSchema,
   TuvrenMessage,
   TuvrenModelResponse,
+  TuvrenPrompt,
   TuvrenStreamEvent,
   TuvrenToolDefinition,
 } from "@tuvren/runtime-api";
+import {
+  assertProviderStreamChunk,
+  assertTuvrenMessage,
+  assertTuvrenModelResponse,
+} from "@tuvren/runtime-api";
+import {
+  type AdapterCapabilities,
+  type AdapterControls,
+  createAdapterErrorEnvelope,
+  type OperationOutcome,
+} from "../../../../../../tools/conformance/adapter-protocol/index.js";
 import { createReActDriver } from "../../drivers/react/src/index.ts";
 import {
   executeGenerateCall,
@@ -40,24 +55,15 @@ import {
 import {
   createDriverRegistry,
   createTuvrenRuntimeCore,
+  DEFAULT_AGENT_SCHEMA,
 } from "../../runtime-core/src/index.ts";
 import { createFakeKernelHarness } from "../../runtime-core/test/fake-kernel.ts";
 
-export interface AdapterControls {
-  readonly cancelAfterEvent?: string;
-  readonly signal?: AbortSignal;
-}
-
-export interface AdapterCapabilities {
-  readonly adapterId: string;
-  readonly packetId: string;
-  readonly planVersion: string;
-}
-
-export interface OperationOutcome {
-  readonly result?: unknown;
-  readonly status: "completed" | "failed" | "paused";
-}
+export type {
+  AdapterCapabilities,
+  AdapterControls,
+  OperationOutcome,
+} from "../../../../../../tools/conformance/adapter-protocol/index.js";
 
 export interface EvidenceRecord {
   readonly checkId: string;
@@ -94,11 +100,13 @@ interface AdapterProjection {
 interface OperationObservation {
   adapterEvents: number;
   initialized: boolean;
-  status: OperationOutcome["status"];
+  status: OperationStatus;
 }
 
 const DRIVER_ID = "typescript-conformance-driver";
 const AGENT_NAME = "typescript-conformance-agent";
+
+type OperationStatus = "completed" | "failed" | "paused";
 
 export class TypeScriptFrameworkAdapter implements ImplementationAdapter {
   readonly evidence: EvidenceRecord[] = [];
@@ -108,25 +116,46 @@ export class TypeScriptFrameworkAdapter implements ImplementationAdapter {
 
   async dispatch(
     operation: string,
-    _input: unknown,
+    input: unknown,
     controls: AdapterControls
   ): Promise<OperationOutcome> {
     this.requireInitialized();
     throwIfCancelled(controls);
 
-    const projection = await this.projectOperation(operation, controls);
-    const status = projectionStatus(projection);
-    this.latestState = projection.state ?? null;
-    this.observations.set(operation, {
-      adapterEvents: 0,
-      initialized: true,
-      status,
-    });
+    try {
+      const projection = await this.projectOperation(
+        operation,
+        input,
+        controls
+      );
+      const status = projectionStatus(projection);
+      this.latestState = projection.state ?? null;
+      this.observations.set(operation, {
+        adapterEvents: 0,
+        initialized: true,
+        status,
+      });
 
-    return {
-      result: projection,
-      status,
-    };
+      return {
+        kind: "result",
+        value: projection,
+      };
+    } catch (error: unknown) {
+      const envelope = createAdapterErrorEnvelope(error);
+      this.latestState = {
+        adapterError: envelope,
+      };
+      this.observations.set(operation, {
+        adapterEvents: 0,
+        initialized: true,
+        status: "failed",
+      });
+
+      return {
+        error: envelope,
+        kind: "error",
+      };
+    }
   }
 
   emitEvidence(checkId: string, key: string, payload: unknown): Promise<void> {
@@ -203,6 +232,7 @@ export class TypeScriptFrameworkAdapter implements ImplementationAdapter {
 
   private projectOperation(
     operation: string,
+    input: unknown,
     controls: AdapterControls
   ): Promise<AdapterProjection> {
     // This switch is language-local adapter routing only; shared plans own the
@@ -213,25 +243,29 @@ export class TypeScriptFrameworkAdapter implements ImplementationAdapter {
       case "runtime.cancel-execution":
         return runCancelledRuntimeTurn(controls);
       case "runtime.approval-resolve":
-        return runApprovalResume();
+        return runApprovalResume(input);
       case "runtime.branch-create":
         return runBranchCreate();
       case "runtime.provider-generate":
-        return runProviderGenerate();
+        return runProviderGenerate(input);
       case "runtime.provider-stream":
-        return runProviderStream();
+        return runProviderStream(input);
       case "runtime.tool-execute":
-        return runToolExecution();
+        return runToolExecution(input);
       case "runtime.validate-structured-output":
-        return runStructuredValidationFailure();
+        return runStructuredValidationFailure(input);
+      case "runtime.context-transform":
+        return runContextTransform(input);
+      case "runtime.recover-result":
+        return runRecoverResult(input);
       case "driver.execute":
-        return runDriverExecute();
+        return runDriverExecute(input);
       case "driver.execute-error":
         return runDriverExecuteError();
       case "driver.resume":
-        return runDriverResume();
+        return runDriverResume(input);
       case "driver.checkpoint":
-        return runDriverCheckpoint();
+        return runDriverCheckpoint(input);
       default:
         throw new Error(
           `unsupported promoted framework operation ${operation}`
@@ -267,8 +301,8 @@ async function runCompletedRuntimeTurn(): Promise<AdapterProjection> {
   return {
     evidence: {
       runtime: {
-        completed: handle.status().phase === "completed",
         eventCount: events.length,
+        phase: handle.status().phase,
       },
     },
   };
@@ -324,10 +358,12 @@ async function runCancelledRuntimeTurn(
   return {
     evidence: {
       controls: {
-        honored: controls.cancelAfterEvent !== undefined || executeCount > 1,
+        cancelAfterEvent: controls.cancelAfterEvent,
+        deadlineMs: controls.deadlineMs,
       },
       runtime: {
-        failed: handle.status().phase === "failed",
+        iterationCount: handle.status().iterationCount,
+        phase: handle.status().phase,
       },
     },
     result: {
@@ -336,37 +372,42 @@ async function runCancelledRuntimeTurn(
   };
 }
 
-async function runApprovalResume(): Promise<AdapterProjection> {
+async function runApprovalResume(input: unknown): Promise<AdapterProjection> {
+  const scenario = readOperationScenario(input, "runtime.approval-resolve");
+  const prompt = readStringProperty(
+    scenario,
+    "prompt",
+    "runtime.approval-resolve.prompt"
+  );
+  const calls = readScenarioToolCalls(
+    scenario,
+    "runtime.approval-resolve.toolCalls"
+  );
+  const decisions = readApprovalDecisions(
+    scenario,
+    "runtime.approval-resolve.approvalDecisions"
+  );
+  const finalText = readStringProperty(
+    scenario,
+    "finalText",
+    "runtime.approval-resolve.finalText"
+  );
   const harness = createFakeKernelHarness();
-  let searchCalls = 0;
-  let emailCalls = 0;
+  const executedNames: string[] = [];
   const driver = {
     async execute(context) {
       await Promise.resolve();
 
       if (!hasToolMessage(context.messages)) {
         return {
-          messages: [
-            assistantToolCalls([
-              {
-                callId: "call-search",
-                input: { query: "latest status" },
-                name: "search",
-              },
-              {
-                callId: "call-email",
-                input: { subject: "Status update", to: "ops@example.com" },
-                name: "email",
-              },
-            ]),
-          ],
+          messages: [assistantToolCalls(calls)],
           resolution: { type: "continue_iteration" },
           toolExecutionMode: "parallel",
         };
       }
 
       return {
-        messages: [assistantText("approved")],
+        messages: [assistantText(finalText)],
         resolution: {
           reason: "done",
           type: "end_turn",
@@ -375,34 +416,18 @@ async function runApprovalResume(): Promise<AdapterProjection> {
     },
     id: DRIVER_ID,
   } satisfies RuntimeDriver;
-  const tools: TuvrenToolDefinition[] = [
-    {
-      description: "Search docs",
+  const tools = calls.map(
+    (call): TuvrenToolDefinition => ({
+      approval: call.requiresApproval,
+      description: `Shared conformance tool ${call.name}`,
       execute() {
-        searchCalls += 1;
-        return { ok: true };
+        executedNames.push(call.name);
+        return call.output;
       },
       inputSchema: { type: "object" },
-      name: "search",
-    },
-    {
-      approval: true,
-      description: "Send email",
-      execute() {
-        emailCalls += 1;
-        return { sent: true };
-      },
-      inputSchema: {
-        properties: {
-          subject: { type: "string" },
-          to: { type: "string" },
-        },
-        required: ["to", "subject"],
-        type: "object",
-      },
-      name: "email",
-    },
-  ];
+      name: call.name,
+    })
+  );
   const runtime = createTuvrenRuntimeCore({
     defaultDriverId: DRIVER_ID,
     driverRegistry: createDriverRegistry([driver]),
@@ -412,21 +437,20 @@ async function runApprovalResume(): Promise<AdapterProjection> {
   const pausedHandle = runtime.executeTurn({
     branchId: thread.branchId,
     config: { name: AGENT_NAME, tools },
-    signal: textSignal("approve"),
+    signal: textSignal(prompt),
     threadId: thread.threadId,
   });
 
   const pausedEvents = await collectValues(pausedHandle.events());
+  const pausedPhase = pausedHandle.status().phase;
 
-  if (pausedHandle.status().phase !== "paused") {
+  if (pausedPhase !== "paused") {
     return {
       evidence: {
         approval: {
-          continued: false,
+          pausedPhase,
         },
-        callables: {
-          approvalResolve: false,
-        },
+        tool: { execution: { executedNames } },
       },
       state: {
         approvalError: readFirstErrorEnvelope(pausedEvents),
@@ -436,7 +460,7 @@ async function runApprovalResume(): Promise<AdapterProjection> {
   }
 
   const resumedHandle = pausedHandle.resolveApproval({
-    decisions: [{ callId: "call-email", type: "approve" }],
+    decisions,
   });
 
   await collectValues(resumedHandle.events());
@@ -444,11 +468,11 @@ async function runApprovalResume(): Promise<AdapterProjection> {
   return {
     evidence: {
       approval: {
-        continued: resumedHandle.status().phase === "completed",
+        decisions,
+        pausedPhase,
+        resumedPhase: resumedHandle.status().phase,
       },
-      callables: {
-        approvalResolve: searchCalls === 1 && emailCalls === 1,
-      },
+      tool: { execution: { executedNames } },
     },
   };
 }
@@ -477,20 +501,32 @@ async function runBranchCreate(): Promise<AdapterProjection> {
   return {
     state: {
       branch: {
-        created:
-          branch.branchId !== thread.branchId &&
-          branch.headTurnNodeHash === thread.rootTurnNodeHash,
+        createdBranchId: branch.branchId,
+        createdHeadTurnNodeHash: branch.headTurnNodeHash,
+        sourceBranchId: thread.branchId,
+        sourceHeadTurnNodeHash: thread.rootTurnNodeHash,
       },
     },
   };
 }
 
-async function runProviderGenerate(): Promise<AdapterProjection> {
+async function runProviderGenerate(input: unknown): Promise<AdapterProjection> {
+  const scenario = readOperationScenario(input, "runtime.provider-generate");
+  const response = readModelResponseProperty(
+    scenario,
+    "providerResponse",
+    "runtime.provider-generate.providerResponse"
+  );
+  const prompt = readPromptProperty(
+    scenario,
+    "prompt",
+    "runtime.provider-generate.prompt"
+  );
   let generateCalls = 0;
   const provider: TuvrenProvider = {
     generate() {
       generateCalls += 1;
-      return Promise.resolve(textResponse("generated"));
+      return Promise.resolve(structuredClone(response));
     },
     id: "provider",
     async *stream() {
@@ -500,20 +536,34 @@ async function runProviderGenerate(): Promise<AdapterProjection> {
   };
   const sequence = await executeGenerateCall({
     now: createClock(),
-    prompt: createPrompt(),
+    prompt,
     provider,
   });
 
   return {
     evidence: {
-      callables: {
-        providerGenerate: generateCalls === 1 && sequence.events.length > 0,
+      provider: {
+        generate: {
+          callCount: generateCalls,
+          eventTypes: sequence.events.map((event) => event.type),
+          response: sequence.response,
+        },
       },
     },
   };
 }
 
-async function runProviderStream(): Promise<AdapterProjection> {
+async function runProviderStream(input: unknown): Promise<AdapterProjection> {
+  const scenario = readOperationScenario(input, "runtime.provider-stream");
+  const chunks = readProviderStreamChunks(
+    scenario,
+    "runtime.provider-stream.streamChunks"
+  );
+  const prompt = readPromptProperty(
+    scenario,
+    "prompt",
+    "runtime.provider-stream.prompt"
+  );
   let streamCalls = 0;
   const emittedEvents: TuvrenStreamEvent[] = [];
   const provider: TuvrenProvider = {
@@ -526,22 +576,14 @@ async function runProviderStream(): Promise<AdapterProjection> {
     async *stream() {
       await Promise.resolve();
       streamCalls += 1;
-      const textChunk: ProviderStreamChunk = {
-        text: "streamed",
-        type: "text_delta",
-      };
-      const finishChunk: ProviderStreamChunk = {
-        finishReason: "stop",
-        type: "finish",
-      };
-
-      yield textChunk;
-      yield finishChunk;
+      for (const chunk of chunks) {
+        yield structuredClone(chunk);
+      }
     },
   };
   const sequence = await executeStreamCall({
     now: createClock(),
-    prompt: createPrompt(),
+    prompt,
     provider,
     runtime: {
       emit(event) {
@@ -553,33 +595,57 @@ async function runProviderStream(): Promise<AdapterProjection> {
 
   return {
     evidence: {
-      callables: {
-        providerStream:
-          streamCalls === 1 &&
-          emittedEvents.length > 0 &&
-          sequence.response.parts.length > 0,
+      provider: {
+        stream: {
+          callCount: streamCalls,
+          chunkTypes: chunks.map((chunk) => chunk.type),
+          emittedEventTypes: emittedEvents.map((event) => event.type),
+          response: sequence.response,
+        },
       },
     },
   };
 }
 
-async function runToolExecution(): Promise<AdapterProjection> {
+async function runToolExecution(input: unknown): Promise<AdapterProjection> {
+  const scenario = readOperationScenario(input, "runtime.tool-execute");
+  const prompt = readStringProperty(
+    scenario,
+    "prompt",
+    "runtime.tool-execute.prompt"
+  );
+  const call = readScenarioToolCall(
+    readRecordProperty(scenario, "toolCall", "runtime.tool-execute.toolCall"),
+    "runtime.tool-execute.toolCall"
+  );
+  const toolResult = readProperty(
+    scenario,
+    "toolResult",
+    "runtime.tool-execute.toolResult"
+  );
+  const finalText = readStringProperty(
+    scenario,
+    "finalText",
+    "runtime.tool-execute.finalText"
+  );
   const harness = createFakeKernelHarness();
   let toolCalls = 0;
+  const toolInputs: unknown[] = [];
+  const toolOutputs: unknown[] = [];
   const driver = {
     async execute(context) {
       await Promise.resolve();
 
       if (!hasToolMessage(context.messages)) {
         return {
-          messages: [assistantToolCall("call-tool", "search")],
+          messages: [assistantToolCalls([call])],
           resolution: { type: "continue_iteration" },
           toolExecutionMode: "parallel",
         };
       }
 
       return {
-        messages: [assistantText("tool finished")],
+        messages: [assistantText(finalText)],
         resolution: {
           reason: "done",
           type: "end_turn",
@@ -603,14 +669,16 @@ async function runToolExecution(): Promise<AdapterProjection> {
           description: "Search docs",
           execute() {
             toolCalls += 1;
-            return { ok: true };
+            toolInputs.push(call.input);
+            toolOutputs.push(toolResult);
+            return toolResult;
           },
           inputSchema: { type: "object" },
-          name: "search",
+          name: call.name,
         },
       ],
     },
-    signal: textSignal("tool"),
+    signal: textSignal(prompt),
     threadId: thread.threadId,
   });
 
@@ -618,8 +686,12 @@ async function runToolExecution(): Promise<AdapterProjection> {
 
   return {
     evidence: {
-      callables: {
-        toolExecute: toolCalls === 1 && handle.status().phase === "completed",
+      tool: {
+        execution: {
+          callCount: toolCalls,
+          inputs: toolInputs,
+          outputs: toolOutputs,
+        },
       },
     },
     state: {
@@ -631,19 +703,26 @@ async function runToolExecution(): Promise<AdapterProjection> {
   };
 }
 
-async function runStructuredValidationFailure(): Promise<AdapterProjection> {
+async function runStructuredValidationFailure(
+  input: unknown
+): Promise<AdapterProjection> {
+  const scenario = readOperationScenario(
+    input,
+    "runtime.validate-structured-output"
+  );
+  const response = readModelResponseProperty(
+    scenario,
+    "providerResponse",
+    "runtime.validate-structured-output.providerResponse"
+  );
+  const responseFormat = readResponseFormatProperty(
+    scenario,
+    "responseFormat",
+    "runtime.validate-structured-output.responseFormat"
+  );
   const provider: TuvrenProvider = {
     generate() {
-      return Promise.resolve({
-        finishReason: "stop",
-        parts: [
-          {
-            data: { answer: 42 },
-            name: "answer",
-            type: "structured",
-          },
-        ],
-      });
+      return Promise.resolve(structuredClone(response));
     },
     id: "provider",
     async *stream() {
@@ -657,16 +736,7 @@ async function runStructuredValidationFailure(): Promise<AdapterProjection> {
       config: {
         model: provider,
         name: AGENT_NAME,
-        responseFormat: {
-          name: "answer",
-          schema: {
-            properties: {
-              answer: { type: "string" },
-            },
-            required: ["answer"],
-            type: "object",
-          },
-        },
+        responseFormat,
       },
     })
   );
@@ -675,17 +745,206 @@ async function runStructuredValidationFailure(): Promise<AdapterProjection> {
 
   return {
     evidence: {
-      callables: {
-        validationFailure: result.resolution.type === "fail",
+      validation: {
+        error:
+          result.resolution.type === "fail"
+            ? {
+                message: result.resolution.error.message,
+              }
+            : undefined,
+        resolutionType: result.resolution.type,
       },
     },
   };
 }
 
-async function runDriverExecute(): Promise<AdapterProjection> {
+async function runContextTransform(input: unknown): Promise<AdapterProjection> {
+  const scenario = readOperationScenario(input, "runtime.context-transform");
+  const prompt = readStringProperty(
+    scenario,
+    "prompt",
+    "runtime.context-transform.prompt"
+  );
+  const summaryText = readStringProperty(
+    scenario,
+    "summaryText",
+    "runtime.context-transform.summaryText"
+  );
+  const finalText = readStringProperty(
+    scenario,
+    "finalText",
+    "runtime.context-transform.finalText"
+  );
+  const harness = createFakeKernelHarness();
+  const runtime = createTuvrenRuntimeCore({
+    defaultDriverId: DRIVER_ID,
+    driverRegistry: createDriverRegistry([
+      createStaticDriver(() => ({
+        messages: [assistantText(finalText)],
+        resolution: {
+          reason: "done",
+          type: "end_turn",
+        },
+      })),
+    ]),
+    kernel: harness.kernel,
+  });
+  const thread = await runtime.createThread({});
+  const handle = runtime.executeTurn({
+    branchId: thread.branchId,
+    config: {
+      contextPolicy: {
+        evaluate(_manifest, iterationCount) {
+          if (iterationCount !== 1) {
+            return { action: "none" };
+          }
+
+          return {
+            action: "append_shared_summary",
+            execute(context) {
+              return [
+                ...context.messageHashes,
+                context.helpers.storeMessage(assistantText(summaryText)),
+              ];
+            },
+          };
+        },
+      },
+      name: AGENT_NAME,
+    },
+    signal: textSignal(prompt),
+    threadId: thread.threadId,
+  });
+
+  await collectValues(handle.events());
+  const manifest = await harness.readBranchManifest(thread.branchId);
+  const messages = await harness.readBranchMessages(thread.branchId);
+
+  return {
+    evidence: {
+      context: {
+        messageCount: messages.length,
+        summaryText: readAssistantText(messages, summaryText),
+      },
+      runtime: {
+        phase: handle.status().phase,
+      },
+    },
+    state: {
+      context: {
+        manifest,
+      },
+    },
+  };
+}
+
+async function runRecoverResult(input: unknown): Promise<AdapterProjection> {
+  const scenario = readOperationScenario(input, "runtime.recover-result");
+  const stagedObject = readRecordProperty(
+    scenario,
+    "stagedObject",
+    "runtime.recover-result.stagedObject"
+  );
+  const taskId = readStringProperty(
+    stagedObject,
+    "taskId",
+    "runtime.recover-result.stagedObject.taskId"
+  );
+  const objectType = readStringProperty(
+    stagedObject,
+    "objectType",
+    "runtime.recover-result.stagedObject.objectType"
+  );
+  const payload = readProperty(
+    stagedObject,
+    "payload",
+    "runtime.recover-result.stagedObject.payload"
+  );
+  const harness = createFakeKernelHarness();
+  const runtime = createTuvrenRuntimeCore({
+    defaultDriverId: DRIVER_ID,
+    driverRegistry: createDriverRegistry([
+      createStaticDriver(() => ({
+        messages: [assistantText("recovery placeholder")],
+        resolution: {
+          reason: "done",
+          type: "end_turn",
+        },
+      })),
+    ]),
+    kernel: harness.kernel,
+  });
+  const thread = await runtime.createThread({});
+  const runId = "shared-recovery-run";
+
+  await harness.kernel.run.create(
+    runId,
+    "shared-recovery-turn",
+    thread.branchId,
+    DEFAULT_AGENT_SCHEMA.schemaId,
+    thread.rootTurnNodeHash,
+    [
+      {
+        deterministic: false,
+        id: taskId,
+        sideEffects: false,
+      },
+    ]
+  );
+  await harness.kernel.staging.stage(
+    runId,
+    new TextEncoder().encode(JSON.stringify(payload)),
+    taskId,
+    objectType,
+    "completed"
+  );
+
+  const recovery = await harness.kernel.run.recover(runId);
+  const [firstStagedResult] = recovery.uncommittedStagedResults;
+
+  return {
+    evidence: {
+      recovery: {
+        firstObjectType: firstStagedResult?.objectType,
+        firstTaskId: firstStagedResult?.taskId,
+        lastTurnNodeHash: recovery.lastTurnNodeHash,
+        uncommittedStagedResults: recovery.uncommittedStagedResults.length,
+      },
+    },
+    state: {
+      recovery,
+    },
+  };
+}
+
+async function runDriverExecute(input: unknown): Promise<AdapterProjection> {
+  const scenario = readOperationScenario(input, "driver.execute");
+  const prompt = readStringProperty(
+    scenario,
+    "prompt",
+    "driver.execute.prompt"
+  );
+  const providerResponses = readModelResponseArrayProperty(
+    scenario,
+    "providerResponses",
+    "driver.execute.providerResponses"
+  );
+  const toolName = readFirstToolCallName(
+    providerResponses,
+    "driver.execute.providerResponses"
+  );
+  const toolResult = readProperty(
+    scenario,
+    "toolResult",
+    "driver.execute.toolResult"
+  );
   const harness = createFakeKernelHarness();
   const hooks = createHookCounters();
-  const provider = createToolCallingProvider();
+  let generateCalls = 0;
+  let toolCalls = 0;
+  const provider = createScenarioProvider(providerResponses, () => {
+    generateCalls += 1;
+  });
   const reactDriver = createReActDriver({
     providerCallMode: "generate",
   }).create();
@@ -705,14 +964,15 @@ async function runDriverExecute(): Promise<AdapterProjection> {
         {
           description: "Search docs",
           execute() {
-            return { ok: true };
+            toolCalls += 1;
+            return toolResult;
           },
           inputSchema: { type: "object" },
-          name: "search",
+          name: toolName,
         },
       ],
     },
-    signal: textSignal("measure driver hooks"),
+    signal: textSignal(prompt),
     threadId: thread.threadId,
   });
 
@@ -721,13 +981,23 @@ async function runDriverExecute(): Promise<AdapterProjection> {
   return {
     evidence: {
       driver: {
-        executed: handle.status().phase === "completed",
+        phase: handle.status().phase,
       },
       hooks: {
-        afterIteration: hooks.afterIteration > 0,
-        aroundModel: hooks.aroundModel > 0,
-        aroundTool: hooks.aroundTool > 0,
-        beforeIteration: hooks.beforeIteration > 0,
+        afterIteration: hooks.afterIteration,
+        aroundModel: hooks.aroundModel,
+        aroundTool: hooks.aroundTool,
+        beforeIteration: hooks.beforeIteration,
+      },
+      provider: {
+        generate: {
+          callCount: generateCalls,
+        },
+      },
+      tool: {
+        execution: {
+          callCount: toolCalls,
+        },
       },
     },
     state: {
@@ -762,8 +1032,18 @@ async function runDriverExecuteError(): Promise<AdapterProjection> {
   };
 }
 
-async function runDriverResume(): Promise<AdapterProjection> {
-  const driver = createMeasuredDriver();
+async function runDriverResume(input: unknown): Promise<AdapterProjection> {
+  const scenario = readOperationScenario(input, "driver.resume");
+  const decisions = readApprovalDecisions(
+    scenario,
+    "driver.resume.approvalDecisions"
+  );
+  const finalText = readStringProperty(
+    scenario,
+    "finalText",
+    "driver.resume.finalText"
+  );
+  const driver = createMeasuredDriver(finalText);
 
   if (driver.resume === undefined) {
     throw new Error("measured driver must implement resume");
@@ -772,7 +1052,7 @@ async function runDriverResume(): Promise<AdapterProjection> {
   const result = await driver.resume({
     ...createDriverExecutionContext(),
     approval: {
-      decisions: [{ callId: "call-search", type: "approve" }],
+      decisions,
     },
   });
 
@@ -781,19 +1061,25 @@ async function runDriverResume(): Promise<AdapterProjection> {
   return {
     evidence: {
       driver: {
-        resumed: result.resolution.type === "end_turn",
+        resolutionType: result.resolution.type,
       },
     },
   };
 }
 
-async function runDriverCheckpoint(): Promise<AdapterProjection> {
+async function runDriverCheckpoint(input: unknown): Promise<AdapterProjection> {
+  const scenario = readOperationScenario(input, "driver.checkpoint");
+  const finalText = readStringProperty(
+    scenario,
+    "finalText",
+    "driver.checkpoint.finalText"
+  );
   const harness = createFakeKernelHarness();
   const runtime = createTuvrenRuntimeCore({
     defaultDriverId: DRIVER_ID,
     driverRegistry: createDriverRegistry([
       createStaticDriver(() => ({
-        messages: [assistantText("checkpoint")],
+        messages: [assistantText(finalText)],
         resolution: {
           reason: "done",
           type: "end_turn",
@@ -817,13 +1103,16 @@ async function runDriverCheckpoint(): Promise<AdapterProjection> {
   return {
     evidence: {
       checkpoint: {
-        emitted: Object.keys(manifest).length > 0,
+        manifestPathCount: Object.keys(manifest).length,
+      },
+      runtime: {
+        phase: handle.status().phase,
       },
     },
   };
 }
 
-function createMeasuredDriver(): RuntimeDriver {
+function createMeasuredDriver(finalText = "driver resume"): RuntimeDriver {
   return {
     execute() {
       return Promise.resolve({
@@ -837,7 +1126,7 @@ function createMeasuredDriver(): RuntimeDriver {
     id: DRIVER_ID,
     resume() {
       return Promise.resolve({
-        messages: [assistantText("driver resume")],
+        messages: [assistantText(finalText)],
         resolution: {
           reason: "done",
           type: "end_turn",
@@ -883,28 +1172,26 @@ function createMeasuredExtension(hooks: HookCounters): TuvrenExtension {
   };
 }
 
-function createToolCallingProvider(): TuvrenProvider {
-  let generateCalls = 0;
+function createScenarioProvider(
+  responses: readonly TuvrenModelResponse[],
+  onGenerate: () => void
+): TuvrenProvider {
+  let responseIndex = 0;
 
   return {
     generate() {
-      generateCalls += 1;
+      onGenerate();
 
-      if (generateCalls === 1) {
-        return Promise.resolve({
-          finishReason: "tool_call",
-          parts: [
-            {
-              callId: "call-search",
-              input: { query: "driver hook measurement" },
-              name: "search",
-              type: "tool_call",
-            },
-          ],
-        });
+      const response = responses[responseIndex] ?? responses.at(-1);
+
+      if (response === undefined) {
+        return Promise.reject(
+          new Error("driver scenario must provide at least one response")
+        );
       }
 
-      return Promise.resolve(textResponse("driver hook turn completed"));
+      responseIndex += 1;
+      return Promise.resolve(structuredClone(response));
     },
     id: "provider",
     async *stream() {
@@ -1052,17 +1339,14 @@ function assistantText(text: string): TuvrenMessage {
   };
 }
 
-function assistantToolCall(callId: string, name: string): TuvrenMessage {
-  return assistantToolCalls([{ callId, input: { query: "docs" }, name }]);
-}
+function assistantToolCalls(calls: readonly ScenarioToolCall[]): TuvrenMessage {
+  const firstCall = calls[0];
 
-function assistantToolCalls(
-  calls: readonly [
-    { callId: string; input: unknown; name: string },
-    ...{ callId: string; input: unknown; name: string }[],
-  ]
-): TuvrenMessage {
-  const [firstCall, ...remainingCalls] = calls;
+  if (firstCall === undefined) {
+    throw new Error("tool call scenario must contain at least one call");
+  }
+
+  const remainingCalls = calls.slice(1);
   const parts: [ToolCallPart, ...ToolCallPart[]] = [
     toToolCallPart(firstCall),
     ...remainingCalls.map(toToolCallPart),
@@ -1090,19 +1374,6 @@ function toToolCallPart(call: {
 function textSignal(text: string): InputSignal {
   return {
     parts: [{ text, type: "text" }],
-  };
-}
-
-function textResponse(text: string): TuvrenModelResponse {
-  return {
-    finishReason: "stop",
-    parts: [{ text, type: "text" }],
-  };
-}
-
-function createPrompt(): Parameters<TuvrenProvider["generate"]>[0] {
-  return {
-    messages: [{ parts: [{ text: "hello", type: "text" }], role: "user" }],
   };
 }
 
@@ -1178,9 +1449,7 @@ function readFirstErrorEnvelope(
   return undefined;
 }
 
-function projectionStatus(
-  projection: AdapterProjection
-): OperationOutcome["status"] {
+function projectionStatus(projection: AdapterProjection): OperationStatus {
   if (isRecord(projection.result) && projection.result.error !== undefined) {
     return "failed";
   }
@@ -1189,9 +1458,348 @@ function projectionStatus(
 }
 
 function throwIfCancelled(controls: AdapterControls): void {
-  if (controls.signal?.aborted === true) {
-    throw new Error("adapter operation cancelled");
+  if (controls.cancel !== undefined) {
+    throw new Error(controls.cancel.reason);
   }
+}
+
+interface ScenarioToolCall {
+  readonly callId: string;
+  readonly input: unknown;
+  readonly name: string;
+  readonly output?: unknown;
+  readonly requiresApproval?: boolean;
+}
+
+type JsonValue =
+  | boolean
+  | null
+  | number
+  | string
+  | JsonValue[]
+  | { [key: string]: JsonValue };
+
+function readOperationScenario(
+  input: unknown,
+  operation: string
+): Record<string, unknown> {
+  const envelope = readRecord(input, `${operation}.input`);
+  const scenario = readRecordProperty(
+    envelope,
+    "scenario",
+    `${operation}.input.scenario`
+  );
+  const scenarioOperation = readStringProperty(
+    scenario,
+    "operation",
+    `${operation}.scenario.operation`
+  );
+
+  if (scenarioOperation !== operation) {
+    throw new Error(
+      `${operation} scenario declared operation ${scenarioOperation}`
+    );
+  }
+
+  return scenario;
+}
+
+function readPromptProperty(
+  source: Record<string, unknown>,
+  key: string,
+  label: string
+): TuvrenPrompt {
+  const value = readRecordProperty(source, key, label);
+  const messages = readArrayProperty(value, "messages", `${label}.messages`);
+  const promptMessages = messages.map((message, index) => {
+    assertTuvrenMessage(message, `${label}.messages[${index}]`);
+    return structuredClone(message);
+  });
+  const responseFormat =
+    value.responseFormat === undefined
+      ? undefined
+      : readResponseFormat(value.responseFormat, `${label}.responseFormat`);
+
+  return responseFormat === undefined
+    ? { messages: promptMessages }
+    : { messages: promptMessages, responseFormat };
+}
+
+function readModelResponseProperty(
+  source: Record<string, unknown>,
+  key: string,
+  label: string
+): TuvrenModelResponse {
+  const value = readRecordProperty(source, key, label);
+  assertTuvrenModelResponse(value, label);
+  return structuredClone(value);
+}
+
+function readModelResponseArrayProperty(
+  source: Record<string, unknown>,
+  key: string,
+  label: string
+): TuvrenModelResponse[] {
+  return readArrayProperty(source, key, label).map((value, index) => {
+    assertTuvrenModelResponse(value, `${label}[${index}]`);
+    return structuredClone(value);
+  });
+}
+
+function readFirstToolCallName(
+  responses: readonly TuvrenModelResponse[],
+  label: string
+): string {
+  for (const response of responses) {
+    for (const part of response.parts) {
+      if (part.type === "tool_call") {
+        return part.name;
+      }
+    }
+  }
+
+  throw new Error(`${label} must contain a tool_call part`);
+}
+
+function readProviderStreamChunks(
+  scenario: Record<string, unknown>,
+  label: string
+): ProviderStreamChunk[] {
+  const values = readArrayProperty(scenario, "streamChunks", label);
+  return values.map((value, index) => {
+    assertProviderStreamChunk(value, `${label}[${index}]`);
+    return structuredClone(value);
+  });
+}
+
+function readResponseFormatProperty(
+  source: Record<string, unknown>,
+  key: string,
+  label: string
+): StructuredOutputRequest {
+  return readResponseFormat(readProperty(source, key, label), label);
+}
+
+function readResponseFormat(
+  value: unknown,
+  label: string
+): StructuredOutputRequest {
+  const record = readRecord(value, label);
+  const schema = readJsonSchemaProperty(record, "schema", `${label}.schema`);
+  const name =
+    record.name === undefined
+      ? undefined
+      : readStringProperty(record, "name", `${label}.name`);
+  const strict =
+    record.strict === undefined
+      ? undefined
+      : readBooleanProperty(record, "strict", `${label}.strict`);
+
+  return {
+    ...(name === undefined ? {} : { name }),
+    schema,
+    ...(strict === undefined ? {} : { strict }),
+  };
+}
+
+function readScenarioToolCalls(
+  scenario: Record<string, unknown>,
+  label: string
+): ScenarioToolCall[] {
+  return readArrayProperty(scenario, "toolCalls", label).map((value, index) =>
+    readScenarioToolCall(
+      readRecord(value, `${label}[${index}]`),
+      `${label}[${index}]`
+    )
+  );
+}
+
+function readScenarioToolCall(
+  record: Record<string, unknown>,
+  label: string
+): ScenarioToolCall {
+  return {
+    callId: readStringProperty(record, "callId", `${label}.callId`),
+    input: readProperty(record, "input", `${label}.input`),
+    name: readStringProperty(record, "name", `${label}.name`),
+    output: record.output,
+    requiresApproval:
+      record.requiresApproval === undefined
+        ? undefined
+        : readBooleanProperty(
+            record,
+            "requiresApproval",
+            `${label}.requiresApproval`
+          ),
+  };
+}
+
+function readApprovalDecisions(
+  scenario: Record<string, unknown>,
+  label: string
+): ApprovalDecision[] {
+  return readArrayProperty(scenario, "approvalDecisions", label).map(
+    (value, index) => {
+      const record = readRecord(value, `${label}[${index}]`);
+      return {
+        callId: readStringProperty(
+          record,
+          "callId",
+          `${label}[${index}].callId`
+        ),
+        type: readStringProperty(record, "type", `${label}[${index}].type`),
+      };
+    }
+  );
+}
+
+function readAssistantText(
+  messages: readonly unknown[],
+  expectedText: string
+): string | undefined {
+  for (const message of messages) {
+    if (!isRecord(message) || message.role !== "assistant") {
+      continue;
+    }
+
+    const parts = message.parts;
+
+    if (!Array.isArray(parts)) {
+      continue;
+    }
+
+    for (const part of parts) {
+      if (
+        isRecord(part) &&
+        part.type === "text" &&
+        part.text === expectedText
+      ) {
+        return expectedText;
+      }
+    }
+  }
+
+  return undefined;
+}
+
+function readJsonSchemaProperty(
+  source: Record<string, unknown>,
+  key: string,
+  label: string
+): TuvrenJsonSchema {
+  const value = readProperty(source, key, label);
+
+  if (typeof value === "boolean") {
+    return value;
+  }
+
+  return readJsonObject(value, label);
+}
+
+function readArrayProperty(
+  source: Record<string, unknown>,
+  key: string,
+  label: string
+): unknown[] {
+  const value = readProperty(source, key, label);
+
+  if (!Array.isArray(value)) {
+    throw new Error(`${label} must be an array`);
+  }
+
+  return value;
+}
+
+function readRecordProperty(
+  source: Record<string, unknown>,
+  key: string,
+  label: string
+): Record<string, unknown> {
+  return readRecord(readProperty(source, key, label), label);
+}
+
+function readStringProperty(
+  source: Record<string, unknown>,
+  key: string,
+  label: string
+): string {
+  const value = readProperty(source, key, label);
+
+  if (typeof value !== "string") {
+    throw new Error(`${label} must be a string`);
+  }
+
+  return value;
+}
+
+function readBooleanProperty(
+  source: Record<string, unknown>,
+  key: string,
+  label: string
+): boolean {
+  const value = readProperty(source, key, label);
+
+  if (typeof value !== "boolean") {
+    throw new Error(`${label} must be a boolean`);
+  }
+
+  return value;
+}
+
+function readProperty(
+  source: Record<string, unknown>,
+  key: string,
+  label: string
+): unknown {
+  if (!(key in source)) {
+    throw new Error(`${label} is required`);
+  }
+
+  return source[key];
+}
+
+function readRecord(value: unknown, label: string): Record<string, unknown> {
+  if (!isRecord(value) || Array.isArray(value)) {
+    throw new Error(`${label} must be an object`);
+  }
+
+  return value;
+}
+
+function readJsonValue(value: unknown, label: string): JsonValue {
+  if (
+    value === null ||
+    typeof value === "boolean" ||
+    typeof value === "string"
+  ) {
+    return value;
+  }
+
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+
+  if (Array.isArray(value)) {
+    return value.map((item, index) =>
+      readJsonValue(item, `${label}[${index}]`)
+    );
+  }
+
+  return readJsonObject(value, label);
+}
+
+function readJsonObject(
+  value: unknown,
+  label: string
+): { [key: string]: JsonValue } {
+  const record = readRecord(value, label);
+  const object: { [key: string]: JsonValue } = {};
+
+  for (const [key, item] of Object.entries(record)) {
+    object[key] = readJsonValue(item, `${label}.${key}`);
+  }
+
+  return object;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

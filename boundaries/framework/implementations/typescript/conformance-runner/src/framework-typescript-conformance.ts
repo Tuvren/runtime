@@ -343,7 +343,12 @@ function createAdapterInput(
   };
 
   if (check.scenario !== undefined) {
-    input.scenario = plan.scenarios.get(check.scenario);
+    const scenarioSource = plan.scenarios.get(check.scenario);
+    const scenarioPath = readInputStringOptional(check.input, "scenarioPath");
+    input.scenario =
+      scenarioPath === undefined
+        ? scenarioSource
+        : readPath(scenarioSource, scenarioPath);
   }
 
   return input;
@@ -356,6 +361,7 @@ function createAdapterControls(check: ConformancePlanCheck): AdapterControls {
 
   return {
     cancelAfterEvent: check.controls.cancelAfterEvent,
+    deadlineMs: check.controls.deadlineMs,
   };
 }
 
@@ -363,17 +369,26 @@ function createAdapterAssertionContext(
   outcome: OperationOutcome,
   inspectedState: unknown
 ): AssertionContext {
-  if (!isRecord(outcome.result)) {
+  if (outcome.kind === "error") {
     return {
-      result: outcome.result,
+      result: {
+        error: outcome.error,
+      },
+      state: inspectedState ?? undefined,
+    };
+  }
+
+  if (!isRecord(outcome.value)) {
+    return {
+      result: outcome.value,
       state: inspectedState ?? undefined,
     };
   }
 
   return {
-    evidence: readOptionalRecord(outcome.result.evidence),
-    result: outcome.result.result,
-    state: inspectedState ?? readOptionalRecord(outcome.result.state),
+    evidence: readOptionalRecord(outcome.value.evidence),
+    result: outcome.value.result,
+    state: inspectedState ?? readOptionalRecord(outcome.value.state),
   };
 }
 
@@ -482,6 +497,27 @@ function readInputString(input: unknown, key: string): string {
   }
 
   return input[key];
+}
+
+function readInputStringOptional(
+  input: unknown,
+  key: string
+): string | undefined {
+  if (!isRecord(input)) {
+    return undefined;
+  }
+
+  const value = input[key];
+
+  if (value === undefined) {
+    return undefined;
+  }
+
+  if (typeof value !== "string") {
+    throw new Error(`check input ${key} must be a string when present`);
+  }
+
+  return value;
 }
 
 function readRecordString(value: unknown, key: string): string | undefined {

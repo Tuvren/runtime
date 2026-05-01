@@ -212,6 +212,13 @@ export const DEFAULT_VERIFICATION_STEPS: readonly VerificationStep[] = [
   {
     command: [
       "bun",
+      "tools/conformance/adapter-protocol/validate-adapter-protocol.ts",
+    ],
+    id: "adapter protocol validation",
+  },
+  {
+    command: [
+      "bun",
       "tools/scripts/authority-guardrails/authority-guardrails.ts",
     ],
     id: "machine authority guardrails",

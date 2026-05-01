@@ -5,15 +5,20 @@
   "applicability": {
     "capabilities": ["framework.driver-api"]
   },
+  "scenarios": {
+    "driver-api-scenarios": "../scenarios/driver-api-scenarios.json"
+  },
   "checks": [
     {
       "checkId": "driver-callable.before-iteration",
       "operation": "driver.execute",
+      "scenario": "driver-api-scenarios",
+      "input": { "scenarioPath": "$.driver-hook-turn" },
       "assertions": [
         {
           "kind": "evidenceField",
           "field": "$.hooks.beforeIteration",
-          "equals": true
+          "equals": 2
         }
       ],
       "evidence": ["hooks.beforeIteration"]
@@ -21,11 +26,13 @@
     {
       "checkId": "driver-callable.around-model",
       "operation": "driver.execute",
+      "scenario": "driver-api-scenarios",
+      "input": { "scenarioPath": "$.driver-hook-turn" },
       "assertions": [
         {
           "kind": "evidenceField",
           "field": "$.hooks.aroundModel",
-          "equals": true
+          "equals": 2
         }
       ],
       "evidence": ["hooks.aroundModel"]
@@ -33,11 +40,13 @@
     {
       "checkId": "driver-callable.around-tool",
       "operation": "driver.execute",
+      "scenario": "driver-api-scenarios",
+      "input": { "scenarioPath": "$.driver-hook-turn" },
       "assertions": [
         {
           "kind": "evidenceField",
           "field": "$.hooks.aroundTool",
-          "equals": true
+          "equals": 1
         }
       ],
       "evidence": ["hooks.aroundTool"]
@@ -45,11 +54,13 @@
     {
       "checkId": "driver-callable.after-iteration",
       "operation": "driver.execute",
+      "scenario": "driver-api-scenarios",
+      "input": { "scenarioPath": "$.driver-hook-turn" },
       "assertions": [
         {
           "kind": "evidenceField",
           "field": "$.hooks.afterIteration",
-          "equals": true
+          "equals": 2
         }
       ],
       "evidence": ["hooks.afterIteration"]
@@ -57,14 +68,16 @@
     {
       "checkId": "driver-callable.checkpoint",
       "operation": "driver.checkpoint",
+      "scenario": "driver-api-scenarios",
+      "input": { "scenarioPath": "$.driver-checkpoint-turn" },
       "assertions": [
         {
           "kind": "evidenceField",
-          "field": "$.checkpoint.emitted",
-          "equals": true
+          "field": "$.checkpoint.manifestPathCount",
+          "equals": 4
         }
       ],
-      "evidence": ["checkpoint.emitted"]
+      "evidence": ["checkpoint.manifestPathCount"]
     }
   ]
 }

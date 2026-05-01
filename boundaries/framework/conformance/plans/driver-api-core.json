@@ -5,30 +5,37 @@
   "applicability": {
     "capabilities": ["framework.driver-api"]
   },
+  "scenarios": {
+    "driver-api-scenarios": "../scenarios/driver-api-scenarios.json"
+  },
   "checks": [
     {
       "checkId": "driver-api.execute.resolution",
       "operation": "driver.execute",
+      "scenario": "driver-api-scenarios",
+      "input": { "scenarioPath": "$.driver-hook-turn" },
       "assertions": [
         {
           "kind": "evidenceField",
-          "field": "$.driver.executed",
-          "equals": true
+          "field": "$.driver.phase",
+          "equals": "completed"
         }
       ],
-      "evidence": ["driver.executed"]
+      "evidence": ["driver.phase"]
     },
     {
       "checkId": "driver-api.resume.approval",
       "operation": "driver.resume",
+      "scenario": "driver-api-scenarios",
+      "input": { "scenarioPath": "$.driver-resume-approval" },
       "assertions": [
         {
           "kind": "evidenceField",
-          "field": "$.driver.resumed",
-          "equals": true
+          "field": "$.driver.resolutionType",
+          "equals": "end_turn"
         }
       ],
-      "evidence": ["driver.resumed"]
+      "evidence": ["driver.resolutionType"]
     },
     {
       "checkId": "driver-api.error.envelope",
