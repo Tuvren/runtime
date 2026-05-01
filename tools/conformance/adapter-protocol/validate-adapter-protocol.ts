@@ -106,6 +106,7 @@ function createSample(definitionName: string): unknown {
     case "AdapterCapabilities":
       return {
         adapterId: "sample-adapter",
+        capabilities: ["sample.capability"],
         packetId: "tuvren.sample.packet",
         planVersion: "0.1.0",
       };

@@ -106,6 +106,20 @@ const cases: readonly MetaCase[] = [
     id: "equalsPath resolution",
   },
   {
+    check: check("object-equals-order-independent", [
+      {
+        field: "$.actual",
+        kind: "evidenceField",
+        equals: { alpha: 1, nested: { left: true, right: false } },
+      },
+    ]),
+    context: {
+      evidence: { actual: { nested: { right: false, left: true }, alpha: 1 } },
+    },
+    expected: "pass",
+    id: "object equality ignores key insertion order",
+  },
+  {
     check: check("contains-path", [
       {
         containsPath: "$.fixture.requiredType",

@@ -35,7 +35,7 @@
           "pattern": "^\\d+\\.\\d+\\.\\d+$"
         }
       },
-      "required": ["adapterId", "packetId", "planVersion"]
+      "required": ["adapterId", "capabilities", "packetId", "planVersion"]
     },
     "AdapterCancelControl": {
       "type": "object",

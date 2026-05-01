@@ -20,6 +20,7 @@ use serde_json::{Value, json};
 #[derive(Deserialize)]
 struct JsonRpcRequest {
     id: Value,
+    jsonrpc: String,
     method: String,
     #[serde(default)]
     params: Value,
@@ -75,6 +76,13 @@ fn handle_line(line: &str) -> Value {
             );
         }
     };
+    if request.jsonrpc != "2.0" {
+        return error_response(
+            request.id,
+            "invalid_json_rpc_request",
+            "request jsonrpc must be 2.0",
+        );
+    }
     let id = request.id.clone();
 
     match dispatch_request(request) {

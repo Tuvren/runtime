@@ -291,6 +291,17 @@ async function runTraceCheck(
         instance
       );
       const context = createAssertionContext(outcome, input);
+      const extraEvents = await client.events(
+        step.operation,
+        input,
+        controls,
+        instance
+      );
+
+      if (context.events === undefined && extraEvents.length > 0) {
+        context.events = extraEvents;
+      }
+
       const inspectedState =
         step.inspectState === undefined
           ? undefined
@@ -325,6 +336,9 @@ async function runTraceCheck(
 
   const finalContext: AssertionContext = {
     evidence: { trace },
+    fixture: baseInput.fixture,
+    input: baseInput.checkInput,
+    scenario: baseInput.scenario,
     state: { trace },
   };
   assertionResults.push(

@@ -26,7 +26,7 @@ export interface AdapterControls {
 
 export interface AdapterCapabilities {
   readonly adapterId: string;
-  readonly capabilities?: readonly string[];
+  readonly capabilities: readonly string[];
   readonly packetId: string;
   readonly planVersion: string;
 }
