@@ -17,14 +17,18 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { EventSchemas, EventType } from "@ag-ui/core";
 import {
-  collectStreamValues,
-  createFixtureEventStream,
-  frameworkStreamTestFixtures,
-  waitForAsyncTurn,
-} from "@tuvren/framework-testkit";
+  assertTuvrenStreamEvent,
+  type TuvrenStreamEvent,
+} from "@tuvren/event-stream";
 import { toAgUiEvents } from "@tuvren/stream-agui";
 import { teeTuvrenStreamEvents } from "@tuvren/stream-core";
 import { toSseFrames } from "@tuvren/stream-sse";
+import {
+  type CompiledConformancePlan,
+  type ConformancePlanCheck,
+  evaluateAssertions,
+  loadConformancePlan,
+} from "../../../../../../tools/conformance/plan-compiler/index.js";
 import {
   type ConformanceCheckResult,
   type ConformanceEvidence,
@@ -42,8 +46,20 @@ const FRAMEWORK_MANIFEST_PATH = resolve(
   dirname(fileURLToPath(import.meta.url)),
   "../../../../conformance/scenarios/suite-manifest.json"
 );
+const EVENT_STREAM_PLAN_PATH = resolve(
+  dirname(fileURLToPath(import.meta.url)),
+  "../../../../conformance/plans/event-stream-core.json"
+);
 const IMPLEMENTATION_ID = "typescript-framework";
 const LANGUAGE = "typescript";
+let eventStreamPlan: CompiledConformancePlan | undefined;
+let eventStreamFixtures: FrameworkStreamFixtureSet | undefined;
+
+interface FrameworkStreamFixtureSet {
+  completedTurn: readonly TuvrenStreamEvent[];
+  failedTurn: readonly TuvrenStreamEvent[];
+  pausedTurn: readonly TuvrenStreamEvent[];
+}
 
 await main();
 
@@ -73,11 +89,11 @@ async function main(): Promise<void> {
 function runCheck(checkId: string): Promise<ConformanceCheckResult> {
   switch (checkId) {
     case "framework.stream.completed_turn_sequence":
-      return Promise.resolve(createCompletedTurnSequenceCheck());
+      return createCompletedTurnSequenceCheck();
     case "framework.stream.failed_turn_terminal_error":
-      return Promise.resolve(createFailedTurnCheck());
+      return createFailedTurnCheck();
     case "framework.stream.paused_turn_approval_shape":
-      return Promise.resolve(createPausedTurnCheck());
+      return createPausedTurnCheck();
     case "framework.stream.sse_projection":
       return createSseProjectionCheck();
     case "framework.stream.sse_eager_subscription":
@@ -93,72 +109,32 @@ function runCheck(checkId: string): Promise<ConformanceCheckResult> {
   }
 }
 
-function createCompletedTurnSequenceCheck(): ConformanceCheckResult {
-  const eventTypes = frameworkStreamTestFixtures.completedTurn.map(
-    (event) => event.type
-  );
-  const argsDeltaEvent = frameworkStreamTestFixtures.completedTurn[6];
-  const manifestEvent = frameworkStreamTestFixtures.completedTurn[10];
+async function createCompletedTurnSequenceCheck(): Promise<ConformanceCheckResult> {
+  const planCheck = await readEventStreamPlanCheck(0);
+  const fixtures = await readEventStreamFixtures();
+  const eventTypes = fixtures.completedTurn.map((event) => event.type);
 
   return createCheckResult(
     "framework.stream.completed_turn_sequence",
-    [
-      createAssertionResult(
-        "completed_turn_event_order",
-        arraysAreEqual(eventTypes, [
-          "turn.start",
-          "iteration.start",
-          "message.start",
-          "text.delta",
-          "text.done",
-          "tool_call.start",
-          "tool_call.args_delta",
-          "tool_call.done",
-          "tool.start",
-          "tool.result",
-          "state.snapshot",
-          "custom",
-          "message.done",
-          "iteration.end",
-          "turn.end",
-        ])
-      ),
-      createAssertionResult(
-        "completed_turn_tool_args_delta",
-        argsDeltaEvent?.type === "tool_call.args_delta" &&
-          argsDeltaEvent.delta === '{"query":"docs"}'
-      ),
-      createAssertionResult(
-        "completed_turn_manifest_snapshot",
-        manifestEvent?.type === "state.snapshot" &&
-          manifestEvent.manifest.messageCount === 3 &&
-          manifestEvent.manifest.toolCalls.total === 1
-      ),
-    ],
+    evaluateAssertions(planCheck, {
+      events: fixtures.completedTurn,
+    }),
     {
       eventTypes,
     }
   );
 }
 
-function createFailedTurnCheck(): ConformanceCheckResult {
-  const errorEvent = frameworkStreamTestFixtures.failedTurn.find(
-    (event) => event.type === "error"
-  );
-  const terminalEvent = frameworkStreamTestFixtures.failedTurn.at(-1);
+async function createFailedTurnCheck(): Promise<ConformanceCheckResult> {
+  const planCheck = await readEventStreamPlanCheck(1);
+  const fixtures = await readEventStreamFixtures();
+  const terminalEvent = fixtures.failedTurn.at(-1);
 
   return createCheckResult(
     "framework.stream.failed_turn_terminal_error",
-    [
-      createAssertionResult(
-        "failed_turn_has_error_event",
-        errorEvent !== undefined
-      ),
-      createAssertionResult(
-        "failed_turn_has_failed_status",
-        terminalEvent?.type === "turn.end" && terminalEvent.status === "failed"
-      ),
-    ],
+    evaluateAssertions(planCheck, {
+      events: fixtures.failedTurn,
+    }),
     {
       failedStatus:
         terminalEvent?.type === "turn.end" ? terminalEvent.status : undefined,
@@ -166,23 +142,16 @@ function createFailedTurnCheck(): ConformanceCheckResult {
   );
 }
 
-function createPausedTurnCheck(): ConformanceCheckResult {
-  const approvalEvent = frameworkStreamTestFixtures.pausedTurn[1];
-  const terminalEvent = frameworkStreamTestFixtures.pausedTurn.at(-1);
+async function createPausedTurnCheck(): Promise<ConformanceCheckResult> {
+  const planCheck = await readEventStreamPlanCheck(2);
+  const fixtures = await readEventStreamFixtures();
+  const approvalEvent = fixtures.pausedTurn[1];
 
   return createCheckResult(
     "framework.stream.paused_turn_approval_shape",
-    [
-      createAssertionResult(
-        "paused_turn_has_approval_request",
-        approvalEvent?.type === "approval.requested" &&
-          approvalEvent.request.toolCalls[0]?.name === "send_email"
-      ),
-      createAssertionResult(
-        "paused_turn_has_paused_status",
-        terminalEvent?.type === "turn.end" && terminalEvent.status === "paused"
-      ),
-    ],
+    evaluateAssertions(planCheck, {
+      events: fixtures.pausedTurn,
+    }),
     {
       approvalNames:
         approvalEvent?.type === "approval.requested"
@@ -192,11 +161,45 @@ function createPausedTurnCheck(): ConformanceCheckResult {
   );
 }
 
+async function readEventStreamFixtures(): Promise<FrameworkStreamFixtureSet> {
+  if (eventStreamFixtures !== undefined) {
+    return eventStreamFixtures;
+  }
+
+  const plan = await readEventStreamPlan();
+  const fixture = plan.fixtures.get("stream-events");
+
+  // This TypeScript projection validates loaded JSON bytes only; fixture
+  // authority remains the conformance plan and boundary-owned fixture file.
+  assertFrameworkStreamFixtureSet(fixture, "stream-events fixture");
+  eventStreamFixtures = fixture;
+  return eventStreamFixtures;
+}
+
+async function readEventStreamPlan(): Promise<CompiledConformancePlan> {
+  eventStreamPlan ??= await loadConformancePlan(EVENT_STREAM_PLAN_PATH);
+  return eventStreamPlan;
+}
+
+async function readEventStreamPlanCheck(
+  index: number
+): Promise<ConformancePlanCheck> {
+  const plan = await readEventStreamPlan();
+  // Keep promoted semantic check ids in the conformance plan. The runner keeps
+  // legacy suite-manifest ids only as compatibility evidence labels.
+  const planCheck = plan.plan.checks[index];
+
+  if (planCheck === undefined) {
+    throw new Error(`event-stream conformance plan is missing check ${index}`);
+  }
+
+  return planCheck;
+}
+
 async function createSseProjectionCheck(): Promise<ConformanceCheckResult> {
+  const fixtures = await readEventStreamFixtures();
   const frames = await collectStreamValues(
-    toSseFrames(
-      createFixtureEventStream(frameworkStreamTestFixtures.completedTurn)
-    )
+    toSseFrames(createFixtureEventStream(fixtures.completedTurn))
   );
   const firstFrame = frames[0];
   const toolResultFrame = frames.find((frame) =>
@@ -224,8 +227,9 @@ async function createSseProjectionCheck(): Promise<ConformanceCheckResult> {
 }
 
 async function createSseEagerSubscriptionCheck(): Promise<ConformanceCheckResult> {
+  const fixtures = await readEventStreamFixtures();
   const [sseBranch, directBranch] = teeTuvrenStreamEvents(
-    createFixtureEventStream(frameworkStreamTestFixtures.completedTurn),
+    createFixtureEventStream(fixtures.completedTurn),
     2
   );
   const sseFrames = toSseFrames(sseBranch);
@@ -248,16 +252,14 @@ async function createSseEagerSubscriptionCheck(): Promise<ConformanceCheckResult
 }
 
 async function createAgUiProjectionCheck(): Promise<ConformanceCheckResult> {
+  const fixtures = await readEventStreamFixtures();
   const warnings: string[] = [];
   const events = await collectStreamValues(
-    toAgUiEvents(
-      createFixtureEventStream(frameworkStreamTestFixtures.completedTurn),
-      {
-        onWarning(warning) {
-          warnings.push(warning.code);
-        },
-      }
-    )
+    toAgUiEvents(createFixtureEventStream(fixtures.completedTurn), {
+      onWarning(warning) {
+        warnings.push(warning.code);
+      },
+    })
   );
   const aguiTypes = events.map((event) => EventSchemas.parse(event).type);
   const stateSnapshot = events.find(
@@ -301,10 +303,9 @@ async function createAgUiProjectionCheck(): Promise<ConformanceCheckResult> {
 }
 
 async function createAgUiFailedTurnCheck(): Promise<ConformanceCheckResult> {
+  const fixtures = await readEventStreamFixtures();
   const events = await collectStreamValues(
-    toAgUiEvents(
-      createFixtureEventStream(frameworkStreamTestFixtures.failedTurn)
-    )
+    toAgUiEvents(createFixtureEventStream(fixtures.failedTurn))
   );
   const runError = events[1];
 
@@ -324,16 +325,14 @@ async function createAgUiFailedTurnCheck(): Promise<ConformanceCheckResult> {
 }
 
 async function createAgUiPausedTurnCheck(): Promise<ConformanceCheckResult> {
+  const fixtures = await readEventStreamFixtures();
   const warnings: string[] = [];
   const events = await collectStreamValues(
-    toAgUiEvents(
-      createFixtureEventStream(frameworkStreamTestFixtures.pausedTurn),
-      {
-        onWarning(warning) {
-          warnings.push(warning.code);
-        },
-      }
-    )
+    toAgUiEvents(createFixtureEventStream(fixtures.pausedTurn), {
+      onWarning(warning) {
+        warnings.push(warning.code);
+      },
+    })
   );
   const pausedEvent = events.find(
     (event) =>
@@ -360,7 +359,7 @@ async function createAgUiPausedTurnCheck(): Promise<ConformanceCheckResult> {
         "agui_paused_turn_custom_payload",
         pausedEvent?.type === EventType.CUSTOM &&
           JSON.stringify(pausedEvent.rawEvent) ===
-            JSON.stringify(frameworkStreamTestFixtures.pausedTurn[2])
+            JSON.stringify(fixtures.pausedTurn[2])
       ),
     ],
     {
@@ -378,4 +377,68 @@ function arraysAreEqual(
   }
 
   return left.every((value, index) => value === right[index]);
+}
+
+async function collectStreamValues<T>(values: AsyncIterable<T>): Promise<T[]> {
+  const collected: T[] = [];
+
+  for await (const value of values) {
+    collected.push(value);
+  }
+
+  return collected;
+}
+
+function createFixtureEventStream(
+  events: readonly TuvrenStreamEvent[]
+): AsyncIterable<TuvrenStreamEvent> {
+  return {
+    async *[Symbol.asyncIterator](): AsyncIterator<TuvrenStreamEvent> {
+      await Promise.resolve();
+
+      for (const event of events) {
+        yield cloneTuvrenStreamEvent(event);
+      }
+    },
+  };
+}
+
+async function waitForAsyncTurn(): Promise<void> {
+  await Promise.resolve();
+}
+
+function assertFrameworkStreamFixtureSet(
+  value: unknown,
+  label: string
+): asserts value is FrameworkStreamFixtureSet {
+  if (!isRecord(value)) {
+    throw new Error(`${label} must be an object`);
+  }
+
+  assertTuvrenStreamEvents(value.completedTurn, `${label}.completedTurn`);
+  assertTuvrenStreamEvents(value.failedTurn, `${label}.failedTurn`);
+  assertTuvrenStreamEvents(value.pausedTurn, `${label}.pausedTurn`);
+}
+
+function assertTuvrenStreamEvents(
+  value: unknown,
+  label: string
+): asserts value is readonly TuvrenStreamEvent[] {
+  if (!Array.isArray(value)) {
+    throw new Error(`${label} must be an array`);
+  }
+
+  for (const [index, event] of value.entries()) {
+    assertTuvrenStreamEvent(event, `${label}[${index}]`);
+  }
+}
+
+function cloneTuvrenStreamEvent(event: TuvrenStreamEvent): TuvrenStreamEvent {
+  const cloned = structuredClone(event);
+  assertTuvrenStreamEvent(cloned, "cloned stream event");
+  return cloned;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
 }

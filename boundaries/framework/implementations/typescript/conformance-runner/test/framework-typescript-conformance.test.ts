@@ -20,10 +20,6 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { AnySchema } from "ajv";
 import Ajv2020 from "ajv/dist/2020.js";
-import {
-  type FrameworkStreamTestFixtureSet,
-  frameworkStreamTestFixtures,
-} from "../../testkit/src/index.ts";
 
 const FRAMEWORK_SUITE_MANIFEST = new URL(
   "../../../../conformance/scenarios/suite-manifest.json",
@@ -41,10 +37,6 @@ describe("framework TypeScript conformance runner", () => {
       "stream-events"
     );
 
-    // The TypeScript testkit remains a helper facade. The runner anchors its
-    // evidence in the boundary-owned fixture file and only compares the helper
-    // export to prove this implementation line is consuming the shared corpus.
-    expect(frameworkStreamTestFixtures).toEqual(fixture);
     expect(
       fixture.completedTurn.map((event: { type: string }) => event.type)
     ).toEqual([
@@ -113,7 +105,7 @@ describe("framework TypeScript conformance runner", () => {
 function readValidatedSingleFixtureSuite(
   manifestUrl: URL,
   expectedFixtureId: string
-): FrameworkStreamTestFixtureSet {
+): LoadedEventStreamFixtureSet {
   const manifest = readSuiteManifest(manifestUrl);
   const manifestSchema = readJsonSchema(
     fileURLToPath(FRAMEWORK_SUITE_MANIFEST_SCHEMA)
@@ -147,7 +139,7 @@ function readValidatedSingleFixtureSuite(
   const validate = ajv.compile(schema);
 
   expect(validate(fixture), ajv.errorsText(validate.errors)).toBe(true);
-  assertFrameworkStreamTestFixtureSet(fixture, fixturePath);
+  assertLoadedEventStreamFixtureSet(fixture, fixturePath);
   return fixture;
 }
 
@@ -162,6 +154,16 @@ interface SuiteManifest {
   fixtures: [SuiteFixture];
   suiteId: string;
   suiteVersion: string;
+}
+
+interface LoadedEventStreamFixtureSet {
+  completedTurn: readonly FixtureStreamEvent[];
+  failedTurn: readonly FixtureStreamEvent[];
+  pausedTurn: readonly FixtureStreamEvent[];
+}
+
+interface FixtureStreamEvent extends Record<string, unknown> {
+  type: string;
 }
 
 function readSuiteManifest(url: URL): SuiteManifest {
@@ -197,10 +199,10 @@ function readSuiteManifest(url: URL): SuiteManifest {
   };
 }
 
-function assertFrameworkStreamTestFixtureSet(
+function assertLoadedEventStreamFixtureSet(
   value: unknown,
   label: string
-): asserts value is FrameworkStreamTestFixtureSet {
+): asserts value is LoadedEventStreamFixtureSet {
   if (
     !(
       isRecord(value) &&
@@ -210,6 +212,18 @@ function assertFrameworkStreamTestFixtureSet(
     )
   ) {
     throw new Error(`${label} must contain framework stream fixture arrays`);
+  }
+
+  for (const [name, events] of [
+    ["completedTurn", value.completedTurn],
+    ["failedTurn", value.failedTurn],
+    ["pausedTurn", value.pausedTurn],
+  ] as const) {
+    for (const [index, event] of events.entries()) {
+      if (!isRecord(event) || typeof event.type !== "string") {
+        throw new Error(`${label}.${name}[${index}] must contain a type`);
+      }
+    }
   }
 }
 

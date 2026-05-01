@@ -1,0 +1,79 @@
+{
+  "planId": "tuvren.framework.runtime-api.callables",
+  "planVersion": "0.1.0",
+  "packetId": "tuvren.framework.runtime-api",
+  "applicability": {
+    "adapters": ["typescript-framework"]
+  },
+  "checks": [
+    {
+      "checkId": "runtime-callable.provider-generate",
+      "operation": "runtime.provider-generate",
+      "assertions": [
+        {
+          "kind": "evidenceField",
+          "field": "$.callable",
+          "equals": "provider-generate"
+        }
+      ],
+      "evidence": ["callable"]
+    },
+    {
+      "checkId": "runtime-callable.provider-stream",
+      "operation": "runtime.provider-stream",
+      "assertions": [
+        {
+          "kind": "evidenceField",
+          "field": "$.callable",
+          "equals": "provider-stream"
+        }
+      ],
+      "evidence": ["callable"]
+    },
+    {
+      "checkId": "runtime-callable.tool-execute",
+      "operation": "runtime.tool-execute",
+      "assertions": [
+        {
+          "kind": "evidenceField",
+          "field": "$.callable",
+          "equals": "tool-execute"
+        }
+      ],
+      "evidence": ["callable"]
+    },
+    {
+      "checkId": "runtime-callable.approval-resolve",
+      "operation": "runtime.approval-resolve",
+      "assertions": [
+        {
+          "kind": "evidenceField",
+          "field": "$.callable",
+          "equals": "approval-resolve"
+        }
+      ],
+      "evidence": ["callable"]
+    },
+    {
+      "checkId": "runtime-callable.validation-failure",
+      "operation": "runtime.validate-structured-output",
+      "assertions": [
+        {
+          "kind": "evidenceField",
+          "field": "$.callable",
+          "equals": "validation-failure"
+        }
+      ],
+      "evidence": ["callable"]
+    },
+    {
+      "checkId": "runtime-callable.timeout-retry-cancellation-idempotency",
+      "operation": "runtime.cancel-execution",
+      "controls": { "deadlineMs": 1000, "cancelAfterEvent": "turn.start" },
+      "assertions": [
+        { "kind": "evidenceField", "field": "$.controls", "equals": "honored" }
+      ],
+      "evidence": ["controls"]
+    }
+  ]
+}

@@ -1,0 +1,49 @@
+{
+  "planId": "tuvren.framework.driver-api.core",
+  "planVersion": "0.1.0",
+  "packetId": "tuvren.framework.driver-api",
+  "applicability": {
+    "adapters": ["typescript-framework"]
+  },
+  "checks": [
+    {
+      "checkId": "driver-api.execute.resolution",
+      "operation": "driver.execute",
+      "assertions": [
+        {
+          "kind": "evidenceField",
+          "field": "$.driver.resolution",
+          "equals": "declared"
+        }
+      ],
+      "evidence": ["driver.resolution"]
+    },
+    {
+      "checkId": "driver-api.resume.approval",
+      "operation": "driver.resume",
+      "assertions": [
+        {
+          "kind": "evidenceField",
+          "field": "$.driver.resume",
+          "equals": "approval-aware"
+        }
+      ],
+      "evidence": ["driver.resume"]
+    },
+    {
+      "checkId": "driver-api.error.envelope",
+      "operation": "driver.execute",
+      "assertions": [
+        {
+          "kind": "errorEnvelope",
+          "path": "$.result.error",
+          "equals": {
+            "code": "driver_execution_failed",
+            "message": "driver execution failed"
+          }
+        }
+      ],
+      "evidence": ["result.error.code"]
+    }
+  ]
+}

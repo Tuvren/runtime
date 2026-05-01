@@ -1,0 +1,71 @@
+{
+  "planId": "tuvren.framework.runtime-api.lifecycle",
+  "planVersion": "0.1.0",
+  "packetId": "tuvren.framework.runtime-api",
+  "applicability": {
+    "adapters": ["typescript-framework"]
+  },
+  "scenarios": {
+    "runtime-api-scenarios": "../scenarios/runtime-api-scenarios.json"
+  },
+  "checks": [
+    {
+      "checkId": "runtime-api.execute-turn.lifecycle",
+      "operation": "runtime.execute-turn",
+      "scenario": "runtime-api-scenarios",
+      "input": { "scenarioPath": "$.completed-turn" },
+      "assertions": [
+        {
+          "kind": "evidenceField",
+          "field": "$.runtime.lifecycle",
+          "equals": "completed"
+        }
+      ],
+      "evidence": ["runtime.lifecycle"]
+    },
+    {
+      "checkId": "runtime-api.cancel-execution.failure",
+      "operation": "runtime.cancel-execution",
+      "controls": { "deadlineMs": 1000 },
+      "assertions": [
+        {
+          "kind": "errorEnvelope",
+          "path": "$.result.error",
+          "equals": {
+            "code": "runtime_execution_cancelled",
+            "message": "execution cancelled"
+          }
+        }
+      ],
+      "evidence": ["result.error.code"]
+    },
+    {
+      "checkId": "runtime-api.approval-resolve.paused-resume",
+      "operation": "runtime.approval-resolve",
+      "scenario": "runtime-api-scenarios",
+      "input": { "scenarioPath": "$.paused-turn-resume" },
+      "assertions": [
+        {
+          "kind": "evidenceField",
+          "field": "$.approval.resolution",
+          "equals": "continued"
+        }
+      ],
+      "evidence": ["approval.resolution"]
+    },
+    {
+      "checkId": "runtime-api.branch-create.recovery",
+      "operation": "runtime.branch-create",
+      "scenario": "runtime-api-scenarios",
+      "input": { "scenarioPath": "$.branch-from-completed-head" },
+      "assertions": [
+        {
+          "kind": "stateField",
+          "field": "$.branch.status",
+          "equals": "created"
+        }
+      ],
+      "evidence": ["branch.status"]
+    }
+  ]
+}

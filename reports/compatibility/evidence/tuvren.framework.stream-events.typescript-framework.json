@@ -4,15 +4,15 @@
     {
       "assertionResults": [
         {
-          "assertionId": "completed_turn_event_order",
+          "assertionId": "event-stream.completed-turn.sequence.1.eventSequence",
           "status": "pass"
         },
         {
-          "assertionId": "completed_turn_tool_args_delta",
+          "assertionId": "event-stream.completed-turn.sequence.2.terminalEvent",
           "status": "pass"
         },
         {
-          "assertionId": "completed_turn_manifest_snapshot",
+          "assertionId": "event-stream.completed-turn.sequence.3.ordering",
           "status": "pass"
         }
       ],
@@ -41,11 +41,11 @@
     {
       "assertionResults": [
         {
-          "assertionId": "failed_turn_has_error_event",
+          "assertionId": "event-stream.failed-turn.terminal.1.eventSequence",
           "status": "pass"
         },
         {
-          "assertionId": "failed_turn_has_failed_status",
+          "assertionId": "event-stream.failed-turn.terminal.2.terminalEvent",
           "status": "pass"
         }
       ],
@@ -58,11 +58,11 @@
     {
       "assertionResults": [
         {
-          "assertionId": "paused_turn_has_approval_request",
+          "assertionId": "event-stream.paused-turn.approval.1.eventSequence",
           "status": "pass"
         },
         {
-          "assertionId": "paused_turn_has_paused_status",
+          "assertionId": "event-stream.paused-turn.approval.2.terminalEvent",
           "status": "pass"
         }
       ],

@@ -190,13 +190,31 @@ export const DEFAULT_VERIFICATION_STEPS: readonly VerificationStep[] = [
       "-t",
       "codegen",
       "-p",
-      "framework-tool-contracts,provider-api,telemetry-semconv,compatibility-reporting,kernel-interop-grpc",
+      "shared-core-types,framework-runtime-api,framework-event-stream,framework-driver-api,framework-tool-contracts,provider-api,telemetry-semconv,compatibility-reporting,kernel-interop-grpc",
       // Compatibility codegen shells out to the conformance runners to produce
       // measured evidence, so verify forces a fresh execution here instead of
       // accepting cached artifacts from another workspace state.
       "--skipNxCache",
     ],
     id: "telemetry, compatibility, and interop code generation",
+  },
+  {
+    command: [
+      "bun",
+      "tools/scripts/authority-packet/validate-authority-packets.ts",
+    ],
+    id: "authority packet validation",
+  },
+  {
+    command: ["bun", "tools/conformance/plan-compiler/validate-plans.ts"],
+    id: "conformance plan validation",
+  },
+  {
+    command: [
+      "bun",
+      "tools/scripts/authority-guardrails/authority-guardrails.ts",
+    ],
+    id: "machine authority guardrails",
   },
   {
     command: [

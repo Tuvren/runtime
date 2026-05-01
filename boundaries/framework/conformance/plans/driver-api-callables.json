@@ -1,0 +1,62 @@
+{
+  "planId": "tuvren.framework.driver-api.callables",
+  "planVersion": "0.1.0",
+  "packetId": "tuvren.framework.driver-api",
+  "applicability": {
+    "adapters": ["typescript-framework"]
+  },
+  "checks": [
+    {
+      "checkId": "driver-callable.before-iteration",
+      "operation": "driver.execute",
+      "assertions": [
+        {
+          "kind": "evidenceField",
+          "field": "$.hook",
+          "equals": "before-iteration"
+        }
+      ],
+      "evidence": ["hook"]
+    },
+    {
+      "checkId": "driver-callable.around-model",
+      "operation": "driver.execute",
+      "assertions": [
+        { "kind": "evidenceField", "field": "$.hook", "equals": "around-model" }
+      ],
+      "evidence": ["hook"]
+    },
+    {
+      "checkId": "driver-callable.around-tool",
+      "operation": "driver.execute",
+      "assertions": [
+        { "kind": "evidenceField", "field": "$.hook", "equals": "around-tool" }
+      ],
+      "evidence": ["hook"]
+    },
+    {
+      "checkId": "driver-callable.after-iteration",
+      "operation": "driver.execute",
+      "assertions": [
+        {
+          "kind": "evidenceField",
+          "field": "$.hook",
+          "equals": "after-iteration"
+        }
+      ],
+      "evidence": ["hook"]
+    },
+    {
+      "checkId": "driver-callable.checkpoint",
+      "operation": "driver.checkpoint",
+      "assertions": [
+        {
+          "kind": "evidenceField",
+          "field": "$.checkpoint",
+          "equals": "emitted"
+        }
+      ],
+      "evidence": ["checkpoint"]
+    }
+  ]
+}
