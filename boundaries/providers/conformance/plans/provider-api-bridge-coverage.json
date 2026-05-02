@@ -1,0 +1,257 @@
+{
+  "applicability": {
+    "capabilities": [
+      "providers.provider-api"
+    ]
+  },
+  "checks": [
+    {
+      "assertions": [
+        {
+          "field": "$.bridge.cancel.invocations",
+          "kind": "evidenceField"
+        }
+      ],
+      "capabilities": [
+        "providers.ai-sdk-bridge"
+      ],
+      "checkId": "providers-coverage.providers_bridge_cancel",
+      "evidence": [
+        "bridge.cancel.invocations"
+      ],
+      "operation": "providers.bridge.cancel"
+    },
+    {
+      "assertions": [
+        {
+          "field": "$.bridge.usage.inputTokens",
+          "kind": "evidenceField"
+        },
+        {
+          "field": "$.bridge.usage.outputTokens",
+          "kind": "evidenceField"
+        }
+      ],
+      "capabilities": [
+        "providers.ai-sdk-bridge"
+      ],
+      "checkId": "providers-coverage.providers_bridge_usage-emission",
+      "evidence": [
+        "bridge.usage.inputTokens",
+        "bridge.usage.outputTokens"
+      ],
+      "operation": "providers.bridge.usage-emission"
+    },
+    {
+      "assertions": [
+        {
+          "field": "$.bridge.toolCall.argsCompleted",
+          "kind": "evidenceField"
+        }
+      ],
+      "capabilities": [
+        "providers.ai-sdk-bridge"
+      ],
+      "checkId": "providers-coverage.providers_bridge_tool-call-emission",
+      "evidence": [
+        "bridge.toolCall.argsCompleted"
+      ],
+      "operation": "providers.bridge.tool-call-emission"
+    },
+    {
+      "assertions": [
+        {
+          "field": "$.bridge.reasoning.partTypes",
+          "kind": "evidenceField"
+        }
+      ],
+      "capabilities": [
+        "providers.ai-sdk-bridge"
+      ],
+      "checkId": "providers-coverage.providers_bridge_reasoning-emission",
+      "evidence": [
+        "bridge.reasoning.partTypes"
+      ],
+      "operation": "providers.bridge.reasoning-emission"
+    },
+    {
+      "assertions": [
+        {
+          "field": "$.bridge.image.partTypes",
+          "kind": "evidenceField"
+        }
+      ],
+      "capabilities": [
+        "providers.ai-sdk-bridge"
+      ],
+      "checkId": "providers-coverage.providers_bridge_image-emission",
+      "evidence": [
+        "bridge.image.partTypes"
+      ],
+      "operation": "providers.bridge.image-emission"
+    },
+    {
+      "assertions": [
+        {
+          "field": "$.bridge.audio.partTypes",
+          "kind": "evidenceField"
+        }
+      ],
+      "capabilities": [
+        "providers.ai-sdk-bridge"
+      ],
+      "checkId": "providers-coverage.providers_bridge_audio-emission",
+      "evidence": [
+        "bridge.audio.partTypes"
+      ],
+      "operation": "providers.bridge.audio-emission"
+    },
+    {
+      "assertions": [
+        {
+          "field": "$.bridge.fileAttachment.partTypes",
+          "kind": "evidenceField"
+        }
+      ],
+      "capabilities": [
+        "providers.ai-sdk-bridge"
+      ],
+      "checkId": "providers-coverage.providers_bridge_file-attachment-emission",
+      "evidence": [
+        "bridge.fileAttachment.partTypes"
+      ],
+      "operation": "providers.bridge.file-attachment-emission"
+    },
+    {
+      "assertions": [
+        {
+          "field": "$.bridge.stop.reasonsObserved",
+          "kind": "evidenceField"
+        }
+      ],
+      "capabilities": [
+        "providers.ai-sdk-bridge"
+      ],
+      "checkId": "providers-coverage.providers_bridge_stop-reason-mapping",
+      "evidence": [
+        "bridge.stop.reasonsObserved"
+      ],
+      "operation": "providers.bridge.stop-reason-mapping"
+    },
+    {
+      "assertions": [
+        {
+          "field": "$.bridge.providerOptions.passthrough",
+          "kind": "evidenceField"
+        }
+      ],
+      "capabilities": [
+        "providers.ai-sdk-bridge"
+      ],
+      "checkId": "providers-coverage.providers_bridge_provider-options-passthrough",
+      "evidence": [
+        "bridge.providerOptions.passthrough"
+      ],
+      "operation": "providers.bridge.provider-options-passthrough"
+    },
+    {
+      "assertions": [
+        {
+          "field": "$.bridge.cache.hits",
+          "kind": "evidenceField"
+        }
+      ],
+      "capabilities": [
+        "providers.ai-sdk-bridge"
+      ],
+      "checkId": "providers-coverage.providers_bridge_cache-hit-emission",
+      "evidence": [
+        "bridge.cache.hits"
+      ],
+      "operation": "providers.bridge.cache-hit-emission"
+    },
+    {
+      "assertions": [
+        {
+          "field": "$.bridge.headers.normalized",
+          "kind": "evidenceField"
+        }
+      ],
+      "capabilities": [
+        "providers.ai-sdk-bridge"
+      ],
+      "checkId": "providers-coverage.providers_bridge_headers-normalization",
+      "evidence": [
+        "bridge.headers.normalized"
+      ],
+      "operation": "providers.bridge.headers-normalization"
+    },
+    {
+      "assertions": [
+        {
+          "field": "$.bridge.timeout.elapsedMs",
+          "kind": "evidenceField"
+        }
+      ],
+      "capabilities": [
+        "providers.ai-sdk-bridge"
+      ],
+      "checkId": "providers-coverage.providers_bridge_timeout-handling",
+      "evidence": [
+        "bridge.timeout.elapsedMs"
+      ],
+      "operation": "providers.bridge.timeout-handling"
+    },
+    {
+      "assertions": [
+        {
+          "field": "$.bridge.retry.attempts",
+          "kind": "evidenceField"
+        }
+      ],
+      "capabilities": [
+        "providers.ai-sdk-bridge"
+      ],
+      "checkId": "providers-coverage.providers_bridge_retry-handling",
+      "evidence": [
+        "bridge.retry.attempts"
+      ],
+      "operation": "providers.bridge.retry-handling"
+    },
+    {
+      "assertions": [
+        {
+          "field": "$.bridge.streamRetry.fragments",
+          "kind": "evidenceField"
+        }
+      ],
+      "capabilities": [
+        "providers.ai-sdk-bridge"
+      ],
+      "checkId": "providers-coverage.providers_bridge_stream-retry",
+      "evidence": [
+        "bridge.streamRetry.fragments"
+      ],
+      "operation": "providers.bridge.stream-retry"
+    },
+    {
+      "assertions": [
+        {
+          "field": "$.bridge.contentType.normalized",
+          "kind": "evidenceField"
+        }
+      ],
+      "capabilities": [
+        "providers.ai-sdk-bridge"
+      ],
+      "checkId": "providers-coverage.providers_bridge_content-type-normalization",
+      "evidence": [
+        "bridge.contentType.normalized"
+      ],
+      "operation": "providers.bridge.content-type-normalization"
+    }
+  ],
+  "packetId": "tuvren.providers.provider-api",
+  "planId": "tuvren.providers.provider-api.bridge-coverage",
+  "planVersion": "0.1.0"
+}

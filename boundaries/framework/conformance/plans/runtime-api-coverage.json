@@ -1,0 +1,207 @@
+{
+  "applicability": {
+    "capabilities": [
+      "framework.runtime-api"
+    ]
+  },
+  "checks": [
+    {
+      "assertions": [
+        {
+          "field": "$.thread.create.threadId",
+          "kind": "evidenceField"
+        }
+      ],
+      "checkId": "runtime-coverage.runtime_thread-create",
+      "evidence": [
+        "thread.create.threadId"
+      ],
+      "operation": "runtime.thread-create"
+    },
+    {
+      "assertions": [
+        {
+          "field": "$.thread.list.threadIds",
+          "kind": "evidenceField"
+        }
+      ],
+      "checkId": "runtime-coverage.runtime_thread-list",
+      "evidence": [
+        "thread.list.threadIds"
+      ],
+      "operation": "runtime.thread-list"
+    },
+    {
+      "assertions": [
+        {
+          "field": "$.turn.create.turnId",
+          "kind": "evidenceField"
+        }
+      ],
+      "checkId": "runtime-coverage.runtime_turn-create",
+      "evidence": [
+        "turn.create.turnId"
+      ],
+      "operation": "runtime.turn-create"
+    },
+    {
+      "assertions": [
+        {
+          "field": "$.turn.list.turnIds",
+          "kind": "evidenceField"
+        }
+      ],
+      "checkId": "runtime-coverage.runtime_turn-list",
+      "evidence": [
+        "turn.list.turnIds"
+      ],
+      "operation": "runtime.turn-list"
+    },
+    {
+      "assertions": [
+        {
+          "field": "$.branch.list.branchIds",
+          "kind": "evidenceField"
+        }
+      ],
+      "checkId": "runtime-coverage.runtime_branch-list",
+      "evidence": [
+        "branch.list.branchIds"
+      ],
+      "operation": "runtime.branch-list"
+    },
+    {
+      "assertions": [
+        {
+          "field": "$.branch.archive.archiveBranchId",
+          "kind": "evidenceField"
+        }
+      ],
+      "checkId": "runtime-coverage.runtime_branch-archive",
+      "evidence": [
+        "branch.archive.archiveBranchId"
+      ],
+      "operation": "runtime.branch-archive"
+    },
+    {
+      "assertions": [
+        {
+          "field": "$.history.walk.depth",
+          "kind": "evidenceField"
+        }
+      ],
+      "checkId": "runtime-coverage.runtime_history-walk",
+      "evidence": [
+        "history.walk.depth"
+      ],
+      "operation": "runtime.history-walk"
+    },
+    {
+      "assertions": [
+        {
+          "field": "$.state.snapshot.checkpoints",
+          "kind": "evidenceField"
+        }
+      ],
+      "checkId": "runtime-coverage.runtime_state-snapshot",
+      "evidence": [
+        "state.snapshot.checkpoints"
+      ],
+      "operation": "runtime.state-snapshot"
+    },
+    {
+      "assertions": [
+        {
+          "field": "$.tool.cancel.invocations",
+          "kind": "evidenceField"
+        }
+      ],
+      "checkId": "runtime-coverage.runtime_tool-cancel",
+      "evidence": [
+        "tool.cancel.invocations"
+      ],
+      "operation": "runtime.tool-cancel"
+    },
+    {
+      "assertions": [
+        {
+          "field": "$.provider.cancel.invocations",
+          "kind": "evidenceField"
+        }
+      ],
+      "checkId": "runtime-coverage.runtime_provider-cancel",
+      "evidence": [
+        "provider.cancel.invocations"
+      ],
+      "operation": "runtime.provider-cancel"
+    },
+    {
+      "assertions": [
+        {
+          "field": "$.approval.reject.resolution",
+          "kind": "evidenceField"
+        }
+      ],
+      "checkId": "runtime-coverage.runtime_approval-reject",
+      "evidence": [
+        "approval.reject.resolution"
+      ],
+      "operation": "runtime.approval-reject"
+    },
+    {
+      "assertions": [
+        {
+          "field": "$.context.summarize.tokensSaved",
+          "kind": "evidenceField"
+        }
+      ],
+      "checkId": "runtime-coverage.runtime_context-summarize",
+      "evidence": [
+        "context.summarize.tokensSaved"
+      ],
+      "operation": "runtime.context-summarize"
+    },
+    {
+      "assertions": [
+        {
+          "field": "$.context.window.usage",
+          "kind": "evidenceField"
+        }
+      ],
+      "checkId": "runtime-coverage.runtime_context-window-status",
+      "evidence": [
+        "context.window.usage"
+      ],
+      "operation": "runtime.context-window-status"
+    },
+    {
+      "assertions": [
+        {
+          "field": "$.lease.renew.fencingToken",
+          "kind": "evidenceField"
+        }
+      ],
+      "checkId": "runtime-coverage.runtime_lease-renew",
+      "evidence": [
+        "lease.renew.fencingToken"
+      ],
+      "operation": "runtime.lease-renew"
+    },
+    {
+      "assertions": [
+        {
+          "field": "$.lease.preempt.previousOwner",
+          "kind": "evidenceField"
+        }
+      ],
+      "checkId": "runtime-coverage.runtime_lease-preempt",
+      "evidence": [
+        "lease.preempt.previousOwner"
+      ],
+      "operation": "runtime.lease-preempt"
+    }
+  ],
+  "packetId": "tuvren.framework.runtime-api",
+  "planId": "tuvren.framework.runtime-api.coverage",
+  "planVersion": "0.1.0"
+}

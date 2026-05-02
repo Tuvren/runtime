@@ -19,6 +19,18 @@
     {
       "path": "boundaries/framework/conformance/plans/runtime-api-callables.json",
       "format": "conformance-plan"
+    },
+    {
+      "path": "boundaries/framework/conformance/plans/runtime-api-callables-extended.json",
+      "format": "conformance-plan"
+    },
+    {
+      "path": "boundaries/framework/conformance/plans/runtime-api-lifecycle-extended.json",
+      "format": "conformance-plan"
+    },
+    {
+      "path": "boundaries/framework/conformance/plans/runtime-api-coverage.json",
+      "format": "conformance-plan"
     }
   ],
   "generatedArtifacts": [
@@ -38,6 +50,21 @@
       "planId": "tuvren.framework.runtime-api.callables",
       "planVersion": "0.1.0",
       "path": "boundaries/framework/conformance/plans/runtime-api-callables.json"
+    },
+    {
+      "planId": "tuvren.framework.runtime-api.callables-extended",
+      "planVersion": "0.1.0",
+      "path": "boundaries/framework/conformance/plans/runtime-api-callables-extended.json"
+    },
+    {
+      "planId": "tuvren.framework.runtime-api.lifecycle-extended",
+      "planVersion": "0.1.0",
+      "path": "boundaries/framework/conformance/plans/runtime-api-lifecycle-extended.json"
+    },
+    {
+      "planId": "tuvren.framework.runtime-api.coverage",
+      "planVersion": "0.1.0",
+      "path": "boundaries/framework/conformance/plans/runtime-api-coverage.json"
     }
   ],
   "bindingProjections": {
@@ -74,6 +101,18 @@
     {
       "kind": "conformance-plan",
       "target": "boundaries/framework/conformance/plans/runtime-api-callables.json"
+    },
+    {
+      "kind": "conformance-plan",
+      "target": "boundaries/framework/conformance/plans/runtime-api-callables-extended.json"
+    },
+    {
+      "kind": "conformance-plan",
+      "target": "boundaries/framework/conformance/plans/runtime-api-lifecycle-extended.json"
+    },
+    {
+      "kind": "conformance-plan",
+      "target": "boundaries/framework/conformance/plans/runtime-api-coverage.json"
     },
     {
       "kind": "freshness-check",

@@ -1,0 +1,221 @@
+{
+  "applicability": {
+    "capabilities": [
+      "framework.react-driver"
+    ]
+  },
+  "checks": [
+    {
+      "assertions": [
+        {
+          "equals": 2,
+          "field": "$.hooks.beforeIteration",
+          "kind": "evidenceField"
+        }
+      ],
+      "checkId": "react-driver-ext.before-iteration-twice",
+      "evidence": [
+        "hooks.beforeIteration"
+      ],
+      "input": {
+        "scenarioPath": "$.driver-hook-turn"
+      },
+      "operation": "driver.execute",
+      "scenario": "driver-api-scenarios"
+    },
+    {
+      "assertions": [
+        {
+          "equals": 2,
+          "field": "$.hooks.aroundModel",
+          "kind": "evidenceField"
+        }
+      ],
+      "checkId": "react-driver-ext.around-model-twice",
+      "evidence": [
+        "hooks.aroundModel"
+      ],
+      "input": {
+        "scenarioPath": "$.driver-hook-turn"
+      },
+      "operation": "driver.execute",
+      "scenario": "driver-api-scenarios"
+    },
+    {
+      "assertions": [
+        {
+          "equals": 2,
+          "field": "$.hooks.afterIteration",
+          "kind": "evidenceField"
+        }
+      ],
+      "checkId": "react-driver-ext.after-iteration-twice",
+      "evidence": [
+        "hooks.afterIteration"
+      ],
+      "input": {
+        "scenarioPath": "$.driver-hook-turn"
+      },
+      "operation": "driver.execute",
+      "scenario": "driver-api-scenarios"
+    },
+    {
+      "assertions": [
+        {
+          "equals": 1,
+          "field": "$.hooks.aroundTool",
+          "kind": "evidenceField"
+        }
+      ],
+      "checkId": "react-driver-ext.around-tool-once",
+      "evidence": [
+        "hooks.aroundTool"
+      ],
+      "input": {
+        "scenarioPath": "$.driver-hook-turn"
+      },
+      "operation": "driver.execute",
+      "scenario": "driver-api-scenarios"
+    },
+    {
+      "assertions": [
+        {
+          "field": "$.hooks.beforeIteration",
+          "kind": "evidenceField"
+        }
+      ],
+      "checkId": "react-driver-ext.hook-field-present.before-iteration-present",
+      "evidence": [
+        "hooks.beforeIteration"
+      ],
+      "input": {
+        "scenarioPath": "$.driver-hook-turn"
+      },
+      "operation": "driver.execute",
+      "scenario": "driver-api-scenarios"
+    },
+    {
+      "assertions": [
+        {
+          "field": "$.hooks.afterIteration",
+          "kind": "evidenceField"
+        }
+      ],
+      "checkId": "react-driver-ext.hook-field-present.after-iteration-present",
+      "evidence": [
+        "hooks.afterIteration"
+      ],
+      "input": {
+        "scenarioPath": "$.driver-hook-turn"
+      },
+      "operation": "driver.execute",
+      "scenario": "driver-api-scenarios"
+    },
+    {
+      "assertions": [
+        {
+          "field": "$.hooks.aroundModel",
+          "kind": "evidenceField"
+        }
+      ],
+      "checkId": "react-driver-ext.hook-field-present.around-model-present",
+      "evidence": [
+        "hooks.aroundModel"
+      ],
+      "input": {
+        "scenarioPath": "$.driver-hook-turn"
+      },
+      "operation": "driver.execute",
+      "scenario": "driver-api-scenarios"
+    },
+    {
+      "assertions": [
+        {
+          "field": "$.hooks.aroundTool",
+          "kind": "evidenceField"
+        }
+      ],
+      "checkId": "react-driver-ext.hook-field-present.around-tool-present",
+      "evidence": [
+        "hooks.aroundTool"
+      ],
+      "input": {
+        "scenarioPath": "$.driver-hook-turn"
+      },
+      "operation": "driver.execute",
+      "scenario": "driver-api-scenarios"
+    },
+    {
+      "assertions": [
+        {
+          "equals": 4,
+          "field": "$.trace.checkpoint.evidence.checkpoint.manifestPathCount",
+          "kind": "stateField"
+        }
+      ],
+      "checkId": "react-driver-ext.checkpoint-manifest-path-count",
+      "evidence": [
+        "trace.checkpoint.evidence.checkpoint.manifestPathCount"
+      ],
+      "input": {
+        "scenarioPath": "$.driver-checkpoint-turn"
+      },
+      "operation": "driver.checkpoint",
+      "scenario": "driver-api-scenarios",
+      "steps": [
+        {
+          "input": {
+            "scenarioPath": "$.driver-checkpoint-turn"
+          },
+          "operation": "driver.checkpoint",
+          "stepId": "checkpoint"
+        }
+      ]
+    },
+    {
+      "assertions": [
+        {
+          "field": "$.reactDriver.replay.iterations",
+          "kind": "evidenceField"
+        }
+      ],
+      "checkId": "react-driver-ext.coverage.react-driver_replay",
+      "evidence": [
+        "reactDriver.replay.iterations"
+      ],
+      "operation": "react-driver.replay"
+    },
+    {
+      "assertions": [
+        {
+          "field": "$.reactDriver.budget.maxIterations",
+          "kind": "evidenceField"
+        }
+      ],
+      "checkId": "react-driver-ext.coverage.react-driver_budget",
+      "evidence": [
+        "reactDriver.budget.maxIterations"
+      ],
+      "operation": "react-driver.budget"
+    },
+    {
+      "assertions": [
+        {
+          "field": "$.reactDriver.tool.allowList",
+          "kind": "evidenceField"
+        }
+      ],
+      "checkId": "react-driver-ext.coverage.react-driver_tool-allowlist",
+      "evidence": [
+        "reactDriver.tool.allowList"
+      ],
+      "operation": "react-driver.tool-allowlist"
+    }
+  ],
+  "packetId": "tuvren.framework.react-driver",
+  "planId": "tuvren.framework.react-driver.extended",
+  "planVersion": "0.1.0",
+  "scenarios": {
+    "driver-api-scenarios": "../scenarios/driver-api-scenarios.json"
+  }
+}

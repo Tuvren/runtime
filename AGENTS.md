@@ -63,6 +63,7 @@ Keep semantic decisions in shared plans and shared runner code.
 - Keep authority fixture validation separate from implementation conformance.
 - Use implementation-emitted events for event-stream conformance.
 - Fail normal `conformance`, `codegen`, and `verify` gates when structured evidence has `status: "fail"`.
+- Compute canonical encodings (CBOR bytes, hash digests, schema signatures) with the TypeScript reference implementation and commit the result under `boundaries/<area>/conformance/fixtures/`. The committed JSON is authority; the generator is tooling. Cross-validate against another language's reference encoder before promotion once a second implementation exists, and prefer agreement between implementations over single-language computation.
 
 ## Tests And PRs
 Validate the narrowest relevant target first, then broaden.

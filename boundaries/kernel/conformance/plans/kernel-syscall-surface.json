@@ -1,0 +1,488 @@
+{
+  "applicability": {
+    "capabilities": [
+      "kernel.protocol"
+    ]
+  },
+  "checks": [
+    {
+      "assertions": [
+        {
+          "field": "$.result.error",
+          "kind": "errorEnvelope",
+          "path": "$.state.adapterError"
+        }
+      ],
+      "capabilities": [
+        "kernel.protocol"
+      ],
+      "checkId": "kernel.surface.kernel_store_put",
+      "evidence": [
+        "adapterError.code"
+      ],
+      "operation": "kernel.store.put"
+    },
+    {
+      "assertions": [
+        {
+          "field": "$.result.error",
+          "kind": "errorEnvelope",
+          "path": "$.state.adapterError"
+        }
+      ],
+      "capabilities": [
+        "kernel.protocol"
+      ],
+      "checkId": "kernel.surface.kernel_store_get",
+      "evidence": [
+        "adapterError.code"
+      ],
+      "operation": "kernel.store.get"
+    },
+    {
+      "assertions": [
+        {
+          "field": "$.result.error",
+          "kind": "errorEnvelope",
+          "path": "$.state.adapterError"
+        }
+      ],
+      "capabilities": [
+        "kernel.protocol"
+      ],
+      "checkId": "kernel.surface.kernel_store_has",
+      "evidence": [
+        "adapterError.code"
+      ],
+      "operation": "kernel.store.has"
+    },
+    {
+      "assertions": [
+        {
+          "field": "$.result.error",
+          "kind": "errorEnvelope",
+          "path": "$.state.adapterError"
+        }
+      ],
+      "capabilities": [
+        "kernel.protocol"
+      ],
+      "checkId": "kernel.surface.kernel_schema_register",
+      "evidence": [
+        "adapterError.code"
+      ],
+      "operation": "kernel.schema.register"
+    },
+    {
+      "assertions": [
+        {
+          "field": "$.result.error",
+          "kind": "errorEnvelope",
+          "path": "$.state.adapterError"
+        }
+      ],
+      "capabilities": [
+        "kernel.protocol"
+      ],
+      "checkId": "kernel.surface.kernel_schema_get",
+      "evidence": [
+        "adapterError.code"
+      ],
+      "operation": "kernel.schema.get"
+    },
+    {
+      "assertions": [
+        {
+          "field": "$.result.error",
+          "kind": "errorEnvelope",
+          "path": "$.state.adapterError"
+        }
+      ],
+      "capabilities": [
+        "kernel.protocol"
+      ],
+      "checkId": "kernel.surface.kernel_tree_create",
+      "evidence": [
+        "adapterError.code"
+      ],
+      "operation": "kernel.tree.create"
+    },
+    {
+      "assertions": [
+        {
+          "field": "$.result.error",
+          "kind": "errorEnvelope",
+          "path": "$.state.adapterError"
+        }
+      ],
+      "capabilities": [
+        "kernel.protocol"
+      ],
+      "checkId": "kernel.surface.kernel_tree_incorporate",
+      "evidence": [
+        "adapterError.code"
+      ],
+      "operation": "kernel.tree.incorporate"
+    },
+    {
+      "assertions": [
+        {
+          "field": "$.result.error",
+          "kind": "errorEnvelope",
+          "path": "$.state.adapterError"
+        }
+      ],
+      "capabilities": [
+        "kernel.protocol"
+      ],
+      "checkId": "kernel.surface.kernel_tree_diff",
+      "evidence": [
+        "adapterError.code"
+      ],
+      "operation": "kernel.tree.diff"
+    },
+    {
+      "assertions": [
+        {
+          "field": "$.result.error",
+          "kind": "errorEnvelope",
+          "path": "$.state.adapterError"
+        }
+      ],
+      "capabilities": [
+        "kernel.protocol"
+      ],
+      "checkId": "kernel.surface.kernel_tree_resolve",
+      "evidence": [
+        "adapterError.code"
+      ],
+      "operation": "kernel.tree.resolve"
+    },
+    {
+      "assertions": [
+        {
+          "field": "$.result.error",
+          "kind": "errorEnvelope",
+          "path": "$.state.adapterError"
+        }
+      ],
+      "capabilities": [
+        "kernel.protocol"
+      ],
+      "checkId": "kernel.surface.kernel_tree_manifest",
+      "evidence": [
+        "adapterError.code"
+      ],
+      "operation": "kernel.tree.manifest"
+    },
+    {
+      "assertions": [
+        {
+          "field": "$.result.error",
+          "kind": "errorEnvelope",
+          "path": "$.state.adapterError"
+        }
+      ],
+      "capabilities": [
+        "kernel.protocol"
+      ],
+      "checkId": "kernel.surface.kernel_node_get",
+      "evidence": [
+        "adapterError.code"
+      ],
+      "operation": "kernel.node.get"
+    },
+    {
+      "assertions": [
+        {
+          "field": "$.result.error",
+          "kind": "errorEnvelope",
+          "path": "$.state.adapterError"
+        }
+      ],
+      "capabilities": [
+        "kernel.protocol"
+      ],
+      "checkId": "kernel.surface.kernel_node_walk-back",
+      "evidence": [
+        "adapterError.code"
+      ],
+      "operation": "kernel.node.walk-back"
+    },
+    {
+      "assertions": [
+        {
+          "field": "$.result.error",
+          "kind": "errorEnvelope",
+          "path": "$.state.adapterError"
+        }
+      ],
+      "capabilities": [
+        "kernel.protocol"
+      ],
+      "checkId": "kernel.surface.kernel_thread_create",
+      "evidence": [
+        "adapterError.code"
+      ],
+      "operation": "kernel.thread.create"
+    },
+    {
+      "assertions": [
+        {
+          "field": "$.result.error",
+          "kind": "errorEnvelope",
+          "path": "$.state.adapterError"
+        }
+      ],
+      "capabilities": [
+        "kernel.protocol"
+      ],
+      "checkId": "kernel.surface.kernel_thread_get",
+      "evidence": [
+        "adapterError.code"
+      ],
+      "operation": "kernel.thread.get"
+    },
+    {
+      "assertions": [
+        {
+          "field": "$.result.error",
+          "kind": "errorEnvelope",
+          "path": "$.state.adapterError"
+        }
+      ],
+      "capabilities": [
+        "kernel.protocol"
+      ],
+      "checkId": "kernel.surface.kernel_branch_create",
+      "evidence": [
+        "adapterError.code"
+      ],
+      "operation": "kernel.branch.create"
+    },
+    {
+      "assertions": [
+        {
+          "field": "$.result.error",
+          "kind": "errorEnvelope",
+          "path": "$.state.adapterError"
+        }
+      ],
+      "capabilities": [
+        "kernel.protocol"
+      ],
+      "checkId": "kernel.surface.kernel_branch_get",
+      "evidence": [
+        "adapterError.code"
+      ],
+      "operation": "kernel.branch.get"
+    },
+    {
+      "assertions": [
+        {
+          "field": "$.result.error",
+          "kind": "errorEnvelope",
+          "path": "$.state.adapterError"
+        }
+      ],
+      "capabilities": [
+        "kernel.protocol"
+      ],
+      "checkId": "kernel.surface.kernel_branch_set-head",
+      "evidence": [
+        "adapterError.code"
+      ],
+      "operation": "kernel.branch.set-head"
+    },
+    {
+      "assertions": [
+        {
+          "field": "$.result.error",
+          "kind": "errorEnvelope",
+          "path": "$.state.adapterError"
+        }
+      ],
+      "capabilities": [
+        "kernel.protocol"
+      ],
+      "checkId": "kernel.surface.kernel_staging_stage",
+      "evidence": [
+        "adapterError.code"
+      ],
+      "operation": "kernel.staging.stage"
+    },
+    {
+      "assertions": [
+        {
+          "field": "$.result.error",
+          "kind": "errorEnvelope",
+          "path": "$.state.adapterError"
+        }
+      ],
+      "capabilities": [
+        "kernel.protocol"
+      ],
+      "checkId": "kernel.surface.kernel_staging_current",
+      "evidence": [
+        "adapterError.code"
+      ],
+      "operation": "kernel.staging.current"
+    },
+    {
+      "assertions": [
+        {
+          "field": "$.result.error",
+          "kind": "errorEnvelope",
+          "path": "$.state.adapterError"
+        }
+      ],
+      "capabilities": [
+        "kernel.protocol"
+      ],
+      "checkId": "kernel.surface.kernel_run_create",
+      "evidence": [
+        "adapterError.code"
+      ],
+      "operation": "kernel.run.create"
+    },
+    {
+      "assertions": [
+        {
+          "field": "$.result.error",
+          "kind": "errorEnvelope",
+          "path": "$.state.adapterError"
+        }
+      ],
+      "capabilities": [
+        "kernel.protocol"
+      ],
+      "checkId": "kernel.surface.kernel_run_begin-step",
+      "evidence": [
+        "adapterError.code"
+      ],
+      "operation": "kernel.run.begin-step"
+    },
+    {
+      "assertions": [
+        {
+          "field": "$.result.error",
+          "kind": "errorEnvelope",
+          "path": "$.state.adapterError"
+        }
+      ],
+      "capabilities": [
+        "kernel.protocol"
+      ],
+      "checkId": "kernel.surface.kernel_run_complete-step",
+      "evidence": [
+        "adapterError.code"
+      ],
+      "operation": "kernel.run.complete-step"
+    },
+    {
+      "assertions": [
+        {
+          "field": "$.result.error",
+          "kind": "errorEnvelope",
+          "path": "$.state.adapterError"
+        }
+      ],
+      "capabilities": [
+        "kernel.protocol"
+      ],
+      "checkId": "kernel.surface.kernel_run_complete-run",
+      "evidence": [
+        "adapterError.code"
+      ],
+      "operation": "kernel.run.complete-run"
+    },
+    {
+      "assertions": [
+        {
+          "field": "$.result.error",
+          "kind": "errorEnvelope",
+          "path": "$.state.adapterError"
+        }
+      ],
+      "capabilities": [
+        "kernel.protocol"
+      ],
+      "checkId": "kernel.surface.kernel_run_recover",
+      "evidence": [
+        "adapterError.code"
+      ],
+      "operation": "kernel.run.recover"
+    },
+    {
+      "assertions": [
+        {
+          "field": "$.result.error",
+          "kind": "errorEnvelope",
+          "path": "$.state.adapterError"
+        }
+      ],
+      "capabilities": [
+        "kernel.protocol"
+      ],
+      "checkId": "kernel.surface.kernel_verdicts_compose",
+      "evidence": [
+        "adapterError.code"
+      ],
+      "operation": "kernel.verdicts.compose"
+    },
+    {
+      "assertions": [
+        {
+          "field": "$.result.error",
+          "kind": "errorEnvelope",
+          "path": "$.state.adapterError"
+        }
+      ],
+      "capabilities": [
+        "kernel.protocol"
+      ],
+      "checkId": "kernel.surface.kernel_turn_create",
+      "evidence": [
+        "adapterError.code"
+      ],
+      "operation": "kernel.turn.create"
+    },
+    {
+      "assertions": [
+        {
+          "field": "$.result.error",
+          "kind": "errorEnvelope",
+          "path": "$.state.adapterError"
+        }
+      ],
+      "capabilities": [
+        "kernel.protocol"
+      ],
+      "checkId": "kernel.surface.kernel_turn_get",
+      "evidence": [
+        "adapterError.code"
+      ],
+      "operation": "kernel.turn.get"
+    },
+    {
+      "assertions": [
+        {
+          "field": "$.result.error",
+          "kind": "errorEnvelope",
+          "path": "$.state.adapterError"
+        }
+      ],
+      "capabilities": [
+        "kernel.protocol"
+      ],
+      "checkId": "kernel.surface.kernel_turn_update-head",
+      "evidence": [
+        "adapterError.code"
+      ],
+      "operation": "kernel.turn.update-head"
+    }
+  ],
+  "packetId": "tuvren.kernel.protocol",
+  "planId": "tuvren.kernel.protocol.syscall-surface",
+  "planVersion": "0.1.0"
+}

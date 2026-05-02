@@ -247,7 +247,14 @@ async function runCheck(
       timeoutMs
     );
 
-    if (inspectedState !== null && inspectedState !== undefined) {
+    // Adapter-supplied state from the dispatch outcome already populates
+    // context.state; only fall back to the inspectState query when dispatch
+    // did not pack any state. Mirrors the events handling below.
+    if (
+      context.state === undefined &&
+      inspectedState !== null &&
+      inspectedState !== undefined
+    ) {
       context.state = inspectedState;
     }
 
@@ -649,13 +656,13 @@ function applyShard(
   scheduled: readonly ScheduledCheck[],
   options: CliOptions
 ): ScheduledCheck[] {
-  if (options.shard === undefined) {
+  const shard = options.shard;
+
+  if (shard === undefined) {
     return [...scheduled];
   }
 
-  return scheduled.filter(
-    (_entry, index) => index % options.shard?.count === options.shard.index
-  );
+  return scheduled.filter((_entry, index) => index % shard.count === shard.index);
 }
 
 async function readAdapterManifest(path: string): Promise<AdapterManifest> {

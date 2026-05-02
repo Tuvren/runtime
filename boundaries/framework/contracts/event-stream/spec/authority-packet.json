@@ -15,6 +15,10 @@
     {
       "path": "boundaries/framework/conformance/plans/event-stream-core.json",
       "format": "conformance-plan"
+    },
+    {
+      "path": "boundaries/framework/conformance/plans/event-stream-extended.json",
+      "format": "conformance-plan"
     }
   ],
   "generatedArtifacts": [
@@ -29,6 +33,11 @@
       "planId": "tuvren.framework.event-stream.core",
       "planVersion": "0.1.0",
       "path": "boundaries/framework/conformance/plans/event-stream-core.json"
+    },
+    {
+      "planId": "tuvren.framework.event-stream.extended",
+      "planVersion": "0.1.0",
+      "path": "boundaries/framework/conformance/plans/event-stream-extended.json"
     }
   ],
   "bindingProjections": {
@@ -59,6 +68,10 @@
     {
       "kind": "conformance-plan",
       "target": "boundaries/framework/conformance/plans/event-stream-core.json"
+    },
+    {
+      "kind": "conformance-plan",
+      "target": "boundaries/framework/conformance/plans/event-stream-extended.json"
     },
     {
       "kind": "freshness-check",

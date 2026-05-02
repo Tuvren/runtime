@@ -268,8 +268,16 @@ export class JsonRpcAdapterClient {
       return;
     }
 
-    if (!isJsonRpcResponse(parsed) || typeof parsed.id !== "number") {
+    if (!isJsonRpcResponse(parsed)) {
       this.rejectAll(new Error("adapter stdout contained malformed JSON-RPC"));
+      return;
+    }
+
+    // JSON-RPC 2.0 permits numeric, string, and null ids. The runner only
+    // dispatches numeric ids today, so non-numeric replies cannot correlate
+    // to a pending request — drop them as transport noise rather than
+    // tearing down every in-flight request.
+    if (typeof parsed.id !== "number") {
       return;
     }
 

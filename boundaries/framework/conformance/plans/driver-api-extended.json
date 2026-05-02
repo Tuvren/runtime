@@ -1,0 +1,297 @@
+{
+  "applicability": {
+    "capabilities": [
+      "framework.driver-api"
+    ]
+  },
+  "checks": [
+    {
+      "assertions": [
+        {
+          "equals": "completed",
+          "field": "$.driver.phase",
+          "kind": "evidenceField"
+        }
+      ],
+      "checkId": "driver-api-ext.execute.hook-turn-phase-completed",
+      "evidence": [
+        "driver.phase"
+      ],
+      "input": {
+        "scenarioPath": "$.driver-hook-turn"
+      },
+      "operation": "driver.execute",
+      "scenario": "driver-api-scenarios"
+    },
+    {
+      "assertions": [
+        {
+          "field": "$.driver.phase",
+          "kind": "evidenceField",
+          "matches": "^(running|paused|completed|failed)$"
+        }
+      ],
+      "checkId": "driver-api-ext.execute.hook-turn-phase-string",
+      "evidence": [
+        "driver.phase"
+      ],
+      "input": {
+        "scenarioPath": "$.driver-hook-turn"
+      },
+      "operation": "driver.execute",
+      "scenario": "driver-api-scenarios"
+    },
+    {
+      "assertions": [
+        {
+          "kind": "errorEnvelope",
+          "path": "$.result.error"
+        }
+      ],
+      "checkId": "driver-api-ext.execute.provider-failure-error-envelope",
+      "evidence": [
+        "result.error.code"
+      ],
+      "input": {
+        "scenarioPath": "$.driver-provider-failure"
+      },
+      "operation": "driver.execute",
+      "scenario": "driver-api-scenarios"
+    },
+    {
+      "assertions": [
+        {
+          "field": "$.result.error.code",
+          "kind": "evidenceField",
+          "matches": "^[a-z0-9]+(?:_[a-z0-9]+)*$"
+        }
+      ],
+      "checkId": "driver-api-ext.execute.provider-failure-error-code-snake-case",
+      "evidence": [
+        "result.error.code"
+      ],
+      "input": {
+        "scenarioPath": "$.driver-provider-failure"
+      },
+      "operation": "driver.execute",
+      "scenario": "driver-api-scenarios"
+    },
+    {
+      "assertions": [
+        {
+          "field": "$.result.error.message",
+          "kind": "evidenceField",
+          "matches": ".+"
+        }
+      ],
+      "checkId": "driver-api-ext.execute.provider-failure-message-non-empty",
+      "evidence": [
+        "result.error.message"
+      ],
+      "input": {
+        "scenarioPath": "$.driver-provider-failure"
+      },
+      "operation": "driver.execute",
+      "scenario": "driver-api-scenarios"
+    },
+    {
+      "assertions": [
+        {
+          "equals": "end_turn",
+          "field": "$.driver.resolutionType",
+          "kind": "evidenceField"
+        }
+      ],
+      "checkId": "driver-api-ext.resume.approval-resolution-end-turn",
+      "evidence": [
+        "driver.resolutionType"
+      ],
+      "input": {
+        "scenarioPath": "$.driver-resume-approval"
+      },
+      "operation": "driver.resume",
+      "scenario": "driver-api-scenarios"
+    },
+    {
+      "assertions": [
+        {
+          "contains": "call-search",
+          "field": "$.driver.pendingToolCallIds",
+          "kind": "evidenceField"
+        }
+      ],
+      "checkId": "driver-api-ext.resume.approval-pending-call-id-list-non-empty",
+      "evidence": [
+        "driver.pendingToolCallIds"
+      ],
+      "input": {
+        "scenarioPath": "$.driver-resume-approval"
+      },
+      "operation": "driver.resume",
+      "scenario": "driver-api-scenarios"
+    },
+    {
+      "assertions": [
+        {
+          "contains": "call-search",
+          "field": "$.driver.approvalDecisionCallIds",
+          "kind": "evidenceField"
+        }
+      ],
+      "checkId": "driver-api-ext.resume.approval-decision-call-id-includes-call-search",
+      "evidence": [
+        "driver.approvalDecisionCallIds"
+      ],
+      "input": {
+        "scenarioPath": "$.driver-resume-approval"
+      },
+      "operation": "driver.resume",
+      "scenario": "driver-api-scenarios"
+    },
+    {
+      "assertions": [
+        {
+          "equals": "fail",
+          "field": "$.driver.resolutionType",
+          "kind": "evidenceField"
+        }
+      ],
+      "checkId": "driver-api-ext.resume.missing-pending-call-resolution-fail",
+      "evidence": [
+        "driver.resolutionType"
+      ],
+      "input": {
+        "scenarioPath": "$.driver-resume-missing-pending-call"
+      },
+      "operation": "driver.resume",
+      "scenario": "driver-api-scenarios"
+    },
+    {
+      "assertions": [
+        {
+          "kind": "errorEnvelope",
+          "path": "$.result.error"
+        }
+      ],
+      "checkId": "driver-api-ext.resume.missing-pending-call-error-envelope",
+      "evidence": [
+        "result.error.code"
+      ],
+      "input": {
+        "scenarioPath": "$.driver-resume-missing-pending-call"
+      },
+      "operation": "driver.resume",
+      "scenario": "driver-api-scenarios"
+    },
+    {
+      "assertions": [
+        {
+          "field": "$.driver.cancel.cancellationKind",
+          "kind": "evidenceField"
+        }
+      ],
+      "checkId": "driver-api-ext.coverage.driver_cancel",
+      "evidence": [
+        "driver.cancel.cancellationKind"
+      ],
+      "operation": "driver.cancel"
+    },
+    {
+      "assertions": [
+        {
+          "field": "$.driver.replay.iterations",
+          "kind": "evidenceField"
+        }
+      ],
+      "checkId": "driver-api-ext.coverage.driver_replay",
+      "evidence": [
+        "driver.replay.iterations"
+      ],
+      "operation": "driver.replay"
+    },
+    {
+      "assertions": [
+        {
+          "field": "$.driver.metrics.iterationCount",
+          "kind": "evidenceField"
+        }
+      ],
+      "checkId": "driver-api-ext.coverage.driver_metrics",
+      "evidence": [
+        "driver.metrics.iterationCount"
+      ],
+      "operation": "driver.metrics"
+    },
+    {
+      "assertions": [
+        {
+          "field": "$.driver.before-iteration.invocations",
+          "kind": "evidenceField"
+        }
+      ],
+      "checkId": "driver-api-ext.coverage.driver_before-iteration",
+      "evidence": [
+        "driver.before-iteration.invocations"
+      ],
+      "operation": "driver.before-iteration"
+    },
+    {
+      "assertions": [
+        {
+          "field": "$.driver.around-model.invocations",
+          "kind": "evidenceField"
+        }
+      ],
+      "checkId": "driver-api-ext.coverage.driver_around-model",
+      "evidence": [
+        "driver.around-model.invocations"
+      ],
+      "operation": "driver.around-model"
+    },
+    {
+      "assertions": [
+        {
+          "field": "$.driver.around-tool.invocations",
+          "kind": "evidenceField"
+        }
+      ],
+      "checkId": "driver-api-ext.coverage.driver_around-tool",
+      "evidence": [
+        "driver.around-tool.invocations"
+      ],
+      "operation": "driver.around-tool"
+    },
+    {
+      "assertions": [
+        {
+          "field": "$.driver.after-iteration.invocations",
+          "kind": "evidenceField"
+        }
+      ],
+      "checkId": "driver-api-ext.coverage.driver_after-iteration",
+      "evidence": [
+        "driver.after-iteration.invocations"
+      ],
+      "operation": "driver.after-iteration"
+    },
+    {
+      "assertions": [
+        {
+          "field": "$.driver.terminate.reason",
+          "kind": "evidenceField"
+        }
+      ],
+      "checkId": "driver-api-ext.coverage.driver_terminate",
+      "evidence": [
+        "driver.terminate.reason"
+      ],
+      "operation": "driver.terminate"
+    }
+  ],
+  "packetId": "tuvren.framework.driver-api",
+  "planId": "tuvren.framework.driver-api.extended",
+  "planVersion": "0.1.0",
+  "scenarios": {
+    "driver-api-scenarios": "../scenarios/driver-api-scenarios.json"
+  }
+}

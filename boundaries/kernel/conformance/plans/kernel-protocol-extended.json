@@ -1,0 +1,949 @@
+{
+  "applicability": {
+    "capabilities": [
+      "kernel.protocol"
+    ]
+  },
+  "checks": [
+    {
+      "assertions": [
+        {
+          "equalsPath": "$.fixture.rawOpaqueBytesSha256Hex",
+          "field": "$.hashes.rawOpaqueBytes",
+          "kind": "evidenceField"
+        },
+        {
+          "equalsPath": "$.fixture.turnTreeSchemaRecordSha256Hex",
+          "field": "$.hashes.turnTreeSchema",
+          "kind": "evidenceField"
+        },
+        {
+          "equalsPath": "$.fixture.turnNodeIdentityRecordSha256Hex",
+          "field": "$.hashes.turnNodeIdentity",
+          "kind": "evidenceField"
+        }
+      ],
+      "checkId": "kernel.protocol.deterministic_hashing.f-empty-bytes",
+      "evidence": [
+        "hashes.rawOpaqueBytes",
+        "hashes.turnTreeSchema",
+        "hashes.turnNodeIdentity"
+      ],
+      "fixture": "f-empty-bytes",
+      "operation": "kernel.protocol.deterministic-hashing"
+    },
+    {
+      "assertions": [
+        {
+          "equalsPath": "$.fixture.turnTreeSchemaRecord.schemaId",
+          "field": "$.roundtrip.turnTreeSchemaRecord.schemaId",
+          "kind": "evidenceField"
+        },
+        {
+          "equalsPath": "$.fixture.turnNodeIdentityRecord.schemaId",
+          "field": "$.roundtrip.turnNodeIdentityRecord.schemaId",
+          "kind": "evidenceField"
+        },
+        {
+          "equalsPath": "$.fixture.turnNodeIdentityRecord.turnTreeHash",
+          "field": "$.roundtrip.turnNodeIdentityRecord.turnTreeHash",
+          "kind": "evidenceField"
+        }
+      ],
+      "checkId": "kernel.protocol.schema_roundtrip.f-empty-bytes",
+      "evidence": [
+        "roundtrip.turnTreeSchemaRecord.schemaId",
+        "roundtrip.turnNodeIdentityRecord.schemaId",
+        "roundtrip.turnNodeIdentityRecord.turnTreeHash"
+      ],
+      "fixture": "f-empty-bytes",
+      "operation": "kernel.protocol.schema-roundtrip"
+    },
+    {
+      "assertions": [
+        {
+          "equalsPath": "$.fixture.rawOpaqueBytesSha256Hex",
+          "field": "$.hashes.rawOpaqueBytes",
+          "kind": "evidenceField"
+        },
+        {
+          "equalsPath": "$.fixture.turnTreeSchemaRecordSha256Hex",
+          "field": "$.hashes.turnTreeSchema",
+          "kind": "evidenceField"
+        },
+        {
+          "equalsPath": "$.fixture.turnNodeIdentityRecordSha256Hex",
+          "field": "$.hashes.turnNodeIdentity",
+          "kind": "evidenceField"
+        }
+      ],
+      "checkId": "kernel.protocol.deterministic_hashing.f-single-byte",
+      "evidence": [
+        "hashes.rawOpaqueBytes",
+        "hashes.turnTreeSchema",
+        "hashes.turnNodeIdentity"
+      ],
+      "fixture": "f-single-byte",
+      "operation": "kernel.protocol.deterministic-hashing"
+    },
+    {
+      "assertions": [
+        {
+          "equalsPath": "$.fixture.turnTreeSchemaRecord.schemaId",
+          "field": "$.roundtrip.turnTreeSchemaRecord.schemaId",
+          "kind": "evidenceField"
+        },
+        {
+          "equalsPath": "$.fixture.turnNodeIdentityRecord.schemaId",
+          "field": "$.roundtrip.turnNodeIdentityRecord.schemaId",
+          "kind": "evidenceField"
+        },
+        {
+          "equalsPath": "$.fixture.turnNodeIdentityRecord.turnTreeHash",
+          "field": "$.roundtrip.turnNodeIdentityRecord.turnTreeHash",
+          "kind": "evidenceField"
+        }
+      ],
+      "checkId": "kernel.protocol.schema_roundtrip.f-single-byte",
+      "evidence": [
+        "roundtrip.turnTreeSchemaRecord.schemaId",
+        "roundtrip.turnNodeIdentityRecord.schemaId",
+        "roundtrip.turnNodeIdentityRecord.turnTreeHash"
+      ],
+      "fixture": "f-single-byte",
+      "operation": "kernel.protocol.schema-roundtrip"
+    },
+    {
+      "assertions": [
+        {
+          "equalsPath": "$.fixture.rawOpaqueBytesSha256Hex",
+          "field": "$.hashes.rawOpaqueBytes",
+          "kind": "evidenceField"
+        },
+        {
+          "equalsPath": "$.fixture.turnTreeSchemaRecordSha256Hex",
+          "field": "$.hashes.turnTreeSchema",
+          "kind": "evidenceField"
+        },
+        {
+          "equalsPath": "$.fixture.turnNodeIdentityRecordSha256Hex",
+          "field": "$.hashes.turnNodeIdentity",
+          "kind": "evidenceField"
+        }
+      ],
+      "checkId": "kernel.protocol.deterministic_hashing.f-all-zero-bytes",
+      "evidence": [
+        "hashes.rawOpaqueBytes",
+        "hashes.turnTreeSchema",
+        "hashes.turnNodeIdentity"
+      ],
+      "fixture": "f-all-zero-bytes",
+      "operation": "kernel.protocol.deterministic-hashing"
+    },
+    {
+      "assertions": [
+        {
+          "equalsPath": "$.fixture.turnTreeSchemaRecord.schemaId",
+          "field": "$.roundtrip.turnTreeSchemaRecord.schemaId",
+          "kind": "evidenceField"
+        },
+        {
+          "equalsPath": "$.fixture.turnNodeIdentityRecord.schemaId",
+          "field": "$.roundtrip.turnNodeIdentityRecord.schemaId",
+          "kind": "evidenceField"
+        },
+        {
+          "equalsPath": "$.fixture.turnNodeIdentityRecord.turnTreeHash",
+          "field": "$.roundtrip.turnNodeIdentityRecord.turnTreeHash",
+          "kind": "evidenceField"
+        }
+      ],
+      "checkId": "kernel.protocol.schema_roundtrip.f-all-zero-bytes",
+      "evidence": [
+        "roundtrip.turnTreeSchemaRecord.schemaId",
+        "roundtrip.turnNodeIdentityRecord.schemaId",
+        "roundtrip.turnNodeIdentityRecord.turnTreeHash"
+      ],
+      "fixture": "f-all-zero-bytes",
+      "operation": "kernel.protocol.schema-roundtrip"
+    },
+    {
+      "assertions": [
+        {
+          "equalsPath": "$.fixture.rawOpaqueBytesSha256Hex",
+          "field": "$.hashes.rawOpaqueBytes",
+          "kind": "evidenceField"
+        },
+        {
+          "equalsPath": "$.fixture.turnTreeSchemaRecordSha256Hex",
+          "field": "$.hashes.turnTreeSchema",
+          "kind": "evidenceField"
+        },
+        {
+          "equalsPath": "$.fixture.turnNodeIdentityRecordSha256Hex",
+          "field": "$.hashes.turnNodeIdentity",
+          "kind": "evidenceField"
+        }
+      ],
+      "checkId": "kernel.protocol.deterministic_hashing.f-all-ones-bytes",
+      "evidence": [
+        "hashes.rawOpaqueBytes",
+        "hashes.turnTreeSchema",
+        "hashes.turnNodeIdentity"
+      ],
+      "fixture": "f-all-ones-bytes",
+      "operation": "kernel.protocol.deterministic-hashing"
+    },
+    {
+      "assertions": [
+        {
+          "equalsPath": "$.fixture.turnTreeSchemaRecord.schemaId",
+          "field": "$.roundtrip.turnTreeSchemaRecord.schemaId",
+          "kind": "evidenceField"
+        },
+        {
+          "equalsPath": "$.fixture.turnNodeIdentityRecord.schemaId",
+          "field": "$.roundtrip.turnNodeIdentityRecord.schemaId",
+          "kind": "evidenceField"
+        },
+        {
+          "equalsPath": "$.fixture.turnNodeIdentityRecord.turnTreeHash",
+          "field": "$.roundtrip.turnNodeIdentityRecord.turnTreeHash",
+          "kind": "evidenceField"
+        }
+      ],
+      "checkId": "kernel.protocol.schema_roundtrip.f-all-ones-bytes",
+      "evidence": [
+        "roundtrip.turnTreeSchemaRecord.schemaId",
+        "roundtrip.turnNodeIdentityRecord.schemaId",
+        "roundtrip.turnNodeIdentityRecord.turnTreeHash"
+      ],
+      "fixture": "f-all-ones-bytes",
+      "operation": "kernel.protocol.schema-roundtrip"
+    },
+    {
+      "assertions": [
+        {
+          "equalsPath": "$.fixture.rawOpaqueBytesSha256Hex",
+          "field": "$.hashes.rawOpaqueBytes",
+          "kind": "evidenceField"
+        },
+        {
+          "equalsPath": "$.fixture.turnTreeSchemaRecordSha256Hex",
+          "field": "$.hashes.turnTreeSchema",
+          "kind": "evidenceField"
+        },
+        {
+          "equalsPath": "$.fixture.turnNodeIdentityRecordSha256Hex",
+          "field": "$.hashes.turnNodeIdentity",
+          "kind": "evidenceField"
+        }
+      ],
+      "checkId": "kernel.protocol.deterministic_hashing.f-large-bytes",
+      "evidence": [
+        "hashes.rawOpaqueBytes",
+        "hashes.turnTreeSchema",
+        "hashes.turnNodeIdentity"
+      ],
+      "fixture": "f-large-bytes",
+      "operation": "kernel.protocol.deterministic-hashing"
+    },
+    {
+      "assertions": [
+        {
+          "equalsPath": "$.fixture.turnTreeSchemaRecord.schemaId",
+          "field": "$.roundtrip.turnTreeSchemaRecord.schemaId",
+          "kind": "evidenceField"
+        },
+        {
+          "equalsPath": "$.fixture.turnNodeIdentityRecord.schemaId",
+          "field": "$.roundtrip.turnNodeIdentityRecord.schemaId",
+          "kind": "evidenceField"
+        },
+        {
+          "equalsPath": "$.fixture.turnNodeIdentityRecord.turnTreeHash",
+          "field": "$.roundtrip.turnNodeIdentityRecord.turnTreeHash",
+          "kind": "evidenceField"
+        }
+      ],
+      "checkId": "kernel.protocol.schema_roundtrip.f-large-bytes",
+      "evidence": [
+        "roundtrip.turnTreeSchemaRecord.schemaId",
+        "roundtrip.turnNodeIdentityRecord.schemaId",
+        "roundtrip.turnNodeIdentityRecord.turnTreeHash"
+      ],
+      "fixture": "f-large-bytes",
+      "operation": "kernel.protocol.schema-roundtrip"
+    },
+    {
+      "assertions": [
+        {
+          "equalsPath": "$.fixture.rawOpaqueBytesSha256Hex",
+          "field": "$.hashes.rawOpaqueBytes",
+          "kind": "evidenceField"
+        },
+        {
+          "equalsPath": "$.fixture.turnTreeSchemaRecordSha256Hex",
+          "field": "$.hashes.turnTreeSchema",
+          "kind": "evidenceField"
+        },
+        {
+          "equalsPath": "$.fixture.turnNodeIdentityRecordSha256Hex",
+          "field": "$.hashes.turnNodeIdentity",
+          "kind": "evidenceField"
+        }
+      ],
+      "checkId": "kernel.protocol.deterministic_hashing.f-multi-path-schema",
+      "evidence": [
+        "hashes.rawOpaqueBytes",
+        "hashes.turnTreeSchema",
+        "hashes.turnNodeIdentity"
+      ],
+      "fixture": "f-multi-path-schema",
+      "operation": "kernel.protocol.deterministic-hashing"
+    },
+    {
+      "assertions": [
+        {
+          "equalsPath": "$.fixture.turnTreeSchemaRecord.schemaId",
+          "field": "$.roundtrip.turnTreeSchemaRecord.schemaId",
+          "kind": "evidenceField"
+        },
+        {
+          "equalsPath": "$.fixture.turnNodeIdentityRecord.schemaId",
+          "field": "$.roundtrip.turnNodeIdentityRecord.schemaId",
+          "kind": "evidenceField"
+        },
+        {
+          "equalsPath": "$.fixture.turnNodeIdentityRecord.turnTreeHash",
+          "field": "$.roundtrip.turnNodeIdentityRecord.turnTreeHash",
+          "kind": "evidenceField"
+        }
+      ],
+      "checkId": "kernel.protocol.schema_roundtrip.f-multi-path-schema",
+      "evidence": [
+        "roundtrip.turnTreeSchemaRecord.schemaId",
+        "roundtrip.turnNodeIdentityRecord.schemaId",
+        "roundtrip.turnNodeIdentityRecord.turnTreeHash"
+      ],
+      "fixture": "f-multi-path-schema",
+      "operation": "kernel.protocol.schema-roundtrip"
+    },
+    {
+      "assertions": [
+        {
+          "equalsPath": "$.fixture.rawOpaqueBytesSha256Hex",
+          "field": "$.hashes.rawOpaqueBytes",
+          "kind": "evidenceField"
+        },
+        {
+          "equalsPath": "$.fixture.turnTreeSchemaRecordSha256Hex",
+          "field": "$.hashes.turnTreeSchema",
+          "kind": "evidenceField"
+        },
+        {
+          "equalsPath": "$.fixture.turnNodeIdentityRecordSha256Hex",
+          "field": "$.hashes.turnNodeIdentity",
+          "kind": "evidenceField"
+        }
+      ],
+      "checkId": "kernel.protocol.deterministic_hashing.f-all-single-paths",
+      "evidence": [
+        "hashes.rawOpaqueBytes",
+        "hashes.turnTreeSchema",
+        "hashes.turnNodeIdentity"
+      ],
+      "fixture": "f-all-single-paths",
+      "operation": "kernel.protocol.deterministic-hashing"
+    },
+    {
+      "assertions": [
+        {
+          "equalsPath": "$.fixture.turnTreeSchemaRecord.schemaId",
+          "field": "$.roundtrip.turnTreeSchemaRecord.schemaId",
+          "kind": "evidenceField"
+        },
+        {
+          "equalsPath": "$.fixture.turnNodeIdentityRecord.schemaId",
+          "field": "$.roundtrip.turnNodeIdentityRecord.schemaId",
+          "kind": "evidenceField"
+        },
+        {
+          "equalsPath": "$.fixture.turnNodeIdentityRecord.turnTreeHash",
+          "field": "$.roundtrip.turnNodeIdentityRecord.turnTreeHash",
+          "kind": "evidenceField"
+        }
+      ],
+      "checkId": "kernel.protocol.schema_roundtrip.f-all-single-paths",
+      "evidence": [
+        "roundtrip.turnTreeSchemaRecord.schemaId",
+        "roundtrip.turnNodeIdentityRecord.schemaId",
+        "roundtrip.turnNodeIdentityRecord.turnTreeHash"
+      ],
+      "fixture": "f-all-single-paths",
+      "operation": "kernel.protocol.schema-roundtrip"
+    },
+    {
+      "assertions": [
+        {
+          "equalsPath": "$.fixture.rawOpaqueBytesSha256Hex",
+          "field": "$.hashes.rawOpaqueBytes",
+          "kind": "evidenceField"
+        },
+        {
+          "equalsPath": "$.fixture.turnTreeSchemaRecordSha256Hex",
+          "field": "$.hashes.turnTreeSchema",
+          "kind": "evidenceField"
+        },
+        {
+          "equalsPath": "$.fixture.turnNodeIdentityRecordSha256Hex",
+          "field": "$.hashes.turnNodeIdentity",
+          "kind": "evidenceField"
+        }
+      ],
+      "checkId": "kernel.protocol.deterministic_hashing.f-all-ordered-paths",
+      "evidence": [
+        "hashes.rawOpaqueBytes",
+        "hashes.turnTreeSchema",
+        "hashes.turnNodeIdentity"
+      ],
+      "fixture": "f-all-ordered-paths",
+      "operation": "kernel.protocol.deterministic-hashing"
+    },
+    {
+      "assertions": [
+        {
+          "equalsPath": "$.fixture.turnTreeSchemaRecord.schemaId",
+          "field": "$.roundtrip.turnTreeSchemaRecord.schemaId",
+          "kind": "evidenceField"
+        },
+        {
+          "equalsPath": "$.fixture.turnNodeIdentityRecord.schemaId",
+          "field": "$.roundtrip.turnNodeIdentityRecord.schemaId",
+          "kind": "evidenceField"
+        },
+        {
+          "equalsPath": "$.fixture.turnNodeIdentityRecord.turnTreeHash",
+          "field": "$.roundtrip.turnNodeIdentityRecord.turnTreeHash",
+          "kind": "evidenceField"
+        }
+      ],
+      "checkId": "kernel.protocol.schema_roundtrip.f-all-ordered-paths",
+      "evidence": [
+        "roundtrip.turnTreeSchemaRecord.schemaId",
+        "roundtrip.turnNodeIdentityRecord.schemaId",
+        "roundtrip.turnNodeIdentityRecord.turnTreeHash"
+      ],
+      "fixture": "f-all-ordered-paths",
+      "operation": "kernel.protocol.schema-roundtrip"
+    },
+    {
+      "assertions": [
+        {
+          "equalsPath": "$.fixture.rawOpaqueBytesSha256Hex",
+          "field": "$.hashes.rawOpaqueBytes",
+          "kind": "evidenceField"
+        },
+        {
+          "equalsPath": "$.fixture.turnTreeSchemaRecordSha256Hex",
+          "field": "$.hashes.turnTreeSchema",
+          "kind": "evidenceField"
+        },
+        {
+          "equalsPath": "$.fixture.turnNodeIdentityRecordSha256Hex",
+          "field": "$.hashes.turnNodeIdentity",
+          "kind": "evidenceField"
+        }
+      ],
+      "checkId": "kernel.protocol.deterministic_hashing.f-with-prev-turn",
+      "evidence": [
+        "hashes.rawOpaqueBytes",
+        "hashes.turnTreeSchema",
+        "hashes.turnNodeIdentity"
+      ],
+      "fixture": "f-with-prev-turn",
+      "operation": "kernel.protocol.deterministic-hashing"
+    },
+    {
+      "assertions": [
+        {
+          "equalsPath": "$.fixture.turnTreeSchemaRecord.schemaId",
+          "field": "$.roundtrip.turnTreeSchemaRecord.schemaId",
+          "kind": "evidenceField"
+        },
+        {
+          "equalsPath": "$.fixture.turnNodeIdentityRecord.schemaId",
+          "field": "$.roundtrip.turnNodeIdentityRecord.schemaId",
+          "kind": "evidenceField"
+        },
+        {
+          "equalsPath": "$.fixture.turnNodeIdentityRecord.turnTreeHash",
+          "field": "$.roundtrip.turnNodeIdentityRecord.turnTreeHash",
+          "kind": "evidenceField"
+        }
+      ],
+      "checkId": "kernel.protocol.schema_roundtrip.f-with-prev-turn",
+      "evidence": [
+        "roundtrip.turnTreeSchemaRecord.schemaId",
+        "roundtrip.turnNodeIdentityRecord.schemaId",
+        "roundtrip.turnNodeIdentityRecord.turnTreeHash"
+      ],
+      "fixture": "f-with-prev-turn",
+      "operation": "kernel.protocol.schema-roundtrip"
+    },
+    {
+      "assertions": [
+        {
+          "equalsPath": "$.fixture.rawOpaqueBytesSha256Hex",
+          "field": "$.hashes.rawOpaqueBytes",
+          "kind": "evidenceField"
+        },
+        {
+          "equalsPath": "$.fixture.turnTreeSchemaRecordSha256Hex",
+          "field": "$.hashes.turnTreeSchema",
+          "kind": "evidenceField"
+        },
+        {
+          "equalsPath": "$.fixture.turnNodeIdentityRecordSha256Hex",
+          "field": "$.hashes.turnNodeIdentity",
+          "kind": "evidenceField"
+        }
+      ],
+      "checkId": "kernel.protocol.deterministic_hashing.f-with-event-hash",
+      "evidence": [
+        "hashes.rawOpaqueBytes",
+        "hashes.turnTreeSchema",
+        "hashes.turnNodeIdentity"
+      ],
+      "fixture": "f-with-event-hash",
+      "operation": "kernel.protocol.deterministic-hashing"
+    },
+    {
+      "assertions": [
+        {
+          "equalsPath": "$.fixture.turnTreeSchemaRecord.schemaId",
+          "field": "$.roundtrip.turnTreeSchemaRecord.schemaId",
+          "kind": "evidenceField"
+        },
+        {
+          "equalsPath": "$.fixture.turnNodeIdentityRecord.schemaId",
+          "field": "$.roundtrip.turnNodeIdentityRecord.schemaId",
+          "kind": "evidenceField"
+        },
+        {
+          "equalsPath": "$.fixture.turnNodeIdentityRecord.turnTreeHash",
+          "field": "$.roundtrip.turnNodeIdentityRecord.turnTreeHash",
+          "kind": "evidenceField"
+        }
+      ],
+      "checkId": "kernel.protocol.schema_roundtrip.f-with-event-hash",
+      "evidence": [
+        "roundtrip.turnTreeSchemaRecord.schemaId",
+        "roundtrip.turnNodeIdentityRecord.schemaId",
+        "roundtrip.turnNodeIdentityRecord.turnTreeHash"
+      ],
+      "fixture": "f-with-event-hash",
+      "operation": "kernel.protocol.schema-roundtrip"
+    },
+    {
+      "assertions": [
+        {
+          "equalsPath": "$.fixture.rawOpaqueBytesSha256Hex",
+          "field": "$.hashes.rawOpaqueBytes",
+          "kind": "evidenceField"
+        },
+        {
+          "equalsPath": "$.fixture.turnTreeSchemaRecordSha256Hex",
+          "field": "$.hashes.turnTreeSchema",
+          "kind": "evidenceField"
+        },
+        {
+          "equalsPath": "$.fixture.turnNodeIdentityRecordSha256Hex",
+          "field": "$.hashes.turnNodeIdentity",
+          "kind": "evidenceField"
+        }
+      ],
+      "checkId": "kernel.protocol.deterministic_hashing.f-staged-failed",
+      "evidence": [
+        "hashes.rawOpaqueBytes",
+        "hashes.turnTreeSchema",
+        "hashes.turnNodeIdentity"
+      ],
+      "fixture": "f-staged-failed",
+      "operation": "kernel.protocol.deterministic-hashing"
+    },
+    {
+      "assertions": [
+        {
+          "equalsPath": "$.fixture.turnTreeSchemaRecord.schemaId",
+          "field": "$.roundtrip.turnTreeSchemaRecord.schemaId",
+          "kind": "evidenceField"
+        },
+        {
+          "equalsPath": "$.fixture.turnNodeIdentityRecord.schemaId",
+          "field": "$.roundtrip.turnNodeIdentityRecord.schemaId",
+          "kind": "evidenceField"
+        },
+        {
+          "equalsPath": "$.fixture.turnNodeIdentityRecord.turnTreeHash",
+          "field": "$.roundtrip.turnNodeIdentityRecord.turnTreeHash",
+          "kind": "evidenceField"
+        }
+      ],
+      "checkId": "kernel.protocol.schema_roundtrip.f-staged-failed",
+      "evidence": [
+        "roundtrip.turnTreeSchemaRecord.schemaId",
+        "roundtrip.turnNodeIdentityRecord.schemaId",
+        "roundtrip.turnNodeIdentityRecord.turnTreeHash"
+      ],
+      "fixture": "f-staged-failed",
+      "operation": "kernel.protocol.schema-roundtrip"
+    },
+    {
+      "assertions": [
+        {
+          "equalsPath": "$.fixture.rawOpaqueBytesSha256Hex",
+          "field": "$.hashes.rawOpaqueBytes",
+          "kind": "evidenceField"
+        },
+        {
+          "equalsPath": "$.fixture.turnTreeSchemaRecordSha256Hex",
+          "field": "$.hashes.turnTreeSchema",
+          "kind": "evidenceField"
+        },
+        {
+          "equalsPath": "$.fixture.turnNodeIdentityRecordSha256Hex",
+          "field": "$.hashes.turnNodeIdentity",
+          "kind": "evidenceField"
+        }
+      ],
+      "checkId": "kernel.protocol.deterministic_hashing.f-staged-interrupted",
+      "evidence": [
+        "hashes.rawOpaqueBytes",
+        "hashes.turnTreeSchema",
+        "hashes.turnNodeIdentity"
+      ],
+      "fixture": "f-staged-interrupted",
+      "operation": "kernel.protocol.deterministic-hashing"
+    },
+    {
+      "assertions": [
+        {
+          "equalsPath": "$.fixture.turnTreeSchemaRecord.schemaId",
+          "field": "$.roundtrip.turnTreeSchemaRecord.schemaId",
+          "kind": "evidenceField"
+        },
+        {
+          "equalsPath": "$.fixture.turnNodeIdentityRecord.schemaId",
+          "field": "$.roundtrip.turnNodeIdentityRecord.schemaId",
+          "kind": "evidenceField"
+        },
+        {
+          "equalsPath": "$.fixture.turnNodeIdentityRecord.turnTreeHash",
+          "field": "$.roundtrip.turnNodeIdentityRecord.turnTreeHash",
+          "kind": "evidenceField"
+        }
+      ],
+      "checkId": "kernel.protocol.schema_roundtrip.f-staged-interrupted",
+      "evidence": [
+        "roundtrip.turnTreeSchemaRecord.schemaId",
+        "roundtrip.turnNodeIdentityRecord.schemaId",
+        "roundtrip.turnNodeIdentityRecord.turnTreeHash"
+      ],
+      "fixture": "f-staged-interrupted",
+      "operation": "kernel.protocol.schema-roundtrip"
+    },
+    {
+      "assertions": [
+        {
+          "equalsPath": "$.fixture.rawOpaqueBytesSha256Hex",
+          "field": "$.hashes.rawOpaqueBytes",
+          "kind": "evidenceField"
+        },
+        {
+          "equalsPath": "$.fixture.turnTreeSchemaRecordSha256Hex",
+          "field": "$.hashes.turnTreeSchema",
+          "kind": "evidenceField"
+        },
+        {
+          "equalsPath": "$.fixture.turnNodeIdentityRecordSha256Hex",
+          "field": "$.hashes.turnNodeIdentity",
+          "kind": "evidenceField"
+        }
+      ],
+      "checkId": "kernel.protocol.deterministic_hashing.f-many-staged-results",
+      "evidence": [
+        "hashes.rawOpaqueBytes",
+        "hashes.turnTreeSchema",
+        "hashes.turnNodeIdentity"
+      ],
+      "fixture": "f-many-staged-results",
+      "operation": "kernel.protocol.deterministic-hashing"
+    },
+    {
+      "assertions": [
+        {
+          "equalsPath": "$.fixture.turnTreeSchemaRecord.schemaId",
+          "field": "$.roundtrip.turnTreeSchemaRecord.schemaId",
+          "kind": "evidenceField"
+        },
+        {
+          "equalsPath": "$.fixture.turnNodeIdentityRecord.schemaId",
+          "field": "$.roundtrip.turnNodeIdentityRecord.schemaId",
+          "kind": "evidenceField"
+        },
+        {
+          "equalsPath": "$.fixture.turnNodeIdentityRecord.turnTreeHash",
+          "field": "$.roundtrip.turnNodeIdentityRecord.turnTreeHash",
+          "kind": "evidenceField"
+        }
+      ],
+      "checkId": "kernel.protocol.schema_roundtrip.f-many-staged-results",
+      "evidence": [
+        "roundtrip.turnTreeSchemaRecord.schemaId",
+        "roundtrip.turnNodeIdentityRecord.schemaId",
+        "roundtrip.turnNodeIdentityRecord.turnTreeHash"
+      ],
+      "fixture": "f-many-staged-results",
+      "operation": "kernel.protocol.schema-roundtrip"
+    },
+    {
+      "assertions": [
+        {
+          "equalsPath": "$.fixture.rawOpaqueBytesSha256Hex",
+          "field": "$.hashes.rawOpaqueBytes",
+          "kind": "evidenceField"
+        },
+        {
+          "equalsPath": "$.fixture.turnTreeSchemaRecordSha256Hex",
+          "field": "$.hashes.turnTreeSchema",
+          "kind": "evidenceField"
+        },
+        {
+          "equalsPath": "$.fixture.turnNodeIdentityRecordSha256Hex",
+          "field": "$.hashes.turnNodeIdentity",
+          "kind": "evidenceField"
+        }
+      ],
+      "checkId": "kernel.protocol.deterministic_hashing.f-deep-path-schema",
+      "evidence": [
+        "hashes.rawOpaqueBytes",
+        "hashes.turnTreeSchema",
+        "hashes.turnNodeIdentity"
+      ],
+      "fixture": "f-deep-path-schema",
+      "operation": "kernel.protocol.deterministic-hashing"
+    },
+    {
+      "assertions": [
+        {
+          "equalsPath": "$.fixture.turnTreeSchemaRecord.schemaId",
+          "field": "$.roundtrip.turnTreeSchemaRecord.schemaId",
+          "kind": "evidenceField"
+        },
+        {
+          "equalsPath": "$.fixture.turnNodeIdentityRecord.schemaId",
+          "field": "$.roundtrip.turnNodeIdentityRecord.schemaId",
+          "kind": "evidenceField"
+        },
+        {
+          "equalsPath": "$.fixture.turnNodeIdentityRecord.turnTreeHash",
+          "field": "$.roundtrip.turnNodeIdentityRecord.turnTreeHash",
+          "kind": "evidenceField"
+        }
+      ],
+      "checkId": "kernel.protocol.schema_roundtrip.f-deep-path-schema",
+      "evidence": [
+        "roundtrip.turnTreeSchemaRecord.schemaId",
+        "roundtrip.turnNodeIdentityRecord.schemaId",
+        "roundtrip.turnNodeIdentityRecord.turnTreeHash"
+      ],
+      "fixture": "f-deep-path-schema",
+      "operation": "kernel.protocol.schema-roundtrip"
+    },
+    {
+      "assertions": [
+        {
+          "equalsPath": "$.fixture.rawOpaqueBytesSha256Hex",
+          "field": "$.hashes.rawOpaqueBytes",
+          "kind": "evidenceField"
+        },
+        {
+          "equalsPath": "$.fixture.turnTreeSchemaRecordSha256Hex",
+          "field": "$.hashes.turnTreeSchema",
+          "kind": "evidenceField"
+        },
+        {
+          "equalsPath": "$.fixture.turnNodeIdentityRecordSha256Hex",
+          "field": "$.hashes.turnNodeIdentity",
+          "kind": "evidenceField"
+        }
+      ],
+      "checkId": "kernel.protocol.deterministic_hashing.f-non-utf8-bytes",
+      "evidence": [
+        "hashes.rawOpaqueBytes",
+        "hashes.turnTreeSchema",
+        "hashes.turnNodeIdentity"
+      ],
+      "fixture": "f-non-utf8-bytes",
+      "operation": "kernel.protocol.deterministic-hashing"
+    },
+    {
+      "assertions": [
+        {
+          "equalsPath": "$.fixture.turnTreeSchemaRecord.schemaId",
+          "field": "$.roundtrip.turnTreeSchemaRecord.schemaId",
+          "kind": "evidenceField"
+        },
+        {
+          "equalsPath": "$.fixture.turnNodeIdentityRecord.schemaId",
+          "field": "$.roundtrip.turnNodeIdentityRecord.schemaId",
+          "kind": "evidenceField"
+        },
+        {
+          "equalsPath": "$.fixture.turnNodeIdentityRecord.turnTreeHash",
+          "field": "$.roundtrip.turnNodeIdentityRecord.turnTreeHash",
+          "kind": "evidenceField"
+        }
+      ],
+      "checkId": "kernel.protocol.schema_roundtrip.f-non-utf8-bytes",
+      "evidence": [
+        "roundtrip.turnTreeSchemaRecord.schemaId",
+        "roundtrip.turnNodeIdentityRecord.schemaId",
+        "roundtrip.turnNodeIdentityRecord.turnTreeHash"
+      ],
+      "fixture": "f-non-utf8-bytes",
+      "operation": "kernel.protocol.schema-roundtrip"
+    },
+    {
+      "assertions": [
+        {
+          "equalsPath": "$.fixture.rawOpaqueBytesSha256Hex",
+          "field": "$.hashes.rawOpaqueBytes",
+          "kind": "evidenceField"
+        },
+        {
+          "equalsPath": "$.fixture.turnTreeSchemaRecordSha256Hex",
+          "field": "$.hashes.turnTreeSchema",
+          "kind": "evidenceField"
+        },
+        {
+          "equalsPath": "$.fixture.turnNodeIdentityRecordSha256Hex",
+          "field": "$.hashes.turnNodeIdentity",
+          "kind": "evidenceField"
+        }
+      ],
+      "checkId": "kernel.protocol.deterministic_hashing.f-zero-turn-tree-hash",
+      "evidence": [
+        "hashes.rawOpaqueBytes",
+        "hashes.turnTreeSchema",
+        "hashes.turnNodeIdentity"
+      ],
+      "fixture": "f-zero-turn-tree-hash",
+      "operation": "kernel.protocol.deterministic-hashing"
+    },
+    {
+      "assertions": [
+        {
+          "equalsPath": "$.fixture.turnTreeSchemaRecord.schemaId",
+          "field": "$.roundtrip.turnTreeSchemaRecord.schemaId",
+          "kind": "evidenceField"
+        },
+        {
+          "equalsPath": "$.fixture.turnNodeIdentityRecord.schemaId",
+          "field": "$.roundtrip.turnNodeIdentityRecord.schemaId",
+          "kind": "evidenceField"
+        },
+        {
+          "equalsPath": "$.fixture.turnNodeIdentityRecord.turnTreeHash",
+          "field": "$.roundtrip.turnNodeIdentityRecord.turnTreeHash",
+          "kind": "evidenceField"
+        }
+      ],
+      "checkId": "kernel.protocol.schema_roundtrip.f-zero-turn-tree-hash",
+      "evidence": [
+        "roundtrip.turnTreeSchemaRecord.schemaId",
+        "roundtrip.turnNodeIdentityRecord.schemaId",
+        "roundtrip.turnNodeIdentityRecord.turnTreeHash"
+      ],
+      "fixture": "f-zero-turn-tree-hash",
+      "operation": "kernel.protocol.schema-roundtrip"
+    },
+    {
+      "assertions": [
+        {
+          "equalsPath": "$.fixture.rawOpaqueBytesSha256Hex",
+          "field": "$.hashes.rawOpaqueBytes",
+          "kind": "evidenceField"
+        },
+        {
+          "equalsPath": "$.fixture.turnTreeSchemaRecordSha256Hex",
+          "field": "$.hashes.turnTreeSchema",
+          "kind": "evidenceField"
+        },
+        {
+          "equalsPath": "$.fixture.turnNodeIdentityRecordSha256Hex",
+          "field": "$.hashes.turnNodeIdentity",
+          "kind": "evidenceField"
+        }
+      ],
+      "checkId": "kernel.protocol.deterministic_hashing.f-mixed-status-staged",
+      "evidence": [
+        "hashes.rawOpaqueBytes",
+        "hashes.turnTreeSchema",
+        "hashes.turnNodeIdentity"
+      ],
+      "fixture": "f-mixed-status-staged",
+      "operation": "kernel.protocol.deterministic-hashing"
+    },
+    {
+      "assertions": [
+        {
+          "equalsPath": "$.fixture.turnTreeSchemaRecord.schemaId",
+          "field": "$.roundtrip.turnTreeSchemaRecord.schemaId",
+          "kind": "evidenceField"
+        },
+        {
+          "equalsPath": "$.fixture.turnNodeIdentityRecord.schemaId",
+          "field": "$.roundtrip.turnNodeIdentityRecord.schemaId",
+          "kind": "evidenceField"
+        },
+        {
+          "equalsPath": "$.fixture.turnNodeIdentityRecord.turnTreeHash",
+          "field": "$.roundtrip.turnNodeIdentityRecord.turnTreeHash",
+          "kind": "evidenceField"
+        }
+      ],
+      "checkId": "kernel.protocol.schema_roundtrip.f-mixed-status-staged",
+      "evidence": [
+        "roundtrip.turnTreeSchemaRecord.schemaId",
+        "roundtrip.turnNodeIdentityRecord.schemaId",
+        "roundtrip.turnNodeIdentityRecord.turnTreeHash"
+      ],
+      "fixture": "f-mixed-status-staged",
+      "operation": "kernel.protocol.schema-roundtrip"
+    }
+  ],
+  "fixtures": {
+    "f-empty-bytes": "../fixtures/kernel-protocol-empty-bytes.json",
+    "f-single-byte": "../fixtures/kernel-protocol-single-byte.json",
+    "f-all-zero-bytes": "../fixtures/kernel-protocol-all-zero-bytes.json",
+    "f-all-ones-bytes": "../fixtures/kernel-protocol-all-ones-bytes.json",
+    "f-large-bytes": "../fixtures/kernel-protocol-large-bytes.json",
+    "f-multi-path-schema": "../fixtures/kernel-protocol-multi-path-schema.json",
+    "f-all-single-paths": "../fixtures/kernel-protocol-all-single-paths-schema.json",
+    "f-all-ordered-paths": "../fixtures/kernel-protocol-all-ordered-paths-schema.json",
+    "f-with-prev-turn": "../fixtures/kernel-protocol-with-prev-turn.json",
+    "f-with-event-hash": "../fixtures/kernel-protocol-with-event-hash.json",
+    "f-staged-failed": "../fixtures/kernel-protocol-staged-result-failed.json",
+    "f-staged-interrupted": "../fixtures/kernel-protocol-staged-result-interrupted.json",
+    "f-many-staged-results": "../fixtures/kernel-protocol-many-staged-results.json",
+    "f-deep-path-schema": "../fixtures/kernel-protocol-deep-path-schema.json",
+    "f-non-utf8-bytes": "../fixtures/kernel-protocol-non-utf8-bytes.json",
+    "f-zero-turn-tree-hash": "../fixtures/kernel-protocol-zero-turn-tree-hash.json",
+    "f-mixed-status-staged": "../fixtures/kernel-protocol-mixed-status-staged-results.json"
+  },
+  "packetId": "tuvren.kernel.protocol",
+  "planId": "tuvren.kernel.protocol.extended",
+  "planVersion": "0.1.0"
+}
