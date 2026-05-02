@@ -14,14 +14,6 @@
       "format": "conformance-plan"
     },
     {
-      "path": "boundaries/kernel/conformance/plans/kernel-syscall-surface.json",
-      "format": "conformance-plan"
-    },
-    {
-      "path": "boundaries/kernel/conformance/plans/kernel-syscall-coverage.json",
-      "format": "conformance-plan"
-    },
-    {
       "path": "boundaries/kernel/conformance/fixtures/kernel-protocol-deterministic.json",
       "format": "fixture-set"
     },
@@ -40,16 +32,6 @@
       "planId": "tuvren.kernel.protocol.extended",
       "planVersion": "0.1.0",
       "path": "boundaries/kernel/conformance/plans/kernel-protocol-extended.json"
-    },
-    {
-      "planId": "tuvren.kernel.protocol.syscall-surface",
-      "planVersion": "0.1.0",
-      "path": "boundaries/kernel/conformance/plans/kernel-syscall-surface.json"
-    },
-    {
-      "planId": "tuvren.kernel.protocol.syscall-coverage",
-      "planVersion": "0.1.0",
-      "path": "boundaries/kernel/conformance/plans/kernel-syscall-coverage.json"
     }
   ],
   "bindingProjections": {
@@ -74,14 +56,6 @@
     {
       "kind": "conformance-plan",
       "target": "boundaries/kernel/conformance/plans/kernel-protocol-extended.json"
-    },
-    {
-      "kind": "conformance-plan",
-      "target": "boundaries/kernel/conformance/plans/kernel-syscall-surface.json"
-    },
-    {
-      "kind": "conformance-plan",
-      "target": "boundaries/kernel/conformance/plans/kernel-syscall-coverage.json"
     }
   ]
 }

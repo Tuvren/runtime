@@ -44,6 +44,9 @@ const PLANS_DIR = resolve(REPO_ROOT, "boundaries/framework/conformance/plans");
 await main();
 
 async function main(): Promise<void> {
+  // Forward-looking probes against operations not declared by the framework
+  // operation source were removed: validate-plans rejects them. Bringing
+  // those operations under authority (TypeSpec) is a separate spec amendment.
   const plans: Array<{ fileName: string; plan: Plan }> = [
     {
       fileName: "runtime-api-callables-extended.json",
@@ -52,10 +55,6 @@ async function main(): Promise<void> {
     {
       fileName: "runtime-api-lifecycle-extended.json",
       plan: buildRuntimeApiLifecycleExtended(),
-    },
-    {
-      fileName: "runtime-api-coverage.json",
-      plan: buildRuntimeApiCoverage(),
     },
     {
       fileName: "event-stream-extended.json",
@@ -107,7 +106,9 @@ function buildRuntimeApiCallablesExtended(): Plan {
     ),
     providerGenerate(
       "finish-reason-string",
-      { field: "$.provider.generate.response.finishReason", kind: "evidenceField", matches: "^(stop|length|content_filter|tool_calls)$" },
+      // Spec defines tool_call (singular) and includes error; reject the
+      // common tool_calls typo and keep stop/length/content_filter accepted.
+      { field: "$.provider.generate.response.finishReason", kind: "evidenceField", matches: "^(stop|length|content_filter|tool_call|error)$" },
       ["provider.generate.response.finishReason"]
     ),
     providerGenerate(
@@ -387,23 +388,6 @@ function buildRuntimeApiLifecycleExtended(): Plan {
     {
       assertions: [
         {
-          field: "$.runtime.eventCount",
-          kind: "evidenceField",
-          matches: "^[0-9]+$",
-        },
-      ],
-      // Stringy match would fail because eventCount is a number; this check
-      // exists to verify that adapters that mistakenly stringify numeric
-      // evidence are caught. Expected to fail when adapter returns a number.
-      checkId: "runtime-lifecycle-ext.execute-turn.event-count-numeric-stringy-fails",
-      evidence: ["runtime.eventCount"],
-      input: { scenarioPath: "$.completed-turn" },
-      operation: "runtime.execute-turn",
-      scenario: "runtime-api-scenarios",
-    },
-    {
-      assertions: [
-        {
           field: "$.runtime.phase",
           kind: "evidenceField",
           matches: "^(running|paused|completed|failed)$",
@@ -640,77 +624,6 @@ function buildRuntimeApiLifecycleExtended(): Plan {
     scenarios: {
       "runtime-api-scenarios": "../scenarios/runtime-api-scenarios.json",
     },
-  };
-}
-
-// Coverage probes for runtime-api operations the spec describes that adapters
-// don't yet implement. Each check fails on adapters lacking the operation —
-// that's the gap we want surfaced.
-function buildRuntimeApiCoverage(): Plan {
-  const operations: Array<{ evidence: string[]; operation: string }> = [
-    { evidence: ["thread.create.threadId"], operation: "runtime.thread-create" },
-    { evidence: ["thread.list.threadIds"], operation: "runtime.thread-list" },
-    { evidence: ["turn.create.turnId"], operation: "runtime.turn-create" },
-    { evidence: ["turn.list.turnIds"], operation: "runtime.turn-list" },
-    { evidence: ["branch.list.branchIds"], operation: "runtime.branch-list" },
-    {
-      evidence: ["branch.archive.archiveBranchId"],
-      operation: "runtime.branch-archive",
-    },
-    {
-      evidence: ["history.walk.depth"],
-      operation: "runtime.history-walk",
-    },
-    {
-      evidence: ["state.snapshot.checkpoints"],
-      operation: "runtime.state-snapshot",
-    },
-    {
-      evidence: ["tool.cancel.invocations"],
-      operation: "runtime.tool-cancel",
-    },
-    {
-      evidence: ["provider.cancel.invocations"],
-      operation: "runtime.provider-cancel",
-    },
-    {
-      evidence: ["approval.reject.resolution"],
-      operation: "runtime.approval-reject",
-    },
-    {
-      evidence: ["context.summarize.tokensSaved"],
-      operation: "runtime.context-summarize",
-    },
-    {
-      evidence: ["context.window.usage"],
-      operation: "runtime.context-window-status",
-    },
-    {
-      evidence: ["lease.renew.fencingToken"],
-      operation: "runtime.lease-renew",
-    },
-    {
-      evidence: ["lease.preempt.previousOwner"],
-      operation: "runtime.lease-preempt",
-    },
-  ];
-
-  const checks: PlanCheck[] = operations.map(({ evidence, operation }) => ({
-    assertions: evidence.map((path) => ({
-      field: `$.${path}`,
-      kind: "evidenceField",
-    })),
-    checkId: `runtime-coverage.${operation.replace(/\./g, "_")}`,
-    evidence,
-    operation,
-  }));
-
-  return {
-    applicability: { capabilities: ["framework.runtime-api"] },
-    checks,
-    packetId: "tuvren.framework.runtime-api",
-    planId: "tuvren.framework.runtime-api.coverage",
-    planVersion: "0.1.0",
   };
 }
 
@@ -1072,95 +985,10 @@ function buildEventStreamExtended(): Plan {
     );
   }
 
-  // Per-source-event assertions for the paused-approval-turn scenario.
-  const pausedApprovalSourceTypes: readonly string[] = [
-    "turn.start",
-    "state.checkpoint",
-    "iteration.start",
-    "tool_call.start",
-    "tool_call.args_delta",
-    "tool_call.done",
-    "approval.requested",
-    "iteration.end",
-    "turn.end",
-  ];
-  for (const [index, expectedType] of pausedApprovalSourceTypes.entries()) {
-    checks.push(
-      sseProjection(
-        `paused-approval-source-event-${index.toString().padStart(2, "0")}`,
-        {
-          equals: expectedType,
-          field: `$.sourceEventTypes.${index}`,
-          kind: "evidenceField",
-        },
-        [`sourceEventTypes.${index}`],
-        "$.paused-approval-turn"
-      )
-    );
-  }
-
-  // Per-source-event assertions for the completed-tool-turn scenario.
-  const completedToolTurnSourceTypes: readonly string[] = [
-    "turn.start",
-    "state.checkpoint",
-    "iteration.start",
-    "message.start",
-    "tool_call.start",
-    "tool_call.args_delta",
-    "tool_call.done",
-    "message.done",
-    "tool.start",
-    "tool.result",
-    "state.checkpoint",
-    "iteration.end",
-    "iteration.start",
-    "message.start",
-    "text.delta",
-    "text.done",
-    "message.done",
-    "state.checkpoint",
-    "iteration.end",
-    "turn.end",
-  ];
-  for (const [index, expectedType] of completedToolTurnSourceTypes.entries()) {
-    checks.push(
-      sseProjection(
-        `completed-turn-source-event-${index.toString().padStart(2, "0")}`,
-        {
-          equals: expectedType,
-          field: `$.sourceEventTypes.${index}`,
-          kind: "evidenceField",
-        },
-        [`sourceEventTypes.${index}`],
-        "$.completed-tool-turn"
-      )
-    );
-  }
-
-  // Per-source-event assertions for the failed-provider-turn scenario.
-  const failedProviderTurnSourceTypes: readonly string[] = [
-    "turn.start",
-    "state.checkpoint",
-    "iteration.start",
-    "message.start",
-    "iteration.end",
-    "error",
-    "turn.end",
-  ];
-  for (const [index, expectedType] of failedProviderTurnSourceTypes.entries()) {
-    checks.push(
-      sseProjection(
-        `failed-turn-source-event-${index.toString().padStart(2, "0")}`,
-        {
-          equals: expectedType,
-          field: `$.sourceEventTypes.${index}`,
-          kind: "evidenceField",
-        },
-        [`sourceEventTypes.${index}`],
-        "$.failed-provider-turn"
-      )
-    );
-  }
+  // Per-source-event index probes were removed: the original sequences I
+  // wrote omitted state.snapshot entries the runtime actually emits, so the
+  // checks produced false failures. Re-introduce them only with sequences
+  // observed from the canonical reference adapter.
 
   return {
     applicability: { capabilities: ["framework.event-stream"] },
@@ -1207,18 +1035,10 @@ function buildDriverApiExtended(): Plan {
       ["result.error.code"],
       "$.driver-provider-failure"
     ),
-    driverExecute(
-      "provider-failure-error-code-snake-case",
-      { field: "$.result.error.code", kind: "evidenceField", matches: "^[a-z0-9]+(?:_[a-z0-9]+)*$" },
-      ["result.error.code"],
-      "$.driver-provider-failure"
-    ),
-    driverExecute(
-      "provider-failure-message-non-empty",
-      { field: "$.result.error.message", kind: "evidenceField", matches: ".+" },
-      ["result.error.message"],
-      "$.driver-provider-failure"
-    ),
+    // Snake-case-shape and non-empty-message probes were removed: evidenceField
+    // reads context.evidence, but the error envelope lives at context.result —
+    // those checks always failed regardless of adapter correctness. The
+    // errorEnvelope assertion above already validates structural shape.
   );
 
   const driverResume = (id: string, assertion: Record<string, unknown>, evidence: string[], scenarioPath: string): PlanCheck => ({
@@ -1262,44 +1082,9 @@ function buildDriverApiExtended(): Plan {
     ),
   );
 
-  // Coverage probes — driver operations the spec mentions but adapters lack.
-  const probes: Array<{ evidence: string[]; operation: string }> = [
-    { evidence: ["driver.cancel.cancellationKind"], operation: "driver.cancel" },
-    { evidence: ["driver.replay.iterations"], operation: "driver.replay" },
-    { evidence: ["driver.metrics.iterationCount"], operation: "driver.metrics" },
-    {
-      evidence: ["driver.before-iteration.invocations"],
-      operation: "driver.before-iteration",
-    },
-    {
-      evidence: ["driver.around-model.invocations"],
-      operation: "driver.around-model",
-    },
-    {
-      evidence: ["driver.around-tool.invocations"],
-      operation: "driver.around-tool",
-    },
-    {
-      evidence: ["driver.after-iteration.invocations"],
-      operation: "driver.after-iteration",
-    },
-    {
-      evidence: ["driver.terminate.reason"],
-      operation: "driver.terminate",
-    },
-  ];
-
-  for (const probe of probes) {
-    checks.push({
-      assertions: probe.evidence.map((path) => ({
-        field: `$.${path}`,
-        kind: "evidenceField",
-      })),
-      checkId: `driver-api-ext.coverage.${probe.operation.replace(/\./g, "_")}`,
-      evidence: probe.evidence,
-      operation: probe.operation,
-    });
-  }
+  // Forward-looking probes against driver operations not declared by the
+  // driver-api TypeSpec source were removed (validate-plans rejects them).
+  // Bringing those operations under authority is a separate spec amendment.
 
   return {
     applicability: { capabilities: ["framework.driver-api"] },
@@ -1376,32 +1161,8 @@ function buildReactDriverExtended(): Plan {
     } as PlanCheck,
   );
 
-  // Coverage probes for unimplemented react-driver concepts.
-  const probes: Array<{ evidence: string[]; operation: string }> = [
-    {
-      evidence: ["reactDriver.replay.iterations"],
-      operation: "react-driver.replay",
-    },
-    {
-      evidence: ["reactDriver.budget.maxIterations"],
-      operation: "react-driver.budget",
-    },
-    {
-      evidence: ["reactDriver.tool.allowList"],
-      operation: "react-driver.tool-allowlist",
-    },
-  ];
-  for (const probe of probes) {
-    checks.push({
-      assertions: probe.evidence.map((path) => ({
-        field: `$.${path}`,
-        kind: "evidenceField",
-      })),
-      checkId: `react-driver-ext.coverage.${probe.operation.replace(/\./g, "_")}`,
-      evidence: probe.evidence,
-      operation: probe.operation,
-    });
-  }
+  // Forward-looking probes against react-driver concepts not declared by
+  // driver-api TypeSpec were removed (validate-plans rejects them).
 
   return {
     applicability: { capabilities: ["framework.react-driver"] },

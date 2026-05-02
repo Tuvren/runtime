@@ -44,7 +44,7 @@
         {
           "field": "$.provider.generate.response.finishReason",
           "kind": "evidenceField",
-          "matches": "^(stop|length|content_filter|tool_calls)$"
+          "matches": "^(stop|length|content_filter|tool_call|error)$"
         }
       ],
       "checkId": "runtime-callable-ext.provider-generate.finish-reason-string",

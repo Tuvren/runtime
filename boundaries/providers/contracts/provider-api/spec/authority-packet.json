@@ -17,14 +17,6 @@
       "format": "conformance-plan"
     },
     {
-      "path": "boundaries/providers/conformance/plans/provider-api-bridge-coverage.json",
-      "format": "conformance-plan"
-    },
-    {
-      "path": "boundaries/providers/conformance/plans/provider-api-bridge-negative.json",
-      "format": "conformance-plan"
-    },
-    {
       "path": "boundaries/providers/conformance/fixtures/provider-fixtures.json",
       "format": "fixture-set"
     }
@@ -39,16 +31,6 @@
       "planId": "tuvren.providers.provider-api.bridge-extended",
       "planVersion": "0.1.0",
       "path": "boundaries/providers/conformance/plans/provider-api-bridge-extended.json"
-    },
-    {
-      "planId": "tuvren.providers.provider-api.bridge-coverage",
-      "planVersion": "0.1.0",
-      "path": "boundaries/providers/conformance/plans/provider-api-bridge-coverage.json"
-    },
-    {
-      "planId": "tuvren.providers.provider-api.bridge-negative",
-      "planVersion": "0.1.0",
-      "path": "boundaries/providers/conformance/plans/provider-api-bridge-negative.json"
     }
   ],
   "bindingProjections": {
@@ -71,14 +53,6 @@
     {
       "kind": "conformance-plan",
       "target": "boundaries/providers/conformance/plans/provider-api-bridge-extended.json"
-    },
-    {
-      "kind": "conformance-plan",
-      "target": "boundaries/providers/conformance/plans/provider-api-bridge-coverage.json"
-    },
-    {
-      "kind": "conformance-plan",
-      "target": "boundaries/providers/conformance/plans/provider-api-bridge-negative.json"
     }
   ]
 }

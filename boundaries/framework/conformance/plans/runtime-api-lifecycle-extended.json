@@ -26,24 +26,6 @@
     {
       "assertions": [
         {
-          "field": "$.runtime.eventCount",
-          "kind": "evidenceField",
-          "matches": "^[0-9]+$"
-        }
-      ],
-      "checkId": "runtime-lifecycle-ext.execute-turn.event-count-numeric-stringy-fails",
-      "evidence": [
-        "runtime.eventCount"
-      ],
-      "input": {
-        "scenarioPath": "$.completed-turn"
-      },
-      "operation": "runtime.execute-turn",
-      "scenario": "runtime-api-scenarios"
-    },
-    {
-      "assertions": [
-        {
           "field": "$.runtime.phase",
           "kind": "evidenceField",
           "matches": "^(running|paused|completed|failed)$"

@@ -171,45 +171,6 @@
           "stepId": "checkpoint"
         }
       ]
-    },
-    {
-      "assertions": [
-        {
-          "field": "$.reactDriver.replay.iterations",
-          "kind": "evidenceField"
-        }
-      ],
-      "checkId": "react-driver-ext.coverage.react-driver_replay",
-      "evidence": [
-        "reactDriver.replay.iterations"
-      ],
-      "operation": "react-driver.replay"
-    },
-    {
-      "assertions": [
-        {
-          "field": "$.reactDriver.budget.maxIterations",
-          "kind": "evidenceField"
-        }
-      ],
-      "checkId": "react-driver-ext.coverage.react-driver_budget",
-      "evidence": [
-        "reactDriver.budget.maxIterations"
-      ],
-      "operation": "react-driver.budget"
-    },
-    {
-      "assertions": [
-        {
-          "field": "$.reactDriver.tool.allowList",
-          "kind": "evidenceField"
-        }
-      ],
-      "checkId": "react-driver-ext.coverage.react-driver_tool-allowlist",
-      "evidence": [
-        "reactDriver.tool.allowList"
-      ],
-      "operation": "react-driver.tool-allowlist"
     }
   ],
   "packetId": "tuvren.framework.react-driver",

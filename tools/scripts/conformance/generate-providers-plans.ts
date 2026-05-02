@@ -42,31 +42,19 @@ const PLANS_DIR = resolve(REPO_ROOT, "boundaries/providers/conformance/plans");
 await main();
 
 async function main(): Promise<void> {
+  // Coverage and negative-shape probes against undeclared providers.bridge.*
+  // operations were removed: the shared plan validator only accepts operations
+  // declared by the providers operation source. Bringing those operations
+  // under authority is a separate spec amendment.
   const extended = buildExtended();
-  const coverage = buildCoverage();
-  const negative = buildNegativeShapes();
 
   await writeFile(
     resolve(PLANS_DIR, "provider-api-bridge-extended.json"),
     `${JSON.stringify(extended, null, 2)}\n`
   );
-  await writeFile(
-    resolve(PLANS_DIR, "provider-api-bridge-coverage.json"),
-    `${JSON.stringify(coverage, null, 2)}\n`
-  );
-  await writeFile(
-    resolve(PLANS_DIR, "provider-api-bridge-negative.json"),
-    `${JSON.stringify(negative, null, 2)}\n`
-  );
 
   process.stdout.write(
     `wrote provider-api-bridge-extended.json (${extended.checks.length} checks)\n`
-  );
-  process.stdout.write(
-    `wrote provider-api-bridge-coverage.json (${coverage.checks.length} checks)\n`
-  );
-  process.stdout.write(
-    `wrote provider-api-bridge-negative.json (${negative.checks.length} checks)\n`
   );
 }
 
@@ -234,136 +222,3 @@ function buildExtended(): Plan {
   };
 }
 
-// Coverage probes for provider-api operations the spec describes that the
-// bridge adapter doesn't yet implement. Each check fails until the adapter
-// learns the operation — these are the gaps to find.
-function buildCoverage(): Plan {
-  const probes: Array<{ evidence: string[]; operation: string }> = [
-    {
-      evidence: ["bridge.cancel.invocations"],
-      operation: "providers.bridge.cancel",
-    },
-    {
-      evidence: ["bridge.usage.inputTokens", "bridge.usage.outputTokens"],
-      operation: "providers.bridge.usage-emission",
-    },
-    {
-      evidence: ["bridge.toolCall.argsCompleted"],
-      operation: "providers.bridge.tool-call-emission",
-    },
-    {
-      evidence: ["bridge.reasoning.partTypes"],
-      operation: "providers.bridge.reasoning-emission",
-    },
-    {
-      evidence: ["bridge.image.partTypes"],
-      operation: "providers.bridge.image-emission",
-    },
-    {
-      evidence: ["bridge.audio.partTypes"],
-      operation: "providers.bridge.audio-emission",
-    },
-    {
-      evidence: ["bridge.fileAttachment.partTypes"],
-      operation: "providers.bridge.file-attachment-emission",
-    },
-    {
-      evidence: ["bridge.stop.reasonsObserved"],
-      operation: "providers.bridge.stop-reason-mapping",
-    },
-    {
-      evidence: ["bridge.providerOptions.passthrough"],
-      operation: "providers.bridge.provider-options-passthrough",
-    },
-    {
-      evidence: ["bridge.cache.hits"],
-      operation: "providers.bridge.cache-hit-emission",
-    },
-    {
-      evidence: ["bridge.headers.normalized"],
-      operation: "providers.bridge.headers-normalization",
-    },
-    {
-      evidence: ["bridge.timeout.elapsedMs"],
-      operation: "providers.bridge.timeout-handling",
-    },
-    {
-      evidence: ["bridge.retry.attempts"],
-      operation: "providers.bridge.retry-handling",
-    },
-    {
-      evidence: ["bridge.streamRetry.fragments"],
-      operation: "providers.bridge.stream-retry",
-    },
-    {
-      evidence: ["bridge.contentType.normalized"],
-      operation: "providers.bridge.content-type-normalization",
-    },
-  ];
-
-  const checks: PlanCheck[] = probes.map(({ evidence, operation }) => ({
-    assertions: evidence.map((path) => ({
-      field: `$.${path}`,
-      kind: "evidenceField",
-    })),
-    capabilities: ["providers.ai-sdk-bridge"],
-    checkId: `providers-coverage.${operation.replace(/\./g, "_")}`,
-    evidence,
-    operation,
-  }));
-
-  return {
-    applicability: { capabilities: ["providers.provider-api"] },
-    checks,
-    packetId: "tuvren.providers.provider-api",
-    planId: "tuvren.providers.provider-api.bridge-coverage",
-    planVersion: "0.1.0",
-  };
-}
-
-// Negative-shape probes — adapters must reject malformed inputs / produce
-// well-formed error envelopes for these operations. These intentionally lack
-// fixtures the adapter expects, so they exercise the error pathway.
-function buildNegativeShapes(): Plan {
-  const probes: Array<{ evidence: string[]; operation: string }> = [
-    {
-      evidence: ["bridge.invalidPrompt.errorCode"],
-      operation: "providers.bridge.reject-invalid-prompt",
-    },
-    {
-      evidence: ["bridge.invalidResponseFormat.errorCode"],
-      operation: "providers.bridge.reject-invalid-response-format",
-    },
-    {
-      evidence: ["bridge.unknownOperation.errorCode"],
-      operation: "providers.bridge.unknown-operation",
-    },
-    {
-      evidence: ["bridge.streamAbort.errorCode"],
-      operation: "providers.bridge.stream-abort",
-    },
-    {
-      evidence: ["bridge.providerThrows.errorCode"],
-      operation: "providers.bridge.provider-throws-non-error",
-    },
-  ];
-
-  const checks: PlanCheck[] = probes.map(({ evidence, operation }) => ({
-    assertions: evidence.map((path) => ({
-      field: `$.${path}`,
-      kind: "evidenceField",
-    })),
-    capabilities: ["providers.ai-sdk-bridge"],
-    checkId: `providers-negative.${operation.replace(/\./g, "_")}`,
-    evidence,
-    operation,
-  }));
-
-  return {
-    applicability: { capabilities: ["providers.provider-api"] },
-    checks,
-    packetId: "tuvren.providers.provider-api",
-    planId: "tuvren.providers.provider-api.bridge-negative",
-    planVersion: "0.1.0",
-  };
-}

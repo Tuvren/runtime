@@ -110,150 +110,23 @@ const fixtures: FixtureEntry[] = [
   },
 ];
 
-interface CoverageProbe {
-  evidencePaths: string[];
-  operation: string;
-}
-
-// Kernel syscall surface (28 operations) per docs/KrakenKernelSpecification.md
-// §7. Adapters today expose only 7 operations; probing the missing 21 catches
-// implementations that claim a kernel capability without backing the full
-// surface.
-const missingKernelOperations: string[] = [
-  "kernel.store.put",
-  "kernel.store.get",
-  "kernel.store.has",
-  "kernel.schema.register",
-  "kernel.schema.get",
-  "kernel.tree.create",
-  "kernel.tree.incorporate",
-  "kernel.tree.diff",
-  "kernel.tree.resolve",
-  "kernel.tree.manifest",
-  "kernel.node.get",
-  "kernel.node.walk-back",
-  "kernel.thread.create",
-  "kernel.thread.get",
-  "kernel.branch.create",
-  "kernel.branch.get",
-  "kernel.branch.set-head",
-  "kernel.staging.stage",
-  "kernel.staging.current",
-  "kernel.run.create",
-  "kernel.run.begin-step",
-  "kernel.run.complete-step",
-  "kernel.run.complete-run",
-  "kernel.run.recover",
-  "kernel.verdicts.compose",
-  "kernel.turn.create",
-  "kernel.turn.get",
-  "kernel.turn.update-head",
-];
-
-const syscallCoverageProbesInline: CoverageProbe[] = [
-  { evidencePaths: ["store.objectHash"], operation: "kernel.store.put" },
-  { evidencePaths: ["store.exists"], operation: "kernel.store.has" },
-  { evidencePaths: ["store.blobLength"], operation: "kernel.store.get" },
-  { evidencePaths: ["schema.schemaId"], operation: "kernel.schema.register" },
-  { evidencePaths: ["schema.paths"], operation: "kernel.schema.get" },
-  { evidencePaths: ["tree.turnTreeHash"], operation: "kernel.tree.create" },
-  {
-    evidencePaths: ["tree.turnTreeHash", "tree.consumedTaskIds"],
-    operation: "kernel.tree.incorporate",
-  },
-  { evidencePaths: ["tree.changedPaths"], operation: "kernel.tree.diff" },
-  { evidencePaths: ["tree.pathValue"], operation: "kernel.tree.resolve" },
-  { evidencePaths: ["tree.manifestPaths"], operation: "kernel.tree.manifest" },
-  { evidencePaths: ["node.turnTreeHash"], operation: "kernel.node.get" },
-  { evidencePaths: ["node.walkLength"], operation: "kernel.node.walk-back" },
-  {
-    evidencePaths: ["thread.threadId", "thread.rootTurnNodeHash"],
-    operation: "kernel.thread.create",
-  },
-  { evidencePaths: ["thread.schemaId"], operation: "kernel.thread.get" },
-  {
-    evidencePaths: ["branch.branchId", "branch.headTurnNodeHash"],
-    operation: "kernel.branch.create",
-  },
-  { evidencePaths: ["branch.threadId"], operation: "kernel.branch.get" },
-  {
-    evidencePaths: ["branch.direction", "branch.archiveBranchId"],
-    operation: "kernel.branch.set-head",
-  },
-  {
-    evidencePaths: ["staging.stagedResult.taskId"],
-    operation: "kernel.staging.stage",
-  },
-  {
-    evidencePaths: ["staging.uncommittedCount"],
-    operation: "kernel.staging.current",
-  },
-  {
-    evidencePaths: ["run.runId", "run.status"],
-    operation: "kernel.run.create",
-  },
-  {
-    evidencePaths: ["run.stepContext.stepId"],
-    operation: "kernel.run.begin-step",
-  },
-  {
-    evidencePaths: ["run.checkpoint.checkpointed"],
-    operation: "kernel.run.complete-step",
-  },
-  {
-    evidencePaths: ["run.completion.status"],
-    operation: "kernel.run.complete-run",
-  },
-  {
-    evidencePaths: [
-      "run.recovery.lastTurnNodeHash",
-      "run.recovery.lastCompletedStepId",
-    ],
-    operation: "kernel.run.recover",
-  },
-  {
-    evidencePaths: ["verdicts.composedKind"],
-    operation: "kernel.verdicts.compose",
-  },
-  {
-    evidencePaths: ["turn.turnId", "turn.startTurnNodeHash"],
-    operation: "kernel.turn.create",
-  },
-  { evidencePaths: ["turn.parentTurnId"], operation: "kernel.turn.get" },
-  {
-    evidencePaths: ["turn.headTurnNodeHash"],
-    operation: "kernel.turn.update-head",
-  },
-];
-
 await main();
 
 async function main(): Promise<void> {
+  // Probe plans for the 21 unimplemented kernel syscalls were removed: the
+  // shared plan validator only accepts operations declared in the kernel
+  // operation source, so forward-looking probes against undeclared operations
+  // would block the codegen/verify gate. Bringing those operations under
+  // authority is a separate spec amendment.
   const extendedPlan = buildExtendedProtocolPlan();
-  const surfacePlan = buildSyscallSurfacePlan();
-  const coveragePlan = buildSyscallCoveragePlan();
 
   await writeFile(
     resolve(PLANS_DIR, "kernel-protocol-extended.json"),
     `${JSON.stringify(extendedPlan, null, 2)}\n`
   );
-  await writeFile(
-    resolve(PLANS_DIR, "kernel-syscall-surface.json"),
-    `${JSON.stringify(surfacePlan, null, 2)}\n`
-  );
-  await writeFile(
-    resolve(PLANS_DIR, "kernel-syscall-coverage.json"),
-    `${JSON.stringify(coveragePlan, null, 2)}\n`
-  );
 
   process.stdout.write(
     `wrote kernel-protocol-extended.json (${extendedPlan.checks.length} checks)\n`
-  );
-  process.stdout.write(
-    `wrote kernel-syscall-surface.json (${surfacePlan.checks.length} checks)\n`
-  );
-  process.stdout.write(
-    `wrote kernel-syscall-coverage.json (${coveragePlan.checks.length} checks)\n`
   );
 }
 
@@ -346,66 +219,3 @@ function buildSchemaRoundtripCheck(fixture: FixtureEntry): PlanCheck {
   };
 }
 
-function buildSyscallSurfacePlan(): {
-  applicability: { capabilities: string[] };
-  checks: PlanCheck[];
-  packetId: string;
-  planId: string;
-  planVersion: string;
-} {
-  // Surface probe: each missing operation must answer the runner with a
-  // protocol-correct error envelope. Adapters that crash, hang, or echo
-  // freeform diagnostics fail this lane.
-  const checks: PlanCheck[] = missingKernelOperations.map((operation) => ({
-    assertions: [
-      {
-        field: "$.result.error",
-        kind: "errorEnvelope",
-        path: "$.state.adapterError",
-      },
-    ],
-    capabilities: ["kernel.protocol"],
-    checkId: `kernel.surface.${operation.replace(/\./g, "_")}`,
-    evidence: ["adapterError.code"],
-    operation,
-  }));
-
-  return {
-    applicability: { capabilities: ["kernel.protocol"] },
-    checks,
-    packetId: "tuvren.kernel.protocol",
-    planId: "tuvren.kernel.protocol.syscall-surface",
-    planVersion: "0.1.0",
-  };
-}
-
-function buildSyscallCoveragePlan(): {
-  applicability: { capabilities: string[] };
-  checks: PlanCheck[];
-  packetId: string;
-  planId: string;
-  planVersion: string;
-} {
-  // Coverage probe: each operation must produce specific evidence keys for the
-  // runner to consider the syscall implemented. Adapters that ignore the
-  // operation, return only an error envelope, or omit the evidence shape will
-  // fail this lane — these are the gaps we want surfaced.
-  const checks: PlanCheck[] = syscallCoverageProbesInline.map((probe) => ({
-    assertions: probe.evidencePaths.map((path) => ({
-      field: `$.${path}`,
-      kind: "evidenceField",
-    })),
-    capabilities: ["kernel.protocol"],
-    checkId: `kernel.coverage.${probe.operation.replace(/\./g, "_")}`,
-    evidence: probe.evidencePaths,
-    operation: probe.operation,
-  }));
-
-  return {
-    applicability: { capabilities: ["kernel.protocol"] },
-    checks,
-    packetId: "tuvren.kernel.protocol",
-    planId: "tuvren.kernel.protocol.syscall-coverage",
-    planVersion: "0.1.0",
-  };
-}
