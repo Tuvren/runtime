@@ -328,11 +328,10 @@ export function createRuntimeKernel(
                 treeHash,
               })
             : undefined;
-          const nextAnnotationsCbor = await encodeStepAnnotationsCbor({
+          const annotationRecords = await createObserveAnnotationRecords({
             now,
             observeResults,
             runId,
-            stepId,
             turnNodeHash: turnNodeHash ?? null,
           });
 
@@ -341,11 +340,7 @@ export function createRuntimeKernel(
               ? run.createdTurnNodes
               : [...run.createdTurnNodes, turnNodeHash];
 
-          const {
-            lastStepAnnotationsCbor: _a,
-            pendingSignalsCbor: _s,
-            ...coreRun
-          } = storedRun;
+          const { pendingSignalsCbor: _s, ...coreRun } = storedRun;
           const updatedRun: StoredRun = {
             ...coreRun,
             createdTurnNodesCbor: encodeRecord(nextCreatedTurnNodes),
@@ -357,12 +352,13 @@ export function createRuntimeKernel(
             ...(nextPendingSignalsCbor === undefined
               ? {}
               : { pendingSignalsCbor: nextPendingSignalsCbor }),
-            ...(nextAnnotationsCbor === undefined
-              ? {}
-              : { lastStepAnnotationsCbor: nextAnnotationsCbor }),
           };
 
           await tx.runs.set(updatedRun);
+
+          for (const annotationRecord of annotationRecords) {
+            await tx.observeAnnotations.set(annotationRecord);
+          }
 
           return {
             checkpointed: turnNodeHash !== undefined,
@@ -949,8 +945,25 @@ async function validateTurnParent(
   parentTurnId: string | null,
   startTurnNodeHash: HashString
 ): Promise<void> {
+  // The kernel owns "immediately previous same-branch turn" legality so a
+  // thinner backend cannot accidentally become an alternate syscall oracle.
+  const candidateTurnsAtStart = (await tx.turns.listByThread(threadId)).filter(
+    (candidateTurn) => candidateTurn.headTurnNodeHash === startTurnNodeHash
+  );
+  const sameBranchCandidateTurns = candidateTurnsAtStart.filter(
+    (candidateTurn) => candidateTurn.branchId === branchId
+  );
+  const immediatelyPreviousSameBranchTurn = sameBranchCandidateTurns.at(-1);
+
   if (parentTurnId === null) {
-    return;
+    if (candidateTurnsAtStart.length === 0) {
+      return;
+    }
+
+    throw new TuvrenLineageError(
+      `turn on branch "${branchId}" must reference the previous semantic turn at "${startTurnNodeHash}"`,
+      { code: "kernel_runtime_turn_parent_required" }
+    );
   }
 
   const parentTurn = await requireStoredTurn(tx, parentTurnId);
@@ -969,8 +982,25 @@ async function validateTurnParent(
     );
   }
 
-  if (parentTurn.branchId !== branchId) {
+  if (sameBranchCandidateTurns.length === 0) {
     return;
+  }
+
+  if (parentTurn.branchId !== branchId) {
+    throw new TuvrenLineageError(
+      `parent turn "${parentTurnId}" is not the immediately previous turn on branch "${branchId}"`,
+      { code: "kernel_runtime_turn_parent_not_immediate_predecessor" }
+    );
+  }
+
+  if (
+    immediatelyPreviousSameBranchTurn === undefined ||
+    immediatelyPreviousSameBranchTurn.turnId !== parentTurn.turnId
+  ) {
+    throw new TuvrenLineageError(
+      `parent turn "${parentTurnId}" is not the immediately previous turn on branch "${branchId}"`,
+      { code: "kernel_runtime_turn_parent_not_immediate_predecessor" }
+    );
   }
 }
 
@@ -1126,35 +1156,51 @@ function encodeSignalsCborFromObserveResults(
   return encodeRecord(newSignals);
 }
 
-async function encodeStepAnnotationsCbor(input: {
+async function createObserveAnnotationRecords(input: {
   now: () => EpochMs;
   observeResults: { annotations: KernelObject[] }[] | undefined;
   runId: string;
-  stepId: string;
   turnNodeHash: HashString | null;
-}): Promise<Uint8Array | undefined> {
+}): Promise<
+  Array<{
+    annotationCbor: Uint8Array;
+    annotationHash: HashString;
+    createdAtMs: EpochMs;
+    runId: string;
+    turnNodeHash: HashString | null;
+  }>
+> {
   const annotations: KernelObject[] =
     input.observeResults?.flatMap((result) => result.annotations) ?? [];
 
   if (annotations.length === 0) {
-    return undefined;
+    return [];
   }
 
-  const records: KernelRecord[] = [];
   const createdAtMs = input.now();
+  const records: Array<{
+    annotationCbor: Uint8Array;
+    annotationHash: HashString;
+    createdAtMs: EpochMs;
+    runId: string;
+    turnNodeHash: HashString | null;
+  }> = [];
 
   for (const annotation of annotations) {
+    // Observe annotations must persist outside TurnNode identity, so each
+    // annotation becomes its own durable record instead of being folded back
+    // into the mutable run row.
+    const annotationCbor = encodeRecord(annotation);
     records.push({
-      annotation,
+      annotationCbor,
       annotationHash: await hashKernelRecord(annotation),
       createdAtMs,
       runId: input.runId,
-      stepId: input.stepId,
       turnNodeHash: input.turnNodeHash,
     });
   }
 
-  return encodeRecord(records);
+  return records;
 }
 
 function validateObserveResults(observeResults: unknown[] | undefined): void {

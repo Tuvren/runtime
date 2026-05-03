@@ -267,6 +267,14 @@ export interface StoredTurnNode {
   turnTreeHash: HashString;
 }
 
+export interface StoredObserveAnnotation {
+  annotationCbor: Uint8Array;
+  annotationHash: HashString;
+  createdAtMs: EpochMs;
+  runId: string;
+  turnNodeHash: HashString | null;
+}
+
 export interface StoredThread {
   createdAtMs: EpochMs;
   rootTurnNodeHash: HashString;
@@ -299,7 +307,6 @@ export interface StoredRun {
   createdAtMs: EpochMs;
   createdTurnNodesCbor: Uint8Array;
   currentStepIndex: number;
-  lastStepAnnotationsCbor?: Uint8Array;
   pendingSignalsCbor?: Uint8Array;
   runId: string;
   schemaId: string;
@@ -367,6 +374,11 @@ export interface TurnNodeRepository {
   put(record: StoredTurnNode): Promise<void>;
 }
 
+export interface ObserveAnnotationRepository {
+  listByRun(runId: string): Promise<StoredObserveAnnotation[]>;
+  set(record: StoredObserveAnnotation): Promise<void>;
+}
+
 export interface ThreadRepository {
   get(threadId: string): Promise<StoredThread | null>;
   put(record: StoredThread): Promise<void>;
@@ -380,6 +392,7 @@ export interface BranchRepository {
 
 export interface TurnRepository {
   get(turnId: string): Promise<StoredTurn | null>;
+  listByThread(threadId: string): Promise<StoredTurn[]>;
   set(record: StoredTurn): Promise<void>;
 }
 
@@ -398,6 +411,7 @@ export interface StagedResultRepository {
 
 export interface RuntimeBackendTx {
   branches: BranchRepository;
+  observeAnnotations: ObserveAnnotationRepository;
   objects: ObjectRepository;
   orderedPathChunks: OrderedPathChunkRepository;
   runs: RunRepository;

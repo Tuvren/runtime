@@ -16,7 +16,11 @@
 
 import { describe, expect, test } from "bun:test";
 import { createMemoryBackend } from "@tuvren/backend-memory";
-import type { RuntimeKernel, TurnTreeSchema } from "@tuvren/kernel-protocol";
+import type {
+  RuntimeBackend,
+  RuntimeKernel,
+  TurnTreeSchema,
+} from "@tuvren/kernel-protocol";
 import { createRuntimeKernel } from "@tuvren/kernel-runtime";
 
 const TEST_SCHEMA = {
@@ -29,6 +33,7 @@ const TEST_SCHEMA = {
 } satisfies TurnTreeSchema;
 
 interface RuntimeKernelFixture {
+  backend: RuntimeBackend;
   branchId: string;
   kernel: RuntimeKernel;
   rootTurnNodeHash: string;
@@ -39,8 +44,9 @@ interface RuntimeKernelFixture {
 async function createThreadFixture(
   input: { branchId?: string; now?: () => number; threadId?: string } = {}
 ): Promise<RuntimeKernelFixture> {
+  const backend = createMemoryBackend();
   const kernel = createRuntimeKernel({
-    backend: createMemoryBackend(),
+    backend,
     now: input.now,
   });
   const schemaId = await kernel.schema.register(TEST_SCHEMA);
@@ -49,6 +55,7 @@ async function createThreadFixture(
   const thread = await kernel.thread.create(threadId, schemaId, branchId);
 
   return {
+    backend,
     branchId: thread.branchId,
     kernel,
     rootTurnNodeHash: thread.rootTurnNodeHash,
@@ -407,5 +414,129 @@ describe("createRuntimeKernel", () => {
       "third"
     );
     expect(third.signals).toEqual([]);
+  });
+
+  test("run.completeStep persists observe annotations as append-only records", async () => {
+    const fixture = await createThreadFixture({
+      branchId: "branch_observe_annotations",
+      threadId: "thread_observe_annotations",
+    });
+    const turn = await fixture.kernel.turn.create(
+      "turn_observe_annotations",
+      fixture.threadId,
+      fixture.branchId,
+      null,
+      fixture.rootTurnNodeHash
+    );
+    await fixture.kernel.run.create(
+      "run_observe_annotations",
+      turn.turnId,
+      fixture.branchId,
+      fixture.schemaId,
+      fixture.rootTurnNodeHash,
+      [
+        { deterministic: true, id: "a", sideEffects: false },
+        { deterministic: true, id: "b", sideEffects: false },
+      ]
+    );
+
+    await fixture.kernel.run.completeStep(
+      "run_observe_annotations",
+      "a",
+      undefined,
+      [{ annotations: [{ note: "first" }], signals: [] }]
+    );
+    await fixture.kernel.run.completeStep(
+      "run_observe_annotations",
+      "b",
+      undefined,
+      [{ annotations: [{ note: "second" }], signals: [] }]
+    );
+
+    const records = await fixture.backend.transact((tx) =>
+      tx.observeAnnotations.listByRun("run_observe_annotations")
+    );
+
+    expect(records).toHaveLength(2);
+    expect(records.map((record) => record.runId)).toEqual([
+      "run_observe_annotations",
+      "run_observe_annotations",
+    ]);
+  });
+
+  test("turn.create rejects stale same-branch parent turns in the kernel", async () => {
+    const fixture = await createThreadFixture({
+      branchId: "branch_turn_parent_kernel",
+      threadId: "thread_turn_parent_kernel",
+    });
+    const bootstrapTurn = await fixture.kernel.turn.create(
+      "turn_parent_bootstrap",
+      fixture.threadId,
+      fixture.branchId,
+      null,
+      fixture.rootTurnNodeHash
+    );
+    await fixture.kernel.run.create(
+      "run_turn_parent_seed",
+      bootstrapTurn.turnId,
+      fixture.branchId,
+      fixture.schemaId,
+      fixture.rootTurnNodeHash,
+      [{ deterministic: false, id: "checkpoint", sideEffects: false }]
+    );
+    const checkpoint = await fixture.kernel.run.completeStep(
+      "run_turn_parent_seed",
+      "checkpoint"
+    );
+
+    if (checkpoint.turnNodeHash === undefined) {
+      throw new Error("expected checkpoint turn node");
+    }
+
+    await fixture.kernel.turn.updateHead(
+      bootstrapTurn.turnId,
+      checkpoint.turnNodeHash
+    );
+    const mainTurn = await fixture.kernel.turn.create(
+      "turn_parent_main",
+      fixture.threadId,
+      fixture.branchId,
+      bootstrapTurn.turnId,
+      checkpoint.turnNodeHash
+    );
+    const forkBranch = await fixture.kernel.branch.create(
+      "branch_turn_parent_kernel_fork",
+      fixture.threadId,
+      checkpoint.turnNodeHash
+    );
+
+    const firstForkTurn = await fixture.kernel.turn.create(
+      "turn_parent_first",
+      fixture.threadId,
+      forkBranch.branchId,
+      mainTurn.turnId,
+      checkpoint.turnNodeHash
+    );
+    const secondForkTurn = await fixture.kernel.turn.create(
+      "turn_parent_second",
+      fixture.threadId,
+      forkBranch.branchId,
+      firstForkTurn.turnId,
+      checkpoint.turnNodeHash
+    );
+
+    await expect(
+      fixture.kernel.turn.create(
+        "turn_parent_stale",
+        fixture.threadId,
+        forkBranch.branchId,
+        mainTurn.turnId,
+        checkpoint.turnNodeHash
+      )
+    ).rejects.toThrow(
+      'parent turn "turn_parent_main" is not the immediately previous turn on branch "branch_turn_parent_kernel_fork"'
+    );
+
+    expect(secondForkTurn.parentTurnId).toBe(firstForkTurn.turnId);
   });
 });

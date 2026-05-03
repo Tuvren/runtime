@@ -26,6 +26,7 @@ import {
 } from "@tuvren/core-types";
 import {
   assertStoredBranch,
+  assertStoredObserveAnnotation,
   assertStoredObject,
   assertStoredObjectIdentity,
   assertStoredOrderedPathChunk,
@@ -47,6 +48,7 @@ import {
   type RuntimeBackend as KrakenBackend,
   type RuntimeBackendTx as KrakenBackendTx,
   type StoredBranch,
+  type StoredObserveAnnotation,
   type StoredObject,
   type StoredOrderedPathChunk,
   type StoredRun,
@@ -69,6 +71,8 @@ const TARGETED_VALIDATION_MIGRATION_NAME =
   "0002_targeted_validation_indexes.sql";
 const PENDING_SIGNALS_AND_ANNOTATIONS_MIGRATION_NAME =
   "0003_pending_signals_and_annotations.sql";
+const OBSERVE_ANNOTATIONS_MIGRATION_NAME =
+  "0004_observe_annotations.sql";
 const INITIAL_SCHEMA_REQUIRED_TABLES = [
   "objects",
   "schemas",
@@ -101,11 +105,15 @@ const INITIAL_SCHEMA_REQUIRED_INDEXES = [
 const TARGETED_VALIDATION_REQUIRED_TABLES = [
   "turn_node_lineage_roots",
 ] as const;
+const OBSERVE_ANNOTATIONS_REQUIRED_TABLES = ["observe_annotations"] as const;
 const TARGETED_VALIDATION_REQUIRED_INDEXES = [
   "idx_turn_node_lineage_roots_root_depth",
   "idx_threads_root_turn_node_hash",
   "idx_branches_archived_from_branch_id",
   "idx_turns_thread_branch_head_turn_node",
+] as const;
+const OBSERVE_ANNOTATIONS_REQUIRED_INDEXES = [
+  "idx_observe_annotations_run_id_created_at_ms",
 ] as const;
 const SQLITE_TRANSIENT_MEMORY_PATH = ":memory:";
 
@@ -760,9 +768,77 @@ const TARGETED_VALIDATION_INDEX_DEFINITIONS = {
   (typeof TARGETED_VALIDATION_REQUIRED_INDEXES)[number],
   ExpectedSqliteIndexSchema
 >;
+const OBSERVE_ANNOTATIONS_TABLE_DEFINITIONS = {
+  observe_annotations: {
+    columns: [
+      {
+        name: "record_key",
+        notNull: false,
+        primaryKeyOrder: 1,
+        type: "TEXT",
+      },
+      {
+        name: "run_id",
+        notNull: true,
+        primaryKeyOrder: 0,
+        type: "TEXT",
+      },
+      {
+        name: "annotation_hash",
+        notNull: true,
+        primaryKeyOrder: 0,
+        type: "TEXT",
+      },
+      {
+        name: "turn_node_hash",
+        notNull: false,
+        primaryKeyOrder: 0,
+        type: "TEXT",
+      },
+      {
+        name: "annotation_cbor",
+        notNull: true,
+        primaryKeyOrder: 0,
+        type: "BLOB",
+      },
+      {
+        name: "created_at_ms",
+        notNull: true,
+        primaryKeyOrder: 0,
+        type: "INTEGER",
+      },
+    ],
+    foreignKeys: [
+      {
+        columns: ["run_id"],
+        referencedColumns: ["run_id"],
+        referencedTable: "runs",
+      },
+      {
+        columns: ["turn_node_hash"],
+        referencedColumns: ["hash"],
+        referencedTable: "turn_nodes",
+      },
+    ],
+  },
+} as const satisfies Record<
+  (typeof OBSERVE_ANNOTATIONS_REQUIRED_TABLES)[number],
+  ExpectedSqliteTableSchema
+>;
+const OBSERVE_ANNOTATIONS_INDEX_DEFINITIONS = {
+  idx_observe_annotations_run_id_created_at_ms: {
+    columns: ["run_id", "created_at_ms"],
+    tableName: "observe_annotations",
+    unique: false,
+  },
+} as const satisfies Record<
+  (typeof OBSERVE_ANNOTATIONS_REQUIRED_INDEXES)[number],
+  ExpectedSqliteIndexSchema
+>;
 
 interface BackendState {
   branches: Map<string, StoredBranch>;
+  observeAnnotations: Map<string, StoredObserveAnnotation[]>;
   objects: Map<string, StoredObject>;
   orderedPathChunks: Map<string, StoredOrderedPathChunk>;
   runs: Map<string, StoredRun>;
@@ -925,6 +1001,15 @@ interface SqliteRunRow {
   step_sequence_cbor: Uint8Array;
   turn_id: string;
   updated_at_ms: number;
+}
+
+interface SqliteObserveAnnotationRow {
+  annotation_cbor: Uint8Array;
+  annotation_hash: string;
+  created_at_ms: number;
+  record_key: string;
+  run_id: string;
+  turn_node_hash: string | null;
 }
 
 interface SqliteStagedResultRow {
@@ -1271,6 +1356,47 @@ function createRepositories(
       },
     },
     now,
+    observeAnnotations: {
+      listByRun(runId) {
+        assertTransactionActive();
+        const records = selectObserveAnnotationsByRun(db, runId);
+        records.sort(compareStoredObserveAnnotation);
+        return Promise.resolve(records.map(cloneStoredObserveAnnotation));
+      },
+      set(record) {
+        assertTransactionActive();
+        assertStoredObserveAnnotation(record, "record");
+        ensureRunExistsInDatabase(db, record.runId, "record.runId");
+
+        if (record.turnNodeHash !== null) {
+          ensureTurnNodeExistsInDatabase(db, record.turnNodeHash, "record.turnNodeHash");
+        }
+
+        db.prepare(
+          `
+            INSERT INTO observe_annotations (
+              record_key,
+              run_id,
+              annotation_hash,
+              turn_node_hash,
+              annotation_cbor,
+              created_at_ms
+            ) VALUES (?, ?, ?, ?, ?, ?)
+            ON CONFLICT(record_key) DO UPDATE SET
+              annotation_cbor = excluded.annotation_cbor
+          `
+        ).run(
+          keyObserveAnnotation(record),
+          record.runId,
+          record.annotationHash,
+          record.turnNodeHash,
+          bufferFromBytes(record.annotationCbor),
+          record.createdAtMs
+        );
+
+        return Promise.resolve();
+      },
+    },
     objects: {
       get(hash) {
         assertTransactionActive();
@@ -1398,14 +1524,14 @@ function createRepositories(
               updated_at_ms,
               pending_signals_cbor,
               last_step_annotations_cbor
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)
             ON CONFLICT(run_id) DO UPDATE SET
               status = excluded.status,
               current_step_index = excluded.current_step_index,
               created_turn_nodes_cbor = excluded.created_turn_nodes_cbor,
               updated_at_ms = excluded.updated_at_ms,
               pending_signals_cbor = excluded.pending_signals_cbor,
-              last_step_annotations_cbor = excluded.last_step_annotations_cbor
+              last_step_annotations_cbor = NULL
           `
         ).run(
           record.runId,
@@ -1421,10 +1547,7 @@ function createRepositories(
           record.updatedAtMs,
           record.pendingSignalsCbor === undefined
             ? null
-            : bufferFromBytes(record.pendingSignalsCbor),
-          record.lastStepAnnotationsCbor === undefined
-            ? null
-            : bufferFromBytes(record.lastStepAnnotationsCbor)
+            : bufferFromBytes(record.pendingSignalsCbor)
         );
         writeTracker.recordRunSet(existingRun, record);
 
@@ -1748,6 +1871,12 @@ function createRepositories(
         return Promise.resolve(
           record === null ? null : cloneStoredTurn(record)
         );
+      },
+      listByThread(threadId) {
+        assertTransactionActive();
+        const turns = selectTurnsByThread(db, threadId);
+        turns.sort(compareStoredTurn);
+        return Promise.resolve(turns.map(cloneStoredTurn));
       },
       set(record) {
         assertTransactionActive();
@@ -2106,6 +2235,10 @@ function validateMigrationState(db: Database.Database): void {
     validatePendingSignalsAndAnnotationsSchemaPresence(db);
   }
 
+  if (appliedMigrations.has(OBSERVE_ANNOTATIONS_MIGRATION_NAME)) {
+    validateObserveAnnotationsSchemaPresence(db);
+  }
+
   const latestAppliedMigrationName = appliedMigrationNames.at(-1);
   if (latestAppliedMigrationName === INITIAL_SCHEMA_MIGRATION_NAME) {
     validatePrePendingSignalsSchemaShape(db);
@@ -2122,6 +2255,11 @@ function validateMigrationState(db: Database.Database): void {
     latestAppliedMigrationName ===
     PENDING_SIGNALS_AND_ANNOTATIONS_MIGRATION_NAME
   ) {
+    validateCurrentPackageSchemaShape(db);
+    return;
+  }
+
+  if (latestAppliedMigrationName === OBSERVE_ANNOTATIONS_MIGRATION_NAME) {
     validateCurrentPackageSchemaShape(db);
   }
 }
@@ -2260,11 +2398,12 @@ function validatePrePendingSignalsSchemaShape(db: Database.Database): void {
 function validateCurrentPackageSchemaShape(db: Database.Database): void {
   validateSqliteSchemaShape(
     db,
-    PENDING_SIGNALS_AND_ANNOTATIONS_MIGRATION_NAME,
+    OBSERVE_ANNOTATIONS_MIGRATION_NAME,
     INITIAL_SCHEMA_TABLE_DEFINITIONS,
     INITIAL_SCHEMA_INDEX_DEFINITIONS
   );
   validateTargetedValidationSchemaShape(db);
+  validateObserveAnnotationsSchemaShape(db);
 }
 
 function validateTargetedValidationSchemaShape(db: Database.Database): void {
@@ -2273,6 +2412,36 @@ function validateTargetedValidationSchemaShape(db: Database.Database): void {
     TARGETED_VALIDATION_MIGRATION_NAME,
     TARGETED_VALIDATION_TABLE_DEFINITIONS,
     TARGETED_VALIDATION_INDEX_DEFINITIONS
+  );
+}
+
+function validateObserveAnnotationsSchemaPresence(
+  db: Database.Database
+): void {
+  const existingTables = loadSqliteMasterNames(db, "table");
+
+  for (const tableName of OBSERVE_ANNOTATIONS_REQUIRED_TABLES) {
+    if (existingTables.has(tableName)) {
+      continue;
+    }
+
+    throw persistenceError(
+      "sqlite backend found an applied migration without its observe annotation schema table",
+      "sqlite_backend_applied_migration_schema_missing",
+      {
+        migrationName: OBSERVE_ANNOTATIONS_MIGRATION_NAME,
+        tableName,
+      }
+    );
+  }
+}
+
+function validateObserveAnnotationsSchemaShape(db: Database.Database): void {
+  validateSqliteSchemaShape(
+    db,
+    OBSERVE_ANNOTATIONS_MIGRATION_NAME,
+    OBSERVE_ANNOTATIONS_TABLE_DEFINITIONS,
+    OBSERVE_ANNOTATIONS_INDEX_DEFINITIONS
   );
 }
 
@@ -2665,6 +2834,25 @@ function loadState(db: Database.Database): BackendState {
     setUniqueLoadedRecord(state.runs, record.runId, record, "run", {
       runId: record.runId,
     });
+  }
+
+  for (const row of db
+    .prepare("SELECT * FROM observe_annotations")
+    .all() as SqliteObserveAnnotationRow[]) {
+    const record = decodeObserveAnnotationRow(row);
+    const records = state.observeAnnotations.get(record.runId) ?? [];
+    const key = keyObserveAnnotation(record);
+
+    if (records.some((candidate) => keyObserveAnnotation(candidate) === key)) {
+      throw persistenceError(
+        "sqlite backend loaded duplicate observe annotation rows",
+        "sqlite_backend_duplicate_loaded_observe_annotation",
+        { key, runId: record.runId }
+      );
+    }
+
+    records.push(record);
+    state.observeAnnotations.set(record.runId, records);
   }
 
   for (const row of db
@@ -3579,11 +3767,40 @@ function selectTurn(db: Database.Database, turnId: string): StoredTurn | null {
   return row === undefined ? null : decodeTurnRow(row);
 }
 
+function selectTurnsByThread(
+  db: Database.Database,
+  threadId: string
+): StoredTurn[] {
+  const rows = db
+    .prepare(
+      "SELECT * FROM turns WHERE thread_id = ? ORDER BY created_at_ms, turn_id"
+    )
+    .all(threadId) as SqliteTurnRow[];
+  return rows.map(decodeTurnRow);
+}
+
 function selectRun(db: Database.Database, runId: string): StoredRun | null {
   const row = db.prepare("SELECT * FROM runs WHERE run_id = ?").get(runId) as
     | SqliteRunRow
     | undefined;
   return row === undefined ? null : decodeRunRow(row);
+}
+
+function selectObserveAnnotationsByRun(
+  db: Database.Database,
+  runId: string
+): StoredObserveAnnotation[] {
+  const rows = db
+    .prepare(
+      `
+        SELECT *
+        FROM observe_annotations
+        WHERE run_id = ?
+        ORDER BY created_at_ms, record_key
+      `
+    )
+    .all(runId) as SqliteObserveAnnotationRow[];
+  return rows.map(decodeObserveAnnotationRow);
 }
 
 function selectRunsByTurn(db: Database.Database, turnId: string): StoredRun[] {
@@ -4231,6 +4448,20 @@ function decodeTurnRow(row: SqliteTurnRow): StoredTurn {
   return record;
 }
 
+function decodeObserveAnnotationRow(
+  row: SqliteObserveAnnotationRow
+): StoredObserveAnnotation {
+  const record: StoredObserveAnnotation = {
+    annotationCbor: cloneEncodedBytes(toUint8Array(row.annotation_cbor)),
+    annotationHash: row.annotation_hash,
+    createdAtMs: row.created_at_ms,
+    runId: row.run_id,
+    turnNodeHash: row.turn_node_hash,
+  };
+  assertStoredObserveAnnotation(record, "stored observe annotation row");
+  return record;
+}
+
 function decodeUnknownTurnRow(row: unknown): StoredTurn {
   const label = "stored turn query row";
 
@@ -4346,13 +4577,6 @@ function decodeRunRow(row: SqliteRunRow): StoredRun {
       : {
           pendingSignalsCbor: cloneEncodedBytes(
             toUint8Array(row.pending_signals_cbor)
-          ),
-        }),
-    ...(row.last_step_annotations_cbor === null
-      ? {}
-      : {
-          lastStepAnnotationsCbor: cloneEncodedBytes(
-            toUint8Array(row.last_step_annotations_cbor)
           ),
         }),
   };
@@ -4506,6 +4730,7 @@ function getErrorMessage(error: unknown): string {
 function createEmptyState(): BackendState {
   return {
     branches: new Map(),
+    observeAnnotations: new Map(),
     objects: new Map(),
     orderedPathChunks: new Map(),
     runs: new Map(),
@@ -4582,6 +4807,12 @@ async function validateLoadedState(state: BackendState): Promise<void> {
 
   for (const run of state.runs.values()) {
     assertStoredRun(run, "stored run row");
+  }
+
+  for (const records of state.observeAnnotations.values()) {
+    for (const record of records) {
+      assertStoredObserveAnnotation(record, "stored observe annotation row");
+    }
   }
 
   for (const stagedResults of state.stagedResults.values()) {
@@ -6873,6 +7104,20 @@ function cloneStoredRun(record: StoredRun): StoredRun {
     ...record,
     createdTurnNodesCbor: cloneEncodedBytes(record.createdTurnNodesCbor),
     stepSequenceCbor: cloneEncodedBytes(record.stepSequenceCbor),
+    ...(record.pendingSignalsCbor === undefined
+      ? {}
+      : {
+          pendingSignalsCbor: cloneEncodedBytes(record.pendingSignalsCbor),
+        }),
+  };
+}
+
+function cloneStoredObserveAnnotation(
+  record: StoredObserveAnnotation
+): StoredObserveAnnotation {
+  return {
+    ...record,
+    annotationCbor: cloneEncodedBytes(record.annotationCbor),
   };
 }
 
@@ -6899,6 +7144,17 @@ function cloneStoredBranch(record: StoredBranch): StoredBranch {
 
 function cloneStoredTurn(record: StoredTurn): StoredTurn {
   return { ...record };
+}
+
+function keyObserveAnnotation(record: StoredObserveAnnotation): string {
+  // SQLite keeps a synthetic record key so durable annotation history can stay
+  // append-only even though the protocol shape does not expose a row id.
+  return [
+    record.runId,
+    String(record.createdAtMs),
+    record.annotationHash,
+    record.turnNodeHash ?? "",
+  ].join("\0");
 }
 
 function cloneStoredTurnTreePath(
@@ -7092,6 +7348,18 @@ function compareStoredRun(left: StoredRun, right: StoredRun): number {
     right.createdAtMs,
     left.runId,
     right.runId
+  );
+}
+
+function compareStoredObserveAnnotation(
+  left: StoredObserveAnnotation,
+  right: StoredObserveAnnotation
+): number {
+  return compareByTimestampAndKey(
+    left.createdAtMs,
+    right.createdAtMs,
+    keyObserveAnnotation(left),
+    keyObserveAnnotation(right)
   );
 }
 

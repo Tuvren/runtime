@@ -48,6 +48,7 @@ import type {
   StepContext,
   StepDeclaration,
   StoredBranch,
+  StoredObserveAnnotation,
   StoredObject,
   StoredOrderedPathChunk,
   StoredRun,
@@ -1354,6 +1355,41 @@ export async function assertStoredTurnNodeIdentity(
   }
 }
 
+export function isStoredObserveAnnotation(
+  value: unknown
+): value is StoredObserveAnnotation {
+  return tryAssert(value, assertStoredObserveAnnotation);
+}
+
+export function assertStoredObserveAnnotation(
+  value: unknown,
+  label = "value"
+): asserts value is StoredObserveAnnotation {
+  const objectValue = assertPlainObject(value, label);
+  assertAllowedObjectKeys(
+    objectValue,
+    [
+      "annotationCbor",
+      "annotationHash",
+      "createdAtMs",
+      "runId",
+      "turnNodeHash",
+    ],
+    label
+  );
+
+  assertUint8Array(objectValue.annotationCbor, `${label}.annotationCbor`);
+  assertHashString(objectValue.annotationHash, `${label}.annotationHash`);
+  assertEpochMs(objectValue.createdAtMs, `${label}.createdAtMs`);
+  assertNonEmptyString(objectValue.runId, `${label}.runId`);
+  assertNullableHashString(objectValue.turnNodeHash, `${label}.turnNodeHash`);
+  assertDecodedKernelRecord(
+    objectValue.annotationCbor,
+    assertKernelObject,
+    `${label}.annotationCbor`
+  );
+}
+
 export function isStoredThread(value: unknown): value is StoredThread {
   return tryAssert(value, assertStoredThread);
 }
@@ -1490,7 +1526,6 @@ export function assertStoredRun(
       "createdAtMs",
       "createdTurnNodesCbor",
       "currentStepIndex",
-      "lastStepAnnotationsCbor",
       "pendingSignalsCbor",
       "runId",
       "schemaId",
@@ -1511,11 +1546,6 @@ export function assertStoredRun(
     "pendingSignalsCbor",
     label
   );
-  assertOptionalFieldIsOmittedWhenUndefined(
-    objectValue,
-    "lastStepAnnotationsCbor",
-    label
-  );
   assertNonEmptyString(objectValue.runId, `${label}.runId`);
   assertNonEmptyString(objectValue.turnId, `${label}.turnId`);
   assertNonEmptyString(objectValue.branchId, `${label}.branchId`);
@@ -1530,13 +1560,6 @@ export function assertStoredRun(
     assertUint8Array(
       objectValue.pendingSignalsCbor,
       `${label}.pendingSignalsCbor`
-    );
-  }
-
-  if (objectValue.lastStepAnnotationsCbor !== undefined) {
-    assertUint8Array(
-      objectValue.lastStepAnnotationsCbor,
-      `${label}.lastStepAnnotationsCbor`
     );
   }
   const stepSequence = assertDecodedKernelRecord(
