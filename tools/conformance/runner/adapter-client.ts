@@ -268,8 +268,15 @@ export class JsonRpcAdapterClient {
       return;
     }
 
-    if (!isJsonRpcResponse(parsed) || typeof parsed.id !== "number") {
+    if (!isJsonRpcResponse(parsed)) {
       this.rejectAll(new Error("adapter stdout contained malformed JSON-RPC"));
+      return;
+    }
+
+    if (typeof parsed.id !== "number") {
+      if ("error" in parsed) {
+        this.rejectAll(new JsonRpcAdapterError(parsed.error));
+      }
       return;
     }
 
@@ -305,11 +312,21 @@ function isJsonRpcResponse(value: unknown): value is JsonRpcResponse {
     return false;
   }
 
+  if (!isJsonRpcId(value.id)) {
+    return false;
+  }
+
   if ("result" in value) {
     return !("error" in value);
   }
 
   return "error" in value && isAdapterErrorEnvelope(value.error);
+}
+
+function isJsonRpcId(value: unknown): value is number | string | null {
+  return (
+    value === null || typeof value === "number" || typeof value === "string"
+  );
 }
 
 function isOperationOutcome(value: unknown): value is OperationOutcome {

@@ -15,6 +15,10 @@
     {
       "path": "boundaries/framework/conformance/plans/driver-api-core.json",
       "format": "conformance-plan"
+    },
+    {
+      "path": "boundaries/framework/conformance/plans/driver-api-extended.json",
+      "format": "conformance-plan"
     }
   ],
   "generatedArtifacts": [
@@ -29,6 +33,11 @@
       "planId": "tuvren.framework.driver-api.core",
       "planVersion": "0.1.0",
       "path": "boundaries/framework/conformance/plans/driver-api-core.json"
+    },
+    {
+      "planId": "tuvren.framework.driver-api.extended",
+      "planVersion": "0.1.0",
+      "path": "boundaries/framework/conformance/plans/driver-api-extended.json"
     }
   ],
   "bindingProjections": {
@@ -64,6 +73,10 @@
     {
       "kind": "conformance-plan",
       "target": "boundaries/framework/conformance/plans/driver-api-core.json"
+    },
+    {
+      "kind": "conformance-plan",
+      "target": "boundaries/framework/conformance/plans/driver-api-extended.json"
     },
     {
       "kind": "freshness-check",

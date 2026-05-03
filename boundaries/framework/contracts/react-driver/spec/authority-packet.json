@@ -11,6 +11,10 @@
     {
       "path": "boundaries/framework/conformance/plans/react-driver-callables.json",
       "format": "conformance-plan"
+    },
+    {
+      "path": "boundaries/framework/conformance/plans/react-driver-extended.json",
+      "format": "conformance-plan"
     }
   ],
   "conformancePlans": [
@@ -18,6 +22,11 @@
       "planId": "tuvren.framework.react-driver.callables",
       "planVersion": "0.1.0",
       "path": "boundaries/framework/conformance/plans/react-driver-callables.json"
+    },
+    {
+      "planId": "tuvren.framework.react-driver.extended",
+      "planVersion": "0.1.0",
+      "path": "boundaries/framework/conformance/plans/react-driver-extended.json"
     }
   ],
   "bindingProjections": {
@@ -36,6 +45,10 @@
     {
       "kind": "conformance-plan",
       "target": "boundaries/framework/conformance/plans/react-driver-callables.json"
+    },
+    {
+      "kind": "conformance-plan",
+      "target": "boundaries/framework/conformance/plans/react-driver-extended.json"
     }
   ]
 }

@@ -1,0 +1,271 @@
+{
+  "applicability": {
+    "capabilities": ["framework.runtime-api"]
+  },
+  "checks": [
+    {
+      "assertions": [
+        {
+          "equals": "completed",
+          "field": "$.runtime.phase",
+          "kind": "evidenceField"
+        }
+      ],
+      "checkId": "runtime-lifecycle-ext.execute-turn.phase-completed",
+      "evidence": ["runtime.phase"],
+      "input": {
+        "scenarioPath": "$.completed-turn"
+      },
+      "operation": "runtime.execute-turn",
+      "scenario": "runtime-api-scenarios"
+    },
+    {
+      "assertions": [
+        {
+          "field": "$.runtime.phase",
+          "kind": "evidenceField",
+          "matches": "^(running|paused|completed|failed)$"
+        }
+      ],
+      "checkId": "runtime-lifecycle-ext.execute-turn.phase-enum",
+      "evidence": ["runtime.phase"],
+      "input": {
+        "scenarioPath": "$.completed-turn"
+      },
+      "operation": "runtime.execute-turn",
+      "scenario": "runtime-api-scenarios"
+    },
+    {
+      "assertions": [
+        {
+          "equals": "paused",
+          "field": "$.trace.approval.evidence.approval.pausedPhase",
+          "kind": "stateField"
+        }
+      ],
+      "checkId": "runtime-lifecycle-ext.approval-resolve.paused-phase-trace",
+      "evidence": ["trace.approval.evidence.approval.pausedPhase"],
+      "input": {
+        "scenarioPath": "$.paused-turn-resume"
+      },
+      "operation": "runtime.approval-resolve",
+      "scenario": "runtime-api-scenarios",
+      "steps": [
+        {
+          "input": {
+            "scenarioPath": "$.paused-turn-resume"
+          },
+          "operation": "runtime.approval-resolve",
+          "stepId": "approval"
+        }
+      ]
+    },
+    {
+      "assertions": [
+        {
+          "equals": "completed",
+          "field": "$.trace.approval.evidence.approval.resumedPhase",
+          "kind": "stateField"
+        }
+      ],
+      "checkId": "runtime-lifecycle-ext.approval-resolve.resumed-phase-trace",
+      "evidence": ["trace.approval.evidence.approval.resumedPhase"],
+      "input": {
+        "scenarioPath": "$.paused-turn-resume"
+      },
+      "operation": "runtime.approval-resolve",
+      "scenario": "runtime-api-scenarios",
+      "steps": [
+        {
+          "input": {
+            "scenarioPath": "$.paused-turn-resume"
+          },
+          "operation": "runtime.approval-resolve",
+          "stepId": "approval"
+        }
+      ]
+    },
+    {
+      "assertions": [
+        {
+          "equals": "completed",
+          "field": "$.branch.completedTurnPhase",
+          "kind": "stateField"
+        }
+      ],
+      "checkId": "runtime-lifecycle-ext.branch-create.source-phase-completed",
+      "evidence": ["branch.completedTurnPhase"],
+      "input": {
+        "scenarioPath": "$.branch-from-completed-head"
+      },
+      "operation": "runtime.branch-create",
+      "scenario": "runtime-api-scenarios"
+    },
+    {
+      "assertions": [
+        {
+          "equals": 2,
+          "field": "$.branch.sourceMessageCount",
+          "kind": "stateField"
+        }
+      ],
+      "checkId": "runtime-lifecycle-ext.branch-create.source-message-count",
+      "evidence": ["branch.sourceMessageCount"],
+      "input": {
+        "scenarioPath": "$.branch-from-completed-head"
+      },
+      "operation": "runtime.branch-create",
+      "scenario": "runtime-api-scenarios"
+    },
+    {
+      "assertions": [
+        {
+          "field": "$.branch.sourceHeadTurnNodeHash",
+          "kind": "stateField",
+          "matches": "^[a-f0-9]{64}$"
+        }
+      ],
+      "checkId": "runtime-lifecycle-ext.branch-create.source-head-hash-format",
+      "evidence": ["branch.sourceHeadTurnNodeHash"],
+      "input": {
+        "scenarioPath": "$.branch-from-completed-head"
+      },
+      "operation": "runtime.branch-create",
+      "scenario": "runtime-api-scenarios"
+    },
+    {
+      "assertions": [
+        {
+          "field": "$.branch.createdHeadTurnNodeHash",
+          "kind": "stateField",
+          "matches": "^[a-f0-9]{64}$"
+        }
+      ],
+      "checkId": "runtime-lifecycle-ext.branch-create.created-head-hash-format",
+      "evidence": ["branch.createdHeadTurnNodeHash"],
+      "input": {
+        "scenarioPath": "$.branch-from-completed-head"
+      },
+      "operation": "runtime.branch-create",
+      "scenario": "runtime-api-scenarios"
+    },
+    {
+      "assertions": [
+        {
+          "equals": 3,
+          "field": "$.context.messageCount",
+          "kind": "evidenceField"
+        }
+      ],
+      "checkId": "runtime-lifecycle-ext.context-transform.message-count",
+      "evidence": ["context.messageCount"],
+      "input": {
+        "scenarioPath": "$.context-transform-append-summary"
+      },
+      "operation": "runtime.context-transform",
+      "scenario": "runtime-api-scenarios"
+    },
+    {
+      "assertions": [
+        {
+          "equals": "Shared context engineering summary.",
+          "field": "$.context.summaryText",
+          "kind": "evidenceField"
+        }
+      ],
+      "checkId": "runtime-lifecycle-ext.context-transform.summary-text",
+      "evidence": ["context.summaryText"],
+      "input": {
+        "scenarioPath": "$.context-transform-append-summary"
+      },
+      "operation": "runtime.context-transform",
+      "scenario": "runtime-api-scenarios"
+    },
+    {
+      "assertions": [
+        {
+          "equals": "completed",
+          "field": "$.runtime.phase",
+          "kind": "evidenceField"
+        }
+      ],
+      "checkId": "runtime-lifecycle-ext.context-transform.runtime-phase-completed",
+      "evidence": ["runtime.phase"],
+      "input": {
+        "scenarioPath": "$.context-transform-append-summary"
+      },
+      "operation": "runtime.context-transform",
+      "scenario": "runtime-api-scenarios"
+    },
+    {
+      "assertions": [
+        {
+          "equals": 1,
+          "field": "$.recovery.uncommittedStagedResults",
+          "kind": "evidenceField"
+        }
+      ],
+      "checkId": "runtime-lifecycle-ext.recover-result.uncommitted-count",
+      "evidence": ["recovery.uncommittedStagedResults"],
+      "input": {
+        "scenarioPath": "$.recover-staged-result"
+      },
+      "operation": "runtime.recover-result",
+      "scenario": "runtime-api-scenarios"
+    },
+    {
+      "assertions": [
+        {
+          "equals": "tool-search",
+          "field": "$.recovery.firstTaskId",
+          "kind": "evidenceField"
+        }
+      ],
+      "checkId": "runtime-lifecycle-ext.recover-result.first-task-id",
+      "evidence": ["recovery.firstTaskId"],
+      "input": {
+        "scenarioPath": "$.recover-staged-result"
+      },
+      "operation": "runtime.recover-result",
+      "scenario": "runtime-api-scenarios"
+    },
+    {
+      "assertions": [
+        {
+          "equals": "message",
+          "field": "$.recovery.firstObjectType",
+          "kind": "evidenceField"
+        }
+      ],
+      "checkId": "runtime-lifecycle-ext.recover-result.first-object-type",
+      "evidence": ["recovery.firstObjectType"],
+      "input": {
+        "scenarioPath": "$.recover-staged-result"
+      },
+      "operation": "runtime.recover-result",
+      "scenario": "runtime-api-scenarios"
+    },
+    {
+      "assertions": [
+        {
+          "field": "$.recovery.lastTurnNodeHash",
+          "kind": "evidenceField",
+          "matches": "^[a-f0-9]{64}$"
+        }
+      ],
+      "checkId": "runtime-lifecycle-ext.recover-result.last-turn-node-hash-format",
+      "evidence": ["recovery.lastTurnNodeHash"],
+      "input": {
+        "scenarioPath": "$.recover-staged-result"
+      },
+      "operation": "runtime.recover-result",
+      "scenario": "runtime-api-scenarios"
+    }
+  ],
+  "packetId": "tuvren.framework.runtime-api",
+  "planId": "tuvren.framework.runtime-api.lifecycle-extended",
+  "planVersion": "0.1.0",
+  "scenarios": {
+    "runtime-api-scenarios": "../scenarios/runtime-api-scenarios.json"
+  }
+}

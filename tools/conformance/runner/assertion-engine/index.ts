@@ -158,7 +158,11 @@ function assertTerminalEvent(
     return false;
   }
 
-  const value = readPath(terminalEvent, assertion.path ?? "$");
+  // When eventType is supplied, callers expect the assertion to read the
+  // event's discriminant by default. Defaulting path to "$" forced every plan
+  // to redundantly write path: "$.type" for the comparison to ever match.
+  const defaultPath = assertion.eventType === undefined ? "$" : "$.type";
+  const value = readPath(terminalEvent, assertion.path ?? defaultPath);
 
   return assertion.eventType === undefined
     ? assertValue(assertion, value, context)
@@ -236,6 +240,16 @@ function assertNoEvent(
 ): boolean {
   if (assertion.eventType === undefined) {
     throw new Error("noEvent assertion requires eventType");
+  }
+
+  if (assertion.field !== undefined) {
+    const value = readPath(context.evidence, assertion.field);
+
+    if (!Array.isArray(value)) {
+      return value !== assertion.eventType;
+    }
+
+    return value.every((entry) => entry !== assertion.eventType);
   }
 
   const events = readEvents(context);

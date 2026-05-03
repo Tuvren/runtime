@@ -247,9 +247,7 @@ async function runCheck(
       timeoutMs
     );
 
-    if (inspectedState !== null && inspectedState !== undefined) {
-      context.state = inspectedState;
-    }
+    mergeInspectedState(context, inspectedState, outcome);
 
     const assertionResults = [
       ...evaluateAssertions(check, context),
@@ -428,6 +426,30 @@ function createAssertionContext(
     scenario: input.scenario,
     state: readOptionalRecord(outcome.value.state),
   };
+}
+
+function mergeInspectedState(
+  context: AssertionContext,
+  inspectedState: unknown,
+  outcome: Awaited<ReturnType<JsonRpcAdapterClient["dispatch"]>>
+): void {
+  if (inspectedState === null || inspectedState === undefined) {
+    return;
+  }
+
+  if (outcome.kind === "error") {
+    context.state = isRecord(inspectedState)
+      ? { ...inspectedState, adapterError: outcome.error }
+      : { adapterError: outcome.error, inspectedState };
+    return;
+  }
+
+  // Adapter-supplied state from a successful dispatch already populates
+  // context.state; only fall back to the inspectState query when dispatch did
+  // not pack value.state. Mirrors the events handling above.
+  if (context.state === undefined) {
+    context.state = inspectedState;
+  }
 }
 
 function readAdapterFailure(error: unknown): unknown {
@@ -649,12 +671,14 @@ function applyShard(
   scheduled: readonly ScheduledCheck[],
   options: CliOptions
 ): ScheduledCheck[] {
-  if (options.shard === undefined) {
+  const shard = options.shard;
+
+  if (shard === undefined) {
     return [...scheduled];
   }
 
   return scheduled.filter(
-    (_entry, index) => index % options.shard?.count === options.shard.index
+    (_entry, index) => index % shard.count === shard.index
   );
 }
 

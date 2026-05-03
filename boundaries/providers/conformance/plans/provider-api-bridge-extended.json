@@ -1,0 +1,96 @@
+{
+  "applicability": {
+    "capabilities": ["providers.provider-api"]
+  },
+  "checks": [
+    {
+      "assertions": [
+        {
+          "field": "$.generate.responsePartTypes.0",
+          "kind": "evidenceField"
+        }
+      ],
+      "capabilities": ["providers.ai-sdk-bridge"],
+      "checkId": "providers-ext.generate.response-part-types-shape-array",
+      "evidence": ["generate.responsePartTypes.0"],
+      "fixture": "provider-fixtures",
+      "operation": "providers.bridge.generate-mapping"
+    },
+    {
+      "assertions": [
+        {
+          "field": "$.generate.responseFormatName",
+          "kind": "evidenceField",
+          "matches": "^[a-z][a-zA-Z0-9_]*$"
+        }
+      ],
+      "capabilities": ["providers.ai-sdk-bridge"],
+      "checkId": "providers-ext.generate.response-format-name-matches-pattern",
+      "evidence": ["generate.responseFormatName"],
+      "fixture": "provider-fixtures",
+      "operation": "providers.bridge.generate-mapping"
+    },
+    {
+      "assertions": [
+        {
+          "field": "$.structured.doneName",
+          "kind": "evidenceField",
+          "matches": "^[a-z][a-zA-Z0-9_]*$"
+        }
+      ],
+      "capabilities": ["providers.ai-sdk-bridge"],
+      "checkId": "providers-ext.structured.done-name-matches-identifier",
+      "evidence": ["structured.doneName"],
+      "fixture": "provider-fixtures",
+      "operation": "providers.bridge.structured-output-stream"
+    },
+    {
+      "assertions": [
+        {
+          "field": "$.structured.chunkTypes.0",
+          "kind": "evidenceField",
+          "matches": "^(structured_delta|text_delta)$"
+        }
+      ],
+      "capabilities": ["providers.ai-sdk-bridge"],
+      "checkId": "providers-ext.structured.first-chunk-is-structured-delta-or-text-delta",
+      "evidence": ["structured.chunkTypes.0"],
+      "fixture": "provider-fixtures",
+      "operation": "providers.bridge.structured-output-stream"
+    },
+    {
+      "assertions": [
+        {
+          "field": "$.failure.errorCode",
+          "kind": "evidenceField",
+          "matches": "^[a-z0-9]+(?:_[a-z0-9]+)*$"
+        }
+      ],
+      "capabilities": ["providers.ai-sdk-bridge"],
+      "checkId": "providers-ext.failure.error-code-snake-case",
+      "evidence": ["failure.errorCode"],
+      "fixture": "provider-fixtures",
+      "operation": "providers.bridge.provider-failure-normalization"
+    },
+    {
+      "assertions": [
+        {
+          "field": "$.failure.errorName",
+          "kind": "evidenceField",
+          "matches": "^[A-Z][A-Za-z0-9]+$"
+        }
+      ],
+      "capabilities": ["providers.ai-sdk-bridge"],
+      "checkId": "providers-ext.failure.error-name-pascal-case",
+      "evidence": ["failure.errorName"],
+      "fixture": "provider-fixtures",
+      "operation": "providers.bridge.provider-failure-normalization"
+    }
+  ],
+  "fixtures": {
+    "provider-fixtures": "../fixtures/provider-fixtures.json"
+  },
+  "packetId": "tuvren.providers.provider-api",
+  "planId": "tuvren.providers.provider-api.bridge-extended",
+  "planVersion": "0.1.0"
+}

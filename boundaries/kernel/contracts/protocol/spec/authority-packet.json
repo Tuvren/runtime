@@ -10,6 +10,10 @@
       "format": "conformance-plan"
     },
     {
+      "path": "boundaries/kernel/conformance/plans/kernel-protocol-extended.json",
+      "format": "conformance-plan"
+    },
+    {
       "path": "boundaries/kernel/conformance/fixtures/kernel-protocol-deterministic.json",
       "format": "fixture-set"
     },
@@ -23,6 +27,11 @@
       "planId": "tuvren.kernel.protocol.core",
       "planVersion": "0.1.0",
       "path": "boundaries/kernel/conformance/plans/kernel-protocol-core.json"
+    },
+    {
+      "planId": "tuvren.kernel.protocol.extended",
+      "planVersion": "0.1.0",
+      "path": "boundaries/kernel/conformance/plans/kernel-protocol-extended.json"
     }
   ],
   "bindingProjections": {
@@ -43,6 +52,10 @@
     {
       "kind": "conformance-plan",
       "target": "boundaries/kernel/conformance/plans/kernel-protocol-core.json"
+    },
+    {
+      "kind": "conformance-plan",
+      "target": "boundaries/kernel/conformance/plans/kernel-protocol-extended.json"
     }
   ]
 }

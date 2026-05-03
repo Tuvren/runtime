@@ -1,0 +1,491 @@
+{
+  "applicability": {
+    "capabilities": ["framework.runtime-api"]
+  },
+  "checks": [
+    {
+      "assertions": [
+        {
+          "field": "$.provider.generate.callCount",
+          "kind": "evidenceField"
+        }
+      ],
+      "checkId": "runtime-callable-ext.provider-generate.call-count-positive",
+      "evidence": ["provider.generate.callCount"],
+      "input": {
+        "scenarioPath": "$.provider-generate-text"
+      },
+      "operation": "runtime.provider-generate",
+      "scenario": "runtime-api-scenarios"
+    },
+    {
+      "assertions": [
+        {
+          "field": "$.provider.generate.response.parts.0",
+          "kind": "evidenceField"
+        }
+      ],
+      "checkId": "runtime-callable-ext.provider-generate.response-parts-first-present",
+      "evidence": ["provider.generate.response.parts.0"],
+      "input": {
+        "scenarioPath": "$.provider-generate-text"
+      },
+      "operation": "runtime.provider-generate",
+      "scenario": "runtime-api-scenarios"
+    },
+    {
+      "assertions": [
+        {
+          "field": "$.provider.generate.response.finishReason",
+          "kind": "evidenceField",
+          "matches": "^(stop|length|content_filter|tool_call|error)$"
+        }
+      ],
+      "checkId": "runtime-callable-ext.provider-generate.finish-reason-string",
+      "evidence": ["provider.generate.response.finishReason"],
+      "input": {
+        "scenarioPath": "$.provider-generate-text"
+      },
+      "operation": "runtime.provider-generate",
+      "scenario": "runtime-api-scenarios"
+    },
+    {
+      "assertions": [
+        {
+          "field": "$.provider.generate.response.parts.0.type",
+          "kind": "evidenceField",
+          "equals": "text"
+        }
+      ],
+      "checkId": "runtime-callable-ext.provider-generate.first-part-text-shape",
+      "evidence": ["provider.generate.response.parts.0.type"],
+      "input": {
+        "scenarioPath": "$.provider-generate-text"
+      },
+      "operation": "runtime.provider-generate",
+      "scenario": "runtime-api-scenarios"
+    },
+    {
+      "assertions": [
+        {
+          "equals": "stop",
+          "field": "$.provider.generate.response.finishReason",
+          "kind": "evidenceField"
+        }
+      ],
+      "checkId": "runtime-callable-ext.provider-generate.response-finish-reason-equals-stop",
+      "evidence": ["provider.generate.response.finishReason"],
+      "input": {
+        "scenarioPath": "$.provider-generate-text"
+      },
+      "operation": "runtime.provider-generate",
+      "scenario": "runtime-api-scenarios"
+    },
+    {
+      "assertions": [
+        {
+          "contains": "finish",
+          "field": "$.provider.stream.chunkTypes",
+          "kind": "evidenceField"
+        }
+      ],
+      "checkId": "runtime-callable-ext.provider-stream.chunk-types-include-finish",
+      "evidence": ["provider.stream.chunkTypes"],
+      "input": {
+        "scenarioPath": "$.provider-stream-text"
+      },
+      "operation": "runtime.provider-stream",
+      "scenario": "runtime-api-scenarios"
+    },
+    {
+      "assertions": [
+        {
+          "contains": "text.delta",
+          "field": "$.provider.stream.emittedEventTypes",
+          "kind": "evidenceField"
+        }
+      ],
+      "checkId": "runtime-callable-ext.provider-stream.emitted-event-types-text-delta",
+      "evidence": ["provider.stream.emittedEventTypes"],
+      "input": {
+        "scenarioPath": "$.provider-stream-text"
+      },
+      "operation": "runtime.provider-stream",
+      "scenario": "runtime-api-scenarios"
+    },
+    {
+      "assertions": [
+        {
+          "contains": "message.start",
+          "field": "$.provider.stream.emittedEventTypes",
+          "kind": "evidenceField"
+        }
+      ],
+      "checkId": "runtime-callable-ext.provider-stream.emitted-event-types-include-message-start",
+      "evidence": ["provider.stream.emittedEventTypes"],
+      "input": {
+        "scenarioPath": "$.provider-stream-text"
+      },
+      "operation": "runtime.provider-stream",
+      "scenario": "runtime-api-scenarios"
+    },
+    {
+      "assertions": [
+        {
+          "contains": "message.done",
+          "field": "$.provider.stream.emittedEventTypes",
+          "kind": "evidenceField"
+        }
+      ],
+      "checkId": "runtime-callable-ext.provider-stream.emitted-event-types-include-message-done",
+      "evidence": ["provider.stream.emittedEventTypes"],
+      "input": {
+        "scenarioPath": "$.provider-stream-text"
+      },
+      "operation": "runtime.provider-stream",
+      "scenario": "runtime-api-scenarios"
+    },
+    {
+      "assertions": [
+        {
+          "equals": "text_delta",
+          "field": "$.provider.stream.chunkTypes.0",
+          "kind": "evidenceField"
+        }
+      ],
+      "checkId": "runtime-callable-ext.provider-stream.chunk-types-text-delta-first",
+      "evidence": ["provider.stream.chunkTypes.0"],
+      "input": {
+        "scenarioPath": "$.provider-stream-text"
+      },
+      "operation": "runtime.provider-stream",
+      "scenario": "runtime-api-scenarios"
+    },
+    {
+      "assertions": [
+        {
+          "equals": "streamed from shared scenario",
+          "field": "$.provider.stream.response.parts.0.text",
+          "kind": "evidenceField"
+        }
+      ],
+      "checkId": "runtime-callable-ext.provider-stream.response-text-matches-scenario",
+      "evidence": ["provider.stream.response.parts.0.text"],
+      "input": {
+        "scenarioPath": "$.provider-stream-text"
+      },
+      "operation": "runtime.provider-stream",
+      "scenario": "runtime-api-scenarios"
+    },
+    {
+      "assertions": [
+        {
+          "equals": 1,
+          "field": "$.tool.execution.callCount",
+          "kind": "evidenceField"
+        }
+      ],
+      "checkId": "runtime-callable-ext.tool-execute.call-count-equals-one",
+      "evidence": ["tool.execution.callCount"],
+      "input": {
+        "scenarioPath": "$.tool-execute-search"
+      },
+      "operation": "runtime.tool-execute",
+      "scenario": "runtime-api-scenarios"
+    },
+    {
+      "assertions": [
+        {
+          "equals": "shared docs",
+          "field": "$.tool.execution.inputs.0.query",
+          "kind": "evidenceField"
+        }
+      ],
+      "checkId": "runtime-callable-ext.tool-execute.input-query-matches",
+      "evidence": ["tool.execution.inputs.0.query"],
+      "input": {
+        "scenarioPath": "$.tool-execute-search"
+      },
+      "operation": "runtime.tool-execute",
+      "scenario": "runtime-api-scenarios"
+    },
+    {
+      "assertions": [
+        {
+          "equals": "shared scenario",
+          "field": "$.tool.execution.outputs.0.source",
+          "kind": "evidenceField"
+        }
+      ],
+      "checkId": "runtime-callable-ext.tool-execute.output-source-matches",
+      "evidence": ["tool.execution.outputs.0.source"],
+      "input": {
+        "scenarioPath": "$.tool-execute-search"
+      },
+      "operation": "runtime.tool-execute",
+      "scenario": "runtime-api-scenarios"
+    },
+    {
+      "assertions": [
+        {
+          "kind": "schemaValid",
+          "path": "$.evidence.tool.execution.outputs.0",
+          "schema": "$.scenario.toolResultSchema"
+        }
+      ],
+      "checkId": "runtime-callable-ext.tool-execute.output-shape-matches-scenario",
+      "evidence": ["tool.execution.outputs.0"],
+      "input": {
+        "scenarioPath": "$.tool-execute-search"
+      },
+      "operation": "runtime.tool-execute",
+      "scenario": "runtime-api-scenarios"
+    },
+    {
+      "assertions": [
+        {
+          "equals": "completed",
+          "field": "$.toolExecution.status.phase",
+          "kind": "stateField"
+        }
+      ],
+      "checkId": "runtime-callable-ext.tool-execute.state-phase-completed",
+      "evidence": ["toolExecution.status.phase"],
+      "input": {
+        "scenarioPath": "$.tool-execute-search"
+      },
+      "operation": "runtime.tool-execute",
+      "scenario": "runtime-api-scenarios"
+    },
+    {
+      "assertions": [
+        {
+          "equals": 1,
+          "field": "$.toolExecution.status.manifest.toolResults.total",
+          "kind": "stateField"
+        }
+      ],
+      "checkId": "runtime-callable-ext.tool-execute.state-tool-results-total-one",
+      "evidence": ["toolExecution.status.manifest.toolResults.total"],
+      "input": {
+        "scenarioPath": "$.tool-execute-search"
+      },
+      "operation": "runtime.tool-execute",
+      "scenario": "runtime-api-scenarios"
+    },
+    {
+      "assertions": [
+        {
+          "equals": "paused",
+          "field": "$.approval.pausedPhase",
+          "kind": "evidenceField"
+        }
+      ],
+      "checkId": "runtime-callable-ext.approval-resolve.paused-phase-paused",
+      "evidence": ["approval.pausedPhase"],
+      "input": {
+        "scenarioPath": "$.paused-turn-resume"
+      },
+      "operation": "runtime.approval-resolve",
+      "scenario": "runtime-api-scenarios"
+    },
+    {
+      "assertions": [
+        {
+          "equals": "completed",
+          "field": "$.approval.resumedPhase",
+          "kind": "evidenceField"
+        }
+      ],
+      "checkId": "runtime-callable-ext.approval-resolve.resumed-phase-completed",
+      "evidence": ["approval.resumedPhase"],
+      "input": {
+        "scenarioPath": "$.paused-turn-resume"
+      },
+      "operation": "runtime.approval-resolve",
+      "scenario": "runtime-api-scenarios"
+    },
+    {
+      "assertions": [
+        {
+          "contains": "search",
+          "field": "$.tool.execution.executedNames",
+          "kind": "evidenceField"
+        }
+      ],
+      "checkId": "runtime-callable-ext.approval-resolve.executed-tools-include-search",
+      "evidence": ["tool.execution.executedNames"],
+      "input": {
+        "scenarioPath": "$.paused-turn-resume"
+      },
+      "operation": "runtime.approval-resolve",
+      "scenario": "runtime-api-scenarios"
+    },
+    {
+      "assertions": [
+        {
+          "contains": "email",
+          "field": "$.tool.execution.executedNames",
+          "kind": "evidenceField"
+        }
+      ],
+      "checkId": "runtime-callable-ext.approval-resolve.executed-tools-include-email",
+      "evidence": ["tool.execution.executedNames"],
+      "input": {
+        "scenarioPath": "$.paused-turn-resume"
+      },
+      "operation": "runtime.approval-resolve",
+      "scenario": "runtime-api-scenarios"
+    },
+    {
+      "assertions": [
+        {
+          "equals": "call-email",
+          "field": "$.approval.decisions.0.callId",
+          "kind": "evidenceField"
+        }
+      ],
+      "checkId": "runtime-callable-ext.approval-resolve.decision-call-id-matches",
+      "evidence": ["approval.decisions.0.callId"],
+      "input": {
+        "scenarioPath": "$.paused-turn-resume"
+      },
+      "operation": "runtime.approval-resolve",
+      "scenario": "runtime-api-scenarios"
+    },
+    {
+      "assertions": [
+        {
+          "equals": "approve",
+          "field": "$.approval.decisions.0.type",
+          "kind": "evidenceField"
+        }
+      ],
+      "checkId": "runtime-callable-ext.approval-resolve.decision-type-approve",
+      "evidence": ["approval.decisions.0.type"],
+      "input": {
+        "scenarioPath": "$.paused-turn-resume"
+      },
+      "operation": "runtime.approval-resolve",
+      "scenario": "runtime-api-scenarios"
+    },
+    {
+      "assertions": [
+        {
+          "equals": "fail",
+          "field": "$.validation.resolutionType",
+          "kind": "evidenceField"
+        }
+      ],
+      "checkId": "runtime-callable-ext.validate-structured-output.resolution-fail",
+      "evidence": ["validation.resolutionType"],
+      "input": {
+        "scenarioPath": "$.structured-validation-failure"
+      },
+      "operation": "runtime.validate-structured-output",
+      "scenario": "runtime-api-scenarios"
+    },
+    {
+      "assertions": [
+        {
+          "field": "$.validation.resolutionType",
+          "kind": "evidenceField",
+          "matches": "^(fail|repair|warn|pass)$"
+        }
+      ],
+      "checkId": "runtime-callable-ext.validate-structured-output.resolution-type-string",
+      "evidence": ["validation.resolutionType"],
+      "input": {
+        "scenarioPath": "$.structured-validation-failure"
+      },
+      "operation": "runtime.validate-structured-output",
+      "scenario": "runtime-api-scenarios"
+    },
+    {
+      "assertions": [
+        {
+          "equals": "turn.start",
+          "field": "$.cancellation.observedEventType",
+          "kind": "evidenceField"
+        }
+      ],
+      "checkId": "runtime-callable-ext.cancel-execution.observed-event-type",
+      "controls": {
+        "cancelAfterEvent": "turn.start",
+        "deadlineMs": 1000
+      },
+      "evidence": ["cancellation.observedEventType"],
+      "operation": "runtime.cancel-execution"
+    },
+    {
+      "assertions": [
+        {
+          "equals": 0,
+          "field": "$.cancellation.observedEventIndex",
+          "kind": "evidenceField"
+        }
+      ],
+      "checkId": "runtime-callable-ext.cancel-execution.observed-event-index-zero",
+      "controls": {
+        "cancelAfterEvent": "turn.start",
+        "deadlineMs": 1000
+      },
+      "evidence": ["cancellation.observedEventIndex"],
+      "operation": "runtime.cancel-execution"
+    },
+    {
+      "assertions": [
+        {
+          "equals": 2,
+          "field": "$.cancellation.cancelInvocations",
+          "kind": "evidenceField"
+        }
+      ],
+      "checkId": "runtime-callable-ext.cancel-execution.cancel-invocation-count",
+      "controls": {
+        "cancelAfterEvent": "turn.start",
+        "deadlineMs": 1000
+      },
+      "evidence": ["cancellation.cancelInvocations"],
+      "operation": "runtime.cancel-execution"
+    },
+    {
+      "assertions": [
+        {
+          "equals": 1,
+          "field": "$.cancellation.errorEventCount",
+          "kind": "evidenceField"
+        }
+      ],
+      "checkId": "runtime-callable-ext.cancel-execution.error-event-count-one",
+      "controls": {
+        "cancelAfterEvent": "turn.start",
+        "deadlineMs": 1000
+      },
+      "evidence": ["cancellation.errorEventCount"],
+      "operation": "runtime.cancel-execution"
+    },
+    {
+      "assertions": [
+        {
+          "equals": "failed",
+          "field": "$.runtime.phase",
+          "kind": "evidenceField"
+        }
+      ],
+      "checkId": "runtime-callable-ext.cancel-execution.runtime-phase-failed",
+      "controls": {
+        "cancelAfterEvent": "turn.start",
+        "deadlineMs": 1000
+      },
+      "evidence": ["runtime.phase"],
+      "operation": "runtime.cancel-execution"
+    }
+  ],
+  "packetId": "tuvren.framework.runtime-api",
+  "planId": "tuvren.framework.runtime-api.callables-extended",
+  "planVersion": "0.1.0",
+  "scenarios": {
+    "runtime-api-scenarios": "../scenarios/runtime-api-scenarios.json"
+  }
+}
