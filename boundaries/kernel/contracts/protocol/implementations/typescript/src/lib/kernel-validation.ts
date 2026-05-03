@@ -1490,6 +1490,8 @@ export function assertStoredRun(
       "createdAtMs",
       "createdTurnNodesCbor",
       "currentStepIndex",
+      "lastStepAnnotationsCbor",
+      "pendingSignalsCbor",
       "runId",
       "schemaId",
       "startTurnNodeHash",
@@ -1504,6 +1506,16 @@ export function assertStoredRun(
   const stepSequenceCbor = objectValue.stepSequenceCbor;
   const createdTurnNodesCbor = objectValue.createdTurnNodesCbor;
 
+  assertOptionalFieldIsOmittedWhenUndefined(
+    objectValue,
+    "pendingSignalsCbor",
+    label
+  );
+  assertOptionalFieldIsOmittedWhenUndefined(
+    objectValue,
+    "lastStepAnnotationsCbor",
+    label
+  );
   assertNonEmptyString(objectValue.runId, `${label}.runId`);
   assertNonEmptyString(objectValue.turnId, `${label}.turnId`);
   assertNonEmptyString(objectValue.branchId, `${label}.branchId`);
@@ -1513,6 +1525,20 @@ export function assertStoredRun(
   assertNonNegativeInteger(currentStepIndex, `${label}.currentStepIndex`);
   assertUint8Array(stepSequenceCbor, `${label}.stepSequenceCbor`);
   assertUint8Array(createdTurnNodesCbor, `${label}.createdTurnNodesCbor`);
+
+  if (objectValue.pendingSignalsCbor !== undefined) {
+    assertUint8Array(
+      objectValue.pendingSignalsCbor,
+      `${label}.pendingSignalsCbor`
+    );
+  }
+
+  if (objectValue.lastStepAnnotationsCbor !== undefined) {
+    assertUint8Array(
+      objectValue.lastStepAnnotationsCbor,
+      `${label}.lastStepAnnotationsCbor`
+    );
+  }
   const stepSequence = assertDecodedKernelRecord(
     stepSequenceCbor,
     assertStepDeclarationArray,

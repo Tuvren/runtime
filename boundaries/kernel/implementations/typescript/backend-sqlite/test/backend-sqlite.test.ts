@@ -429,7 +429,7 @@ registerBackendRecoverySuite({
 });
 
 describe("@tuvren/backend-sqlite", () => {
-  test("enables WAL mode and applies the baseline migration once", async () => {
+  test("enables WAL mode and applies package migrations once", async () => {
     const databasePath = createTempDatabasePath();
     const backend = createSqliteBackend({
       databasePath,
@@ -456,6 +456,7 @@ describe("@tuvren/backend-sqlite", () => {
     deepStrictEqual(migrationRows, [
       { name: "0001_initial_schema.sql" },
       { name: "0002_targeted_validation_indexes.sql" },
+      { name: "0003_pending_signals_and_annotations.sql" },
     ]);
     deepStrictEqual(objectsTable, { name: "objects" });
 
@@ -469,6 +470,7 @@ describe("@tuvren/backend-sqlite", () => {
     deepStrictEqual(reappliedRows, [
       { name: "0001_initial_schema.sql" },
       { name: "0002_targeted_validation_indexes.sql" },
+      { name: "0003_pending_signals_and_annotations.sql" },
     ]);
   });
 
@@ -550,6 +552,7 @@ describe("@tuvren/backend-sqlite", () => {
     deepStrictEqual(migrationRows, [
       { name: "0001_initial_schema.sql" },
       { name: "0002_targeted_validation_indexes.sql" },
+      { name: "0003_pending_signals_and_annotations.sql" },
     ]);
     deepStrictEqual(objectsTable, { name: "objects" });
   });
@@ -689,6 +692,7 @@ describe("@tuvren/backend-sqlite", () => {
       { name: "0001_initial_schema.sql" },
       { name: "0002_targeted_validation_indexes.sql" },
       { name: "0003_add_objects_extra.sql" },
+      { name: "0003_pending_signals_and_annotations.sql" },
     ]);
   });
 

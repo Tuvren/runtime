@@ -67,6 +67,8 @@ const SQLITE_BUSY_TIMEOUT_MS = 5000;
 const INITIAL_SCHEMA_MIGRATION_NAME = "0001_initial_schema.sql";
 const TARGETED_VALIDATION_MIGRATION_NAME =
   "0002_targeted_validation_indexes.sql";
+const PENDING_SIGNALS_AND_ANNOTATIONS_MIGRATION_NAME =
+  "0003_pending_signals_and_annotations.sql";
 const INITIAL_SCHEMA_REQUIRED_TABLES = [
   "objects",
   "schemas",
@@ -270,6 +272,18 @@ const INITIAL_SCHEMA_TABLE_DEFINITIONS = {
         notNull: true,
         primaryKeyOrder: 0,
         type: "INTEGER",
+      },
+      {
+        name: "pending_signals_cbor",
+        notNull: false,
+        primaryKeyOrder: 0,
+        type: "BLOB",
+      },
+      {
+        name: "last_step_annotations_cbor",
+        notNull: false,
+        primaryKeyOrder: 0,
+        type: "BLOB",
       },
     ],
     foreignKeys: [
@@ -591,6 +605,22 @@ const INITIAL_SCHEMA_TABLE_DEFINITIONS = {
   (typeof INITIAL_SCHEMA_REQUIRED_TABLES)[number],
   ExpectedSqliteTableSchema
 >;
+const PRE_PENDING_RUN_COLUMN_NAMES = new Set([
+  "last_step_annotations_cbor",
+  "pending_signals_cbor",
+]);
+const PRE_PENDING_SIGNALS_SCHEMA_TABLE_DEFINITIONS: Record<
+  (typeof INITIAL_SCHEMA_REQUIRED_TABLES)[number],
+  ExpectedSqliteTableSchema
+> = {
+  ...INITIAL_SCHEMA_TABLE_DEFINITIONS,
+  runs: {
+    ...INITIAL_SCHEMA_TABLE_DEFINITIONS.runs,
+    columns: INITIAL_SCHEMA_TABLE_DEFINITIONS.runs.columns.filter(
+      (column) => !PRE_PENDING_RUN_COLUMN_NAMES.has(column.name)
+    ),
+  },
+};
 const INITIAL_SCHEMA_INDEX_DEFINITIONS = {
   idx_branches_head_turn_node_hash: {
     columns: ["head_turn_node_hash"],
@@ -886,6 +916,8 @@ interface SqliteRunRow {
   created_at_ms: number;
   created_turn_nodes_cbor: Uint8Array;
   current_step_index: number;
+  last_step_annotations_cbor: Uint8Array | null;
+  pending_signals_cbor: Uint8Array | null;
   run_id: string;
   schema_id: string;
   start_turn_node_hash: string;
@@ -1363,13 +1395,17 @@ function createRepositories(
               step_sequence_cbor,
               created_turn_nodes_cbor,
               created_at_ms,
-              updated_at_ms
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+              updated_at_ms,
+              pending_signals_cbor,
+              last_step_annotations_cbor
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(run_id) DO UPDATE SET
               status = excluded.status,
               current_step_index = excluded.current_step_index,
               created_turn_nodes_cbor = excluded.created_turn_nodes_cbor,
-              updated_at_ms = excluded.updated_at_ms
+              updated_at_ms = excluded.updated_at_ms,
+              pending_signals_cbor = excluded.pending_signals_cbor,
+              last_step_annotations_cbor = excluded.last_step_annotations_cbor
           `
         ).run(
           record.runId,
@@ -1382,7 +1418,13 @@ function createRepositories(
           bufferFromBytes(record.stepSequenceCbor),
           bufferFromBytes(record.createdTurnNodesCbor),
           record.createdAtMs,
-          record.updatedAtMs
+          record.updatedAtMs,
+          record.pendingSignalsCbor === undefined
+            ? null
+            : bufferFromBytes(record.pendingSignalsCbor),
+          record.lastStepAnnotationsCbor === undefined
+            ? null
+            : bufferFromBytes(record.lastStepAnnotationsCbor)
         );
         writeTracker.recordRunSet(existingRun, record);
 
@@ -2060,14 +2102,18 @@ function validateMigrationState(db: Database.Database): void {
     validateTargetedValidationSchemaPresence(db);
   }
 
+  if (appliedMigrations.has(PENDING_SIGNALS_AND_ANNOTATIONS_MIGRATION_NAME)) {
+    validatePendingSignalsAndAnnotationsSchemaPresence(db);
+  }
+
   const latestAppliedMigrationName = appliedMigrationNames.at(-1);
   if (latestAppliedMigrationName === INITIAL_SCHEMA_MIGRATION_NAME) {
-    validateBaselineSchemaShape(db);
+    validatePrePendingSignalsSchemaShape(db);
     return;
   }
 
   if (latestAppliedMigrationName === TARGETED_VALIDATION_MIGRATION_NAME) {
-    validateBaselineSchemaShape(db);
+    validatePrePendingSignalsSchemaShape(db);
     validateTargetedValidationSchemaShape(db);
   }
 }
@@ -2148,11 +2194,57 @@ function validateTargetedValidationSchemaPresence(db: Database.Database): void {
   }
 }
 
-function validateBaselineSchemaShape(db: Database.Database): void {
+function validatePendingSignalsAndAnnotationsSchemaPresence(
+  db: Database.Database
+): void {
+  const tableInfo = db
+    .prepare("PRAGMA table_info(runs)")
+    .all() as SqliteTableInfoPragmaRow[];
+  const columns = new Map(tableInfo.map((column) => [column.name, column]));
+
+  for (const columnName of PRE_PENDING_RUN_COLUMN_NAMES) {
+    const column = columns.get(columnName);
+
+    if (column === undefined) {
+      throw persistenceError(
+        "sqlite backend found an applied migration without its pending signal schema columns",
+        "sqlite_backend_applied_migration_schema_missing",
+        {
+          columnName,
+          migrationName: PENDING_SIGNALS_AND_ANNOTATIONS_MIGRATION_NAME,
+          tableName: "runs",
+        }
+      );
+    }
+
+    if (column.type.toUpperCase() !== "BLOB" || column.notnull !== 0) {
+      throw persistenceError(
+        "sqlite backend found an applied migration column whose pending signal contract does not match the package schema",
+        "sqlite_backend_applied_migration_schema_mismatch",
+        {
+          actualColumn: {
+            name: column.name,
+            notNull: column.notnull === 1,
+            type: column.type.toUpperCase(),
+          },
+          expectedColumn: {
+            name: columnName,
+            notNull: false,
+            type: "BLOB",
+          },
+          migrationName: PENDING_SIGNALS_AND_ANNOTATIONS_MIGRATION_NAME,
+          tableName: "runs",
+        }
+      );
+    }
+  }
+}
+
+function validatePrePendingSignalsSchemaShape(db: Database.Database): void {
   validateSqliteSchemaShape(
     db,
     INITIAL_SCHEMA_MIGRATION_NAME,
-    INITIAL_SCHEMA_TABLE_DEFINITIONS,
+    PRE_PENDING_SIGNALS_SCHEMA_TABLE_DEFINITIONS,
     INITIAL_SCHEMA_INDEX_DEFINITIONS
   );
 }
@@ -4231,6 +4323,20 @@ function decodeRunRow(row: SqliteRunRow): StoredRun {
     stepSequenceCbor: cloneEncodedBytes(toUint8Array(row.step_sequence_cbor)),
     turnId: row.turn_id,
     updatedAtMs: row.updated_at_ms,
+    ...(row.pending_signals_cbor === null
+      ? {}
+      : {
+          pendingSignalsCbor: cloneEncodedBytes(
+            toUint8Array(row.pending_signals_cbor)
+          ),
+        }),
+    ...(row.last_step_annotations_cbor === null
+      ? {}
+      : {
+          lastStepAnnotationsCbor: cloneEncodedBytes(
+            toUint8Array(row.last_step_annotations_cbor)
+          ),
+        }),
   };
   assertStoredRun(record, "stored run row");
   return record;

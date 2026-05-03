@@ -299,6 +299,8 @@ export interface StoredRun {
   createdAtMs: EpochMs;
   createdTurnNodesCbor: Uint8Array;
   currentStepIndex: number;
+  lastStepAnnotationsCbor?: Uint8Array;
+  pendingSignalsCbor?: Uint8Array;
   runId: string;
   schemaId: string;
   startTurnNodeHash: HashString;

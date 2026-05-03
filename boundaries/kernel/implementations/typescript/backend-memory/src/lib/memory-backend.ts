@@ -2610,6 +2610,14 @@ function cloneStoredRun(record: StoredRun): StoredRun {
     ...record,
     createdTurnNodesCbor: cloneBytes(record.createdTurnNodesCbor),
     stepSequenceCbor: cloneBytes(record.stepSequenceCbor),
+    ...(record.pendingSignalsCbor === undefined
+      ? {}
+      : { pendingSignalsCbor: cloneBytes(record.pendingSignalsCbor) }),
+    ...(record.lastStepAnnotationsCbor === undefined
+      ? {}
+      : {
+          lastStepAnnotationsCbor: cloneBytes(record.lastStepAnnotationsCbor),
+        }),
   };
 }
 
