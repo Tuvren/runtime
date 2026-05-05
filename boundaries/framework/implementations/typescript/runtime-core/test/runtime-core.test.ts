@@ -271,11 +271,15 @@ function createFakeRunLivenessKernelHarness(
 
           const leasedRun = leasedRuns.get(runId);
 
-          if (leasedRun !== undefined) {
-            leasedRun.fencingToken = `token-renewed-${renewLeaseCalls}`;
-            leasedRun.leaseExpiresAtMs = nextLeaseExpiresAtMs;
-            leasedRuns.set(runId, leasedRun);
+          if (leasedRun === undefined) {
+            throw new TuvrenRuntimeError(`run "${runId}" is not leased`, {
+              code: "kernel_runtime_run_not_leased",
+            });
           }
+
+          leasedRun.fencingToken = `token-renewed-${renewLeaseCalls}`;
+          leasedRun.leaseExpiresAtMs = nextLeaseExpiresAtMs;
+          leasedRuns.set(runId, leasedRun);
 
           return {
             fencingToken: `token-renewed-${renewLeaseCalls}`,
@@ -876,6 +880,168 @@ describe("framework-runtime-core", () => {
         "late success"
       )
     ).toBe(false);
+  });
+
+  test("drops driver output after another owner preempts and clears the lease", async () => {
+    const harness = createFakeKernelHarness();
+    const livenessHarness = createFakeRunLivenessKernelHarness(harness);
+    const driver = {
+      async execute(context) {
+        await waitForAbort(context.signal);
+        await delay(20);
+        return {
+          messages: [assistantText("late after preemption")],
+          resolution: {
+            reason: "done",
+            type: "end_turn",
+          },
+        };
+      },
+      id: "fake",
+      async resume() {
+        throw new Error("resume was not expected");
+      },
+    } satisfies KrakenDriver;
+    const runtime = createTuvrenRuntimeCore({
+      defaultDriverId: "fake",
+      driverRegistry: createDriverRegistry([driver]),
+      kernel: livenessHarness.kernel,
+      runLiveness: {
+        executionOwnerId: "worker-1",
+        leaseDurationMs: 50,
+      },
+    });
+    const thread = await runtime.createThread({});
+    const handle = runtime.executeTurn({
+      branchId: thread.branchId,
+      config: { name: "primary" },
+      signal: textSignal("Be preempted"),
+      threadId: thread.threadId,
+    });
+    const capture = startEventCapture(handle.events());
+    await waitForAsync(async () => {
+      return (await harness.readBranchRuns(thread.branchId)).some(
+        (run) => run.status === "running"
+      );
+    });
+    const activeRunId = (await harness.readBranchRuns(thread.branchId)).find(
+      (run) => run.status === "running"
+    )?.runId;
+
+    if (activeRunId === undefined) {
+      throw new Error("expected an active run to preempt");
+    }
+
+    await livenessHarness.kernel.runLiveness.preemptExpired(
+      activeRunId,
+      "worker-2",
+      10,
+      "stale_running_recovery"
+    );
+    await capture.done;
+
+    expect(handle.status().phase).toBe("failed");
+    expect(
+      hasAssistantTextMessage(
+        await harness.readBranchMessages(thread.branchId),
+        "late after preemption"
+      )
+    ).toBe(false);
+  });
+
+  test("recovers a stale handoff_context run under the persisted target agent", async () => {
+    const harness = createFakeKernelHarness();
+    const livenessHarness = createFakeRunLivenessKernelHarness(harness);
+    const driver = {
+      async execute() {
+        return {
+          messages: [assistantText("Recovered handoff continued.")],
+          resolution: {
+            reason: "done",
+            type: "end_turn",
+          },
+        };
+      },
+      id: "fake",
+      async resume() {
+        throw new Error("resume was not expected");
+      },
+    } satisfies KrakenDriver;
+    const runtime = createTuvrenRuntimeCore({
+      defaultDriverId: "fake",
+      driverRegistry: createDriverRegistry([driver]),
+      kernel: livenessHarness.kernel,
+      resolveAgentConfig(agentName) {
+        if (agentName === "reviewer") {
+          return { name: "reviewer" };
+        }
+
+        if (agentName === "primary") {
+          return { name: "primary" };
+        }
+
+        return undefined;
+      },
+      runLiveness: {
+        executionOwnerId: "worker-1",
+        leaseDurationMs: 50,
+      },
+    });
+    const thread = await runtime.createThread({});
+    const staleTurn = await livenessHarness.kernel.turn.create(
+      "turn_stale_handoff_recovery",
+      thread.threadId,
+      thread.branchId,
+      null,
+      thread.rootTurnNodeHash
+    );
+    await livenessHarness.kernel.runLiveness.createLeasedRun({
+      branchId: thread.branchId,
+      executionOwnerId: "worker-stale",
+      leaseExpiresAtMs: 1,
+      runId: "run_stale_handoff_recovery",
+      schemaId: DEFAULT_AGENT_SCHEMA.schemaId,
+      startTurnNodeHash: thread.rootTurnNodeHash,
+      steps: [{ deterministic: false, id: "handoff_context", sideEffects: false }],
+      turnId: staleTurn.turnId,
+    });
+    await livenessHarness.kernel.staging.stage(
+      "run_stale_handoff_recovery",
+      encodeDeterministicKernelRecord({
+        parts: [
+          {
+            text: "Continue the same handoff",
+            type: "text",
+          },
+        ],
+        role: "user",
+      }),
+      "stale_handoff_user_message",
+      "message",
+      "completed"
+    );
+    await livenessHarness.kernel.staging.stage(
+      "run_stale_handoff_recovery",
+      encodeDeterministicKernelRecord({
+        activeAgent: "reviewer",
+        state: "running",
+      }),
+      "stale_handoff_runtime_status",
+      "runtime_status",
+      "completed"
+    );
+
+    const handle = runtime.executeTurn({
+      branchId: thread.branchId,
+      config: { name: "primary" },
+      signal: textSignal("Continue the same handoff"),
+      threadId: thread.threadId,
+    });
+
+    await collectEvents(handle.events());
+
+    expect(handle.status().phase).toBe("completed");
+    expect(handle.status().activeAgent).toBe("reviewer");
   });
 
   test("tool registries snapshot tool definitions instead of exposing live references", () => {

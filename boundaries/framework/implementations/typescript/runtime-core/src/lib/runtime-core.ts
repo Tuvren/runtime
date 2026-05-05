@@ -271,6 +271,7 @@ interface HelperBundle {
 }
 
 interface ExpiredExecutionRecovery {
+  activeAgentName?: string;
   mode?: "reuse_turn" | "skip_fresh_prelude";
   preempted: boolean;
   turnId?: string;
@@ -524,7 +525,7 @@ class RuntimeCore implements TuvrenRuntime {
         branchHeadHash,
         recoveredExecution?.turnId !== undefined
       );
-      const loopState = this.createExecutionLoopState(handle);
+      const loopState = this.createExecutionLoopState(handle, recoveredExecution);
 
       const resumedStart = await this.prepareResumedExecutionStartPrelude(
         handle,
@@ -656,18 +657,34 @@ class RuntimeCore implements TuvrenRuntime {
     );
   }
 
-  private createExecutionLoopState(handle: RuntimeExecutionHandle): LoopState {
+  private createExecutionLoopState(
+    handle: RuntimeExecutionHandle,
+    recoveredExecution?: ExpiredExecutionRecovery
+  ): LoopState {
     const resumedPauseContext = handle.resumedFrom?.pauseContext;
+    const recoveredActiveConfig =
+      recoveredExecution?.activeAgentName === undefined
+        ? undefined
+        : this.options.resolveAgentConfig?.(recoveredExecution.activeAgentName) ??
+          (recoveredExecution.activeAgentName === handle.request.config.name
+            ? handle.request.config
+            : {
+                name: recoveredExecution.activeAgentName,
+              });
+    const initialActiveConfig =
+      resumedPauseContext?.activeConfig ??
+      recoveredActiveConfig ??
+      handle.request.config;
 
     return {
-      activeConfig: resumedPauseContext?.activeConfig ?? handle.request.config,
+      activeConfig: initialActiveConfig,
       activeDriverId:
         resumedPauseContext?.activeDriverId ??
         handle.request.driverId ??
         this.options.defaultDriverId,
       activeToolRegistry:
         resumedPauseContext?.activeToolRegistry ??
-        createActiveToolRegistry(handle.request.tools, handle.request.config),
+        createActiveToolRegistry(handle.request.tools, initialActiveConfig),
       carriedStateUpdates: [
         ...(resumedPauseContext?.carriedStateUpdates ?? []),
       ],
@@ -3393,6 +3410,30 @@ class RuntimeCore implements TuvrenRuntime {
     };
   }
 
+  private async readRecoveredActiveAgentName(
+    turnTreeHash: HashString
+  ): Promise<string | undefined> {
+    const runtimeStatusHash = toOptionalHash(
+      await this.options.kernel.tree.resolve(turnTreeHash, "runtime.status")
+    );
+
+    if (runtimeStatusHash === null) {
+      return undefined;
+    }
+
+    const payload = await this.options.kernel.store.get(runtimeStatusHash);
+
+    if (payload === null) {
+      return undefined;
+    }
+
+    const runtimeStatus = decodeDeterministicKernelRecord(payload);
+
+    return isRecord(runtimeStatus) && typeof runtimeStatus.activeAgent === "string"
+      ? runtimeStatus.activeAgent
+      : undefined;
+  }
+
   private async readManifest(hash: HashString): Promise<ContextManifest> {
     const payload = await this.options.kernel.store.get(hash);
 
@@ -3832,6 +3873,9 @@ class RuntimeCore implements TuvrenRuntime {
     }
 
     return {
+      activeAgentName: await this.readRecoveredActiveAgentName(
+        recoveredHeadState.turnNode.turnTreeHash
+      ),
       mode: classifyRecoveredExecutionMode(recoveryState),
       preempted: true,
       turnId: expiredRun.turnId,
@@ -6412,6 +6456,7 @@ function isRunLeaseFenceError(error: unknown): boolean {
 
   return (
     error.code === "kernel_runtime_run_lease_expired" ||
+    error.code === "kernel_runtime_run_not_leased" ||
     error.code === "kernel_runtime_run_lease_owner_mismatch" ||
     error.code === "kernel_runtime_run_lease_token_mismatch"
   );
