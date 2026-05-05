@@ -15,11 +15,11 @@
  */
 
 import { spawn } from "node:child_process";
-import { mkdtemp, rm } from "node:fs/promises";
+import { randomUUID } from "node:crypto";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { createMemoryBackend } from "@tuvren/backend-memory";
 import {
   assertRecoveryState,
   assertStagedResult,
@@ -30,6 +30,7 @@ import {
   hashOpaqueObjectBytes,
   hashTurnNodeIdentity,
   type RecoveryState,
+  type RuntimeBackend,
   type StagedResult,
   type TurnTreeChangeSet,
   type TurnTreeSchema,
@@ -43,18 +44,12 @@ import type {
 import { createAdapterErrorEnvelope } from "../../../../../../tools/conformance/adapter-protocol/index.js";
 import { serveStdioAdapter } from "../../../../../../tools/conformance/adapter-protocol/stdio-host.js";
 
-declare const Bun: {
-  file(path: string | URL): {
-    json(): Promise<unknown>;
-  };
-};
-
 const CANONICAL_SCHEMA_URL = new URL(
   "../../../../conformance/fixtures/canonical-turn-tree-schema.json",
   import.meta.url
 );
 const SQLITE_RESTART_SCENARIO_URL = new URL(
-  "./sqlite-restart-recovery-scenario.ts",
+  "./sqlite-restart-recovery-scenario.mjs",
   import.meta.url
 );
 
@@ -76,7 +71,6 @@ interface LogicalFixture {
 
 const ADAPTER_CONFIG = readAdapterConfig(process.argv.slice(2));
 let canonicalSchemaPromise: Promise<TurnTreeSchema> | undefined;
-let sqliteRestartBuildPromise: Promise<void> | undefined;
 
 class TypeScriptKernelAdapter {
   initialize(
@@ -475,7 +469,7 @@ async function runCrossThreadLineage(): Promise<Record<string, unknown>> {
 async function runLeaseRenewal(): Promise<Record<string, unknown>> {
   const schema = await loadCanonicalSchema();
   const kernel = createRuntimeKernel({
-    backend: createConfiguredBackend(),
+    backend: await createConfiguredBackend(),
     now: () => 10,
   });
   await kernel.schema.register(schema);
@@ -546,7 +540,7 @@ async function runLeaseRenewal(): Promise<Record<string, unknown>> {
 
 async function runExpiredListing(): Promise<Record<string, unknown>> {
   const schema = await loadCanonicalSchema();
-  const backend = createConfiguredBackend();
+  const backend = await createConfiguredBackend();
   const kernel = createRuntimeKernel({ backend });
   await kernel.schema.register(schema);
   const expiredThread = await kernel.thread.create(
@@ -643,7 +637,7 @@ async function runExpiredListing(): Promise<Record<string, unknown>> {
 
 async function runStalePreemption(): Promise<Record<string, unknown>> {
   const schema = await loadCanonicalSchema();
-  const backend = createConfiguredBackend();
+  const backend = await createConfiguredBackend();
   const storageKernel = createRuntimeKernel({ backend });
   await storageKernel.schema.register(schema);
   const thread = await storageKernel.thread.create(
@@ -716,7 +710,6 @@ async function runStalePreemption(): Promise<Record<string, unknown>> {
 }
 
 async function runRestartRecovery(): Promise<Record<string, unknown>> {
-  await ensureSqliteRestartRuntimeBuilt();
   const tempDirectory = await mkdtemp(join(tmpdir(), "tuvren-kernel-restart-"));
   const databasePath = join(tempDirectory, "kernel.sqlite");
   const metadataPath = join(tempDirectory, "restart-metadata.json");
@@ -740,18 +733,33 @@ async function runRestartRecovery(): Promise<Record<string, unknown>> {
 }
 
 async function createConformanceKernel(schema: TurnTreeSchema) {
-  // The Bun-hosted adapter keeps backend-agnostic semantics on the shared
-  // in-memory kernel path. Durable SQLite behavior is proven separately through
-  // the restart-recovery child process, because better-sqlite3 is not runnable
-  // inside Bun in this environment.
   const kernel = createRuntimeKernel({
-    backend: createConfiguredBackend(),
+    backend: await createConfiguredBackend(),
   });
   await kernel.schema.register(schema);
   return kernel;
 }
 
-function createConfiguredBackend() {
+async function createConfiguredBackend(): Promise<RuntimeBackend> {
+  if (ADAPTER_CONFIG.backend === "sqlite") {
+    const sqliteBackendModuleUrl = new URL(
+      "../../backend-sqlite/dist/index.js",
+      import.meta.url
+    );
+    const { createSqliteBackend } = await import(sqliteBackendModuleUrl.href);
+
+    const databasePath = join(
+      tmpdir(),
+      `${ADAPTER_CONFIG.adapterId}-${process.pid}-${randomUUID()}.sqlite`
+    );
+    return createSqliteBackend({ databasePath });
+  }
+
+  const memoryBackendModuleUrl = new URL(
+    "../../backend-memory/dist/index.js",
+    import.meta.url
+  );
+  const { createMemoryBackend } = await import(memoryBackendModuleUrl.href);
   return createMemoryBackend();
 }
 
@@ -803,46 +811,10 @@ async function runRestartRecoveryPhase(
   return readRecord(value, `restart recovery ${phase} output`);
 }
 
-async function ensureSqliteRestartRuntimeBuilt(): Promise<void> {
-  sqliteRestartBuildPromise ??= (async () => {
-    await runBuildTarget("backend-sqlite:build");
-    await runBuildTarget("kernel-runtime:build");
-  })();
-
-  return await sqliteRestartBuildPromise;
-}
-
-async function runBuildTarget(target: string): Promise<void> {
-  const result = await new Promise<{
-    code: number | null;
-    signal: NodeJS.Signals | null;
-    stderr: string;
-  }>((resolve, reject) => {
-    const child = spawn("bun", ["run", "nx", "run", target, "--skipNxCache"], {
-      stdio: ["ignore", "ignore", "pipe"],
-    });
-    let stderr = "";
-
-    child.stderr.on("data", (chunk: Buffer) => {
-      stderr += chunk.toString("utf8");
-    });
-    child.on("error", reject);
-    child.on("close", (code, signal) => {
-      resolve({ code, signal, stderr });
-    });
-  });
-
-  if (result.code !== 0) {
-    throw new Error(
-      `failed to build ${target} for sqlite restart recovery: code=${String(result.code)} signal=${String(result.signal)} stderr=${result.stderr || "<empty>"}`
-    );
-  }
-}
-
 async function loadCanonicalSchema(): Promise<TurnTreeSchema> {
-  canonicalSchemaPromise ??= Bun.file(CANONICAL_SCHEMA_URL)
-    .json()
-    .then((value: unknown) => {
+  canonicalSchemaPromise ??= readFile(CANONICAL_SCHEMA_URL, "utf8")
+    .then((contents) => JSON.parse(contents) as unknown)
+    .then((value) => {
       assertTurnTreeSchema(value, "canonical kernel conformance schema");
       return value;
     });

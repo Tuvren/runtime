@@ -96,6 +96,11 @@ async function main(): Promise<void> {
   const adapterManifest = await readAdapterManifest(options.adapter);
   const plans = await readPlans(adapterManifest, options);
   const selected = selectChecks(plans, adapterManifest, options);
+  await validateHandshakeForSelectedPlans(
+    adapterManifest,
+    plans,
+    selected.applicable.length === 0
+  );
 
   const scheduled = applyShard(selected.applicable, options);
   const results = await runScheduledChecks(
@@ -145,6 +150,54 @@ async function main(): Promise<void> {
 
   if (evidence.status === "fail" && !options.allowFailingEvidence) {
     process.exitCode = 1;
+  }
+}
+
+async function validateHandshakeForSelectedPlans(
+  manifest: AdapterManifest,
+  plans: readonly CompiledConformancePlan[],
+  required: boolean
+): Promise<void> {
+  if (!required) {
+    return;
+  }
+
+  const uniquePackets = new Map<
+    string,
+    { packetId: string; planVersion: string }
+  >();
+
+  for (const plan of plans) {
+    const key = `${plan.plan.packetId}@@${plan.plan.planVersion}`;
+
+    if (!uniquePackets.has(key)) {
+      uniquePackets.set(key, {
+        packetId: plan.plan.packetId,
+        planVersion: plan.plan.planVersion,
+      });
+    }
+  }
+
+  const client = new JsonRpcAdapterClient({
+    command: manifest.command,
+    cwd: REPO_ROOT,
+  });
+
+  try {
+    for (const packet of uniquePackets.values()) {
+      const capabilities = await client.initialize(
+        packet.packetId,
+        packet.planVersion
+      );
+      validateAdapterHandshake(
+        capabilities,
+        manifest,
+        packet.packetId,
+        packet.planVersion
+      );
+    }
+  } finally {
+    await client.shutdown();
   }
 }
 

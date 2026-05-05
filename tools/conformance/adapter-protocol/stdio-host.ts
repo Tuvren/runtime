@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+import { createInterface } from "node:readline";
 import type {
   AdapterCapabilities,
   AdapterControls,
@@ -54,7 +55,7 @@ interface JsonRpcRequest {
 export async function serveStdioAdapter(
   adapter: StdioConformanceAdapter
 ): Promise<void> {
-  for await (const line of console) {
+  for await (const line of readStdioLines()) {
     // Bun's console iterator can surface a final empty line for piped EOF; it is
     // transport noise, not a JSON-RPC frame, so adapters must stay silent.
     if (line.trim().length === 0) {
@@ -63,6 +64,28 @@ export async function serveStdioAdapter(
 
     const response = await handleStdioAdapterLine(adapter, line);
     process.stdout.write(`${JSON.stringify(response)}\n`);
+  }
+}
+
+async function* readStdioLines(): AsyncIterable<string> {
+  if (isAsyncIterableConsole(console)) {
+    for await (const line of console) {
+      yield line;
+    }
+    return;
+  }
+
+  const reader = createInterface({
+    crlfDelay: Number.POSITIVE_INFINITY,
+    input: process.stdin,
+  });
+
+  try {
+    for await (const line of reader) {
+      yield line;
+    }
+  } finally {
+    reader.close();
   }
 }
 
@@ -238,4 +261,10 @@ function readString(value: unknown, label: string): string {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isAsyncIterableConsole(
+  value: Console
+): value is Console & AsyncIterable<string> {
+  return Symbol.asyncIterator in value;
 }

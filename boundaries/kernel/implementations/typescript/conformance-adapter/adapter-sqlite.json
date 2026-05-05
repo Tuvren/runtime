@@ -9,8 +9,8 @@
     "transport": "json-rpc-2.0-stdio"
   },
   "command": [
-    "bun",
-    "boundaries/kernel/implementations/typescript/conformance-adapter/src/host.ts",
+    "node",
+    "boundaries/kernel/implementations/typescript/conformance-adapter/dist/host.mjs",
     "--adapter-id",
     "typescript-kernel-sqlite",
     "--backend",
