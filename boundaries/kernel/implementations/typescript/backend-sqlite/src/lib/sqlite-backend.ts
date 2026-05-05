@@ -1386,7 +1386,7 @@ function createRepositories(
               annotation_cbor = excluded.annotation_cbor
           `
         ).run(
-          keyObserveAnnotation(record),
+          nextObserveAnnotationRecordKey(db, record),
           record.runId,
           record.annotationHash,
           record.turnNodeHash,
@@ -2841,16 +2841,6 @@ function loadState(db: Database.Database): BackendState {
     .all() as SqliteObserveAnnotationRow[]) {
     const record = decodeObserveAnnotationRow(row);
     const records = state.observeAnnotations.get(record.runId) ?? [];
-    const key = keyObserveAnnotation(record);
-
-    if (records.some((candidate) => keyObserveAnnotation(candidate) === key)) {
-      throw persistenceError(
-        "sqlite backend loaded duplicate observe annotation rows",
-        "sqlite_backend_duplicate_loaded_observe_annotation",
-        { key, runId: record.runId }
-      );
-    }
-
     records.push(record);
     state.observeAnnotations.set(record.runId, records);
   }
@@ -7147,14 +7137,44 @@ function cloneStoredTurn(record: StoredTurn): StoredTurn {
 }
 
 function keyObserveAnnotation(record: StoredObserveAnnotation): string {
-  // SQLite keeps a synthetic record key so durable annotation history can stay
-  // append-only even though the protocol shape does not expose a row id.
+  // SQLite derives a stable identity prefix, then appends an ordinal in
+  // `nextObserveAnnotationRecordKey` so identical annotations still append.
   return [
     record.runId,
     String(record.createdAtMs),
     record.annotationHash,
     record.turnNodeHash ?? "",
   ].join("\0");
+}
+
+function nextObserveAnnotationRecordKey(
+  db: Database.Database,
+  record: StoredObserveAnnotation
+): string {
+  const identityKey = keyObserveAnnotation(record);
+  const row = db
+    .prepare(
+      `
+        SELECT COUNT(*) AS count
+        FROM observe_annotations
+        WHERE run_id = ?
+          AND created_at_ms = ?
+          AND annotation_hash = ?
+          AND (
+            (turn_node_hash IS NULL AND ? IS NULL) OR
+            turn_node_hash = ?
+          )
+      `
+    )
+    .get(
+      record.runId,
+      record.createdAtMs,
+      record.annotationHash,
+      record.turnNodeHash,
+      record.turnNodeHash
+    ) as { count: number };
+
+  return `${identityKey}\0${row.count}`;
 }
 
 function cloneStoredTurnTreePath(

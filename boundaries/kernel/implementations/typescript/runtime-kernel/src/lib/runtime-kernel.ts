@@ -184,6 +184,9 @@ export function createRuntimeKernel(
                 storedRun.status === "paused") &&
               runTouchesSegment(storedRun, abandonedSegmentHashes)
             ) {
+              // Backward rollback must leave touched runs terminal and clean in
+              // one transaction, or backend invariants reject the rewind.
+              await tx.stagedResults.clearRun(storedRun.runId);
               await tx.runs.set({
                 ...storedRun,
                 status: "failed",

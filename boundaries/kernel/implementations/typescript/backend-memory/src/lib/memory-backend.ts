@@ -286,17 +286,9 @@ function createRepositories(
         }
 
         const records = state.observeAnnotations.get(record.runId) ?? [];
-        const key = keyObserveAnnotation(record);
-        const existingIndex = records.findIndex(
-          (candidate) => keyObserveAnnotation(candidate) === key
-        );
-
-        if (existingIndex === -1) {
-          records.push(cloneStoredObserveAnnotation(record));
-        } else {
-          records[existingIndex] = cloneStoredObserveAnnotation(record);
-        }
-
+        // Observe annotations are append-only evidence, so identical payloads
+        // must survive as distinct records instead of being deduplicated.
+        records.push(cloneStoredObserveAnnotation(record));
         state.observeAnnotations.set(record.runId, records);
         return Promise.resolve();
       },
@@ -2701,17 +2693,6 @@ function cloneStoredTurn(record: StoredTurn): StoredTurn {
   return { ...record };
 }
 
-function keyObserveAnnotation(record: StoredObserveAnnotation): string {
-  // Backends use a synthetic storage key so annotation history stays
-  // append-only without making the protocol grow a backend-specific row id.
-  return [
-    record.runId,
-    String(record.createdAtMs),
-    record.annotationHash,
-    record.turnNodeHash ?? "",
-  ].join("\0");
-}
-
 function cloneStoredTurnTreePath(
   record: StoredTurnTreePath
 ): StoredTurnTreePath {
@@ -2903,8 +2884,8 @@ function compareStoredObserveAnnotation(
   return compareByTimestampAndKey(
     left.createdAtMs,
     right.createdAtMs,
-    keyObserveAnnotation(left),
-    keyObserveAnnotation(right)
+    left.annotationHash,
+    right.annotationHash
   );
 }
 

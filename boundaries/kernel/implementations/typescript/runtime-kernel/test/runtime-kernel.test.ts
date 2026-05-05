@@ -361,6 +361,64 @@ describe("createRuntimeKernel", () => {
     expect(recovery.uncommittedStagedResults).toEqual([]);
   });
 
+  test("branch.setHead clears staged results before failing abandoned active runs", async () => {
+    const fixture = await createThreadFixture({
+      branchId: "branch_rollback_clears_staged",
+      threadId: "thread_rollback_clears_staged",
+    });
+    const turn = await fixture.kernel.turn.create(
+      "turn_rollback_clears_staged",
+      fixture.threadId,
+      fixture.branchId,
+      null,
+      fixture.rootTurnNodeHash
+    );
+    await fixture.kernel.run.create(
+      "run_rollback_clears_staged",
+      turn.turnId,
+      fixture.branchId,
+      fixture.schemaId,
+      fixture.rootTurnNodeHash,
+      [
+        { deterministic: false, id: "checkpoint", sideEffects: false },
+        { deterministic: true, id: "active", sideEffects: false },
+      ]
+    );
+
+    const checkpoint = await fixture.kernel.run.completeStep(
+      "run_rollback_clears_staged",
+      "checkpoint"
+    );
+
+    if (checkpoint.turnNodeHash === undefined) {
+      throw new Error("expected checkpoint turn node");
+    }
+
+    await fixture.kernel.staging.stage(
+      "run_rollback_clears_staged",
+      new Uint8Array([4, 5, 6]),
+      "task_rollback_clears_staged",
+      "message",
+      "completed"
+    );
+
+    const rollback = await fixture.kernel.branch.setHead(
+      fixture.branchId,
+      fixture.rootTurnNodeHash
+    );
+
+    expect(rollback.archiveBranch?.headTurnNodeHash).toBe(
+      checkpoint.turnNodeHash
+    );
+    expect(
+      await fixture.kernel.staging.current("run_rollback_clears_staged")
+    ).toEqual([]);
+    const storedRun = await fixture.backend.transact((tx) =>
+      tx.runs.get("run_rollback_clears_staged")
+    );
+    expect(storedRun?.status).toBe("failed");
+  });
+
   test("run.beginStep keeps pending signals durable until completion", async () => {
     const fixture = await createThreadFixture({
       branchId: "branch_pending_signal_durability",
@@ -462,6 +520,48 @@ describe("createRuntimeKernel", () => {
       "run_observe_annotations",
       "run_observe_annotations",
     ]);
+  });
+
+  test("run.completeStep preserves duplicate observe annotations", async () => {
+    const fixture = await createThreadFixture({
+      branchId: "branch_duplicate_observe_annotations",
+      now: () => 100,
+      threadId: "thread_duplicate_observe_annotations",
+    });
+    const turn = await fixture.kernel.turn.create(
+      "turn_duplicate_observe_annotations",
+      fixture.threadId,
+      fixture.branchId,
+      null,
+      fixture.rootTurnNodeHash
+    );
+    await fixture.kernel.run.create(
+      "run_duplicate_observe_annotations",
+      turn.turnId,
+      fixture.branchId,
+      fixture.schemaId,
+      fixture.rootTurnNodeHash,
+      [{ deterministic: true, id: "a", sideEffects: false }]
+    );
+
+    await fixture.kernel.run.completeStep(
+      "run_duplicate_observe_annotations",
+      "a",
+      undefined,
+      [
+        {
+          annotations: [{ note: "same" }, { note: "same" }],
+          signals: [],
+        },
+      ]
+    );
+
+    const records = await fixture.backend.transact((tx) =>
+      tx.observeAnnotations.listByRun("run_duplicate_observe_annotations")
+    );
+
+    expect(records).toHaveLength(2);
+    expect(records[0]?.annotationHash).toBe(records[1]?.annotationHash);
   });
 
   test("turn.create rejects stale same-branch parent turns in the kernel", async () => {
