@@ -1186,7 +1186,15 @@
           "status": "pass"
         },
         {
+          "assertionId": "kernel.run-liveness.expired_listing.3.evidenceField",
+          "status": "pass"
+        },
+        {
           "assertionId": "kernel.run-liveness.expired_listing.requiredEvidence.listing.expiredRunIds",
+          "status": "pass"
+        },
+        {
+          "assertionId": "kernel.run-liveness.expired_listing.requiredEvidence.listing.pausedRunListed",
           "status": "pass"
         },
         {
@@ -1254,11 +1262,27 @@
           "status": "pass"
         },
         {
+          "assertionId": "kernel.run-liveness.stale_preemption.5.evidenceField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "kernel.run-liveness.stale_preemption.requiredEvidence.preemption.branchHeadTurnNodeHash",
+          "status": "pass"
+        },
+        {
           "assertionId": "kernel.run-liveness.stale_preemption.requiredEvidence.preemption.leaseCleared",
           "status": "pass"
         },
         {
           "assertionId": "kernel.run-liveness.stale_preemption.requiredEvidence.preemption.preemptionReason",
+          "status": "pass"
+        },
+        {
+          "assertionId": "kernel.run-liveness.stale_preemption.requiredEvidence.preemption.recoveryHeadMatchesBranchHead",
+          "status": "pass"
+        },
+        {
+          "assertionId": "kernel.run-liveness.stale_preemption.requiredEvidence.preemption.recoveryLastTurnNodeHash",
           "status": "pass"
         },
         {

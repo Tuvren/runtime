@@ -45,9 +45,18 @@
           "kind": "evidenceField",
           "field": "$.listing.pausedRunStatus",
           "equals": "paused"
+        },
+        {
+          "kind": "evidenceField",
+          "field": "$.listing.pausedRunListed",
+          "equals": false
         }
       ],
-      "evidence": ["listing.expiredRunIds", "listing.pausedRunStatus"]
+      "evidence": [
+        "listing.expiredRunIds",
+        "listing.pausedRunStatus",
+        "listing.pausedRunListed"
+      ]
     },
     {
       "checkId": "kernel.run-liveness.stale_preemption",
@@ -72,11 +81,19 @@
           "kind": "evidenceField",
           "field": "$.preemption.leaseCleared",
           "equals": true
+        },
+        {
+          "kind": "evidenceField",
+          "field": "$.preemption.recoveryHeadMatchesBranchHead",
+          "equals": true
         }
       ],
       "evidence": [
+        "preemption.branchHeadTurnNodeHash",
         "preemption.runStatus",
         "preemption.preemptionReason",
+        "preemption.recoveryLastTurnNodeHash",
+        "preemption.recoveryHeadMatchesBranchHead",
         "preemption.uncommittedStagedResults",
         "preemption.leaseCleared"
       ]

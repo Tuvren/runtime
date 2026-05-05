@@ -427,7 +427,8 @@ async function runLeaseRenewal(): Promise<Record<string, unknown>> {
 
 async function runExpiredListing(): Promise<Record<string, unknown>> {
   const schema = await loadCanonicalSchema();
-  const kernel = createRuntimeKernel({ backend: createMemoryBackend() });
+  const backend = createMemoryBackend();
+  const kernel = createRuntimeKernel({ backend });
   await kernel.schema.register(schema);
   const expiredThread = await kernel.thread.create(
     "thread_liveness_listing_expired",
@@ -488,7 +489,9 @@ async function runExpiredListing(): Promise<Record<string, unknown>> {
   const pausedRun = await kernel.runLiveness.createLeasedRun({
     branchId: pausedThread.branchId,
     executionOwnerId: "owner-primary",
-    leaseExpiresAtMs: 50,
+    // This lease is already stale before the pause so the evidence proves that
+    // paused status, not remaining lease time, keeps it out of expired listings.
+    leaseExpiresAtMs: 5,
     runId: "run_paused",
     schemaId: schema.schemaId,
     startTurnNodeHash: pausedThread.rootTurnNodeHash,
@@ -497,14 +500,21 @@ async function runExpiredListing(): Promise<Record<string, unknown>> {
   });
   await kernel.run.complete(freshRun.runId, "failed");
   await kernel.run.complete(pausedRun.runId, "paused");
+  const expiredRuns = await kernel.runLiveness.listExpired(10);
+  const pausedStoredRun = await backend.transact(async (tx) => {
+    return await tx.runs.get(pausedRun.runId);
+  });
+
+  if (pausedStoredRun === null) {
+    throw new Error("expected paused stored run");
+  }
 
   return {
     evidence: {
       listing: {
-        expiredRunIds: (await kernel.runLiveness.listExpired(10)).map(
-          (run) => run.runId
-        ),
-        pausedRunStatus: "paused",
+        expiredRunIds: expiredRuns.map((run) => run.runId),
+        pausedRunListed: expiredRuns.some((run) => run.runId === pausedRun.runId),
+        pausedRunStatus: pausedStoredRun.status,
       },
     },
   };
@@ -560,15 +570,24 @@ async function runStalePreemption(): Promise<Record<string, unknown>> {
   if (storedRun === null) {
     throw new Error("expected preempted stored run");
   }
+  const updatedBranch = await storageKernel.branch.get(thread.branchId);
+
+  if (updatedBranch === null) {
+    throw new Error("expected preempted branch");
+  }
 
   return {
     evidence: {
       preemption: {
+        branchHeadTurnNodeHash: updatedBranch.headTurnNodeHash,
         leaseCleared:
           storedRun.executionOwnerId === undefined &&
           storedRun.fencingToken === undefined &&
           storedRun.leaseExpiresAtMs === undefined,
         preemptionReason: storedRun.preemptionReason ?? null,
+        recoveryHeadMatchesBranchHead:
+          recovery.lastTurnNodeHash === updatedBranch.headTurnNodeHash,
+        recoveryLastTurnNodeHash: recovery.lastTurnNodeHash,
         runStatus: storedRun.status,
         uncommittedStagedResults: recovery.uncommittedStagedResults.length,
       },
@@ -577,6 +596,8 @@ async function runStalePreemption(): Promise<Record<string, unknown>> {
 }
 
 async function createConformanceKernel(schema: TurnTreeSchema) {
+  // The shared kernel adapter proves semantic behavior over a minimal backend;
+  // backend-specific storage and migration rules stay covered by backend suites.
   const kernel = createRuntimeKernel({ backend: createMemoryBackend() });
   await kernel.schema.register(schema);
   return kernel;

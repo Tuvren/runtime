@@ -1344,6 +1344,31 @@ class RuntimeCore implements TuvrenRuntime {
         emittedDriverEvents
       )
     );
+    if (shouldDiscardDriverProgressAfterLeaseLoss(handle)) {
+      // Lease loss fences this execution owner immediately. Any driver output
+      // returned after the abort is stale work and must not be checkpointed.
+      const leaseLostResolution = createCancelledResolution(handle);
+
+      if (leaseLostResolution === undefined) {
+        throw new TuvrenRuntimeError(
+          "lease-loss aborts must surface a cancellation resolution",
+          { code: "missing_run_lease_loss_resolution" }
+        );
+      }
+
+      await this.failTrackedRunWithoutBranchAdvance(
+        handle,
+        iterationRunId,
+        headState.branchHeadHash
+      );
+      return {
+        kind: "outcome",
+        outcome: {
+          resolution: leaseLostResolution,
+        },
+      };
+    }
+
     let resolution = driverResult.resolution;
     const driverMessages = [...(driverResult.messages ?? [])];
     const cancellationResolution = createCancelledResolution(handle);
@@ -3646,37 +3671,122 @@ class RuntimeCore implements TuvrenRuntime {
     }>
   ): Promise<void> {
     this.stopRunLeaseLoop(handle);
+    const leasedRun = await this.createTrackedRunWithStaleRecovery({
+      branchId,
+      runId,
+      schemaId,
+      startTurnNodeHash,
+      steps,
+      turnId,
+    });
+    handle.setActiveRunId(runId);
+    if (leasedRun !== undefined) {
+      this.startRunLeaseLoop(handle, leasedRun);
+    }
+  }
+
+  private async createTrackedRunWithStaleRecovery(input: {
+    branchId: string;
+    runId: string;
+    schemaId: string;
+    startTurnNodeHash: HashString;
+    steps: Array<{
+      deterministic: boolean;
+      id: string;
+      sideEffects: boolean;
+    }>;
+    turnId: string;
+  }): Promise<RunRecord | undefined> {
+    try {
+      return await this.createTrackedRunOnce(input);
+    } catch (error: unknown) {
+      const recovered = await this.tryPreemptExpiredBranchRun(
+        input.branchId,
+        error
+      );
+
+      if (!recovered) {
+        throw error;
+      }
+    }
+
+    // We retry only once after fencing the matching expired owner so unrelated
+    // active-run failures still surface instead of being masked by a loop.
+    return await this.createTrackedRunOnce(input);
+  }
+
+  private async createTrackedRunOnce(input: {
+    branchId: string;
+    runId: string;
+    schemaId: string;
+    startTurnNodeHash: HashString;
+    steps: Array<{
+      deterministic: boolean;
+      id: string;
+      sideEffects: boolean;
+    }>;
+    turnId: string;
+  }): Promise<RunRecord | undefined> {
     const livenessKernel = this.resolveRunLivenessKernel();
     const leasedRun =
       livenessKernel === undefined || this.options.runLiveness === undefined
         ? undefined
         : await livenessKernel.runLiveness.createLeasedRun({
-            branchId,
+            branchId: input.branchId,
             executionOwnerId: this.options.runLiveness.executionOwnerId,
             leaseExpiresAtMs:
               (this.now() + this.options.runLiveness.leaseDurationMs) as EpochMs,
-            runId,
-            schemaId,
-            startTurnNodeHash,
-            steps,
-            turnId,
+            runId: input.runId,
+            schemaId: input.schemaId,
+            startTurnNodeHash: input.startTurnNodeHash,
+            steps: input.steps,
+            turnId: input.turnId,
           });
 
     if (leasedRun === undefined) {
       await this.options.kernel.run.create(
-        runId,
-        turnId,
-        branchId,
-        schemaId,
-        startTurnNodeHash,
-        steps
+        input.runId,
+        input.turnId,
+        input.branchId,
+        input.schemaId,
+        input.startTurnNodeHash,
+        input.steps
       );
     }
 
-    handle.setActiveRunId(runId);
-    if (leasedRun !== undefined) {
-      this.startRunLeaseLoop(handle, leasedRun);
+    return leasedRun;
+  }
+
+  private async tryPreemptExpiredBranchRun(
+    branchId: string,
+    error: unknown
+  ): Promise<boolean> {
+    const livenessKernel = this.resolveRunLivenessKernel();
+    const livenessOptions = this.options.runLiveness;
+
+    if (
+      livenessKernel === undefined ||
+      livenessOptions === undefined ||
+      !isKernelActiveRunError(error)
+    ) {
+      return false;
     }
+
+    const expiredRun = (await livenessKernel.runLiveness.listExpired(this.now()))
+      .filter((candidate) => candidate.branchId === branchId)
+      .at(0);
+
+    if (expiredRun === undefined) {
+      return false;
+    }
+
+    await livenessKernel.runLiveness.preemptExpired(
+      expiredRun.runId,
+      livenessOptions.executionOwnerId,
+      this.now(),
+      "stale_running_recovery"
+    );
+    return true;
   }
 
   private async completeTrackedRun(
@@ -4806,6 +4916,38 @@ function createCancelledResolution(
     fatality: "hard",
     type: "fail",
   };
+}
+
+function shouldDiscardDriverProgressAfterLeaseLoss(
+  handle: RuntimeExecutionHandle
+): boolean {
+  const resolution = createCancelledResolution(handle);
+
+  if (resolution === undefined) {
+    return false;
+  }
+
+  if (resolution.type !== "fail") {
+    return false;
+  }
+
+  return isRunLeaseLostError(resolution.error);
+}
+
+function isRunLeaseLostError(error: unknown): boolean {
+  if (!isRecord(error)) {
+    return false;
+  }
+
+  return error.code === "runtime_execution_lease_lost";
+}
+
+function isKernelActiveRunError(error: unknown): boolean {
+  if (!isRecord(error)) {
+    return false;
+  }
+
+  return error.code === "kernel_runtime_branch_already_active";
 }
 
 function shouldSuppressBufferedDriverEvents(

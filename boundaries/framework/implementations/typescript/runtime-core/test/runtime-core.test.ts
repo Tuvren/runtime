@@ -16,14 +16,17 @@
 
 // biome-ignore-all lint/suspicious/useAwait: Test drivers intentionally match the async framework driver contract.
 import { describe, expect, test } from "bun:test";
+import { TuvrenRuntimeError, type EpochMs } from "@tuvren/core-types";
 import type {
   DriverExecutionResult,
   RuntimeDriver as KrakenDriver,
   RuntimeDriverFactory as KrakenDriverFactory,
 } from "@tuvren/driver-api";
 import type {
+  RecoveryState,
   RuntimeKernel as KrakenKernel,
   RuntimeKernelRunLiveness,
+  RunRecord,
   TurnTreeSchema,
 } from "@tuvren/kernel-protocol";
 import type {
@@ -44,6 +47,7 @@ import {
   collectSystemPrompts,
   createDriverRegistry as createBaseDriverRegistry,
   createContextManifest,
+  DEFAULT_AGENT_SCHEMA,
   createLastOutputOnlyHandoffContextBuilder,
   createPreserveTraceHandoffContextBuilder,
   createToolRegistry,
@@ -54,7 +58,10 @@ import {
   runBeforeTurnHooks,
   updateContextManifest,
 } from "../src/index.ts";
-import { createFakeKernelHarness } from "./fake-kernel.ts";
+import {
+  createFakeKernelHarness,
+  type FakeKernelHarness,
+} from "./fake-kernel.ts";
 import {
   assistantStructured,
   assistantText,
@@ -84,6 +91,174 @@ import {
   waitForAbort,
   waitForAsync,
 } from "./runtime-core-test-helpers.ts";
+
+interface FakeLeasedRunRecord extends RunRecord {
+  executionOwnerId: string;
+  fencingToken: string;
+  leaseExpiresAtMs: EpochMs;
+}
+
+interface FakeRunLivenessKernelHarness {
+  getPreemptCalls(): number;
+  getRenewLeaseCalls(): number;
+  kernel: KrakenKernel & RuntimeKernelRunLiveness;
+  leasedRuns: Map<string, FakeLeasedRunRecord>;
+}
+
+function hasAssistantTextMessage(
+  messages: unknown[],
+  expectedText: string
+): boolean {
+  return messages.some((message) => {
+    const record = toOptionalRecord(message);
+
+    if (record?.role !== "assistant" || !Array.isArray(record.parts)) {
+      return false;
+    }
+
+    return record.parts.some((part) => {
+      const partRecord = toOptionalRecord(part);
+      return (
+        partRecord?.type === "text" && partRecord.text === expectedText
+      );
+    });
+  });
+}
+
+function createFakeRunLivenessKernelHarness(
+  harness: FakeKernelHarness,
+  options?: {
+    onRenewLease?: (
+      runId: string,
+      executionOwnerId: string,
+      fencingToken: string,
+      nextLeaseExpiresAtMs: EpochMs
+    ) => Promise<{ fencingToken: string; leaseExpiresAtMs: EpochMs }>;
+  }
+): FakeRunLivenessKernelHarness {
+  let preemptCalls = 0;
+  let renewLeaseCalls = 0;
+  let tokenOrdinal = 0;
+  const leasedRuns = new Map<string, FakeLeasedRunRecord>();
+  const baseKernel = harness.kernel;
+
+  return {
+    getPreemptCalls() {
+      return preemptCalls;
+    },
+    getRenewLeaseCalls() {
+      return renewLeaseCalls;
+    },
+    kernel: {
+      ...baseKernel,
+      run: {
+        ...baseKernel.run,
+        async complete(runId, status, eventHash) {
+          const completion = await baseKernel.run.complete(
+            runId,
+            status,
+            eventHash
+          );
+          leasedRuns.delete(runId);
+          return completion;
+        },
+      },
+      runLiveness: {
+        async createLeasedRun(input) {
+          try {
+            const run = await baseKernel.run.create(
+              input.runId,
+              input.turnId,
+              input.branchId,
+              input.schemaId,
+              input.startTurnNodeHash,
+              input.steps
+            );
+            const leasedRun: FakeLeasedRunRecord = {
+              ...run,
+              executionOwnerId: input.executionOwnerId,
+              fencingToken: `token-${++tokenOrdinal}`,
+              leaseExpiresAtMs: input.leaseExpiresAtMs,
+            };
+            leasedRuns.set(leasedRun.runId, leasedRun);
+            return { ...leasedRun };
+          } catch (error: unknown) {
+            // The fake kernel only signals active-branch contention by message,
+            // so the wrapper normalizes it into the real kernel error code that
+            // runtime-core branches on for stale-run recovery.
+            if (
+              error instanceof Error &&
+              error.message.includes("already has an active run")
+            ) {
+              throw new TuvrenRuntimeError(error.message, {
+                code: "kernel_runtime_branch_already_active",
+              });
+            }
+
+            throw error;
+          }
+        },
+        async listExpired(nowMs) {
+          return [...leasedRuns.values()].filter(
+            (run) => run.leaseExpiresAtMs <= nowMs
+          );
+        },
+        async preemptExpired(runId, preemptingOwnerId, nowMs, reason) {
+          void preemptingOwnerId;
+          void nowMs;
+          void reason;
+          const leasedRun = leasedRuns.get(runId);
+
+          if (leasedRun === undefined) {
+            throw new Error(`expected leased run "${runId}"`);
+          }
+
+          preemptCalls += 1;
+          await baseKernel.run.complete(runId, "failed");
+          leasedRuns.delete(runId);
+          return {
+            consumedStagedResults: [],
+            lastCompletedStepId: null,
+            lastTurnNodeHash: leasedRun.startTurnNodeHash,
+            stepSequence: leasedRun.stepSequence,
+            uncommittedStagedResults: [],
+          } satisfies RecoveryState;
+        },
+        async renewLease(
+          runId,
+          executionOwnerId,
+          fencingToken,
+          nextLeaseExpiresAtMs
+        ) {
+          renewLeaseCalls += 1;
+
+          if (options?.onRenewLease !== undefined) {
+            return await options.onRenewLease(
+              runId,
+              executionOwnerId,
+              fencingToken,
+              nextLeaseExpiresAtMs
+            );
+          }
+
+          const leasedRun = leasedRuns.get(runId);
+
+          if (leasedRun !== undefined) {
+            leasedRun.fencingToken = `token-renewed-${renewLeaseCalls}`;
+            leasedRun.leaseExpiresAtMs = nextLeaseExpiresAtMs;
+            leasedRuns.set(runId, leasedRun);
+          }
+
+          return {
+            fencingToken: `token-renewed-${renewLeaseCalls}`,
+            leaseExpiresAtMs: nextLeaseExpiresAtMs,
+          };
+        },
+      },
+    } satisfies KrakenKernel & RuntimeKernelRunLiveness,
+    leasedRuns,
+  };
+}
 
 describe("framework-runtime-core", () => {
   test("builds tool registries and rejects duplicate tool names across extensions", () => {
@@ -283,6 +458,124 @@ describe("framework-runtime-core", () => {
     expect(handle.status().phase).toBe("completed");
     expect(createLeasedRunCalls).toBeGreaterThan(0);
     expect(renewLeaseCalls).toBeGreaterThan(0);
+  });
+
+  test("preempts an expired leased branch run before starting replacement execution", async () => {
+    const harness = createFakeKernelHarness();
+    const livenessHarness = createFakeRunLivenessKernelHarness(harness);
+    const driver = {
+      async execute() {
+        return {
+          messages: [assistantText("Replacement execution succeeded.")],
+          resolution: {
+            reason: "done",
+            type: "end_turn",
+          },
+        };
+      },
+      id: "fake",
+      async resume() {
+        throw new Error("resume was not expected");
+      },
+    } satisfies KrakenDriver;
+    const runtime = createTuvrenRuntimeCore({
+      defaultDriverId: "fake",
+      driverRegistry: createDriverRegistry([driver]),
+      kernel: livenessHarness.kernel,
+      runLiveness: {
+        executionOwnerId: "worker-1",
+        leaseDurationMs: 50,
+      },
+    });
+    const thread = await runtime.createThread({});
+    const staleTurn = await livenessHarness.kernel.turn.create(
+      "turn_stale_leased_execution",
+      thread.threadId,
+      thread.branchId,
+      null,
+      thread.rootTurnNodeHash
+    );
+    await livenessHarness.kernel.runLiveness.createLeasedRun({
+      branchId: thread.branchId,
+      executionOwnerId: "worker-stale",
+      leaseExpiresAtMs: 1,
+      runId: "run_stale_leased_execution",
+      schemaId: DEFAULT_AGENT_SCHEMA.schemaId,
+      startTurnNodeHash: thread.rootTurnNodeHash,
+      steps: [{ deterministic: false, id: "iterate", sideEffects: true }],
+      turnId: staleTurn.turnId,
+    });
+
+    const handle = runtime.executeTurn({
+      branchId: thread.branchId,
+      config: { name: "primary" },
+      signal: textSignal("Replace the stale run"),
+      threadId: thread.threadId,
+    });
+
+    await collectEvents(handle.events());
+
+    expect(handle.status().phase).toBe("completed");
+    expect(livenessHarness.getPreemptCalls()).toBe(1);
+    expect(
+      (await harness.readBranchRuns(thread.branchId)).find(
+        (run) => run.runId === "run_stale_leased_execution"
+      )?.status
+    ).toBe("failed");
+  });
+
+  test("drops driver output that arrives after lease loss aborts the execution", async () => {
+    const harness = createFakeKernelHarness();
+    const livenessHarness = createFakeRunLivenessKernelHarness(harness, {
+      async onRenewLease() {
+        throw new Error("lease renewal lost");
+      },
+    });
+    const driver = {
+      async execute(context) {
+        await waitForAbort(context.signal);
+        await delay(20);
+        return {
+          messages: [assistantText("late success")],
+          resolution: {
+            reason: "done",
+            type: "end_turn",
+          },
+        };
+      },
+      id: "fake",
+      async resume() {
+        throw new Error("resume was not expected");
+      },
+    } satisfies KrakenDriver;
+    const runtime = createTuvrenRuntimeCore({
+      defaultDriverId: "fake",
+      driverRegistry: createDriverRegistry([driver]),
+      kernel: livenessHarness.kernel,
+      runLiveness: {
+        executionOwnerId: "worker-1",
+        leaseDurationMs: 40,
+        renewBeforeMs: 20,
+      },
+    });
+    const thread = await runtime.createThread({});
+    const handle = runtime.executeTurn({
+      branchId: thread.branchId,
+      config: { name: "primary" },
+      signal: textSignal("Ignore cancellation and answer late"),
+      threadId: thread.threadId,
+    });
+
+    await collectEvents(handle.events());
+
+    expect(handle.status().phase).toBe("failed");
+    expect(livenessHarness.getRenewLeaseCalls()).toBeGreaterThan(0);
+    expect(
+      hasAssistantTextMessage(
+        await harness.readBranchMessages(thread.branchId),
+        "late success"
+      )
+    ).toBe(false);
   });
 
   test("tool registries snapshot tool definitions instead of exposing live references", () => {

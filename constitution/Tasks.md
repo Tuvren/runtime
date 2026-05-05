@@ -1417,13 +1417,13 @@ And a non-expired running Run or paused Run cannot be preempted through stale-ru
 - **Effort:** 5
 - **Dependencies:** KRT-AB003
 - **Capability / Contract Mapping:** TechSpec §4.10, §4.12, §4.13
-- **Description:** Promote `kernel.run-liveness` conformance plans and refresh compatibility evidence for TypeScript memory/SQLite behavior, leaving Rust non-applicable unless it advertises the extension capability.
+- **Description:** Promote `kernel.run-liveness` conformance plans and refresh shared compatibility evidence for the TypeScript kernel extension while keeping backend-specific memory/SQLite lease storage and migration behavior covered by their implementation test lanes, leaving Rust non-applicable unless it advertises the extension capability.
 - **Acceptance Criteria (Gherkin):**
 
 ```gherkin
 Given TypeScript implements the run-liveness extension
 When shared-runner liveness conformance executes
 Then lease renewal, expired-run discovery, stale preemption, paused exclusion, and replacement recovery state are verified from implementation-produced evidence
-And TypeScript memory and SQLite evidence report honest pass/fail status for the extension
+And shared TypeScript kernel evidence plus backend-specific memory/SQLite verification report honest pass/fail status for the extension
 And Rust evidence is non-applicable unless a Rust adapter advertises `kernel.run-liveness`
 ```
