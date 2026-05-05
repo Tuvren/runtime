@@ -223,7 +223,11 @@ async function findAdapterManifests(directory: string): Promise<string[]> {
       continue;
     }
 
-    if (entry.isFile() && entry.name === "adapter.json") {
+    if (
+      entry.isFile() &&
+      entry.name.startsWith("adapter") &&
+      entry.name.endsWith(".json")
+    ) {
       manifests.push(entryPath);
     }
   }

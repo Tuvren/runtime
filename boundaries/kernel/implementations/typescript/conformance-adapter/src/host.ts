@@ -69,6 +69,11 @@ interface LogicalFixture {
   turnTreeChangeSet: TurnTreeChangeSet;
 }
 
+interface ConfiguredBackendHandle {
+  backend: RuntimeBackend;
+  cleanup(): Promise<void>;
+}
+
 const ADAPTER_CONFIG = readAdapterConfig(process.argv.slice(2));
 let canonicalSchemaPromise: Promise<TurnTreeSchema> | undefined;
 
@@ -277,33 +282,34 @@ function schemaRoundtrip(
 
 async function runModifyComposition(): Promise<Record<string, unknown>> {
   const schema = await loadCanonicalSchema();
-  const kernel = await createConformanceKernel(schema);
-  const verdict = await kernel.verdicts.compose([
-    {
-      kind: "modify",
-      transform: { extension: "first", mutation: "append-prefix" },
-    },
-    { kind: "proceed" },
-    {
-      kind: "modify",
-      transform: { extension: "second", mutation: "append-suffix" },
-    },
-  ]);
-
-  if (verdict.kind !== "modify") {
-    throw new Error(
-      `expected composed modify verdict, received ${verdict.kind}`
-    );
-  }
-
-  return {
-    evidence: {
-      verdict: {
-        kind: verdict.kind,
-        transform: verdict.transform,
+  return await withConformanceKernel(schema, async (kernel) => {
+    const verdict = await kernel.verdicts.compose([
+      {
+        kind: "modify",
+        transform: { extension: "first", mutation: "append-prefix" },
       },
-    },
-  };
+      { kind: "proceed" },
+      {
+        kind: "modify",
+        transform: { extension: "second", mutation: "append-suffix" },
+      },
+    ]);
+
+    if (verdict.kind !== "modify") {
+      throw new Error(
+        `expected composed modify verdict, received ${verdict.kind}`
+      );
+    }
+
+    return {
+      evidence: {
+        verdict: {
+          kind: verdict.kind,
+          transform: verdict.transform,
+        },
+      },
+    };
+  });
 }
 
 async function runLogicalDiff(
@@ -311,22 +317,23 @@ async function runLogicalDiff(
 ): Promise<Record<string, unknown>> {
   const schema = await loadCanonicalSchema();
   const logical = readLogicalFixture(fixture, schema);
-  const kernel = await createConformanceKernel(schema);
-  const created = await kernel.thread.create(
-    "thread_conformance",
-    schema.schemaId,
-    logical.branchHeadListEntry[0]
-  );
-  const changedTree = await kernel.tree.create(
-    schema.schemaId,
-    logical.turnTreeChangeSet,
-    created.rootTurnTreeHash
-  );
-  const diffPaths = (
-    await kernel.tree.diff(created.rootTurnTreeHash, changedTree)
-  ).toSorted();
+  return await withConformanceKernel(schema, async (kernel) => {
+    const created = await kernel.thread.create(
+      "thread_conformance",
+      schema.schemaId,
+      logical.branchHeadListEntry[0]
+    );
+    const changedTree = await kernel.tree.create(
+      schema.schemaId,
+      logical.turnTreeChangeSet,
+      created.rootTurnTreeHash
+    );
+    const diffPaths = (
+      await kernel.tree.diff(created.rootTurnTreeHash, changedTree)
+    ).toSorted();
 
-  return { evidence: { diffPaths } };
+    return { evidence: { diffPaths } };
+  });
 }
 
 async function runBranchList(
@@ -334,15 +341,16 @@ async function runBranchList(
 ): Promise<Record<string, unknown>> {
   const schema = await loadCanonicalSchema();
   const logical = readLogicalFixture(fixture, schema);
-  const kernel = await createConformanceKernel(schema);
-  await kernel.thread.create(
-    "thread_conformance",
-    schema.schemaId,
-    logical.branchHeadListEntry[0]
-  );
-  const branchEntries = await kernel.branch.list("thread_conformance");
+  return await withConformanceKernel(schema, async (kernel) => {
+    await kernel.thread.create(
+      "thread_conformance",
+      schema.schemaId,
+      logical.branchHeadListEntry[0]
+    );
+    const branchEntries = await kernel.branch.list("thread_conformance");
 
-  return { evidence: { branchEntries } };
+    return { evidence: { branchEntries } };
+  });
 }
 
 async function runRecoveryState(
@@ -350,363 +358,373 @@ async function runRecoveryState(
 ): Promise<Record<string, unknown>> {
   const schema = await loadCanonicalSchema();
   const logical = readLogicalFixture(fixture, schema);
-  const kernel = await createConformanceKernel(schema);
-  const thread = await kernel.thread.create(
-    "thread_conformance",
-    schema.schemaId,
-    logical.branchHeadListEntry[0]
-  );
-  const turn = await kernel.turn.create(
-    "turn_recovery",
-    thread.threadId,
-    thread.branchId,
-    null,
-    thread.rootTurnNodeHash
-  );
-  await kernel.run.create(
-    "run_recovery",
-    turn.turnId,
-    thread.branchId,
-    schema.schemaId,
-    thread.rootTurnNodeHash,
-    logical.recoveryState.stepSequence
-  );
+  return await withConformanceKernel(schema, async (kernel) => {
+    const thread = await kernel.thread.create(
+      "thread_conformance",
+      schema.schemaId,
+      logical.branchHeadListEntry[0]
+    );
+    const turn = await kernel.turn.create(
+      "turn_recovery",
+      thread.threadId,
+      thread.branchId,
+      null,
+      thread.rootTurnNodeHash
+    );
+    await kernel.run.create(
+      "run_recovery",
+      turn.turnId,
+      thread.branchId,
+      schema.schemaId,
+      thread.rootTurnNodeHash,
+      logical.recoveryState.stepSequence
+    );
 
-  const [firstStep, secondStep] = logical.recoveryState.stepSequence;
+    const [firstStep, secondStep] = logical.recoveryState.stepSequence;
 
-  if (firstStep === undefined || secondStep === undefined) {
-    throw new Error("logical recovery fixture must declare at least two steps");
-  }
+    if (firstStep === undefined || secondStep === undefined) {
+      throw new Error(
+        "logical recovery fixture must declare at least two steps"
+      );
+    }
 
-  await kernel.run.beginStep("run_recovery", firstStep.id);
-  await kernel.run.completeStep("run_recovery", firstStep.id);
-  await kernel.run.beginStep("run_recovery", secondStep.id);
+    await kernel.run.beginStep("run_recovery", firstStep.id);
+    await kernel.run.completeStep("run_recovery", firstStep.id);
+    await kernel.run.beginStep("run_recovery", secondStep.id);
 
-  for (const [
-    index,
-    stagedResult,
-  ] of logical.recoveryState.consumedStagedResults.entries()) {
-    await stageFixtureResult(kernel, "run_recovery", stagedResult, index);
-  }
+    for (const [
+      index,
+      stagedResult,
+    ] of logical.recoveryState.consumedStagedResults.entries()) {
+      await stageFixtureResult(kernel, "run_recovery", stagedResult, index);
+    }
 
-  await kernel.run.completeStep("run_recovery", secondStep.id);
+    await kernel.run.completeStep("run_recovery", secondStep.id);
 
-  for (const [
-    index,
-    stagedResult,
-  ] of logical.recoveryState.uncommittedStagedResults.entries()) {
-    await stageFixtureResult(kernel, "run_recovery", stagedResult, index);
-  }
+    for (const [
+      index,
+      stagedResult,
+    ] of logical.recoveryState.uncommittedStagedResults.entries()) {
+      await stageFixtureResult(kernel, "run_recovery", stagedResult, index);
+    }
 
-  const recovery = await kernel.run.recover("run_recovery");
+    const recovery = await kernel.run.recover("run_recovery");
 
-  return {
-    evidence: {
-      recovery: {
-        consumedStagedResults: recovery.consumedStagedResults.length,
-        lastCompletedStepId: recovery.lastCompletedStepId,
-        uncommittedStagedResults: recovery.uncommittedStagedResults.length,
+    return {
+      evidence: {
+        recovery: {
+          consumedStagedResults: recovery.consumedStagedResults.length,
+          lastCompletedStepId: recovery.lastCompletedStepId,
+          uncommittedStagedResults: recovery.uncommittedStagedResults.length,
+        },
       },
-    },
-  };
+    };
+  });
 }
 
 async function runCrossThreadLineage(): Promise<Record<string, unknown>> {
   const schema = await loadCanonicalSchema();
-  const kernel = await createConformanceKernel(schema);
-  const threadA = await kernel.thread.create(
-    "thread_a",
-    schema.schemaId,
-    "branch_a"
-  );
-  const turnA = await kernel.turn.create(
-    "turn_a",
-    threadA.threadId,
-    threadA.branchId,
-    null,
-    threadA.rootTurnNodeHash
-  );
-  await kernel.run.create(
-    "run_a",
-    turnA.turnId,
-    threadA.branchId,
-    schema.schemaId,
-    threadA.rootTurnNodeHash,
-    [{ deterministic: false, id: "step_a", sideEffects: false }]
-  );
-  const completed = await kernel.run.completeStep("run_a", "step_a");
-
-  if (completed.turnNodeHash === undefined) {
-    throw new Error("expected checkpoint hash for cross-thread lineage check");
-  }
-
-  await kernel.thread.create("thread_b", schema.schemaId, "branch_b");
-
-  try {
-    await kernel.branch.create(
-      "branch_cross_thread",
-      "thread_b",
-      completed.turnNodeHash
+  return await withConformanceKernel(schema, async (kernel) => {
+    const threadA = await kernel.thread.create(
+      "thread_a",
+      schema.schemaId,
+      "branch_a"
     );
+    const turnA = await kernel.turn.create(
+      "turn_a",
+      threadA.threadId,
+      threadA.branchId,
+      null,
+      threadA.rootTurnNodeHash
+    );
+    await kernel.run.create(
+      "run_a",
+      turnA.turnId,
+      threadA.branchId,
+      schema.schemaId,
+      threadA.rootTurnNodeHash,
+      [{ deterministic: false, id: "step_a", sideEffects: false }]
+    );
+    const completed = await kernel.run.completeStep("run_a", "step_a");
 
-    // Unexpected acceptance is surfaced as evidence instead of crashing the
-    // adapter so the shared runner can report one semantic failure cleanly.
-    return {
-      evidence: {
-        diagnostics: ["thread A node unexpectedly seeded thread B branch"],
-        errorCode: "unexpected_success",
-      },
-    };
-  } catch (error: unknown) {
-    return {
-      evidence: {
-        errorCode: normalizeLogicalErrorCode(readErrorCode(error)),
-      },
-    };
-  }
+    if (completed.turnNodeHash === undefined) {
+      throw new Error(
+        "expected checkpoint hash for cross-thread lineage check"
+      );
+    }
+
+    await kernel.thread.create("thread_b", schema.schemaId, "branch_b");
+
+    try {
+      await kernel.branch.create(
+        "branch_cross_thread",
+        "thread_b",
+        completed.turnNodeHash
+      );
+
+      // Unexpected acceptance is surfaced as evidence instead of crashing the
+      // adapter so the shared runner can report one semantic failure cleanly.
+      return {
+        evidence: {
+          diagnostics: ["thread A node unexpectedly seeded thread B branch"],
+          errorCode: "unexpected_success",
+        },
+      };
+    } catch (error: unknown) {
+      return {
+        evidence: {
+          errorCode: normalizeLogicalErrorCode(readErrorCode(error)),
+        },
+      };
+    }
+  });
 }
 
 async function runLeaseRenewal(): Promise<Record<string, unknown>> {
   const schema = await loadCanonicalSchema();
-  const kernel = createRuntimeKernel({
-    backend: await createConfiguredBackend(),
-    now: () => 10,
-  });
-  await kernel.schema.register(schema);
-  const thread = await kernel.thread.create(
-    "thread_liveness_renewal",
-    schema.schemaId,
-    "branch_liveness_renewal"
-  );
-  const turn = await kernel.turn.create(
-    "turn_liveness_renewal",
-    thread.threadId,
-    thread.branchId,
-    null,
-    thread.rootTurnNodeHash
-  );
-  const leasedRun = await kernel.runLiveness.createLeasedRun({
-    branchId: thread.branchId,
-    executionOwnerId: "owner-primary",
-    leaseExpiresAtMs: 20,
-    runId: "run_liveness_renewal",
-    schemaId: schema.schemaId,
-    startTurnNodeHash: thread.rootTurnNodeHash,
-    steps: [{ deterministic: false, id: "iterate", sideEffects: true }],
-    turnId: turn.turnId,
-  });
-  const staleToken = leasedRun.fencingToken ?? "";
-  const renewed = await kernel.runLiveness.renewLease(
-    leasedRun.runId,
-    "owner-primary",
-    staleToken,
-    40
-  );
-
-  let ownerMismatchCode = "unexpected_success";
-  try {
-    await kernel.runLiveness.renewLease(
-      leasedRun.runId,
-      "owner-secondary",
-      renewed.fencingToken,
-      50
+  return await withConfiguredBackend(async (backend) => {
+    const kernel = createRuntimeKernel({
+      backend,
+      now: () => 10,
+    });
+    await kernel.schema.register(schema);
+    const thread = await kernel.thread.create(
+      "thread_liveness_renewal",
+      schema.schemaId,
+      "branch_liveness_renewal"
     );
-  } catch (error: unknown) {
-    ownerMismatchCode = normalizeLogicalErrorCode(readErrorCode(error));
-  }
-
-  let staleTokenCode = "unexpected_success";
-  try {
-    await kernel.runLiveness.renewLease(
+    const turn = await kernel.turn.create(
+      "turn_liveness_renewal",
+      thread.threadId,
+      thread.branchId,
+      null,
+      thread.rootTurnNodeHash
+    );
+    const leasedRun = await kernel.runLiveness.createLeasedRun({
+      branchId: thread.branchId,
+      executionOwnerId: "owner-primary",
+      leaseExpiresAtMs: 20,
+      runId: "run_liveness_renewal",
+      schemaId: schema.schemaId,
+      startTurnNodeHash: thread.rootTurnNodeHash,
+      steps: [{ deterministic: false, id: "iterate", sideEffects: true }],
+      turnId: turn.turnId,
+    });
+    const staleToken = leasedRun.fencingToken ?? "";
+    const renewed = await kernel.runLiveness.renewLease(
       leasedRun.runId,
       "owner-primary",
       staleToken,
-      50
+      40
     );
-  } catch (error: unknown) {
-    staleTokenCode = normalizeLogicalErrorCode(readErrorCode(error));
-  }
 
-  return {
-    evidence: {
-      renewal: {
-        ownerMismatchCode,
-        renewedLeaseExpiresAtMs: renewed.leaseExpiresAtMs,
-        staleTokenCode,
+    let ownerMismatchCode = "unexpected_success";
+    try {
+      await kernel.runLiveness.renewLease(
+        leasedRun.runId,
+        "owner-secondary",
+        renewed.fencingToken,
+        50
+      );
+    } catch (error: unknown) {
+      ownerMismatchCode = normalizeLogicalErrorCode(readErrorCode(error));
+    }
+
+    let staleTokenCode = "unexpected_success";
+    try {
+      await kernel.runLiveness.renewLease(
+        leasedRun.runId,
+        "owner-primary",
+        staleToken,
+        50
+      );
+    } catch (error: unknown) {
+      staleTokenCode = normalizeLogicalErrorCode(readErrorCode(error));
+    }
+
+    return {
+      evidence: {
+        renewal: {
+          ownerMismatchCode,
+          renewedLeaseExpiresAtMs: renewed.leaseExpiresAtMs,
+          staleTokenCode,
+        },
       },
-    },
-  };
+    };
+  });
 }
 
 async function runExpiredListing(): Promise<Record<string, unknown>> {
   const schema = await loadCanonicalSchema();
-  const backend = await createConfiguredBackend();
-  const kernel = createRuntimeKernel({ backend });
-  await kernel.schema.register(schema);
-  const expiredThread = await kernel.thread.create(
-    "thread_liveness_listing_expired",
-    schema.schemaId,
-    "branch_liveness_listing_expired"
-  );
-  const freshThread = await kernel.thread.create(
-    "thread_liveness_listing_fresh",
-    schema.schemaId,
-    "branch_liveness_listing_fresh"
-  );
-  const pausedThread = await kernel.thread.create(
-    "thread_liveness_listing_paused",
-    schema.schemaId,
-    "branch_liveness_listing_paused"
-  );
-  const expiredTurn = await kernel.turn.create(
-    "turn_liveness_listing_expired",
-    expiredThread.threadId,
-    expiredThread.branchId,
-    null,
-    expiredThread.rootTurnNodeHash
-  );
-  const freshTurn = await kernel.turn.create(
-    "turn_liveness_listing_fresh",
-    freshThread.threadId,
-    freshThread.branchId,
-    null,
-    freshThread.rootTurnNodeHash
-  );
-  const pausedTurn = await kernel.turn.create(
-    "turn_liveness_listing_paused",
-    pausedThread.threadId,
-    pausedThread.branchId,
-    null,
-    pausedThread.rootTurnNodeHash
-  );
-  await kernel.runLiveness.createLeasedRun({
-    branchId: expiredThread.branchId,
-    executionOwnerId: "owner-primary",
-    leaseExpiresAtMs: 5,
-    runId: "run_expired",
-    schemaId: schema.schemaId,
-    startTurnNodeHash: expiredThread.rootTurnNodeHash,
-    steps: [{ deterministic: false, id: "iterate", sideEffects: true }],
-    turnId: expiredTurn.turnId,
-  });
-  const freshRun = await kernel.runLiveness.createLeasedRun({
-    branchId: freshThread.branchId,
-    executionOwnerId: "owner-primary",
-    leaseExpiresAtMs: 50,
-    runId: "run_fresh",
-    schemaId: schema.schemaId,
-    startTurnNodeHash: freshThread.rootTurnNodeHash,
-    steps: [{ deterministic: false, id: "iterate", sideEffects: true }],
-    turnId: freshTurn.turnId,
-  });
-  const pausedRun = await kernel.runLiveness.createLeasedRun({
-    branchId: pausedThread.branchId,
-    executionOwnerId: "owner-primary",
-    // This lease is already stale before the pause so the evidence proves that
-    // paused status, not remaining lease time, keeps it out of expired listings.
-    leaseExpiresAtMs: 5,
-    runId: "run_paused",
-    schemaId: schema.schemaId,
-    startTurnNodeHash: pausedThread.rootTurnNodeHash,
-    steps: [{ deterministic: false, id: "iterate", sideEffects: true }],
-    turnId: pausedTurn.turnId,
-  });
-  await kernel.run.complete(freshRun.runId, "failed");
-  await kernel.run.complete(pausedRun.runId, "paused");
-  const expiredRuns = await kernel.runLiveness.listExpired(10);
-  const pausedStoredRun = await backend.transact(async (tx) => {
-    return await tx.runs.get(pausedRun.runId);
-  });
+  return await withConfiguredBackend(async (backend) => {
+    const kernel = createRuntimeKernel({ backend });
+    await kernel.schema.register(schema);
+    const expiredThread = await kernel.thread.create(
+      "thread_liveness_listing_expired",
+      schema.schemaId,
+      "branch_liveness_listing_expired"
+    );
+    const freshThread = await kernel.thread.create(
+      "thread_liveness_listing_fresh",
+      schema.schemaId,
+      "branch_liveness_listing_fresh"
+    );
+    const pausedThread = await kernel.thread.create(
+      "thread_liveness_listing_paused",
+      schema.schemaId,
+      "branch_liveness_listing_paused"
+    );
+    const expiredTurn = await kernel.turn.create(
+      "turn_liveness_listing_expired",
+      expiredThread.threadId,
+      expiredThread.branchId,
+      null,
+      expiredThread.rootTurnNodeHash
+    );
+    const freshTurn = await kernel.turn.create(
+      "turn_liveness_listing_fresh",
+      freshThread.threadId,
+      freshThread.branchId,
+      null,
+      freshThread.rootTurnNodeHash
+    );
+    const pausedTurn = await kernel.turn.create(
+      "turn_liveness_listing_paused",
+      pausedThread.threadId,
+      pausedThread.branchId,
+      null,
+      pausedThread.rootTurnNodeHash
+    );
+    await kernel.runLiveness.createLeasedRun({
+      branchId: expiredThread.branchId,
+      executionOwnerId: "owner-primary",
+      leaseExpiresAtMs: 5,
+      runId: "run_expired",
+      schemaId: schema.schemaId,
+      startTurnNodeHash: expiredThread.rootTurnNodeHash,
+      steps: [{ deterministic: false, id: "iterate", sideEffects: true }],
+      turnId: expiredTurn.turnId,
+    });
+    const freshRun = await kernel.runLiveness.createLeasedRun({
+      branchId: freshThread.branchId,
+      executionOwnerId: "owner-primary",
+      leaseExpiresAtMs: 50,
+      runId: "run_fresh",
+      schemaId: schema.schemaId,
+      startTurnNodeHash: freshThread.rootTurnNodeHash,
+      steps: [{ deterministic: false, id: "iterate", sideEffects: true }],
+      turnId: freshTurn.turnId,
+    });
+    const pausedRun = await kernel.runLiveness.createLeasedRun({
+      branchId: pausedThread.branchId,
+      executionOwnerId: "owner-primary",
+      // This lease is already stale before the pause so the evidence proves that
+      // paused status, not remaining lease time, keeps it out of expired listings.
+      leaseExpiresAtMs: 5,
+      runId: "run_paused",
+      schemaId: schema.schemaId,
+      startTurnNodeHash: pausedThread.rootTurnNodeHash,
+      steps: [{ deterministic: false, id: "iterate", sideEffects: true }],
+      turnId: pausedTurn.turnId,
+    });
+    await kernel.run.complete(freshRun.runId, "failed");
+    await kernel.run.complete(pausedRun.runId, "paused");
+    const expiredRuns = await kernel.runLiveness.listExpired(10);
+    const pausedStoredRun = await backend.transact(async (tx) => {
+      return await tx.runs.get(pausedRun.runId);
+    });
 
-  if (pausedStoredRun === null) {
-    throw new Error("expected paused stored run");
-  }
+    if (pausedStoredRun === null) {
+      throw new Error("expected paused stored run");
+    }
 
-  return {
-    evidence: {
-      listing: {
-        expiredRunIds: expiredRuns.map((run) => run.runId),
-        pausedRunListed: expiredRuns.some(
-          (run) => run.runId === pausedRun.runId
-        ),
-        pausedRunStatus: pausedStoredRun.status,
+    return {
+      evidence: {
+        listing: {
+          expiredRunIds: expiredRuns.map((run) => run.runId),
+          pausedRunListed: expiredRuns.some(
+            (run) => run.runId === pausedRun.runId
+          ),
+          pausedRunStatus: pausedStoredRun.status,
+        },
       },
-    },
-  };
+    };
+  });
 }
 
 async function runStalePreemption(): Promise<Record<string, unknown>> {
   const schema = await loadCanonicalSchema();
-  const backend = await createConfiguredBackend();
-  const storageKernel = createRuntimeKernel({ backend });
-  await storageKernel.schema.register(schema);
-  const thread = await storageKernel.thread.create(
-    "thread_liveness_preemption",
-    schema.schemaId,
-    "branch_liveness_preemption"
-  );
-  const turn = await storageKernel.turn.create(
-    "turn_liveness_preemption",
-    thread.threadId,
-    thread.branchId,
-    null,
-    thread.rootTurnNodeHash
-  );
-  const leasedRun = await storageKernel.runLiveness.createLeasedRun({
-    branchId: thread.branchId,
-    executionOwnerId: "owner-primary",
-    leaseExpiresAtMs: 5,
-    runId: "run_liveness_preemption",
-    schemaId: schema.schemaId,
-    startTurnNodeHash: thread.rootTurnNodeHash,
-    steps: [{ deterministic: false, id: "iterate", sideEffects: true }],
-    turnId: turn.turnId,
-  });
-  await storageKernel.run.beginStep(leasedRun.runId, "iterate");
-  await storageKernel.staging.stage(
-    leasedRun.runId,
-    new TextEncoder().encode("assistant"),
-    "assistant_message",
-    "message",
-    "completed"
-  );
-  const recovery = await storageKernel.runLiveness.preemptExpired(
-    leasedRun.runId,
-    "owner-secondary",
-    10,
-    "stale_running_recovery"
-  );
+  return await withConfiguredBackend(async (backend) => {
+    const storageKernel = createRuntimeKernel({ backend });
+    await storageKernel.schema.register(schema);
+    const thread = await storageKernel.thread.create(
+      "thread_liveness_preemption",
+      schema.schemaId,
+      "branch_liveness_preemption"
+    );
+    const turn = await storageKernel.turn.create(
+      "turn_liveness_preemption",
+      thread.threadId,
+      thread.branchId,
+      null,
+      thread.rootTurnNodeHash
+    );
+    const leasedRun = await storageKernel.runLiveness.createLeasedRun({
+      branchId: thread.branchId,
+      executionOwnerId: "owner-primary",
+      leaseExpiresAtMs: 5,
+      runId: "run_liveness_preemption",
+      schemaId: schema.schemaId,
+      startTurnNodeHash: thread.rootTurnNodeHash,
+      steps: [{ deterministic: false, id: "iterate", sideEffects: true }],
+      turnId: turn.turnId,
+    });
+    await storageKernel.run.beginStep(leasedRun.runId, "iterate");
+    await storageKernel.staging.stage(
+      leasedRun.runId,
+      new TextEncoder().encode("assistant"),
+      "assistant_message",
+      "message",
+      "completed"
+    );
+    const recovery = await storageKernel.runLiveness.preemptExpired(
+      leasedRun.runId,
+      "owner-secondary",
+      10,
+      "stale_running_recovery"
+    );
 
-  const storedRun = await backend.transact(async (tx) => {
-    return await tx.runs.get(leasedRun.runId);
-  });
+    const storedRun = await backend.transact(async (tx) => {
+      return await tx.runs.get(leasedRun.runId);
+    });
 
-  if (storedRun === null) {
-    throw new Error("expected preempted stored run");
-  }
-  const updatedBranch = await storageKernel.branch.get(thread.branchId);
+    if (storedRun === null) {
+      throw new Error("expected preempted stored run");
+    }
+    const updatedBranch = await storageKernel.branch.get(thread.branchId);
 
-  if (updatedBranch === null) {
-    throw new Error("expected preempted branch");
-  }
+    if (updatedBranch === null) {
+      throw new Error("expected preempted branch");
+    }
 
-  return {
-    evidence: {
-      preemption: {
-        branchHeadTurnNodeHash: updatedBranch.headTurnNodeHash,
-        leaseCleared:
-          storedRun.executionOwnerId === undefined &&
-          storedRun.fencingToken === undefined &&
-          storedRun.leaseExpiresAtMs === undefined,
-        preemptionReason: storedRun.preemptionReason ?? null,
-        recoveryHeadMatchesBranchHead:
-          recovery.lastTurnNodeHash === updatedBranch.headTurnNodeHash,
-        recoveryLastTurnNodeHash: recovery.lastTurnNodeHash,
-        runStatus: storedRun.status,
-        uncommittedStagedResults: recovery.uncommittedStagedResults.length,
+    return {
+      evidence: {
+        preemption: {
+          branchHeadTurnNodeHash: updatedBranch.headTurnNodeHash,
+          leaseCleared:
+            storedRun.executionOwnerId === undefined &&
+            storedRun.fencingToken === undefined &&
+            storedRun.leaseExpiresAtMs === undefined,
+          preemptionReason: storedRun.preemptionReason ?? null,
+          recoveryHeadMatchesBranchHead:
+            recovery.lastTurnNodeHash === updatedBranch.headTurnNodeHash,
+          recoveryLastTurnNodeHash: recovery.lastTurnNodeHash,
+          runStatus: storedRun.status,
+          uncommittedStagedResults: recovery.uncommittedStagedResults.length,
+        },
       },
-    },
-  };
+    };
+  });
 }
 
 async function runRestartRecovery(): Promise<Record<string, unknown>> {
@@ -732,27 +750,38 @@ async function runRestartRecovery(): Promise<Record<string, unknown>> {
   }
 }
 
-async function createConformanceKernel(schema: TurnTreeSchema) {
+async function createConformanceKernel(schema: TurnTreeSchema): Promise<{
+  cleanup(): Promise<void>;
+  kernel: ReturnType<typeof createRuntimeKernel>;
+}> {
+  const configuredBackend = await createConfiguredBackend();
   const kernel = createRuntimeKernel({
-    backend: await createConfiguredBackend(),
+    backend: configuredBackend.backend,
   });
   await kernel.schema.register(schema);
-  return kernel;
+  return {
+    cleanup: configuredBackend.cleanup,
+    kernel,
+  };
 }
 
-async function createConfiguredBackend(): Promise<RuntimeBackend> {
+async function createConfiguredBackend(): Promise<ConfiguredBackendHandle> {
   if (ADAPTER_CONFIG.backend === "sqlite") {
     const sqliteBackendModuleUrl = new URL(
       "../../backend-sqlite/dist/index.js",
       import.meta.url
     );
     const { createSqliteBackend } = await import(sqliteBackendModuleUrl.href);
-
-    const databasePath = join(
-      tmpdir(),
-      `${ADAPTER_CONFIG.adapterId}-${process.pid}-${randomUUID()}.sqlite`
+    const tempDirectory = await mkdtemp(
+      join(tmpdir(), `${ADAPTER_CONFIG.adapterId}-${process.pid}-`)
     );
-    return createSqliteBackend({ databasePath });
+    const databasePath = join(tempDirectory, `${randomUUID()}.sqlite`);
+    return {
+      backend: createSqliteBackend({ databasePath }),
+      cleanup: async () => {
+        await rm(tempDirectory, { force: true, recursive: true });
+      },
+    };
   }
 
   const memoryBackendModuleUrl = new URL(
@@ -760,7 +789,37 @@ async function createConfiguredBackend(): Promise<RuntimeBackend> {
     import.meta.url
   );
   const { createMemoryBackend } = await import(memoryBackendModuleUrl.href);
-  return createMemoryBackend();
+  return {
+    backend: createMemoryBackend(),
+    cleanup: async () => {
+      // Memory backends have no external resources to release.
+    },
+  };
+}
+
+async function withConformanceKernel<T>(
+  schema: TurnTreeSchema,
+  execute: (kernel: ReturnType<typeof createRuntimeKernel>) => Promise<T>
+): Promise<T> {
+  const configuredKernel = await createConformanceKernel(schema);
+
+  try {
+    return await execute(configuredKernel.kernel);
+  } finally {
+    await configuredKernel.cleanup();
+  }
+}
+
+async function withConfiguredBackend<T>(
+  execute: (backend: RuntimeBackend) => Promise<T>
+): Promise<T> {
+  const configuredBackend = await createConfiguredBackend();
+
+  try {
+    return await execute(configuredBackend.backend);
+  } finally {
+    await configuredBackend.cleanup();
+  }
 }
 
 async function runRestartRecoveryPhase(
