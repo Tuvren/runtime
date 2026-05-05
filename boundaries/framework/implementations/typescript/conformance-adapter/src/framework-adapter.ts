@@ -1651,38 +1651,62 @@ async function runOrchestrationLifecycleLocality(
     "case",
     "runtime.orchestration.lifecycle-locality.case"
   );
-  const childText = readStringProperty(
-    scenario,
-    "childText",
-    "runtime.orchestration.lifecycle-locality.childText"
-  );
-  const parentText = readStringProperty(
-    scenario,
-    "parentText",
-    "runtime.orchestration.lifecycle-locality.parentText"
-  );
 
   switch (lifecycleCase) {
     case "parent_pause_child_continues":
       return await runOrchestrationParentPauseChildContinues(
-        childText,
-        parentText
+        readStringProperty(
+          scenario,
+          "childText",
+          "runtime.orchestration.lifecycle-locality.childText"
+        ),
+        readStringProperty(
+          scenario,
+          "parentText",
+          "runtime.orchestration.lifecycle-locality.parentText"
+        )
       );
     case "child_pause_parent_completes":
       return await runOrchestrationChildPauseParentCompletes(
-        childText,
-        parentText
+        readStringProperty(
+          scenario,
+          "childText",
+          "runtime.orchestration.lifecycle-locality.childText"
+        ),
+        readStringProperty(
+          scenario,
+          "parentText",
+          "runtime.orchestration.lifecycle-locality.parentText"
+        )
       );
     case "child_cancel_parent_completes":
       return await runOrchestrationChildCancelParentCompletes(
-        childText,
-        parentText
+        readStringProperty(
+          scenario,
+          "childText",
+          "runtime.orchestration.lifecycle-locality.childText"
+        ),
+        readStringProperty(
+          scenario,
+          "parentText",
+          "runtime.orchestration.lifecycle-locality.parentText"
+        )
       );
     case "parent_cancel_child_completes":
       return await runOrchestrationParentCancelChildCompletes(
-        childText,
-        parentText
+        readStringProperty(
+          scenario,
+          "childText",
+          "runtime.orchestration.lifecycle-locality.childText"
+        ),
+        readStringProperty(
+          scenario,
+          "parentText",
+          "runtime.orchestration.lifecycle-locality.parentText"
+        )
       );
+    case "spawn_requires_running_handle":
+      return await runOrchestrationSpawnRequiresRunningHandle();
     default:
       throw new Error(
         `runtime.orchestration.lifecycle-locality declared unsupported case ${lifecycleCase}`
@@ -1697,6 +1721,22 @@ async function runOrchestrationEventSurfaces(
     input,
     "runtime.orchestration.event-surfaces"
   );
+  const reviewerText =
+    typeof scenario.reviewerText === "string"
+      ? scenario.reviewerText
+      : undefined;
+
+  if (reviewerText !== undefined) {
+    return await runOrchestrationHandoffAttribution(
+      readStringProperty(
+        scenario,
+        "parentText",
+        "runtime.orchestration.event-surfaces.parentText"
+      ),
+      reviewerText
+    );
+  }
+
   const parentText = readStringProperty(
     scenario,
     "parentText",
@@ -1706,6 +1746,11 @@ async function runOrchestrationEventSurfaces(
     scenario,
     "childText",
     "runtime.orchestration.event-surfaces.childText"
+  );
+  const failureMessage = readStringProperty(
+    scenario,
+    "failureMessage",
+    "runtime.orchestration.event-surfaces.failureMessage"
   );
   const harness = createFakeKernelHarness();
   const framework = createTuvrenRuntimeCore({
@@ -1753,25 +1798,32 @@ async function runOrchestrationEventSurfaces(
   const parentEventsPromise = collectValues(handle.events());
   const subtreeEventsPromise = collectValues(handle.allEvents());
 
-  await Promise.resolve();
+  await sleep(0);
 
   const childHandle = handle.spawn({
     agent: "worker",
     signal: textSignal("child"),
   });
+  const childSubtreeEventsPromise = collectValues(childHandle.allEvents());
   const childResult = await childHandle.awaitResult();
-  const [parentEvents, subtreeEvents, parentMessages] = await Promise.all([
-    parentEventsPromise,
-    subtreeEventsPromise,
-    harness.readBranchMessages(thread.branchId),
-  ]);
+  const [parentEvents, subtreeEvents, childSubtreeEvents, parentMessages] =
+    await Promise.all([
+      parentEventsPromise,
+      subtreeEventsPromise,
+      childSubtreeEventsPromise,
+      harness.readBranchMessages(thread.branchId),
+    ]);
   const descendantEvent = findTextEventWithWorker(subtreeEvents, childText);
+  const failedAwaitResultError =
+    await runFailedOrchestrationAwaitResult(failureMessage);
 
   return {
     evidence: {
       orchestration: {
         surfaces: {
           allEventsIncludeDescendants: descendantEvent !== undefined,
+          childAllEventsRemainAvailable:
+            findTextEvent(childSubtreeEvents, childText) !== undefined,
           childResult,
           descendantSourceAttributed:
             descendantEvent?.source?.agent !== undefined &&
@@ -1783,6 +1835,9 @@ async function runOrchestrationEventSurfaces(
               readRecordString(event, "type") === "text.done" &&
               readRecordString(event, "text") === childText
           ),
+          failedAwaitResultError,
+          failedAwaitResultRejected:
+            failedAwaitResultError?.message === failureMessage,
           noCanonicalWorkerResultInjection:
             !containsWorkerResult(parentMessages),
         },
@@ -2456,6 +2511,318 @@ async function runOrchestrationParentCancelChildCompletes(
   };
 }
 
+async function runOrchestrationSpawnRequiresRunningHandle(): Promise<AdapterProjection> {
+  const pausedSpawnError = await runPausedParentSpawnRejection();
+  const completedSpawnError = await runCompletedParentSpawnRejection();
+
+  return {
+    evidence: {
+      orchestration: {
+        lifecycle: {
+          completedSpawnError,
+          pausedSpawnError,
+        },
+      },
+    },
+  };
+}
+
+async function runPausedParentSpawnRejection(): Promise<
+  Record<string, unknown> | undefined
+> {
+  const harness = createFakeKernelHarness();
+  const framework = createTuvrenRuntimeCore({
+    createId: createConformanceIdFactory(),
+    defaultDriverId: DRIVER_ID,
+    driverRegistry: createDriverRegistry([
+      createStaticDriver((context) => {
+        const toolMessages = context.messages.filter(
+          (message) => message.role === "tool"
+        );
+
+        if (toolMessages.length === 0) {
+          return {
+            messages: [
+              assistantToolCalls([
+                {
+                  callId: "call-hold",
+                  input: { hold: true },
+                  name: "hold",
+                },
+              ]),
+            ],
+            resolution: {
+              type: "continue_iteration",
+            },
+            toolExecutionMode: "parallel",
+          };
+        }
+
+        return {
+          messages: [assistantText("Parent resumed.")],
+          resolution: {
+            reason: "done",
+            type: "end_turn",
+          },
+        };
+      }),
+    ]),
+    kernel: harness.kernel,
+  });
+  const orchestration = createOrchestrationRuntime({
+    agents: {
+      primary: {
+        name: "primary",
+        tools: [
+          {
+            approval: true,
+            description: "Pause the parent turn",
+            execute() {
+              return { approved: true };
+            },
+            inputSchema: {
+              properties: {
+                hold: { type: "boolean" },
+              },
+              required: ["hold"],
+              type: "object",
+            },
+            name: "hold",
+          },
+        ],
+      },
+      worker: { name: "worker" },
+    },
+    framework,
+  });
+  const thread = await framework.createThread({});
+  const handle = orchestration.executeTurn({
+    agent: "primary",
+    branchId: thread.branchId,
+    signal: textSignal("pause"),
+    threadId: thread.threadId,
+  });
+
+  await collectValues(handle.events());
+
+  if (handle.status().phase !== "paused") {
+    throw new Error("paused spawn rejection scenario did not pause");
+  }
+
+  return captureActionError(() =>
+    handle.spawn({
+      agent: "worker",
+      signal: textSignal("background"),
+    })
+  );
+}
+
+async function runCompletedParentSpawnRejection(): Promise<
+  Record<string, unknown> | undefined
+> {
+  const harness = createFakeKernelHarness();
+  const framework = createTuvrenRuntimeCore({
+    createId: createConformanceIdFactory(),
+    defaultDriverId: DRIVER_ID,
+    driverRegistry: createDriverRegistry([
+      createStaticDriver(async () => ({
+        messages: [assistantText("Parent complete.")],
+        resolution: {
+          reason: "done",
+          type: "end_turn",
+        },
+      })),
+    ]),
+    kernel: harness.kernel,
+  });
+  const orchestration = createOrchestrationRuntime({
+    agents: {
+      primary: { name: "primary" },
+      worker: { name: "worker" },
+    },
+    framework,
+  });
+  const thread = await framework.createThread({});
+  const handle = orchestration.executeTurn({
+    agent: "primary",
+    branchId: thread.branchId,
+    signal: textSignal("complete"),
+    threadId: thread.threadId,
+  });
+
+  await collectValues(handle.events());
+
+  if (handle.status().phase !== "completed") {
+    throw new Error("completed spawn rejection scenario did not complete");
+  }
+
+  return captureActionError(() =>
+    handle.spawn({
+      agent: "worker",
+      signal: textSignal("too-late"),
+    })
+  );
+}
+
+async function runFailedOrchestrationAwaitResult(
+  failureMessage: string
+): Promise<Record<string, unknown> | undefined> {
+  const harness = createFakeKernelHarness();
+  const framework = createTuvrenRuntimeCore({
+    createId: createConformanceIdFactory(),
+    defaultDriverId: DRIVER_ID,
+    driverRegistry: createDriverRegistry([
+      createStaticDriver(async (context) => {
+        if (context.config.name === "worker") {
+          throw new Error(failureMessage);
+        }
+
+        await sleep(20);
+        return {
+          messages: [assistantText("Parent finished.")],
+          resolution: {
+            reason: "done",
+            type: "end_turn",
+          },
+        };
+      }),
+    ]),
+    kernel: harness.kernel,
+  });
+  const orchestration = createOrchestrationRuntime({
+    agents: {
+      primary: { name: "primary" },
+      worker: { name: "worker" },
+    },
+    framework,
+  });
+  const thread = await framework.createThread({});
+  const handle = orchestration.executeTurn({
+    agent: "primary",
+    branchId: thread.branchId,
+    signal: textSignal("root"),
+    threadId: thread.threadId,
+  });
+
+  const parentEventsPromise = collectValues(handle.allEvents());
+  await sleep(0);
+
+  const childHandle = handle.spawn({
+    agent: "worker",
+    signal: textSignal("failure"),
+  });
+
+  const childError = await captureAsyncActionError(async () => {
+    await childHandle.awaitResult();
+  });
+  await parentEventsPromise;
+  return childError;
+}
+
+async function runOrchestrationHandoffAttribution(
+  parentText: string,
+  reviewerText: string
+): Promise<AdapterProjection> {
+  const harness = createFakeKernelHarness();
+  const agents: Record<string, AgentConfig> = {
+    primary: { name: "primary" },
+    reviewer: { name: "reviewer" },
+    worker: { name: "worker" },
+  };
+  const framework = createTuvrenRuntimeCore({
+    createId: createConformanceIdFactory(),
+    defaultDriverId: DRIVER_ID,
+    driverRegistry: createDriverRegistry([
+      createStaticDriver(async (context) => {
+        if (context.config.name === "worker") {
+          return {
+            messages: [assistantText("Passing this to reviewer.")],
+            resolution: {
+              contextPlan: context.handoff.createContextPlan({
+                mode: "last_output_only",
+                reason: "review_handoff",
+                targetAgent: "reviewer",
+              }),
+              targetAgent: "reviewer",
+              type: "handoff",
+            },
+          };
+        }
+
+        if (context.config.name === "reviewer") {
+          return {
+            messages: [assistantText(reviewerText)],
+            resolution: {
+              reason: "done",
+              type: "end_turn",
+            },
+          };
+        }
+
+        await sleep(20);
+        return {
+          messages: [assistantText(parentText)],
+          resolution: {
+            reason: "done",
+            type: "end_turn",
+          },
+        };
+      }),
+    ]),
+    kernel: harness.kernel,
+    resolveAgentConfig(agentName) {
+      return agents[agentName];
+    },
+  });
+  const orchestration = createOrchestrationRuntime({
+    agents,
+    framework,
+  });
+  const thread = await framework.createThread({});
+  const handle = orchestration.executeTurn({
+    agent: "primary",
+    branchId: thread.branchId,
+    signal: textSignal("Start root"),
+    threadId: thread.threadId,
+  });
+  const rootEventsPromise = collectValues(handle.allEvents());
+
+  await sleep(0);
+
+  const childHandle = handle.spawn({
+    agent: "worker",
+    signal: textSignal("handoff child"),
+  });
+  const childEvents = await collectValues(childHandle.events());
+  const childResult = await childHandle.awaitResult();
+  const rootEvents = await rootEventsPromise;
+  const childReviewerEvent = findTextEvent(childEvents, reviewerText);
+  const rootReviewerEvent = rootEvents.find(
+    (event) =>
+      isRecord(event) &&
+      event.type === "text.done" &&
+      event.text === reviewerText &&
+      isRecord(event.source) &&
+      typeof event.source.workerId === "string"
+  );
+
+  return {
+    evidence: {
+      orchestration: {
+        surfaces: {
+          childResult,
+          handoffDescendantAgentPreserved:
+            readSourceAgent(childReviewerEvent) === "reviewer" &&
+            readSourceAgent(rootReviewerEvent) === "reviewer",
+          handoffRootSource: isRecord(rootReviewerEvent)
+            ? rootReviewerEvent.source
+            : undefined,
+        },
+      },
+    },
+  };
+}
+
 async function runDriverExecute(input: unknown): Promise<AdapterProjection> {
   const scenario = readOperationScenario(input, "driver.execute");
   const providerResponses = readModelResponseArrayProperty(
@@ -3080,6 +3447,12 @@ function findTextEventWithWorker(
   }
 
   return undefined;
+}
+
+function readSourceAgent(event: unknown): string | undefined {
+  return isRecord(event) && isRecord(event.source)
+    ? readRecordString(event.source, "agent")
+    : undefined;
 }
 
 function containsWorkerResult(messages: readonly unknown[]): boolean {

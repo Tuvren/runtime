@@ -11,6 +11,7 @@ Epic AC is closed in current repo reality.
 - The TypeScript binding appendix explicitly owns the TypeScript-only orchestration handle ergonomics while machine-owned semantics live in the packet and shared conformance plans.
 - The TypeScript framework adapter now advertises `framework.orchestration` and executes native `runtime-core` orchestration behavior through shared-runner operations.
 - Compatibility evidence and the compatibility matrix now report `framework.orchestration` for the TypeScript framework line, while Rust remains unsupported or non-applicable unless it advertises the capability.
+- The promoted packet-owned subset covers launch preconditions, run-local lifecycle locality, subtree event boundaries including child subtree availability, failed and successful `awaitResult()` behavior, handed-off descendant agent attribution, execution-surface inheritance, and nested descendant attribution. Static config snapshotting and extension scoping remain local implementation evidence only.
 
 ## Evidence Anchors
 

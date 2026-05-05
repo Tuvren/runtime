@@ -180,11 +180,21 @@
   "orchestration-event-surfaces": {
     "operation": "runtime.orchestration.event-surfaces",
     "childText": "Worker complete.",
+    "failureMessage": "worker exploded",
     "parentText": "Parent complete."
+  },
+  "orchestration-handoff-attribution": {
+    "operation": "runtime.orchestration.event-surfaces",
+    "parentText": "Parent complete.",
+    "reviewerText": "Reviewer done."
   },
   "orchestration-execution-inheritance": {
     "operation": "runtime.orchestration.execution-inheritance",
     "childToolStatus": "inherited"
+  },
+  "orchestration-spawn-running-window": {
+    "operation": "runtime.orchestration.lifecycle-locality",
+    "case": "spawn_requires_running_handle"
   },
   "orchestration-nested-attribution": {
     "operation": "runtime.orchestration.nested-attribution",

@@ -154,6 +154,38 @@
     {
       "assertions": [
         {
+          "equals": "orchestration_parent_inactive",
+          "field": "$.orchestration.lifecycle.pausedSpawnError.code",
+          "kind": "evidenceField"
+        }
+      ],
+      "checkId": "runtime-orchestration.lifecycle.paused-parent-rejects-spawn",
+      "evidence": ["orchestration.lifecycle.pausedSpawnError.code"],
+      "input": {
+        "scenarioPath": "$.orchestration-spawn-running-window"
+      },
+      "operation": "runtime.orchestration.lifecycle-locality",
+      "scenario": "runtime-api-scenarios"
+    },
+    {
+      "assertions": [
+        {
+          "equals": "orchestration_parent_inactive",
+          "field": "$.orchestration.lifecycle.completedSpawnError.code",
+          "kind": "evidenceField"
+        }
+      ],
+      "checkId": "runtime-orchestration.lifecycle.completed-parent-rejects-spawn",
+      "evidence": ["orchestration.lifecycle.completedSpawnError.code"],
+      "input": {
+        "scenarioPath": "$.orchestration-spawn-running-window"
+      },
+      "operation": "runtime.orchestration.lifecycle-locality",
+      "scenario": "runtime-api-scenarios"
+    },
+    {
+      "assertions": [
+        {
           "equals": true,
           "field": "$.orchestration.surfaces.eventsSelfOnly",
           "kind": "evidenceField"
@@ -227,6 +259,54 @@
       "evidence": ["orchestration.surfaces.noCanonicalWorkerResultInjection"],
       "input": {
         "scenarioPath": "$.orchestration-event-surfaces"
+      },
+      "operation": "runtime.orchestration.event-surfaces",
+      "scenario": "runtime-api-scenarios"
+    },
+    {
+      "assertions": [
+        {
+          "equals": true,
+          "field": "$.orchestration.surfaces.childAllEventsRemainAvailable",
+          "kind": "evidenceField"
+        }
+      ],
+      "checkId": "runtime-orchestration.surfaces.child-all-events-remains-available",
+      "evidence": ["orchestration.surfaces.childAllEventsRemainAvailable"],
+      "input": {
+        "scenarioPath": "$.orchestration-event-surfaces"
+      },
+      "operation": "runtime.orchestration.event-surfaces",
+      "scenario": "runtime-api-scenarios"
+    },
+    {
+      "assertions": [
+        {
+          "equals": true,
+          "field": "$.orchestration.surfaces.failedAwaitResultRejected",
+          "kind": "evidenceField"
+        }
+      ],
+      "checkId": "runtime-orchestration.surfaces.await-result-failure-rejects",
+      "evidence": ["orchestration.surfaces.failedAwaitResultRejected"],
+      "input": {
+        "scenarioPath": "$.orchestration-event-surfaces"
+      },
+      "operation": "runtime.orchestration.event-surfaces",
+      "scenario": "runtime-api-scenarios"
+    },
+    {
+      "assertions": [
+        {
+          "equals": true,
+          "field": "$.orchestration.surfaces.handoffDescendantAgentPreserved",
+          "kind": "evidenceField"
+        }
+      ],
+      "checkId": "runtime-orchestration.surfaces.handoff-descendant-agent-preserved",
+      "evidence": ["orchestration.surfaces.handoffDescendantAgentPreserved"],
+      "input": {
+        "scenarioPath": "$.orchestration-handoff-attribution"
       },
       "operation": "runtime.orchestration.event-surfaces",
       "scenario": "runtime-api-scenarios"

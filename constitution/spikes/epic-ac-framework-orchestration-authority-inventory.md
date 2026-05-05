@@ -42,4 +42,5 @@ Epic AC inventory is complete.
 
 - Every behavior in `docs/KrakenFrameworkSpecification.md` §10 is now classified without relying on TypeScript `runtime-core` source as semantic authority.
 - The portable shared semantics that must be promoted by Epic AC are the orchestration handle/runtime surface, launch preconditions, run-local lifecycle behavior, subtree event boundaries, descendant source attribution, explicit execution-surface inheritance, nested descendant attribution, and final visible result semantics.
+- The promoted shared-runner subset is narrower than the full inventory: static agent-config snapshotting and extension-scoping behavior remain implementation-local evidence until a later epic explicitly promotes them into packet-owned conformance.
 - TypeScript local tests remain useful implementation evidence, but future implementation lines should read the runtime-api packet, binding appendix, shared orchestration plans, and compatibility evidence instead of reverse-engineering `runtime-core` source.

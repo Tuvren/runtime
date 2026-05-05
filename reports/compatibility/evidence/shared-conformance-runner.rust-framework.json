@@ -225,8 +225,10 @@
     "runtime-orchestration.lifecycle.child-cancel-parent-completes",
     "runtime-orchestration.lifecycle.child-pause-parent-completes",
     "runtime-orchestration.lifecycle.child-resume-stays-local",
+    "runtime-orchestration.lifecycle.completed-parent-rejects-spawn",
     "runtime-orchestration.lifecycle.parent-cancel-child-completes",
     "runtime-orchestration.lifecycle.parent-pause-child-continues",
+    "runtime-orchestration.lifecycle.paused-parent-rejects-spawn",
     "runtime-orchestration.nested.child-receives-grandchild",
     "runtime-orchestration.nested.child-source-agent",
     "runtime-orchestration.nested.child-source-thread-id-present",
@@ -236,9 +238,12 @@
     "runtime-orchestration.nested.root-source-thread-id-present",
     "runtime-orchestration.nested.root-source-worker-id-present",
     "runtime-orchestration.surfaces.all-events-include-descendants",
+    "runtime-orchestration.surfaces.await-result-failure-rejects",
     "runtime-orchestration.surfaces.await-result-visible-result",
+    "runtime-orchestration.surfaces.child-all-events-remains-available",
     "runtime-orchestration.surfaces.descendant-source-attributed",
     "runtime-orchestration.surfaces.events-self-only",
+    "runtime-orchestration.surfaces.handoff-descendant-agent-preserved",
     "runtime-orchestration.surfaces.no-worker-result-injection"
   ],
   "project": "framework-rust-conformance-runner",
@@ -248,9 +253,9 @@
   "summary": {
     "failedChecks": 0,
     "passedChecks": 0,
-    "totalChecks": 228,
+    "totalChecks": 233,
     "applicableChecks": 0,
-    "nonApplicableChecks": 228
+    "nonApplicableChecks": 233
   },
   "suiteId": "tuvren.framework.promoted-authority",
   "suiteVersion": "0.1.0"
