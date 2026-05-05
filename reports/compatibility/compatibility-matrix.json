@@ -122,6 +122,14 @@
             "event-stream-ext.sse.completed-turn-source-event-types-start-with-turn-start",
             "event-stream-ext.sse.failed-provider-turn-frame-events-include-error",
             "event-stream-ext.sse.paused-approval-turn-source-events-include-approval-requested",
+            "event-stream-ext.sse.resumed-approval-turn-checkpoint-hash-format",
+            "event-stream-ext.sse.resumed-approval-turn-frame-events-contain-turn-end",
+            "event-stream-ext.sse.resumed-approval-turn-resumed-from-hash-format",
+            "event-stream-ext.sse.resumed-approval-turn-source-events-include-approval-requested",
+            "event-stream-ext.sse.resumed-approval-turn-source-events-include-approval-resolved",
+            "event-stream-ext.sse.resumed-approval-turn-source-events-include-text-delta",
+            "event-stream-ext.sse.resumed-approval-turn-source-thread-id-present",
+            "event-stream-ext.sse.resumed-approval-turn-thread-id-present",
             "react-driver-callable.after-iteration",
             "react-driver-callable.around-model",
             "react-driver-callable.around-tool",
@@ -144,9 +152,14 @@
             "runtime-callable.validation-failure",
             "runtime-callable-ext.approval-resolve.decision-call-id-matches",
             "runtime-callable-ext.approval-resolve.decision-type-approve",
+            "runtime-callable-ext.approval-resolve.executed-after-resume-includes-approved-tool",
+            "runtime-callable-ext.approval-resolve.executed-before-resume-stays-pre-approval",
             "runtime-callable-ext.approval-resolve.executed-tools-include-email",
             "runtime-callable-ext.approval-resolve.executed-tools-include-search",
+            "runtime-callable-ext.approval-resolve.paused-approval-call-id-matches",
+            "runtime-callable-ext.approval-resolve.paused-event-types-include-approval-requested",
             "runtime-callable-ext.approval-resolve.paused-phase-paused",
+            "runtime-callable-ext.approval-resolve.resumed-event-types-include-approval-resolved",
             "runtime-callable-ext.approval-resolve.resumed-phase-completed",
             "runtime-callable-ext.cancel-execution.cancel-invocation-count",
             "runtime-callable-ext.cancel-execution.error-event-count-one",
@@ -200,9 +213,9 @@
           ],
           "checkSummary": {
             "failedChecks": 0,
-            "passedChecks": 190,
-            "totalChecks": 190,
-            "applicableChecks": 190,
+            "passedChecks": 203,
+            "totalChecks": 203,
+            "applicableChecks": 203,
             "nonApplicableChecks": 0
           },
           "declaredCapabilities": [
@@ -211,8 +224,9 @@
             "framework.react-driver",
             "framework.run-liveness",
             "framework.runtime-api",
-            "providers.executed-tool-support",
-            "providers.structured-output-strictness",
+            "providers.framework-owned-approval-boundary",
+            "providers.framework-owned-tool-execution",
+            "providers.rejects-native-strict-structured-output",
             "trace.lifecycle"
           ],
           "evidencePath": "reports/compatibility/evidence/shared-conformance-runner.typescript-framework.json",
@@ -381,6 +395,18 @@
       "results": [
         {
           "checkIds": [
+            "providers-ext.approval.error-code-stable",
+            "providers-ext.approval.error-reason-stable",
+            "providers-ext.strict.error-code-stable",
+            "providers-ext.strict.error-reason-stable",
+            "providers-ext.strict.provider-call-count-zero",
+            "providers-ext.strict.stream-call-count-zero",
+            "providers-ext.strict.stream-error-code-stable",
+            "providers-ext.strict.stream-error-reason-stable",
+            "providers-ext.tool-execution.generate-error-code-stable",
+            "providers-ext.tool-execution.generate-error-reason-stable",
+            "providers-ext.tool-execution.stream-error-code-stable",
+            "providers-ext.tool-execution.stream-error-reason-stable",
             "providers.bridge.generate_mapping",
             "providers.bridge.provider_failure_normalization",
             "providers.bridge.stream_metadata_continuity",
@@ -394,16 +420,17 @@
           ],
           "checkSummary": {
             "failedChecks": 0,
-            "passedChecks": 10,
-            "totalChecks": 10,
-            "applicableChecks": 10,
+            "passedChecks": 22,
+            "totalChecks": 22,
+            "applicableChecks": 22,
             "nonApplicableChecks": 0
           },
           "declaredCapabilities": [
             "providers.ai-sdk-bridge",
-            "providers.executed-tool-support",
+            "providers.framework-owned-approval-boundary",
+            "providers.framework-owned-tool-execution",
             "providers.provider-api",
-            "providers.structured-output-strictness"
+            "providers.rejects-native-strict-structured-output"
           ],
           "evidencePath": "reports/compatibility/evidence/shared-conformance-runner.typescript-providers.json",
           "reportLabel": "TypeScript AI SDK provider bridge",
@@ -494,9 +521,9 @@
           "checkSummary": {
             "failedChecks": 0,
             "passedChecks": 0,
-            "totalChecks": 190,
+            "totalChecks": 203,
             "applicableChecks": 0,
-            "nonApplicableChecks": 190
+            "nonApplicableChecks": 203
           },
           "declaredCapabilities": [],
           "evidencePath": "reports/compatibility/evidence/shared-conformance-runner.rust-framework.json",

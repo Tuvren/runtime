@@ -347,6 +347,51 @@ function buildRuntimeApiCallablesExtended(): Plan {
         kind: "evidenceField",
       },
       ["approval.decisions.0.type"]
+    ),
+    approvalResolve(
+      "paused-approval-call-id-matches",
+      {
+        equals: "call-email",
+        field: "$.approval.pausedApprovalCallIds.0",
+        kind: "evidenceField",
+      },
+      ["approval.pausedApprovalCallIds.0"]
+    ),
+    approvalResolve(
+      "executed-before-resume-stays-pre-approval",
+      {
+        equals: ["search"],
+        field: "$.tool.execution.executedNamesBeforeResume",
+        kind: "evidenceField",
+      },
+      ["tool.execution.executedNamesBeforeResume"]
+    ),
+    approvalResolve(
+      "executed-after-resume-includes-approved-tool",
+      {
+        equals: ["search", "email"],
+        field: "$.tool.execution.executedNamesAfterResume",
+        kind: "evidenceField",
+      },
+      ["tool.execution.executedNamesAfterResume"]
+    ),
+    approvalResolve(
+      "paused-event-types-include-approval-requested",
+      {
+        contains: "approval.requested",
+        field: "$.approval.pausedEventTypes",
+        kind: "evidenceField",
+      },
+      ["approval.pausedEventTypes"]
+    ),
+    approvalResolve(
+      "resumed-event-types-include-approval-resolved",
+      {
+        contains: "approval.resolved",
+        field: "$.approval.resumedEventTypes",
+        kind: "evidenceField",
+      },
+      ["approval.resumedEventTypes"]
     )
   );
 
@@ -719,6 +764,175 @@ function buildRuntimeApiLifecycleExtended(): Plan {
     }
   );
 
+  // recover-stale-run remains a promoted run-liveness extension owned by the
+  // runtime API packet, so keep its shared checks in the lifecycle plan.
+  checks.push(
+    {
+      assertions: [
+        {
+          equals: true,
+          field: "$.recovery.sameTurn",
+          kind: "evidenceField",
+        },
+        {
+          equals: 1,
+          field: "$.recovery.originalUserMessageCount",
+          kind: "evidenceField",
+        },
+        {
+          equals: true,
+          field: "$.recovery.recoveredAssistantVisible",
+          kind: "evidenceField",
+        },
+        {
+          equals: "failed",
+          field: "$.recovery.staleRunStatus",
+          kind: "evidenceField",
+        },
+        {
+          equals: 1,
+          field: "$.recovery.preemptCalls",
+          kind: "evidenceField",
+        },
+      ],
+      capabilities: ["framework.run-liveness"],
+      checkId: "runtime-lifecycle-ext.stale-recovery.same-signal-iterate",
+      evidence: [
+        "recovery.sameTurn",
+        "recovery.originalUserMessageCount",
+        "recovery.recoveredAssistantVisible",
+        "recovery.staleRunStatus",
+        "recovery.preemptCalls",
+      ],
+      input: { scenarioPath: "$.stale-recovery-same-signal-iterate" },
+      operation: "runtime.recover-stale-run",
+      scenario: "runtime-api-scenarios",
+    },
+    {
+      assertions: [
+        {
+          equals: false,
+          field: "$.recovery.sameTurn",
+          kind: "evidenceField",
+        },
+        {
+          equals: 1,
+          field: "$.recovery.originalUserMessageCount",
+          kind: "evidenceField",
+        },
+        {
+          equals: 1,
+          field: "$.recovery.freshUserMessageCount",
+          kind: "evidenceField",
+        },
+        {
+          equals: "failed",
+          field: "$.recovery.staleRunStatus",
+          kind: "evidenceField",
+        },
+        {
+          equals: 1,
+          field: "$.recovery.preemptCalls",
+          kind: "evidenceField",
+        },
+      ],
+      capabilities: ["framework.run-liveness"],
+      checkId: "runtime-lifecycle-ext.stale-recovery.signal-mismatch-fresh-turn",
+      evidence: [
+        "recovery.sameTurn",
+        "recovery.originalUserMessageCount",
+        "recovery.freshUserMessageCount",
+        "recovery.staleRunStatus",
+        "recovery.preemptCalls",
+      ],
+      input: { scenarioPath: "$.stale-recovery-signal-mismatch" },
+      operation: "runtime.recover-stale-run",
+      scenario: "runtime-api-scenarios",
+    },
+    {
+      assertions: [
+        {
+          equals: true,
+          field: "$.recovery.sameTurn",
+          kind: "evidenceField",
+        },
+        {
+          equals: "completed",
+          field: "$.recovery.phase",
+          kind: "evidenceField",
+        },
+        {
+          equals: "reviewer",
+          field: "$.recovery.activeAgent",
+          kind: "evidenceField",
+        },
+        {
+          equals: "reviewer",
+          field: "$.recovery.branchStatusActiveAgent",
+          kind: "evidenceField",
+        },
+        {
+          equals: "failed",
+          field: "$.recovery.staleRunStatus",
+          kind: "evidenceField",
+        },
+      ],
+      capabilities: ["framework.run-liveness"],
+      checkId: "runtime-lifecycle-ext.stale-recovery.handoff-context-active-agent",
+      evidence: [
+        "recovery.sameTurn",
+        "recovery.phase",
+        "recovery.activeAgent",
+        "recovery.branchStatusActiveAgent",
+        "recovery.staleRunStatus",
+      ],
+      input: { scenarioPath: "$.stale-recovery-handoff-context" },
+      operation: "runtime.recover-stale-run",
+      scenario: "runtime-api-scenarios",
+    },
+    {
+      assertions: [
+        {
+          equals: true,
+          field: "$.recovery.sameTurn",
+          kind: "evidenceField",
+        },
+        {
+          equals: "completed",
+          field: "$.recovery.phase",
+          kind: "evidenceField",
+        },
+        {
+          equals: 0,
+          field: "$.recovery.driverExecuteCalls",
+          kind: "evidenceField",
+        },
+        {
+          equals: "completed",
+          field: "$.recovery.branchRuntimePhase",
+          kind: "evidenceField",
+        },
+        {
+          equals: "failed",
+          field: "$.recovery.staleRunStatus",
+          kind: "evidenceField",
+        },
+      ],
+      capabilities: ["framework.run-liveness"],
+      checkId: "runtime-lifecycle-ext.stale-recovery.finalize-terminal-status",
+      evidence: [
+        "recovery.sameTurn",
+        "recovery.phase",
+        "recovery.driverExecuteCalls",
+        "recovery.branchRuntimePhase",
+        "recovery.staleRunStatus",
+      ],
+      input: { scenarioPath: "$.stale-recovery-finalize-status" },
+      operation: "runtime.recover-stale-run",
+      scenario: "runtime-api-scenarios",
+    }
+  );
+
   return {
     applicability: { capabilities: ["framework.runtime-api"] },
     checks,
@@ -861,6 +1075,78 @@ function buildEventStreamExtended(): Plan {
       },
       ["sourceEventTypes"],
       "$.paused-approval-turn"
+    ),
+    sseProjection(
+      "resumed-approval-turn-source-events-include-approval-requested",
+      {
+        contains: "approval.requested",
+        field: "$.sourceEventTypes",
+        kind: "evidenceField",
+      },
+      ["sourceEventTypes"],
+      "$.resumed-approval-turn"
+    ),
+    sseProjection(
+      "resumed-approval-turn-source-events-include-approval-resolved",
+      {
+        contains: "approval.resolved",
+        field: "$.sourceEventTypes",
+        kind: "evidenceField",
+      },
+      ["sourceEventTypes"],
+      "$.resumed-approval-turn"
+    ),
+    sseProjection(
+      "resumed-approval-turn-frame-events-contain-turn-end",
+      {
+        contains: "turn.end",
+        field: "$.frameEvents",
+        kind: "evidenceField",
+      },
+      ["frameEvents"],
+      "$.resumed-approval-turn"
+    ),
+    sseProjection(
+      "resumed-approval-turn-thread-id-present",
+      { field: "$.threadIds.0", kind: "evidenceField" },
+      ["threadIds.0"],
+      "$.resumed-approval-turn"
+    ),
+    sseProjection(
+      "resumed-approval-turn-source-thread-id-present",
+      { field: "$.sourceThreadIds.0", kind: "evidenceField" },
+      ["sourceThreadIds.0"],
+      "$.resumed-approval-turn"
+    ),
+    sseProjection(
+      "resumed-approval-turn-checkpoint-hash-format",
+      {
+        field: "$.checkpointHashes.0",
+        kind: "evidenceField",
+        matches: "^[a-f0-9]{64}$",
+      },
+      ["checkpointHashes.0"],
+      "$.resumed-approval-turn"
+    ),
+    sseProjection(
+      "resumed-approval-turn-resumed-from-hash-format",
+      {
+        field: "$.resumedFromHashes.0",
+        kind: "evidenceField",
+        matches: "^[a-f0-9]{64}$",
+      },
+      ["resumedFromHashes.0"],
+      "$.resumed-approval-turn"
+    ),
+    sseProjection(
+      "resumed-approval-turn-source-events-include-text-delta",
+      {
+        contains: "text.delta",
+        field: "$.sourceEventTypes",
+        kind: "evidenceField",
+      },
+      ["sourceEventTypes"],
+      "$.resumed-approval-turn"
     )
   );
 

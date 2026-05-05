@@ -43,10 +43,9 @@ const PLANS_DIR = resolve(REPO_ROOT, "boundaries/providers/conformance/plans");
 await main();
 
 async function main(): Promise<void> {
-  // Coverage and negative-shape probes against undeclared providers.bridge.*
-  // operations were removed: the shared plan validator only accepts operations
-  // declared by the providers operation source. Bringing those operations
-  // under authority is a separate spec amendment.
+  // Extended provider coverage stays on the operations already declared by the
+  // core provider bridge plan, so validate-plans can still reject undeclared
+  // providers.bridge.* additions instead of learning them from this file.
   const extended = buildExtended();
 
   const filePath = resolve(PLANS_DIR, "provider-api-bridge-extended.json");

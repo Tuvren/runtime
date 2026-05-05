@@ -214,6 +214,132 @@
     {
       "assertions": [
         {
+          "contains": "approval.requested",
+          "field": "$.sourceEventTypes",
+          "kind": "evidenceField"
+        }
+      ],
+      "checkId": "event-stream-ext.sse.resumed-approval-turn-source-events-include-approval-requested",
+      "evidence": ["sourceEventTypes"],
+      "input": {
+        "scenarioPath": "$.resumed-approval-turn"
+      },
+      "operation": "event-stream.runtime-sse-projection",
+      "scenario": "event-stream-scenarios"
+    },
+    {
+      "assertions": [
+        {
+          "contains": "approval.resolved",
+          "field": "$.sourceEventTypes",
+          "kind": "evidenceField"
+        }
+      ],
+      "checkId": "event-stream-ext.sse.resumed-approval-turn-source-events-include-approval-resolved",
+      "evidence": ["sourceEventTypes"],
+      "input": {
+        "scenarioPath": "$.resumed-approval-turn"
+      },
+      "operation": "event-stream.runtime-sse-projection",
+      "scenario": "event-stream-scenarios"
+    },
+    {
+      "assertions": [
+        {
+          "contains": "turn.end",
+          "field": "$.frameEvents",
+          "kind": "evidenceField"
+        }
+      ],
+      "checkId": "event-stream-ext.sse.resumed-approval-turn-frame-events-contain-turn-end",
+      "evidence": ["frameEvents"],
+      "input": {
+        "scenarioPath": "$.resumed-approval-turn"
+      },
+      "operation": "event-stream.runtime-sse-projection",
+      "scenario": "event-stream-scenarios"
+    },
+    {
+      "assertions": [
+        {
+          "field": "$.threadIds.0",
+          "kind": "evidenceField"
+        }
+      ],
+      "checkId": "event-stream-ext.sse.resumed-approval-turn-thread-id-present",
+      "evidence": ["threadIds.0"],
+      "input": {
+        "scenarioPath": "$.resumed-approval-turn"
+      },
+      "operation": "event-stream.runtime-sse-projection",
+      "scenario": "event-stream-scenarios"
+    },
+    {
+      "assertions": [
+        {
+          "field": "$.sourceThreadIds.0",
+          "kind": "evidenceField"
+        }
+      ],
+      "checkId": "event-stream-ext.sse.resumed-approval-turn-source-thread-id-present",
+      "evidence": ["sourceThreadIds.0"],
+      "input": {
+        "scenarioPath": "$.resumed-approval-turn"
+      },
+      "operation": "event-stream.runtime-sse-projection",
+      "scenario": "event-stream-scenarios"
+    },
+    {
+      "assertions": [
+        {
+          "field": "$.checkpointHashes.0",
+          "kind": "evidenceField",
+          "matches": "^[a-f0-9]{64}$"
+        }
+      ],
+      "checkId": "event-stream-ext.sse.resumed-approval-turn-checkpoint-hash-format",
+      "evidence": ["checkpointHashes.0"],
+      "input": {
+        "scenarioPath": "$.resumed-approval-turn"
+      },
+      "operation": "event-stream.runtime-sse-projection",
+      "scenario": "event-stream-scenarios"
+    },
+    {
+      "assertions": [
+        {
+          "field": "$.resumedFromHashes.0",
+          "kind": "evidenceField",
+          "matches": "^[a-f0-9]{64}$"
+        }
+      ],
+      "checkId": "event-stream-ext.sse.resumed-approval-turn-resumed-from-hash-format",
+      "evidence": ["resumedFromHashes.0"],
+      "input": {
+        "scenarioPath": "$.resumed-approval-turn"
+      },
+      "operation": "event-stream.runtime-sse-projection",
+      "scenario": "event-stream-scenarios"
+    },
+    {
+      "assertions": [
+        {
+          "contains": "text.delta",
+          "field": "$.sourceEventTypes",
+          "kind": "evidenceField"
+        }
+      ],
+      "checkId": "event-stream-ext.sse.resumed-approval-turn-source-events-include-text-delta",
+      "evidence": ["sourceEventTypes"],
+      "input": {
+        "scenarioPath": "$.resumed-approval-turn"
+      },
+      "operation": "event-stream.runtime-sse-projection",
+      "scenario": "event-stream-scenarios"
+    },
+    {
+      "assertions": [
+        {
           "equals": "turn.start",
           "field": "$.firstDirectEventType",
           "kind": "evidenceField"

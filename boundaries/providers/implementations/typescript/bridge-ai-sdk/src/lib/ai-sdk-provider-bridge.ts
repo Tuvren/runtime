@@ -985,6 +985,7 @@ function createCallOptions(input: {
       {
         modelId: input.model.modelId,
         provider: input.model.provider,
+        reason: "native_strict_structured_output_unsupported",
         responseFormatName: responseFormat.name,
       }
     );
@@ -1542,6 +1543,7 @@ function appendGenerateContentPart(
         "unsupported_ai_sdk_content",
         {
           partType: contentPart.type,
+          reason: "provider_owned_tool_result_unsupported",
           toolName: contentPart.toolName,
         }
       );
@@ -1551,6 +1553,7 @@ function appendGenerateContentPart(
         "unsupported_ai_sdk_content",
         {
           partType: contentPart.type,
+          reason: "provider_owned_tool_approval_unsupported",
         }
       );
     case "source":
@@ -2736,6 +2739,7 @@ function rejectUnsupportedProviderOwnedToolPart(
       {
         modelId: model.modelId,
         provider: model.provider,
+        reason: "provider_owned_tool_execution_unsupported",
         toolName: part.toolName,
       }
     );
@@ -2785,6 +2789,15 @@ function unsupportedStreamPartError(
       modelId: model.modelId,
       partType,
       provider: model.provider,
+      ...(partType === "tool-approval-request"
+        ? {
+            reason: "provider_owned_tool_approval_unsupported",
+          }
+        : partType === "tool-result"
+          ? {
+              reason: "provider_owned_tool_result_unsupported",
+            }
+          : {}),
     }
   );
 }

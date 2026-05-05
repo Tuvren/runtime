@@ -372,6 +372,86 @@
     {
       "assertions": [
         {
+          "equals": "call-email",
+          "field": "$.approval.pausedApprovalCallIds.0",
+          "kind": "evidenceField"
+        }
+      ],
+      "checkId": "runtime-callable-ext.approval-resolve.paused-approval-call-id-matches",
+      "evidence": ["approval.pausedApprovalCallIds.0"],
+      "input": {
+        "scenarioPath": "$.paused-turn-resume"
+      },
+      "operation": "runtime.approval-resolve",
+      "scenario": "runtime-api-scenarios"
+    },
+    {
+      "assertions": [
+        {
+          "equals": ["search"],
+          "field": "$.tool.execution.executedNamesBeforeResume",
+          "kind": "evidenceField"
+        }
+      ],
+      "checkId": "runtime-callable-ext.approval-resolve.executed-before-resume-stays-pre-approval",
+      "evidence": ["tool.execution.executedNamesBeforeResume"],
+      "input": {
+        "scenarioPath": "$.paused-turn-resume"
+      },
+      "operation": "runtime.approval-resolve",
+      "scenario": "runtime-api-scenarios"
+    },
+    {
+      "assertions": [
+        {
+          "equals": ["search", "email"],
+          "field": "$.tool.execution.executedNamesAfterResume",
+          "kind": "evidenceField"
+        }
+      ],
+      "checkId": "runtime-callable-ext.approval-resolve.executed-after-resume-includes-approved-tool",
+      "evidence": ["tool.execution.executedNamesAfterResume"],
+      "input": {
+        "scenarioPath": "$.paused-turn-resume"
+      },
+      "operation": "runtime.approval-resolve",
+      "scenario": "runtime-api-scenarios"
+    },
+    {
+      "assertions": [
+        {
+          "contains": "approval.requested",
+          "field": "$.approval.pausedEventTypes",
+          "kind": "evidenceField"
+        }
+      ],
+      "checkId": "runtime-callable-ext.approval-resolve.paused-event-types-include-approval-requested",
+      "evidence": ["approval.pausedEventTypes"],
+      "input": {
+        "scenarioPath": "$.paused-turn-resume"
+      },
+      "operation": "runtime.approval-resolve",
+      "scenario": "runtime-api-scenarios"
+    },
+    {
+      "assertions": [
+        {
+          "contains": "approval.resolved",
+          "field": "$.approval.resumedEventTypes",
+          "kind": "evidenceField"
+        }
+      ],
+      "checkId": "runtime-callable-ext.approval-resolve.resumed-event-types-include-approval-resolved",
+      "evidence": ["approval.resumedEventTypes"],
+      "input": {
+        "scenarioPath": "$.paused-turn-resume"
+      },
+      "operation": "runtime.approval-resolve",
+      "scenario": "runtime-api-scenarios"
+    },
+    {
+      "assertions": [
+        {
           "equals": "fail",
           "field": "$.validation.resolutionType",
           "kind": "evidenceField"
