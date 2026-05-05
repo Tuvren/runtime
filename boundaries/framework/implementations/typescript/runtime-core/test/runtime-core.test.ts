@@ -1044,6 +1044,166 @@ describe("framework-runtime-core", () => {
     expect(handle.status().activeAgent).toBe("reviewer");
   });
 
+  test("recovers a stale incorporate_steering run without replaying the non-durable steering", async () => {
+    const harness = createFakeKernelHarness();
+    const livenessHarness = createFakeRunLivenessKernelHarness(harness);
+    const driver = {
+      async execute(context) {
+        expect(
+          countUserTextMessages(context.messages, "Continue base request")
+        ).toBe(1);
+        expect(
+          countUserTextMessages(context.messages, "Non-durable steering")
+        ).toBe(0);
+        return {
+          messages: [assistantText("Recovered steering continued.")],
+          resolution: {
+            reason: "done",
+            type: "end_turn",
+          },
+        };
+      },
+      id: "fake",
+      async resume() {
+        throw new Error("resume was not expected");
+      },
+    } satisfies KrakenDriver;
+    const runtime = createTuvrenRuntimeCore({
+      defaultDriverId: "fake",
+      driverRegistry: createDriverRegistry([driver]),
+      kernel: livenessHarness.kernel,
+      runLiveness: {
+        executionOwnerId: "worker-1",
+        leaseDurationMs: 50,
+      },
+    });
+    const thread = await runtime.createThread({});
+    const staleTurn = await livenessHarness.kernel.turn.create(
+      "turn_stale_steering_recovery",
+      thread.threadId,
+      thread.branchId,
+      null,
+      thread.rootTurnNodeHash
+    );
+    await livenessHarness.kernel.runLiveness.createLeasedRun({
+      branchId: thread.branchId,
+      executionOwnerId: "worker-stale",
+      leaseExpiresAtMs: 1,
+      runId: "run_stale_steering_recovery",
+      schemaId: DEFAULT_AGENT_SCHEMA.schemaId,
+      startTurnNodeHash: thread.rootTurnNodeHash,
+      steps: [
+        { deterministic: false, id: "incorporate_steering", sideEffects: true },
+      ],
+      turnId: staleTurn.turnId,
+    });
+    await livenessHarness.kernel.staging.stage(
+      "run_stale_steering_recovery",
+      encodeDeterministicKernelRecord({
+        parts: [
+          {
+            text: "Continue base request",
+            type: "text",
+          },
+        ],
+        role: "user",
+      }),
+      "stale_steering_user_message",
+      "message",
+      "completed"
+    );
+
+    const handle = runtime.executeTurn({
+      branchId: thread.branchId,
+      config: { name: "primary" },
+      signal: textSignal("Continue base request"),
+      threadId: thread.threadId,
+    });
+
+    await collectEvents(handle.events());
+
+    expect(handle.status().phase).toBe("completed");
+  });
+
+  test("completes a stale finalize_turn_status recovery from durable terminal runtime status", async () => {
+    const harness = createFakeKernelHarness();
+    const livenessHarness = createFakeRunLivenessKernelHarness(harness);
+    const driver = {
+      async execute() {
+        throw new Error("execute was not expected");
+      },
+      id: "fake",
+      async resume() {
+        throw new Error("resume was not expected");
+      },
+    } satisfies KrakenDriver;
+    const runtime = createTuvrenRuntimeCore({
+      defaultDriverId: "fake",
+      driverRegistry: createDriverRegistry([driver]),
+      kernel: livenessHarness.kernel,
+      runLiveness: {
+        executionOwnerId: "worker-1",
+        leaseDurationMs: 50,
+      },
+    });
+    const thread = await runtime.createThread({});
+    const staleTurn = await livenessHarness.kernel.turn.create(
+      "turn_stale_finalize_recovery",
+      thread.threadId,
+      thread.branchId,
+      null,
+      thread.rootTurnNodeHash
+    );
+    await livenessHarness.kernel.runLiveness.createLeasedRun({
+      branchId: thread.branchId,
+      executionOwnerId: "worker-stale",
+      leaseExpiresAtMs: 1,
+      runId: "run_stale_finalize_recovery",
+      schemaId: DEFAULT_AGENT_SCHEMA.schemaId,
+      startTurnNodeHash: thread.rootTurnNodeHash,
+      steps: [
+        { deterministic: false, id: "finalize_turn_status", sideEffects: true },
+      ],
+      turnId: staleTurn.turnId,
+    });
+    await livenessHarness.kernel.staging.stage(
+      "run_stale_finalize_recovery",
+      encodeDeterministicKernelRecord({
+        parts: [
+          {
+            text: "Finalize this recovered turn",
+            type: "text",
+          },
+        ],
+        role: "user",
+      }),
+      "stale_finalize_user_message",
+      "message",
+      "completed"
+    );
+    await livenessHarness.kernel.staging.stage(
+      "run_stale_finalize_recovery",
+      encodeDeterministicKernelRecord({
+        activeAgent: "primary",
+        state: "completed",
+      }),
+      "stale_finalize_runtime_status",
+      "runtime_status",
+      "completed"
+    );
+
+    const handle = runtime.executeTurn({
+      branchId: thread.branchId,
+      config: { name: "primary" },
+      signal: textSignal("Finalize this recovered turn"),
+      threadId: thread.threadId,
+    });
+
+    await collectEvents(handle.events());
+
+    expect(handle.status().phase).toBe("completed");
+  });
+
   test("tool registries snapshot tool definitions instead of exposing live references", () => {
     const originalMetadata = {
       channel: "primary",

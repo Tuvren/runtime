@@ -272,8 +272,12 @@ interface HelperBundle {
 
 interface ExpiredExecutionRecovery {
   activeAgentName?: string;
-  mode?: "reuse_turn" | "skip_fresh_prelude";
+  mode?:
+    | "reuse_turn"
+    | "skip_fresh_prelude"
+    | "complete_terminal_status";
   preempted: boolean;
+  runtimeStatus?: DurableRuntimeStatus;
   turnId?: string;
 }
 
@@ -564,6 +568,18 @@ class RuntimeCore implements TuvrenRuntime {
         resumedStart !== undefined &&
         (await this.finishResumedExecutionStart(handle, schemaId, loopState))
       ) {
+        return;
+      }
+
+      if (
+        resumedStart === undefined &&
+        recoveredExecution?.mode === "complete_terminal_status"
+      ) {
+        await this.completeRecoveredTerminalExecution(
+          handle,
+          loopState,
+          recoveredExecution
+        );
         return;
       }
 
@@ -3413,6 +3429,12 @@ class RuntimeCore implements TuvrenRuntime {
   private async readRecoveredActiveAgentName(
     turnTreeHash: HashString
   ): Promise<string | undefined> {
+    return (await this.readRecoveredRuntimeStatus(turnTreeHash))?.activeAgent;
+  }
+
+  private async readRecoveredRuntimeStatus(
+    turnTreeHash: HashString
+  ): Promise<DurableRuntimeStatus | undefined> {
     const runtimeStatusHash = toOptionalHash(
       await this.options.kernel.tree.resolve(turnTreeHash, "runtime.status")
     );
@@ -3429,9 +3451,29 @@ class RuntimeCore implements TuvrenRuntime {
 
     const runtimeStatus = decodeDeterministicKernelRecord(payload);
 
-    return isRecord(runtimeStatus) && typeof runtimeStatus.activeAgent === "string"
-      ? runtimeStatus.activeAgent
-      : undefined;
+    if (
+      !isRecord(runtimeStatus) ||
+      typeof runtimeStatus.state !== "string" ||
+      (runtimeStatus.state !== "completed" &&
+        runtimeStatus.state !== "failed" &&
+        runtimeStatus.state !== "paused" &&
+        runtimeStatus.state !== "running")
+    ) {
+      return undefined;
+    }
+
+    return {
+      ...(typeof runtimeStatus.activeAgent === "string"
+        ? { activeAgent: runtimeStatus.activeAgent }
+        : {}),
+      ...(typeof runtimeStatus.partial === "boolean"
+        ? { partial: runtimeStatus.partial }
+        : {}),
+      ...(typeof runtimeStatus.pauseReason === "string"
+        ? { pauseReason: runtimeStatus.pauseReason }
+        : {}),
+      state: runtimeStatus.state,
+    };
   }
 
   private async readManifest(hash: HashString): Promise<ContextManifest> {
@@ -3878,6 +3920,9 @@ class RuntimeCore implements TuvrenRuntime {
       ),
       mode: classifyRecoveredExecutionMode(recoveryState),
       preempted: true,
+      runtimeStatus: await this.readRecoveredRuntimeStatus(
+        recoveredHeadState.turnNode.turnTreeHash
+      ),
       turnId: expiredRun.turnId,
     };
   }
@@ -3902,6 +3947,44 @@ class RuntimeCore implements TuvrenRuntime {
     }
 
     return completion;
+  }
+
+  private async completeRecoveredTerminalExecution(
+    handle: RuntimeExecutionHandle,
+    loopState: LoopState,
+    recoveredExecution: ExpiredExecutionRecovery
+  ): Promise<void> {
+    const recoveredRuntimeStatus = recoveredExecution.runtimeStatus;
+
+    if (
+      recoveredRuntimeStatus === undefined ||
+      (recoveredRuntimeStatus.state !== "completed" &&
+        recoveredRuntimeStatus.state !== "failed")
+    ) {
+      throw new TuvrenRuntimeError(
+        "recovered terminal execution requires a durable terminal runtime status",
+        { code: "missing_recovered_terminal_status" }
+      );
+    }
+
+    const recoveredHeadState = await this.loadHeadState(handle.request.branchId);
+    handle.replaceStatus({
+      activeAgent:
+        recoveredRuntimeStatus.activeAgent ?? loopState.activeConfig.name,
+      iterationCount: handle.status().iterationCount,
+      manifest: recoveredHeadState.manifest,
+      phase: recoveredRuntimeStatus.state,
+    });
+    this.publishEvent(
+      handle,
+      {
+        status: recoveredRuntimeStatus.state,
+        timestamp: this.now(),
+        turnId: handle.turnId,
+        type: "turn.end",
+      },
+      loopState
+    );
   }
 
   private resolveRunLivenessKernel():
@@ -5088,9 +5171,12 @@ function classifyRecoveredExecutionMode(
     case "iterate":
     case "commit_extension_state":
     case "context_engineering":
+    case "incorporate_steering":
     case "handoff_context":
     case "resume_running_status":
       return "skip_fresh_prelude";
+    case "finalize_turn_status":
+      return "complete_terminal_status";
     default:
       throw new TuvrenRuntimeError(
         "stale run recovery cannot safely resume the recovered phase",
