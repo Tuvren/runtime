@@ -269,6 +269,10 @@ interface HelperBundle {
   resolveHashes(hashes: HashString[]): HashString[];
 }
 
+interface RecoveredExecutionStart {
+  turnId: string;
+}
+
 class FinalizationFailure extends Error {
   readonly finalizationError: Error;
   readonly rootCause?: Error;
@@ -493,9 +497,20 @@ class RuntimeCore implements TuvrenRuntime {
 
       const schemaId = await this.resolveExecutionSchemaId(handle.request);
       handle.setSchemaId(schemaId);
-      await this.recoverExpiredExecutionBranchIfNeeded(handle.request.branchId);
+      const recoveredExecution = await this.recoverExpiredExecutionBranchIfNeeded(
+        handle.request.branchId
+      );
+
+      if (recoveredExecution !== undefined) {
+        handle.setTurnId(recoveredExecution.turnId);
+      }
+
       const branchHeadHash = await this.resolveExecutionBranchHead(handle);
-      await this.createExecutionTurnIfNeeded(handle, branchHeadHash);
+      await this.createExecutionTurnIfNeeded(
+        handle,
+        branchHeadHash,
+        recoveredExecution
+      );
       const loopState = this.createExecutionLoopState(handle);
 
       const resumedStart = await this.prepareResumedExecutionStartPrelude(
@@ -540,7 +555,12 @@ class RuntimeCore implements TuvrenRuntime {
 
       if (
         resumedStart === undefined &&
-        (await this.prepareFreshExecutionStart(handle, schemaId, loopState))
+        (await this.prepareFreshExecutionStart(
+          handle,
+          schemaId,
+          loopState,
+          recoveredExecution
+        ))
       ) {
         return;
       }
@@ -601,9 +621,10 @@ class RuntimeCore implements TuvrenRuntime {
 
   private async createExecutionTurnIfNeeded(
     handle: RuntimeExecutionHandle,
-    branchHeadHash: HashString
+    branchHeadHash: HashString,
+    recoveredExecution: RecoveredExecutionStart | undefined
   ): Promise<void> {
-    if (handle.resumedFrom !== undefined) {
+    if (handle.resumedFrom !== undefined || recoveredExecution !== undefined) {
       return;
     }
 
@@ -661,9 +682,13 @@ class RuntimeCore implements TuvrenRuntime {
   private async prepareFreshExecutionStart(
     handle: RuntimeExecutionHandle,
     schemaId: string,
-    loopState: LoopState
+    loopState: LoopState,
+    recoveredExecution: RecoveredExecutionStart | undefined
   ): Promise<boolean> {
-    await this.incorporateInput(handle, schemaId, loopState);
+    if (recoveredExecution === undefined) {
+      await this.incorporateInput(handle, schemaId, loopState);
+    }
+
     const headState = await this.loadHeadState(handle.request.branchId);
     handle.updateStatus({
       activeAgent: loopState.activeConfig.name,
@@ -3730,12 +3755,12 @@ class RuntimeCore implements TuvrenRuntime {
 
   private async recoverExpiredExecutionBranchIfNeeded(
     branchId: string
-  ): Promise<void> {
+  ): Promise<RecoveredExecutionStart | undefined> {
     const livenessKernel = this.resolveRunLivenessKernel();
     const livenessOptions = this.options.runLiveness;
 
     if (livenessKernel === undefined || livenessOptions === undefined) {
-      return;
+      return undefined;
     }
 
     // Recovery has to happen before we resolve the branch head and parent turn,
@@ -3745,7 +3770,7 @@ class RuntimeCore implements TuvrenRuntime {
       .at(0);
 
     if (expiredRun === undefined) {
-      return;
+      return undefined;
     }
 
     await livenessKernel.runLiveness.preemptExpired(
@@ -3754,6 +3779,9 @@ class RuntimeCore implements TuvrenRuntime {
       this.now(),
       "stale_running_recovery"
     );
+    return {
+      turnId: expiredRun.turnId,
+    };
   }
 
   private async completeTrackedRun(

@@ -351,6 +351,7 @@ export function createRuntimeKernel(
           const { pendingSignalsCbor: _s, ...coreRun } = storedRun;
           const updatedRun: StoredRun = {
             ...coreRun,
+            ...createRunningLeaseUpdate(storedRun, createFencingToken),
             createdTurnNodesCbor: encodeRecord(nextCreatedTurnNodes),
             currentStepIndex: Math.min(
               run.currentStepIndex + 1,
@@ -2021,6 +2022,33 @@ function clearStoredRunLease(
   } = record;
 
   return coreRecord;
+}
+
+function createRunningLeaseUpdate(
+  run: StoredRun,
+  createFencingToken: () => string
+):
+  | {
+      executionOwnerId: string;
+      fencingToken: string;
+      leaseExpiresAtMs: EpochMs;
+    }
+  | {} {
+  if (
+    run.executionOwnerId === undefined ||
+    run.fencingToken === undefined ||
+    run.leaseExpiresAtMs === undefined
+  ) {
+    return {};
+  }
+
+  // Every durable running-state mutation rotates the fencing token so stale
+  // owners are fenced off as soon as a new checkpoint or step write commits.
+  return {
+    executionOwnerId: run.executionOwnerId,
+    fencingToken: createFencingToken(),
+    leaseExpiresAtMs: run.leaseExpiresAtMs,
+  };
 }
 
 function assertLeasedRunCreateInput(input: {

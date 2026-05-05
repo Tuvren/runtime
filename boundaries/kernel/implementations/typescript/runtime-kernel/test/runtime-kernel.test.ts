@@ -337,6 +337,43 @@ describe("createRuntimeKernel", () => {
     expect(renewed.fencingToken).not.toBe(run.fencingToken);
   });
 
+  test("run.completeStep rotates the fencing token for leased running runs", async () => {
+    const fixture = await createThreadFixture({
+      branchId: "branch_leased_complete_step",
+      now: () => 10,
+      threadId: "thread_leased_complete_step",
+    });
+    const turn = await fixture.kernel.turn.create(
+      "turn_leased_complete_step",
+      fixture.threadId,
+      fixture.branchId,
+      null,
+      fixture.rootTurnNodeHash
+    );
+    const leasedRun = await fixture.kernel.runLiveness.createLeasedRun({
+      branchId: fixture.branchId,
+      executionOwnerId: "owner-alpha",
+      leaseExpiresAtMs: 50,
+      runId: "run_leased_complete_step",
+      schemaId: fixture.schemaId,
+      startTurnNodeHash: fixture.rootTurnNodeHash,
+      steps: [{ deterministic: false, id: "iterate", sideEffects: true }],
+      turnId: turn.turnId,
+    });
+
+    await fixture.kernel.run.beginStep(leasedRun.runId, "iterate");
+    await fixture.kernel.run.completeStep(leasedRun.runId, "iterate");
+
+    await expect(
+      fixture.kernel.runLiveness.renewLease(
+        leasedRun.runId,
+        "owner-alpha",
+        leasedRun.fencingToken ?? "",
+        75
+      )
+    ).rejects.toThrow("fencing token");
+  });
+
   test("runLiveness.listExpired excludes paused and non-expired runs", async () => {
     let currentNow = 10;
     const fixture = await createThreadFixture({

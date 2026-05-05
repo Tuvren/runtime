@@ -542,9 +542,10 @@ describe("framework-runtime-core", () => {
       threadId: thread.threadId,
     });
 
-    await collectEvents(handle.events());
+    const events = await collectEvents(handle.events());
 
     expect(handle.status().phase).toBe("completed");
+    expect(extractTurnId(events)).toBe(staleTurn.turnId);
     expect(livenessHarness.getPreemptCalls()).toBe(1);
     expect(
       (await harness.readBranchRuns(thread.branchId)).find(
