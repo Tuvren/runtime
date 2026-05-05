@@ -347,6 +347,51 @@ function buildRuntimeApiCallablesExtended(): Plan {
         kind: "evidenceField",
       },
       ["approval.decisions.0.type"]
+    ),
+    approvalResolve(
+      "paused-approval-call-id-matches",
+      {
+        equals: "call-email",
+        field: "$.approval.pausedApprovalCallIds.0",
+        kind: "evidenceField",
+      },
+      ["approval.pausedApprovalCallIds.0"]
+    ),
+    approvalResolve(
+      "executed-before-resume-stays-pre-approval",
+      {
+        equals: ["search"],
+        field: "$.tool.execution.executedNamesBeforeResume",
+        kind: "evidenceField",
+      },
+      ["tool.execution.executedNamesBeforeResume"]
+    ),
+    approvalResolve(
+      "executed-after-resume-includes-approved-tool",
+      {
+        equals: ["search", "email"],
+        field: "$.tool.execution.executedNamesAfterResume",
+        kind: "evidenceField",
+      },
+      ["tool.execution.executedNamesAfterResume"]
+    ),
+    approvalResolve(
+      "paused-event-types-include-approval-requested",
+      {
+        contains: "approval.requested",
+        field: "$.approval.pausedEventTypes",
+        kind: "evidenceField",
+      },
+      ["approval.pausedEventTypes"]
+    ),
+    approvalResolve(
+      "resumed-event-types-include-approval-resolved",
+      {
+        contains: "approval.resolved",
+        field: "$.approval.resumedEventTypes",
+        kind: "evidenceField",
+      },
+      ["approval.resumedEventTypes"]
     )
   );
 
@@ -861,6 +906,78 @@ function buildEventStreamExtended(): Plan {
       },
       ["sourceEventTypes"],
       "$.paused-approval-turn"
+    ),
+    sseProjection(
+      "resumed-approval-turn-source-events-include-approval-requested",
+      {
+        contains: "approval.requested",
+        field: "$.sourceEventTypes",
+        kind: "evidenceField",
+      },
+      ["sourceEventTypes"],
+      "$.resumed-approval-turn"
+    ),
+    sseProjection(
+      "resumed-approval-turn-source-events-include-approval-resolved",
+      {
+        contains: "approval.resolved",
+        field: "$.sourceEventTypes",
+        kind: "evidenceField",
+      },
+      ["sourceEventTypes"],
+      "$.resumed-approval-turn"
+    ),
+    sseProjection(
+      "resumed-approval-turn-frame-events-contain-turn-end",
+      {
+        contains: "turn.end",
+        field: "$.frameEvents",
+        kind: "evidenceField",
+      },
+      ["frameEvents"],
+      "$.resumed-approval-turn"
+    ),
+    sseProjection(
+      "resumed-approval-turn-thread-id-present",
+      { field: "$.threadIds.0", kind: "evidenceField" },
+      ["threadIds.0"],
+      "$.resumed-approval-turn"
+    ),
+    sseProjection(
+      "resumed-approval-turn-source-thread-id-present",
+      { field: "$.sourceThreadIds.0", kind: "evidenceField" },
+      ["sourceThreadIds.0"],
+      "$.resumed-approval-turn"
+    ),
+    sseProjection(
+      "resumed-approval-turn-checkpoint-hash-format",
+      {
+        field: "$.checkpointHashes.0",
+        kind: "evidenceField",
+        matches: "^[a-f0-9]{64}$",
+      },
+      ["checkpointHashes.0"],
+      "$.resumed-approval-turn"
+    ),
+    sseProjection(
+      "resumed-approval-turn-resumed-from-hash-format",
+      {
+        field: "$.resumedFromHashes.0",
+        kind: "evidenceField",
+        matches: "^[a-f0-9]{64}$",
+      },
+      ["resumedFromHashes.0"],
+      "$.resumed-approval-turn"
+    ),
+    sseProjection(
+      "resumed-approval-turn-source-events-include-text-delta",
+      {
+        contains: "text.delta",
+        field: "$.sourceEventTypes",
+        kind: "evidenceField",
+      },
+      ["sourceEventTypes"],
+      "$.resumed-approval-turn"
     )
   );
 

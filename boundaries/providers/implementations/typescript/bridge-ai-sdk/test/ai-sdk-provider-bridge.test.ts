@@ -1721,11 +1721,17 @@ describe("provider-bridge-ai-sdk", () => {
   });
 
   test("rejects strict structured-output requests in the bridge baseline", async () => {
+    let generateCalls = 0;
     const bridge = createAiSdkProviderBridge({
-      model: createMockModel(),
+      model: createMockModel({
+        async doGenerate() {
+          generateCalls += 1;
+          return createGenerateResult();
+        },
+      }),
     });
 
-    await verifyProviderRejects({
+    const error = await verifyProviderRejects({
       expectedMessage: "StructuredOutputRequest.strict is not supported",
       run: async () => {
         await bridge.generate({
@@ -1751,6 +1757,14 @@ describe("provider-bridge-ai-sdk", () => {
         });
       },
     });
+
+    expect(error).toMatchObject({
+      code: "invalid_ai_sdk_bridge_config",
+      details: {
+        reason: "native_strict_structured_output_unsupported",
+      },
+    });
+    expect(generateCalls).toBe(0);
   });
 
   test("rejects unsupported provider-owned tool results in the baseline bridge", async () => {
@@ -1906,20 +1920,29 @@ describe("provider-bridge-ai-sdk", () => {
       }),
     });
 
-    await expect(
-      collectAsyncIterable(
-        bridge.stream({
-          messages: [
-            {
-              parts: [{ text: "Hello", type: "text" }],
-              role: "user",
-            },
-          ],
-        })
-      )
-    ).rejects.toThrow(
-      'AI SDK stream part "tool-approval-request" is out of scope'
-    );
+    const error = await verifyProviderRejects({
+      expectedMessage:
+        'AI SDK stream part "tool-approval-request" is out of scope',
+      run: async () => {
+        await collectAsyncIterable(
+          bridge.stream({
+            messages: [
+              {
+                parts: [{ text: "Hello", type: "text" }],
+                role: "user",
+              },
+            ],
+          })
+        );
+      },
+    });
+
+    expect(error).toMatchObject({
+      code: "unsupported_ai_sdk_stream_part",
+      details: {
+        reason: "provider_owned_tool_approval_unsupported",
+      },
+    });
   });
 
   test("rejects streamed finishes before tool calls complete", async () => {
@@ -1981,20 +2004,29 @@ describe("provider-bridge-ai-sdk", () => {
       }),
     });
 
-    await expect(
-      collectAsyncIterable(
-        bridge.stream({
-          messages: [
-            {
-              parts: [{ text: "Hello", type: "text" }],
-              role: "user",
-            },
-          ],
-        })
-      )
-    ).rejects.toThrow(
-      "provider-owned tool execution is out of scope for the baseline AI SDK bridge"
-    );
+    const error = await verifyProviderRejects({
+      expectedMessage:
+        "provider-owned tool execution is out of scope for the baseline AI SDK bridge",
+      run: async () => {
+        await collectAsyncIterable(
+          bridge.stream({
+            messages: [
+              {
+                parts: [{ text: "Hello", type: "text" }],
+                role: "user",
+              },
+            ],
+          })
+        );
+      },
+    });
+
+    expect(error).toMatchObject({
+      code: "unsupported_ai_sdk_content",
+      details: {
+        reason: "provider_owned_tool_execution_unsupported",
+      },
+    });
   });
 
   test("rejects dynamic streamed tool inputs in the baseline bridge", async () => {

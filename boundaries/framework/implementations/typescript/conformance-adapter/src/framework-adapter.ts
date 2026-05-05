@@ -205,8 +205,9 @@ export class TypeScriptFrameworkAdapter implements ImplementationAdapter {
         "framework.run-liveness",
         "framework.react-driver",
         "framework.runtime-api",
-        "providers.executed-tool-support",
-        "providers.structured-output-strictness",
+        "providers.framework-owned-approval-boundary",
+        "providers.framework-owned-tool-execution",
+        "providers.rejects-native-strict-structured-output",
         "trace.lifecycle",
       ],
       packetId,
@@ -296,12 +297,34 @@ export class TypeScriptFrameworkAdapter implements ImplementationAdapter {
 async function runSseProjection(input: unknown): Promise<AdapterProjection> {
   const events = await runEventStreamScenario(input, "event-stream");
   const frames = await collectValues(toSseFrames(createEventStream(events)));
+  const threadIds = events.flatMap((event) =>
+    isRecord(event) && typeof event.threadId === "string" ? [event.threadId] : []
+  );
+  const sourceThreadIds = events.flatMap((event) =>
+    isRecord(event.source) && typeof event.source.threadId === "string"
+      ? [event.source.threadId]
+      : []
+  );
+  const checkpointHashes = events.flatMap((event) =>
+    isRecord(event) && typeof event.turnNodeHash === "string"
+      ? [event.turnNodeHash]
+      : []
+  );
+  const resumedFromHashes = events.flatMap((event) =>
+    isRecord(event) && typeof event.resumedFrom === "string"
+      ? [event.resumedFrom]
+      : []
+  );
 
   return {
     evidence: {
+      checkpointHashes,
       sourceEventTypes: events.map((event) => event.type),
       frameEvents: frames.map((frame) => frame.event),
       framePayloads: frames.map((frame) => parseJsonValue(frame.data)),
+      resumedFromHashes,
+      sourceThreadIds,
+      threadIds,
     },
   };
 }
@@ -374,6 +397,8 @@ function runEventStreamScenario(
       return runFailedProviderEventStreamTurn(scenario, label);
     case "event-stream.paused-approval-turn":
       return runPausedApprovalEventStreamTurn(scenario, label);
+    case "event-stream.resumed-approval-turn":
+      return runResumedApprovalEventStreamTurn(scenario, label);
     default:
       throw new Error(`${label} scenario declared unsupported ${operation}`);
   }
@@ -486,6 +511,79 @@ async function runPausedApprovalEventStreamTurn(
   });
 
   return await collectValues(handle.events());
+}
+
+async function runResumedApprovalEventStreamTurn(
+  scenario: Record<string, unknown>,
+  label: string
+): Promise<readonly TuvrenStreamEvent[]> {
+  const prompt = readStringProperty(scenario, "prompt", `${label}.prompt`);
+  const providerResponses = readModelResponseArrayProperty(
+    scenario,
+    "providerResponses",
+    `${label}.providerResponses`
+  );
+  const toolName = readFirstToolCallName(
+    providerResponses,
+    `${label}.providerResponses`
+  );
+  const approvalDecisions = readApprovalDecisions(
+    scenario,
+    `${label}.approvalDecisions`
+  );
+  const runtime = createRuntimeWithReactDriver();
+  const thread = await runtime.createThread({});
+  const handle = runtime.executeTurn({
+    branchId: thread.branchId,
+    config: {
+      model: createScenarioProvider(providerResponses, () => undefined),
+      name: AGENT_NAME,
+      tools: [
+        {
+          approval: true,
+          description: "Shared resumed event-stream approval tool",
+          execute() {
+            return readProperty(scenario, "toolResult", `${label}.toolResult`);
+          },
+          inputSchema: { type: "object" },
+          name: toolName,
+        },
+      ],
+    },
+    signal: textSignal(prompt),
+    threadId: thread.threadId,
+  });
+  const pausedEvents = await collectValues(handle.events());
+
+  if (handle.status().phase !== "paused") {
+    throw new Error(`${label} did not pause before resuming`);
+  }
+
+  const resumedHandle = handle.resolveApproval({
+    decisions: approvalDecisions,
+  });
+  const resumedEvents = await collectValues(resumedHandle.events());
+
+  if (resumedHandle.status().phase !== "completed") {
+    throw new Error(`${label} did not complete after approval resume`);
+  }
+
+  const combinedEvents = [...pausedEvents, ...resumedEvents];
+  const finalEvent = combinedEvents.at(-1);
+
+  if (
+    !isRecord(finalEvent) ||
+    readRecordString(finalEvent, "type") !== "turn.end" ||
+    readRecordString(finalEvent, "status") !== "completed"
+  ) {
+    throw new Error(`${label} did not emit a completed turn.end event`);
+  }
+
+  if (!combinedEvents.some((event) => readRecordString(event, "type") === "approval.resolved")) {
+    throw new Error(`${label} did not emit approval.resolved after resume`);
+  }
+
+  return combinedEvents;
 }
 
 async function runCompletedRuntimeTurn(): Promise<AdapterProjection> {
@@ -693,14 +791,26 @@ async function runApprovalResume(input: unknown): Promise<AdapterProjection> {
 
   const pausedEvents = await collectValues(pausedHandle.events());
   const pausedPhase = pausedHandle.status().phase;
+  const executedNamesBeforeResume = [...executedNames];
+  const pausedApprovalCallIds =
+    pausedHandle.status().approval?.toolCalls.map((toolCall) => toolCall.callId) ??
+    [];
 
   if (pausedPhase !== "paused") {
     return {
       evidence: {
         approval: {
+          pausedApprovalCallIds,
+          pausedEventTypes: pausedEvents.map((event) => readRecordString(event, "type")),
           pausedPhase,
         },
-        tool: { execution: { executedNames } },
+        tool: {
+          execution: {
+            executedNames,
+            executedNamesAfterResume: [...executedNames],
+            executedNamesBeforeResume,
+          },
+        },
       },
       state: {
         approvalError: readFirstErrorEnvelope(pausedEvents),
@@ -713,16 +823,25 @@ async function runApprovalResume(input: unknown): Promise<AdapterProjection> {
     decisions,
   });
 
-  await collectValues(resumedHandle.events());
+  const resumedEvents = await collectValues(resumedHandle.events());
 
   return {
     evidence: {
       approval: {
         decisions,
+        pausedApprovalCallIds,
+        pausedEventTypes: pausedEvents.map((event) => readRecordString(event, "type")),
         pausedPhase,
+        resumedEventTypes: resumedEvents.map((event) => readRecordString(event, "type")),
         resumedPhase: resumedHandle.status().phase,
       },
-      tool: { execution: { executedNames } },
+      tool: {
+        execution: {
+          executedNames,
+          executedNamesAfterResume: [...executedNames],
+          executedNamesBeforeResume,
+        },
+      },
     },
   };
 }

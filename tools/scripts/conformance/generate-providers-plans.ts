@@ -162,6 +162,132 @@ function buildExtended(): Plan {
     )
   );
 
+  const strictStructured = (
+    id: string,
+    assertion: Record<string, unknown>,
+    evidence: string[]
+  ): PlanCheck => ({
+    assertions: [assertion],
+    capabilities: ["providers.rejects-native-strict-structured-output"],
+    checkId: `providers-ext.strict.${id}`,
+    evidence,
+    fixture: "provider-fixtures",
+    operation: "providers.bridge.strict-structured-output-rejection",
+  });
+  checks.push(
+    strictStructured(
+      "error-code-stable",
+      {
+        equals: "invalid_ai_sdk_bridge_config",
+        field: "$.strictStructuredOutput.errorCode",
+        kind: "evidenceField",
+      },
+      ["strictStructuredOutput.errorCode"]
+    ),
+    strictStructured(
+      "error-reason-stable",
+      {
+        equals: "native_strict_structured_output_unsupported",
+        field: "$.strictStructuredOutput.errorReason",
+        kind: "evidenceField",
+      },
+      ["strictStructuredOutput.errorReason"]
+    ),
+    strictStructured(
+      "provider-call-count-zero",
+      {
+        equals: 0,
+        field: "$.strictStructuredOutput.generateCalls",
+        kind: "evidenceField",
+      },
+      ["strictStructuredOutput.generateCalls"]
+    )
+  );
+
+  const frameworkOwnedToolExecution = (
+    id: string,
+    assertion: Record<string, unknown>,
+    evidence: string[]
+  ): PlanCheck => ({
+    assertions: [assertion],
+    capabilities: ["providers.framework-owned-tool-execution"],
+    checkId: `providers-ext.tool-execution.${id}`,
+    evidence,
+    fixture: "provider-fixtures",
+    operation: "providers.bridge.provider-owned-tool-execution-rejection",
+  });
+  checks.push(
+    frameworkOwnedToolExecution(
+      "generate-error-code-stable",
+      {
+        equals: "unsupported_ai_sdk_content",
+        field: "$.frameworkOwnedToolExecution.generateErrorCode",
+        kind: "evidenceField",
+      },
+      ["frameworkOwnedToolExecution.generateErrorCode"]
+    ),
+    frameworkOwnedToolExecution(
+      "generate-error-reason-stable",
+      {
+        equals: "provider_owned_tool_execution_unsupported",
+        field: "$.frameworkOwnedToolExecution.generateErrorReason",
+        kind: "evidenceField",
+      },
+      ["frameworkOwnedToolExecution.generateErrorReason"]
+    ),
+    frameworkOwnedToolExecution(
+      "stream-error-code-stable",
+      {
+        equals: "unsupported_ai_sdk_content",
+        field: "$.frameworkOwnedToolExecution.streamErrorCode",
+        kind: "evidenceField",
+      },
+      ["frameworkOwnedToolExecution.streamErrorCode"]
+    ),
+    frameworkOwnedToolExecution(
+      "stream-error-reason-stable",
+      {
+        equals: "provider_owned_tool_execution_unsupported",
+        field: "$.frameworkOwnedToolExecution.streamErrorReason",
+        kind: "evidenceField",
+      },
+      ["frameworkOwnedToolExecution.streamErrorReason"]
+    )
+  );
+
+  const frameworkOwnedApprovalBoundary = (
+    id: string,
+    assertion: Record<string, unknown>,
+    evidence: string[]
+  ): PlanCheck => ({
+    assertions: [assertion],
+    capabilities: ["providers.framework-owned-approval-boundary"],
+    checkId: `providers-ext.approval.${id}`,
+    evidence,
+    fixture: "provider-fixtures",
+    operation: "providers.bridge.provider-approval-request-rejection",
+  });
+  checks.push(
+    frameworkOwnedApprovalBoundary(
+      "error-code-stable",
+      {
+        equals: "unsupported_ai_sdk_stream_part",
+        field: "$.frameworkOwnedApprovalBoundary.errorCode",
+        kind: "evidenceField",
+      },
+      ["frameworkOwnedApprovalBoundary.errorCode"]
+    ),
+    frameworkOwnedApprovalBoundary(
+      "error-reason-stable",
+      {
+        equals: "provider_owned_tool_approval_unsupported",
+        field: "$.frameworkOwnedApprovalBoundary.errorReason",
+        kind: "evidenceField",
+      },
+      ["frameworkOwnedApprovalBoundary.errorReason"]
+    )
+  );
+
   return {
     applicability: { capabilities: ["providers.provider-api"] },
     checks,
