@@ -411,8 +411,8 @@ export interface StagedResultRepository {
 
 export interface RuntimeBackendTx {
   branches: BranchRepository;
-  observeAnnotations: ObserveAnnotationRepository;
   objects: ObjectRepository;
+  observeAnnotations: ObserveAnnotationRepository;
   orderedPathChunks: OrderedPathChunkRepository;
   runs: RunRepository;
   schemas: SchemaRepository;
@@ -523,5 +523,33 @@ export interface RuntimeKernel {
   };
   verdicts: {
     compose(verdicts: Verdict[]): Promise<ComposedVerdict>;
+  };
+}
+
+export interface RuntimeKernelRunLiveness {
+  runLiveness: {
+    createLeasedRun(input: {
+      branchId: string;
+      executionOwnerId: string;
+      leaseExpiresAtMs: EpochMs;
+      runId: string;
+      schemaId: string;
+      startTurnNodeHash: HashString;
+      steps: StepDeclaration[];
+      turnId: string;
+    }): Promise<RunRecord>;
+    listExpired(nowMs: EpochMs): Promise<RunRecord[]>;
+    preemptExpired(
+      runId: string,
+      preemptingOwnerId: string,
+      nowMs: EpochMs,
+      reason: string
+    ): Promise<RecoveryState>;
+    renewLease(
+      runId: string,
+      executionOwnerId: string,
+      fencingToken: string,
+      nextLeaseExpiresAtMs: EpochMs
+    ): Promise<{ fencingToken: string; leaseExpiresAtMs: EpochMs }>;
   };
 }

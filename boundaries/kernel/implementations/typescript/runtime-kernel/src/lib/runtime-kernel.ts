@@ -462,14 +462,12 @@ export function createRuntimeKernel(
       async register(schema) {
         return await backend.transact(async (tx) => {
           assertTurnTreeSchema(schema, "schema");
-          const encodedSchema = encodeRecord(schema);
           const existing = await tx.schemas.get(schema.schemaId);
 
           if (existing !== null) {
-            if (areUint8ArraysEqual(existing.schemaCbor, encodedSchema)) {
-              return schema.schemaId;
-            }
-
+            // The frozen kernel surface treats schema IDs as write-once
+            // identities, so even byte-for-byte duplicate registrations must
+            // fail instead of becoming an idempotent upsert.
             throw new TuvrenValidationError(
               `schema "${schema.schemaId}" is already registered`,
               { code: "kernel_runtime_duplicate_schema" }
@@ -478,7 +476,7 @@ export function createRuntimeKernel(
 
           await tx.schemas.put({
             createdAtMs: now(),
-            schemaCbor: encodedSchema,
+            schemaCbor: encodeRecord(schema),
             schemaId: schema.schemaId,
           });
           return schema.schemaId;
@@ -1991,20 +1989,6 @@ function decodeManifest(bytes: Uint8Array): TurnTreeManifest {
 
 function encodeRecord(value: unknown): Uint8Array {
   return encodeDeterministicKernelRecord(toKernelRecord(value));
-}
-
-function areUint8ArraysEqual(left: Uint8Array, right: Uint8Array): boolean {
-  if (left.byteLength !== right.byteLength) {
-    return false;
-  }
-
-  for (const [index, value] of left.entries()) {
-    if (right[index] !== value) {
-      return false;
-    }
-  }
-
-  return true;
 }
 
 function toKernelRecord(value: unknown): KernelRecord {
