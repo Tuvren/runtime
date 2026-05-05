@@ -12,6 +12,7 @@
     "runtime.branch-create",
     "runtime.cancel-execution",
     "runtime.recover-result",
+    "runtime.recover-stale-run",
     "runtime.validate-structured-output"
   ]
 }

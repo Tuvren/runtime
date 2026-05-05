@@ -50,7 +50,7 @@
 
 - Epic Z is active to add the missing boundary-owned TypeScript `RuntimeKernel` implementation package over the existing backend contract and close the documented syscall semantics that currently live only in private playground logic or protocol types.
 - Epic AA is active after Epic Z to promote kernel syscall, logical, and observe behavior into authority-packet-backed conformance plans and shared-runner evidence.
-- Epic AB has landed in current repo reality as a contract-first liveness extension for leased running ownership and stale-run preemption; Rust remains non-applicable unless it advertises `kernel.run-liveness`.
+- Epic AB has landed in current repo reality as a contract-first liveness extension for leased running ownership and stale-run preemption, with shared framework stale-recovery conformance now promoted alongside kernel extension evidence; Rust remains non-applicable unless it advertises the relevant liveness capability.
 
 ### Future / Deferred Scope
 
@@ -1354,7 +1354,7 @@ And Rust kernel results remain capability-scoped rather than inferred from TypeS
 
 ### Epic AB - Run Liveness and Stale-Running Recovery (RLSR)
 
-- Epic AB has landed in current repo reality through the advertised `kernel.run-liveness` extension, backend-neutral lease storage and validators, stale-run preemption semantics, shared-runner conformance coverage, and refreshed compatibility evidence.
+- Epic AB has landed in current repo reality through the advertised `kernel.run-liveness` extension, backend-neutral lease storage and validators, stale-run preemption semantics, shared kernel and framework conformance coverage, and refreshed compatibility evidence.
 
 **KRT-AB001 Liveness Extension Contract**
 

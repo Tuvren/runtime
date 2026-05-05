@@ -280,6 +280,7 @@ enum RuntimeOperationName {
   branchCreate: "runtime.branch-create",
   cancelExecution: "runtime.cancel-execution",
   recoverResult: "runtime.recover-result",
+  recoverStaleRun: "runtime.recover-stale-run",
   validateStructuredOutput: "runtime.validate-structured-output",
 }
 

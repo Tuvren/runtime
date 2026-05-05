@@ -5293,15 +5293,20 @@
   ],
   "exitCode": 1,
   "implementationId": "rust-framework",
-  "nonApplicableCheckIds": [],
+  "nonApplicableCheckIds": [
+    "runtime-lifecycle-ext.stale-recovery.finalize-terminal-status",
+    "runtime-lifecycle-ext.stale-recovery.handoff-context-active-agent",
+    "runtime-lifecycle-ext.stale-recovery.same-signal-iterate",
+    "runtime-lifecycle-ext.stale-recovery.signal-mismatch-fresh-turn"
+  ],
   "project": "framework-rust-conformance-runner",
   "status": "fail",
   "summary": {
     "failedChecks": 186,
     "passedChecks": 0,
-    "totalChecks": 186,
+    "totalChecks": 190,
     "applicableChecks": 186,
-    "nonApplicableChecks": 0
+    "nonApplicableChecks": 4
   },
   "suiteId": "tuvren.framework.promoted-authority",
   "suiteVersion": "0.1.0"

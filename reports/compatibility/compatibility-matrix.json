@@ -192,13 +192,17 @@
             "runtime-lifecycle-ext.recover-result.first-object-type",
             "runtime-lifecycle-ext.recover-result.first-task-id",
             "runtime-lifecycle-ext.recover-result.last-turn-node-hash-format",
-            "runtime-lifecycle-ext.recover-result.uncommitted-count"
+            "runtime-lifecycle-ext.recover-result.uncommitted-count",
+            "runtime-lifecycle-ext.stale-recovery.finalize-terminal-status",
+            "runtime-lifecycle-ext.stale-recovery.handoff-context-active-agent",
+            "runtime-lifecycle-ext.stale-recovery.same-signal-iterate",
+            "runtime-lifecycle-ext.stale-recovery.signal-mismatch-fresh-turn"
           ],
           "checkSummary": {
             "failedChecks": 0,
-            "passedChecks": 186,
-            "totalChecks": 186,
-            "applicableChecks": 186,
+            "passedChecks": 190,
+            "totalChecks": 190,
+            "applicableChecks": 190,
             "nonApplicableChecks": 0
           },
           "evidencePath": "reports/compatibility/evidence/shared-conformance-runner.typescript-framework.json",
@@ -564,9 +568,9 @@
           "checkSummary": {
             "failedChecks": 186,
             "passedChecks": 0,
-            "totalChecks": 186,
+            "totalChecks": 190,
             "applicableChecks": 186,
-            "nonApplicableChecks": 0
+            "nonApplicableChecks": 4
           },
           "evidencePath": "reports/compatibility/evidence/shared-conformance-runner.rust-framework.json",
           "status": "fail",

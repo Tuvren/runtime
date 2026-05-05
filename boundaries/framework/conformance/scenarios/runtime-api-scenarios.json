@@ -117,5 +117,35 @@
         ]
       }
     }
+  },
+  "stale-recovery-same-signal-iterate": {
+    "operation": "runtime.recover-stale-run",
+    "recoveryCase": "same_signal_iterate",
+    "staleStepId": "iterate",
+    "prompt": "Retry the shared request",
+    "recoveredAssistantText": "Recovered durable assistant output.",
+    "finalText": "Replacement iteration completed."
+  },
+  "stale-recovery-signal-mismatch": {
+    "operation": "runtime.recover-stale-run",
+    "recoveryCase": "signal_mismatch",
+    "staleStepId": "iterate",
+    "prompt": "Original shared request",
+    "freshPrompt": "Different fresh shared request",
+    "finalText": "Fresh turn executed."
+  },
+  "stale-recovery-handoff-context": {
+    "operation": "runtime.recover-stale-run",
+    "recoveryCase": "handoff_context",
+    "staleStepId": "handoff_context",
+    "prompt": "Continue the same shared handoff",
+    "finalText": "Recovered handoff continued."
+  },
+  "stale-recovery-finalize-status": {
+    "operation": "runtime.recover-stale-run",
+    "recoveryCase": "finalize_turn_status",
+    "staleStepId": "finalize_turn_status",
+    "prompt": "Finalize this shared recovered turn",
+    "finalText": "driver should not run"
   }
 }

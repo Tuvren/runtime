@@ -16,17 +16,15 @@
 
 // biome-ignore-all lint/suspicious/useAwait: Test drivers intentionally match the async framework driver contract.
 import { describe, expect, test } from "bun:test";
-import { TuvrenRuntimeError, type EpochMs } from "@tuvren/core-types";
+import { TuvrenRuntimeError } from "@tuvren/core-types";
 import type {
   DriverExecutionResult,
   RuntimeDriver as KrakenDriver,
   RuntimeDriverFactory as KrakenDriverFactory,
 } from "@tuvren/driver-api";
 import type {
-  RecoveryState,
   RuntimeKernel as KrakenKernel,
   RuntimeKernelRunLiveness,
-  RunRecord,
   TurnTreeSchema,
 } from "@tuvren/kernel-protocol";
 import { encodeDeterministicKernelRecord } from "@tuvren/kernel-protocol";
@@ -48,11 +46,11 @@ import {
   collectSystemPrompts,
   createDriverRegistry as createBaseDriverRegistry,
   createContextManifest,
-  DEFAULT_AGENT_SCHEMA,
   createLastOutputOnlyHandoffContextBuilder,
   createPreserveTraceHandoffContextBuilder,
   createToolRegistry,
   createTuvrenRuntimeCore,
+  DEFAULT_AGENT_SCHEMA,
   type RuntimeWarning,
   runAfterTurnHooks,
   runBeforeIterationHooks,
@@ -61,7 +59,7 @@ import {
 } from "../src/index.ts";
 import {
   createFakeKernelHarness,
-  type FakeKernelHarness,
+  createFakeRunLivenessKernelHarness,
 } from "./fake-kernel.ts";
 import {
   assistantStructured,
@@ -93,19 +91,6 @@ import {
   waitForAsync,
 } from "./runtime-core-test-helpers.ts";
 
-interface FakeLeasedRunRecord extends RunRecord {
-  executionOwnerId: string;
-  fencingToken: string;
-  leaseExpiresAtMs: EpochMs;
-}
-
-interface FakeRunLivenessKernelHarness {
-  getPreemptCalls(): number;
-  getRenewLeaseCalls(): number;
-  kernel: KrakenKernel & RuntimeKernelRunLiveness;
-  leasedRuns: Map<string, FakeLeasedRunRecord>;
-}
-
 function hasAssistantTextMessage(
   messages: readonly unknown[],
   expectedText: string
@@ -119,9 +104,7 @@ function hasAssistantTextMessage(
 
     return record.parts.some((part) => {
       const partRecord = toOptionalRecord(part);
-      return (
-        partRecord?.type === "text" && partRecord.text === expectedText
-      );
+      return partRecord?.type === "text" && partRecord.text === expectedText;
     });
   });
 }
@@ -139,157 +122,9 @@ function countUserTextMessages(
 
     return record.parts.some((part) => {
       const partRecord = toOptionalRecord(part);
-      return (
-        partRecord?.type === "text" && partRecord.text === expectedText
-      );
+      return partRecord?.type === "text" && partRecord.text === expectedText;
     });
   }).length;
-}
-
-function createFakeRunLivenessKernelHarness(
-  harness: FakeKernelHarness,
-  options?: {
-    onRenewLease?: (
-      runId: string,
-      executionOwnerId: string,
-      fencingToken: string,
-      nextLeaseExpiresAtMs: EpochMs
-    ) => Promise<{ fencingToken: string; leaseExpiresAtMs: EpochMs }>;
-  }
-): FakeRunLivenessKernelHarness {
-  let preemptCalls = 0;
-  let renewLeaseCalls = 0;
-  let tokenOrdinal = 0;
-  const leasedRuns = new Map<string, FakeLeasedRunRecord>();
-  const baseKernel = harness.kernel;
-
-  return {
-    getPreemptCalls() {
-      return preemptCalls;
-    },
-    getRenewLeaseCalls() {
-      return renewLeaseCalls;
-    },
-    kernel: {
-      ...baseKernel,
-      run: {
-        ...baseKernel.run,
-        async complete(runId, status, eventHash) {
-          const completion = await baseKernel.run.complete(
-            runId,
-            status,
-            eventHash
-          );
-          leasedRuns.delete(runId);
-          return completion;
-        },
-      },
-      runLiveness: {
-        async createLeasedRun(input) {
-          try {
-            const run = await baseKernel.run.create(
-              input.runId,
-              input.turnId,
-              input.branchId,
-              input.schemaId,
-              input.startTurnNodeHash,
-              input.steps
-            );
-            const leasedRun: FakeLeasedRunRecord = {
-              ...run,
-              executionOwnerId: input.executionOwnerId,
-              fencingToken: `token-${++tokenOrdinal}`,
-              leaseExpiresAtMs: input.leaseExpiresAtMs,
-            };
-            leasedRuns.set(leasedRun.runId, leasedRun);
-            return { ...leasedRun };
-          } catch (error: unknown) {
-            // The fake kernel only signals active-branch contention by message,
-            // so the wrapper normalizes it into the real kernel error code that
-            // runtime-core branches on for stale-run recovery.
-            if (
-              error instanceof Error &&
-              error.message.includes("already has an active run")
-            ) {
-              throw new TuvrenRuntimeError(error.message, {
-                code: "kernel_runtime_branch_already_active",
-              });
-            }
-
-            throw error;
-          }
-        },
-        async listExpired(nowMs) {
-          return [...leasedRuns.values()].filter(
-            (run) => run.leaseExpiresAtMs <= nowMs
-          );
-        },
-        async preemptExpired(runId, preemptingOwnerId, nowMs, reason) {
-          void preemptingOwnerId;
-          void nowMs;
-          void reason;
-          const leasedRun = leasedRuns.get(runId);
-
-          if (leasedRun === undefined) {
-            throw new Error(`expected leased run "${runId}"`);
-          }
-
-          preemptCalls += 1;
-          const completion = await baseKernel.run.complete(runId, "failed");
-          const recoveredBranch = await baseKernel.branch.get(leasedRun.branchId);
-
-          if (recoveredBranch === null) {
-            throw new Error(`expected branch "${leasedRun.branchId}"`);
-          }
-
-          leasedRuns.delete(runId);
-          return {
-            consumedStagedResults: [],
-            lastCompletedStepId: null,
-            lastTurnNodeHash:
-              completion.turnNodeHash ?? recoveredBranch.headTurnNodeHash,
-            stepSequence: leasedRun.stepSequence,
-            uncommittedStagedResults: [],
-          } satisfies RecoveryState;
-        },
-        async renewLease(
-          runId,
-          executionOwnerId,
-          fencingToken,
-          nextLeaseExpiresAtMs
-        ) {
-          renewLeaseCalls += 1;
-
-          if (options?.onRenewLease !== undefined) {
-            return await options.onRenewLease(
-              runId,
-              executionOwnerId,
-              fencingToken,
-              nextLeaseExpiresAtMs
-            );
-          }
-
-          const leasedRun = leasedRuns.get(runId);
-
-          if (leasedRun === undefined) {
-            throw new TuvrenRuntimeError(`run "${runId}" is not leased`, {
-              code: "kernel_runtime_run_not_leased",
-            });
-          }
-
-          leasedRun.fencingToken = `token-renewed-${renewLeaseCalls}`;
-          leasedRun.leaseExpiresAtMs = nextLeaseExpiresAtMs;
-          leasedRuns.set(runId, leasedRun);
-
-          return {
-            fencingToken: `token-renewed-${renewLeaseCalls}`,
-            leaseExpiresAtMs: nextLeaseExpiresAtMs,
-          };
-        },
-      },
-    } satisfies KrakenKernel & RuntimeKernelRunLiveness,
-    leasedRuns,
-  };
 }
 
 describe("framework-runtime-core", () => {
@@ -439,26 +274,18 @@ describe("framework-runtime-core", () => {
             leaseExpiresAtMs: input.leaseExpiresAtMs,
           };
         },
-        async listExpired(nowMs) {
-          void nowMs;
+        async listExpired(_nowMs) {
           return [];
         },
-        async preemptExpired(runId, preemptingOwnerId, nowMs, reason) {
-          void runId;
-          void preemptingOwnerId;
-          void nowMs;
-          void reason;
+        async preemptExpired(_runId, _preemptingOwnerId, _nowMs, _reason) {
           throw new Error("preemptExpired was not expected");
         },
         async renewLease(
-          runId,
-          executionOwnerId,
-          fencingToken,
+          _runId,
+          _executionOwnerId,
+          _fencingToken,
           nextLeaseExpiresAtMs
         ) {
-          void runId;
-          void executionOwnerId;
-          void fencingToken;
           renewLeaseCalls += 1;
           return {
             fencingToken: `token-renewed-${renewLeaseCalls}`,
@@ -497,9 +324,9 @@ describe("framework-runtime-core", () => {
     const livenessHarness = createFakeRunLivenessKernelHarness(harness);
     const driver = {
       async execute(context) {
-        expect(countUserTextMessages(context.messages, "Replace the stale run")).toBe(
-          1
-        );
+        expect(
+          countUserTextMessages(context.messages, "Replace the stale run")
+        ).toBe(1);
         return {
           messages: [assistantText("Replacement execution succeeded.")],
           resolution: {
@@ -537,7 +364,9 @@ describe("framework-runtime-core", () => {
       runId: "run_stale_leased_execution",
       schemaId: DEFAULT_AGENT_SCHEMA.schemaId,
       startTurnNodeHash: thread.rootTurnNodeHash,
-      steps: [{ deterministic: false, id: "incorporate_input", sideEffects: true }],
+      steps: [
+        { deterministic: false, id: "incorporate_input", sideEffects: true },
+      ],
       turnId: staleTurn.turnId,
     });
     await livenessHarness.kernel.staging.stage(
@@ -580,9 +409,9 @@ describe("framework-runtime-core", () => {
     const livenessHarness = createFakeRunLivenessKernelHarness(harness);
     const driver = {
       async execute(context) {
-        expect(countUserTextMessages(context.messages, "Retry the same request")).toBe(
-          1
-        );
+        expect(
+          countUserTextMessages(context.messages, "Retry the same request")
+        ).toBe(1);
         expect(
           hasAssistantTextMessage(
             context.messages,
@@ -677,9 +506,9 @@ describe("framework-runtime-core", () => {
     const livenessHarness = createFakeRunLivenessKernelHarness(harness);
     const driver = {
       async execute(context) {
-        expect(countUserTextMessages(context.messages, "Original request")).toBe(
-          1
-        );
+        expect(
+          countUserTextMessages(context.messages, "Original request")
+        ).toBe(1);
         expect(
           countUserTextMessages(context.messages, "Different fresh request")
         ).toBe(1);
@@ -1002,7 +831,9 @@ describe("framework-runtime-core", () => {
       runId: "run_stale_handoff_recovery",
       schemaId: DEFAULT_AGENT_SCHEMA.schemaId,
       startTurnNodeHash: thread.rootTurnNodeHash,
-      steps: [{ deterministic: false, id: "handoff_context", sideEffects: false }],
+      steps: [
+        { deterministic: false, id: "handoff_context", sideEffects: false },
+      ],
       turnId: staleTurn.turnId,
     });
     await livenessHarness.kernel.staging.stage(
