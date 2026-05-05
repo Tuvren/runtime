@@ -21,6 +21,7 @@ import type {
   RuntimeDriver,
 } from "@tuvren/driver-api";
 import { assertDriverExecutionResult } from "@tuvren/driver-api";
+import { encodeDeterministicKernelRecord } from "@tuvren/kernel-protocol";
 import type { ProviderStreamChunk, TuvrenProvider } from "@tuvren/provider-api";
 import type {
   ApprovalDecision,
@@ -61,7 +62,10 @@ import {
   createTuvrenRuntimeCore,
   DEFAULT_AGENT_SCHEMA,
 } from "../../runtime-core/src/index.ts";
-import { createFakeKernelHarness } from "../../runtime-core/test/fake-kernel.ts";
+import {
+  createFakeKernelHarness,
+  createFakeRunLivenessKernelHarness,
+} from "../../runtime-core/test/fake-kernel.ts";
 
 export type {
   AdapterCapabilities,
@@ -198,6 +202,7 @@ export class TypeScriptFrameworkAdapter implements ImplementationAdapter {
       capabilities: [
         "framework.driver-api",
         "framework.event-stream",
+        "framework.run-liveness",
         "framework.react-driver",
         "framework.runtime-api",
         "trace.lifecycle",
@@ -264,6 +269,8 @@ export class TypeScriptFrameworkAdapter implements ImplementationAdapter {
         return runContextTransform(input);
       case "runtime.recover-result":
         return runRecoverResult(input);
+      case "runtime.recover-stale-run":
+        return runRecoverStaleRun(input);
       case "driver.execute":
         return runDriverExecute(input);
       case "driver.resume":
@@ -1173,6 +1180,209 @@ async function runRecoverResult(input: unknown): Promise<AdapterProjection> {
   };
 }
 
+async function runRecoverStaleRun(input: unknown): Promise<AdapterProjection> {
+  const scenario = readOperationScenario(input, "runtime.recover-stale-run");
+  const recoveryCase = readStringProperty(
+    scenario,
+    "recoveryCase",
+    "runtime.recover-stale-run.recoveryCase"
+  );
+  const prompt = readStringProperty(
+    scenario,
+    "prompt",
+    "runtime.recover-stale-run.prompt"
+  );
+  const recoveredAssistantText =
+    typeof scenario.recoveredAssistantText === "string"
+      ? scenario.recoveredAssistantText
+      : undefined;
+  const harness = createFakeKernelHarness();
+  const livenessHarness = createFakeRunLivenessKernelHarness(harness);
+  let executeCalls = 0;
+
+  const driver = {
+    execute() {
+      executeCalls += 1;
+      return {
+        messages: [
+          assistantText(
+            readStringProperty(
+              scenario,
+              "finalText",
+              "runtime.recover-stale-run.finalText"
+            )
+          ),
+        ],
+        resolution: {
+          reason: "done",
+          type: "end_turn",
+        },
+      };
+    },
+    id: DRIVER_ID,
+  } satisfies RuntimeDriver;
+  const runtime = createTuvrenRuntimeCore({
+    createId: createConformanceIdFactory(),
+    defaultDriverId: DRIVER_ID,
+    driverRegistry: createDriverRegistry([driver]),
+    kernel: livenessHarness.kernel,
+    resolveAgentConfig(agentName) {
+      if (agentName === "primary" || agentName === "reviewer") {
+        return { name: agentName };
+      }
+
+      return undefined;
+    },
+    runLiveness: {
+      executionOwnerId: "worker-1",
+      leaseDurationMs: 50,
+    },
+  });
+  const thread = await runtime.createThread({});
+  const staleTurn = await livenessHarness.kernel.turn.create(
+    `turn_${recoveryCase}`,
+    thread.threadId,
+    thread.branchId,
+    null,
+    thread.rootTurnNodeHash
+  );
+  const staleRunId = `run_${recoveryCase}`;
+  const staleStepId = readStringProperty(
+    scenario,
+    "staleStepId",
+    "runtime.recover-stale-run.staleStepId"
+  );
+  const staleStepSideEffects = !(
+    staleStepId === "handoff_context" || staleStepId === "finalize_turn_status"
+  );
+
+  await livenessHarness.kernel.runLiveness.createLeasedRun({
+    branchId: thread.branchId,
+    executionOwnerId: "worker-stale",
+    leaseExpiresAtMs: 1,
+    runId: staleRunId,
+    schemaId: DEFAULT_AGENT_SCHEMA.schemaId,
+    startTurnNodeHash: thread.rootTurnNodeHash,
+    steps: [
+      {
+        deterministic: false,
+        id: staleStepId,
+        sideEffects: staleStepSideEffects,
+      },
+    ],
+    turnId: staleTurn.turnId,
+  });
+  await stageRecoveredMessage(
+    livenessHarness,
+    staleRunId,
+    `${recoveryCase}_user_message`,
+    prompt
+  );
+
+  switch (recoveryCase) {
+    case "same_signal_iterate":
+      await stageRecoveredMessage(
+        livenessHarness,
+        staleRunId,
+        `${recoveryCase}_assistant_message`,
+        recoveredAssistantText ??
+          readStringProperty(
+            scenario,
+            "recoveredAssistantText",
+            "runtime.recover-stale-run.recoveredAssistantText"
+          ),
+        "assistant"
+      );
+      break;
+    case "signal_mismatch":
+      break;
+    case "handoff_context":
+      // `runtime.status` is the only durable source for the recovered active
+      // agent, so the scenario intentionally proves recovery from persisted
+      // status instead of from any in-memory handoff bookkeeping.
+      await stageRecoveredRuntimeStatus(
+        livenessHarness,
+        staleRunId,
+        `${recoveryCase}_runtime_status`,
+        {
+          activeAgent: "reviewer",
+          state: "running",
+        }
+      );
+      break;
+    case "finalize_turn_status":
+      // Terminal stale recovery must short-circuit from durable status alone;
+      // a driver re-entry here would hide the exact bug this check is meant to catch.
+      await stageRecoveredRuntimeStatus(
+        livenessHarness,
+        staleRunId,
+        `${recoveryCase}_runtime_status`,
+        {
+          activeAgent: "primary",
+          state: "completed",
+        }
+      );
+      break;
+    default:
+      throw new Error(
+        `runtime.recover-stale-run declared unsupported recoveryCase ${recoveryCase}`
+      );
+  }
+
+  const signalText =
+    recoveryCase === "signal_mismatch"
+      ? readStringProperty(
+          scenario,
+          "freshPrompt",
+          "runtime.recover-stale-run.freshPrompt"
+        )
+      : prompt;
+  const handle = runtime.executeTurn({
+    branchId: thread.branchId,
+    config: { name: "primary" },
+    signal: textSignal(signalText),
+    threadId: thread.threadId,
+  });
+  const events = await collectValues(handle.events());
+  const branchMessages = await harness.readBranchMessages(thread.branchId);
+  const branchRuns = await harness.readBranchRuns(thread.branchId);
+  const branchRuntimeStatus = await harness.readBranchRuntimeStatus(
+    thread.branchId
+  );
+  const observedTurnId = readTurnId(events);
+
+  // The current spec surface persists message parts but not a durable request id,
+  // so shared conformance proves same-turn recovery using the exact persisted input.
+  return {
+    evidence: {
+      recovery: {
+        activeAgent: handle.status().activeAgent,
+        branchRuntimePhase: readRecordString(branchRuntimeStatus, "state"),
+        branchStatusActiveAgent: readRecordString(
+          branchRuntimeStatus,
+          "activeAgent"
+        ),
+        driverExecuteCalls: executeCalls,
+        freshUserMessageCount: countUserTextMessages(
+          branchMessages,
+          signalText
+        ),
+        originalUserMessageCount: countUserTextMessages(branchMessages, prompt),
+        phase: handle.status().phase,
+        preemptCalls: livenessHarness.getPreemptCalls(),
+        recoveredAssistantVisible: hasTextMessage(
+          branchMessages,
+          "assistant",
+          recoveredAssistantText ?? ""
+        ),
+        sameTurn: observedTurnId === staleTurn.turnId,
+        staleRunStatus:
+          branchRuns.find((run) => run.runId === staleRunId)?.status ?? null,
+      },
+    },
+  };
+}
+
 async function runDriverExecute(input: unknown): Promise<AdapterProjection> {
   const scenario = readOperationScenario(input, "driver.execute");
   const providerResponses = readModelResponseArrayProperty(
@@ -1668,6 +1878,104 @@ function textSignal(text: string): InputSignal {
 
 function hasToolMessage(messages: readonly TuvrenMessage[]): boolean {
   return messages.some((message) => message.role === "tool");
+}
+
+function hasTextMessage(
+  messages: readonly unknown[],
+  role: "assistant" | "user",
+  expectedText: string
+): boolean {
+  if (expectedText.length === 0) {
+    return false;
+  }
+
+  return messages.some((message) => {
+    if (
+      !isRecord(message) ||
+      message.role !== role ||
+      !Array.isArray(message.parts)
+    ) {
+      return false;
+    }
+
+    return message.parts.some((part) => {
+      return (
+        isRecord(part) &&
+        part.type === "text" &&
+        typeof part.text === "string" &&
+        part.text === expectedText
+      );
+    });
+  });
+}
+
+function countUserTextMessages(
+  messages: readonly unknown[],
+  expectedText: string
+): number {
+  let count = 0;
+
+  for (const message of messages) {
+    if (hasTextMessage([message], "user", expectedText)) {
+      count += 1;
+    }
+  }
+
+  return count;
+}
+
+function readTurnId(events: readonly unknown[]): string | undefined {
+  for (const event of events) {
+    const turnId = readRecordString(event, "turnId");
+
+    if (turnId !== undefined) {
+      return turnId;
+    }
+  }
+
+  return undefined;
+}
+
+async function stageRecoveredMessage(
+  livenessHarness: ReturnType<typeof createFakeRunLivenessKernelHarness>,
+  runId: string,
+  taskId: string,
+  text: string,
+  role: "assistant" | "user" = "user"
+): Promise<void> {
+  await livenessHarness.kernel.staging.stage(
+    runId,
+    encodeDeterministicKernelRecord({
+      parts: [
+        {
+          text,
+          type: "text",
+        },
+      ],
+      role,
+    }),
+    taskId,
+    "message",
+    "completed"
+  );
+}
+
+async function stageRecoveredRuntimeStatus(
+  livenessHarness: ReturnType<typeof createFakeRunLivenessKernelHarness>,
+  runId: string,
+  taskId: string,
+  status: {
+    activeAgent: string;
+    state: "completed" | "running";
+  }
+): Promise<void> {
+  await livenessHarness.kernel.staging.stage(
+    runId,
+    encodeDeterministicKernelRecord(status),
+    taskId,
+    "runtime_status",
+    "completed"
+  );
 }
 
 function createClock(): () => number {

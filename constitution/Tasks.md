@@ -50,7 +50,7 @@
 
 - Epic Z is active to add the missing boundary-owned TypeScript `RuntimeKernel` implementation package over the existing backend contract and close the documented syscall semantics that currently live only in private playground logic or protocol types.
 - Epic AA is active after Epic Z to promote kernel syscall, logical, and observe behavior into authority-packet-backed conformance plans and shared-runner evidence.
-- Epic AB is active after Epic AA as a contract-first liveness extension for leased running ownership and stale-run preemption.
+- Epic AB has landed in current repo reality as a contract-first liveness extension for leased running ownership and stale-run preemption, with shared framework stale-recovery conformance now promoted alongside kernel extension evidence; Rust remains non-applicable unless it advertises the relevant liveness capability.
 
 ### Future / Deferred Scope
 
@@ -1354,8 +1354,11 @@ And Rust kernel results remain capability-scoped rather than inferred from TypeS
 
 ### Epic AB - Run Liveness and Stale-Running Recovery (RLSR)
 
+- Epic AB has landed in current repo reality through the advertised `kernel.run-liveness` extension, backend-neutral lease storage and validators, stale-run preemption semantics, shared kernel and framework conformance coverage, and refreshed compatibility evidence.
+
 **KRT-AB001 Liveness Extension Contract**
 
+- **Status:** Closed in current repo reality.
 - **Type:** Feature
 - **Effort:** 5
 - **Dependencies:** KRT-AA004
@@ -1373,6 +1376,7 @@ And the base `RuntimeKernel` interface remains compatible for non-liveness imple
 
 **KRT-AB002 Lease Storage and Validators**
 
+- **Status:** Closed in current repo reality.
 - **Type:** Feature
 - **Effort:** 5
 - **Dependencies:** KRT-AB001
@@ -1390,6 +1394,7 @@ And paused, completed, and failed Runs are not lease-expiry candidates
 
 **KRT-AB003 Preemption Semantics**
 
+- **Status:** Closed in current repo reality.
 - **Type:** Feature
 - **Effort:** 5
 - **Dependencies:** KRT-AB002
@@ -1407,17 +1412,18 @@ And a non-expired running Run or paused Run cannot be preempted through stale-ru
 
 **KRT-AB004 Liveness Conformance Evidence**
 
+- **Status:** Closed in current repo reality.
 - **Type:** Chore
 - **Effort:** 5
 - **Dependencies:** KRT-AB003
 - **Capability / Contract Mapping:** TechSpec §4.10, §4.12, §4.13
-- **Description:** Promote `kernel.run-liveness` conformance plans and refresh compatibility evidence for TypeScript memory/SQLite behavior, leaving Rust non-applicable unless it advertises the extension capability.
+- **Description:** Promote `kernel.run-liveness` conformance plans and refresh shared compatibility evidence for the TypeScript kernel extension while keeping backend-specific memory/SQLite lease storage and migration behavior covered by their implementation test lanes, leaving Rust non-applicable unless it advertises the extension capability.
 - **Acceptance Criteria (Gherkin):**
 
 ```gherkin
 Given TypeScript implements the run-liveness extension
 When shared-runner liveness conformance executes
 Then lease renewal, expired-run discovery, stale preemption, paused exclusion, and replacement recovery state are verified from implementation-produced evidence
-And TypeScript memory and SQLite evidence report honest pass/fail status for the extension
+And shared TypeScript kernel evidence plus backend-specific memory/SQLite verification report honest pass/fail status for the extension
 And Rust evidence is non-applicable unless a Rust adapter advertises `kernel.run-liveness`
 ```

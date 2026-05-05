@@ -67,7 +67,7 @@ export class RuntimeExecutionHandle implements ExecutionHandle {
   private statusSnapshot: ExecutionStatus;
   readonly request: ExecutionSessionRequest;
   readonly resumedFrom?: ResumeContext;
-  readonly turnId: string;
+  turnId: string;
 
   constructor(
     runtime: RuntimeExecutionHandleRuntime,
@@ -184,6 +184,12 @@ export class RuntimeExecutionHandle implements ExecutionHandle {
     this.eventsQueue.close();
   }
 
+  abortWithError(error: Error): void {
+    if (!this.abortController.signal.aborted) {
+      this.abortController.abort(error);
+    }
+  }
+
   get abortSignal(): AbortSignal {
     return this.abortController.signal;
   }
@@ -230,6 +236,12 @@ export class RuntimeExecutionHandle implements ExecutionHandle {
 
   setSchemaId(schemaId: string): void {
     this.schemaIdValue = schemaId;
+  }
+
+  setTurnId(turnId: string): void {
+    // Stale-run recovery can continue an existing durable turn; we retarget the
+    // handle before any events are published so downstream state stays coherent.
+    this.turnId = turnId;
   }
 
   takeActiveRunId(): string | undefined {

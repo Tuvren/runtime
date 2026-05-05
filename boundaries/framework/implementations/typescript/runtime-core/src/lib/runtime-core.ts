@@ -36,6 +36,9 @@ import {
   decodeDeterministicKernelRecord,
   encodeDeterministicKernelRecord,
   type RuntimeKernel as KrakenKernel,
+  type RuntimeKernelRunLiveness,
+  type RecoveryState,
+  type RunRecord,
   type PathValue,
   type RunCompletionStatus,
   type TurnNode,
@@ -118,6 +121,12 @@ import { createToolRegistry } from "./tool-registry.js";
 export const DEFAULT_AGENT_SCHEMA_ID = "tuvren.agent.v1";
 export const DEFAULT_MAX_PARALLEL_TOOL_CALLS = 10;
 export const DEFAULT_MANIFEST_EXTENSION_STATE_WARNING_BUDGET_BYTES = 256 * 1024;
+
+export interface RuntimeRunLivenessOptions {
+  executionOwnerId: string;
+  leaseDurationMs: number;
+  renewBeforeMs?: number;
+}
 export const DEFAULT_AGENT_SCHEMA: TurnTreeSchema = {
   incorporationRules: [
     { objectType: "message", targetPath: "messages" },
@@ -156,6 +165,7 @@ export interface RuntimeCoreOptions {
     threadId: string,
     branchId: string
   ) => Promise<string | null> | string | null;
+  runLiveness?: RuntimeRunLivenessOptions;
 }
 
 interface ResolvedRuntimeCoreOptions {
@@ -174,6 +184,13 @@ interface ResolvedRuntimeCoreOptions {
     threadId: string,
     branchId: string
   ) => Promise<string | null> | string | null;
+  runLiveness?: ResolvedRuntimeRunLivenessOptions;
+}
+
+interface ResolvedRuntimeRunLivenessOptions {
+  executionOwnerId: string;
+  leaseDurationMs: number;
+  renewBeforeMs: number;
 }
 
 export interface RuntimeWarning {
@@ -253,6 +270,20 @@ interface HelperBundle {
   resolveHashes(hashes: HashString[]): HashString[];
 }
 
+interface ExpiredExecutionRecovery {
+  activeAgentName?: string;
+  iterationCount?: number;
+  mode?:
+    | "reuse_turn"
+    | "skip_fresh_prelude"
+    | "complete_terminal_status";
+  needsInputReincorporation?: boolean;
+  preempted: boolean;
+  recoveryContended?: boolean;
+  runtimeStatus?: DurableRuntimeStatus;
+  turnId?: string;
+}
+
 class FinalizationFailure extends Error {
   readonly finalizationError: Error;
   readonly rootCause?: Error;
@@ -266,6 +297,16 @@ class FinalizationFailure extends Error {
 }
 
 class RuntimeCore implements TuvrenRuntime {
+  private readonly activeRunLeaseControllers = new WeakMap<
+    RuntimeExecutionHandle,
+    {
+      abortController: AbortController;
+      executionOwnerId: string;
+      fencingToken: string;
+      leaseExpiresAtMs: EpochMs;
+      runId: string;
+    }
+  >();
   private readonly manifestExtensionStateWarningKeys = new WeakMap<
     RuntimeExecutionHandle,
     Set<string>
@@ -294,7 +335,23 @@ class RuntimeCore implements TuvrenRuntime {
       onWarning: options.onWarning,
       resolveAgentConfig: options.resolveAgentConfig,
       resolveParentTurnId: options.resolveParentTurnId,
+      runLiveness:
+        options.runLiveness === undefined
+          ? undefined
+          : normalizeRunLivenessOptions(options.runLiveness),
     };
+
+    if (
+      this.options.runLiveness !== undefined &&
+      !hasRunLivenessKernel(this.options.kernel)
+    ) {
+      throw new TuvrenRuntimeError(
+        "runLiveness requires a kernel that implements the kernel.run-liveness extension",
+        {
+          code: "missing_run_liveness_extension",
+        }
+      );
+    }
   }
 
   async createBranch(input: {
@@ -454,9 +511,35 @@ class RuntimeCore implements TuvrenRuntime {
 
       const schemaId = await this.resolveExecutionSchemaId(handle.request);
       handle.setSchemaId(schemaId);
-      const branchHeadHash = await this.resolveExecutionBranchHead(handle);
-      await this.createExecutionTurnIfNeeded(handle, branchHeadHash);
-      const loopState = this.createExecutionLoopState(handle);
+      const initialBranchHeadHash = await this.resolveExecutionBranchHead(
+        handle
+      );
+      const recoveredExecution = await this.recoverExpiredExecutionBranchIfNeeded(
+        handle.request.branchId,
+        handle.request.signal
+      );
+
+      if (recoveredExecution?.recoveryContended === true) {
+        // Losing the stale-recovery race means another owner still controls the
+        // branch or already fenced the stale run. We fail before `turn.create`
+        // so this handle cannot mutate lineage while recovery ownership is contested.
+        throw createStaleRecoveryContendedError();
+      }
+
+      if (recoveredExecution?.turnId !== undefined) {
+        handle.setTurnId(recoveredExecution.turnId);
+      }
+
+      const branchHeadHash =
+        recoveredExecution?.preempted === true
+          ? await this.resolveExecutionBranchHead(handle)
+          : initialBranchHeadHash;
+      await this.createExecutionTurnIfNeeded(
+        handle,
+        branchHeadHash,
+        recoveredExecution?.turnId !== undefined
+      );
+      const loopState = this.createExecutionLoopState(handle, recoveredExecution);
 
       const resumedStart = await this.prepareResumedExecutionStartPrelude(
         handle,
@@ -500,7 +583,26 @@ class RuntimeCore implements TuvrenRuntime {
 
       if (
         resumedStart === undefined &&
-        (await this.prepareFreshExecutionStart(handle, schemaId, loopState))
+        recoveredExecution?.mode === "complete_terminal_status"
+      ) {
+        await this.completeRecoveredTerminalExecution(
+          handle,
+          loopState,
+          recoveredExecution
+        );
+        return;
+      }
+
+      if (
+        resumedStart === undefined &&
+        (await this.prepareFreshExecutionStart(
+          handle,
+          schemaId,
+          loopState,
+          recoveredExecution?.mode,
+          recoveredExecution?.iterationCount,
+          recoveredExecution?.needsInputReincorporation ?? false
+        ))
       ) {
         return;
       }
@@ -521,6 +623,7 @@ class RuntimeCore implements TuvrenRuntime {
     } catch (error: unknown) {
       await this.handleExecutionFailure(handle, error);
     } finally {
+      this.stopRunLeaseLoop(handle);
       handle.finish();
     }
   }
@@ -560,9 +663,10 @@ class RuntimeCore implements TuvrenRuntime {
 
   private async createExecutionTurnIfNeeded(
     handle: RuntimeExecutionHandle,
-    branchHeadHash: HashString
+    branchHeadHash: HashString,
+    reuseRecoveredTurn: boolean
   ): Promise<void> {
-    if (handle.resumedFrom !== undefined) {
+    if (handle.resumedFrom !== undefined || reuseRecoveredTurn) {
       return;
     }
 
@@ -581,18 +685,34 @@ class RuntimeCore implements TuvrenRuntime {
     );
   }
 
-  private createExecutionLoopState(handle: RuntimeExecutionHandle): LoopState {
+  private createExecutionLoopState(
+    handle: RuntimeExecutionHandle,
+    recoveredExecution?: ExpiredExecutionRecovery
+  ): LoopState {
     const resumedPauseContext = handle.resumedFrom?.pauseContext;
+    const recoveredActiveConfig =
+      recoveredExecution?.activeAgentName === undefined
+        ? undefined
+        : this.options.resolveAgentConfig?.(recoveredExecution.activeAgentName) ??
+          (recoveredExecution.activeAgentName === handle.request.config.name
+            ? handle.request.config
+            : {
+                name: recoveredExecution.activeAgentName,
+              });
+    const initialActiveConfig =
+      resumedPauseContext?.activeConfig ??
+      recoveredActiveConfig ??
+      handle.request.config;
 
     return {
-      activeConfig: resumedPauseContext?.activeConfig ?? handle.request.config,
+      activeConfig: initialActiveConfig,
       activeDriverId:
         resumedPauseContext?.activeDriverId ??
         handle.request.driverId ??
         this.options.defaultDriverId,
       activeToolRegistry:
         resumedPauseContext?.activeToolRegistry ??
-        createActiveToolRegistry(handle.request.tools, handle.request.config),
+        createActiveToolRegistry(handle.request.tools, initialActiveConfig),
       carriedStateUpdates: [
         ...(resumedPauseContext?.carriedStateUpdates ?? []),
       ],
@@ -620,23 +740,36 @@ class RuntimeCore implements TuvrenRuntime {
   private async prepareFreshExecutionStart(
     handle: RuntimeExecutionHandle,
     schemaId: string,
-    loopState: LoopState
+    loopState: LoopState,
+    recoveredExecutionMode: ExpiredExecutionRecovery["mode"],
+    recoveredIterationCount?: number,
+    needsInputReincorporation = false
   ): Promise<boolean> {
-    await this.incorporateInput(handle, schemaId, loopState);
+    if (recoveredExecutionMode === undefined || needsInputReincorporation) {
+      // `incorporate_input` recovery only re-stages the signal when the
+      // recovered branch head still lacks a durable matching user message.
+      await this.incorporateInput(handle, schemaId, loopState);
+    }
+
     const headState = await this.loadHeadState(handle.request.branchId);
+    const initialIterationCount = recoveredIterationCount ?? 0;
     handle.updateStatus({
       activeAgent: loopState.activeConfig.name,
-      iterationCount: 0,
+      iterationCount: initialIterationCount,
       manifest: headState.manifest,
       phase: "running",
     });
+
+    if (recoveredExecutionMode === "skip_fresh_prelude") {
+      return false;
+    }
 
     const beforeTurn = await runBeforeTurnHooks({
       emit: (event) => {
         this.publishCustomEvent(handle, event, loopState);
       },
       extensions: loopState.activeConfig.extensions ?? [],
-      iterationCount: 0,
+      iterationCount: initialIterationCount,
       manifest: headState.manifest,
       messages: headState.messages,
       runId: this.createId(),
@@ -1042,6 +1175,18 @@ class RuntimeCore implements TuvrenRuntime {
     loopState: LoopState
   ): Promise<LoopOutcome> {
     while (true) {
+      if (
+        loopState.activeConfig.maxIterations !== undefined &&
+        handle.status().iterationCount >= loopState.activeConfig.maxIterations
+      ) {
+        return {
+          resolution: {
+            reason: "max_iterations",
+            type: "end_turn",
+          },
+        };
+      }
+
       const nextIteration = handle.status().iterationCount + 1;
       loopState.enteredIterationLoop = true;
 
@@ -1304,6 +1449,31 @@ class RuntimeCore implements TuvrenRuntime {
         emittedDriverEvents
       )
     );
+    if (shouldDiscardDriverProgressAfterLeaseLoss(handle)) {
+      // Lease loss fences this execution owner immediately. Any driver output
+      // returned after the abort is stale work and must not be checkpointed.
+      const leaseLostResolution = createCancelledResolution(handle);
+
+      if (leaseLostResolution === undefined) {
+        throw new TuvrenRuntimeError(
+          "lease-loss aborts must surface a cancellation resolution",
+          { code: "missing_run_lease_loss_resolution" }
+        );
+      }
+
+      await this.failTrackedRunWithoutBranchAdvance(
+        handle,
+        iterationRunId,
+        headState.branchHeadHash
+      );
+      return {
+        kind: "outcome",
+        outcome: {
+          resolution: leaseLostResolution,
+        },
+      };
+    }
+
     let resolution = driverResult.resolution;
     const driverMessages = [...(driverResult.messages ?? [])];
     const cancellationResolution = createCancelledResolution(handle);
@@ -2352,6 +2522,7 @@ class RuntimeCore implements TuvrenRuntime {
         undefined,
         treeHash
       );
+      this.syncRunLeaseStateFromStepResult(handle, runId, stepResult);
       const completion = await this.completeTrackedRun(
         handle,
         runId,
@@ -2496,6 +2667,7 @@ class RuntimeCore implements TuvrenRuntime {
         type: "input_received",
       })
     );
+    this.syncRunLeaseStateFromStepResult(handle, runId, stepResult);
     await this.completeTrackedRun(handle, runId, "completed");
 
     if (stepResult.turnNodeHash !== undefined) {
@@ -2565,6 +2737,7 @@ class RuntimeCore implements TuvrenRuntime {
         type: "steering_incorporated",
       })
     );
+    this.syncRunLeaseStateFromStepResult(handle, runId, stepResult);
     await this.completeTrackedRun(handle, runId, "completed");
 
     if (stepResult.turnNodeHash !== undefined) {
@@ -2635,6 +2808,7 @@ class RuntimeCore implements TuvrenRuntime {
         type: "extension_state_committed",
       })
     );
+    this.syncRunLeaseStateFromStepResult(handle, runId, stepResult);
     await this.completeTrackedRun(handle, runId, "completed");
 
     if (stepResult.turnNodeHash !== undefined) {
@@ -2727,6 +2901,7 @@ class RuntimeCore implements TuvrenRuntime {
       undefined,
       nextTreeHash
     );
+    this.syncRunLeaseStateFromStepResult(handle, runId, stepResult);
     await this.completeTrackedRun(handle, runId, "completed");
     if (stepResult.turnNodeHash !== undefined) {
       await this.advanceTurnAndBranchHead(handle, stepResult.turnNodeHash);
@@ -2872,6 +3047,7 @@ class RuntimeCore implements TuvrenRuntime {
       undefined,
       nextTreeHash
     );
+    this.syncRunLeaseStateFromStepResult(handle, runId, stepResult);
     await this.completeTrackedRun(handle, runId, "completed");
 
     if (stepResult.turnNodeHash !== undefined) {
@@ -3079,6 +3255,7 @@ class RuntimeCore implements TuvrenRuntime {
         type: "turn_status_finalized",
       })
     );
+    this.syncRunLeaseStateFromStepResult(handle, runId, stepResult);
     await this.completeTrackedRun(handle, runId, "completed");
 
     if (stepResult.turnNodeHash !== undefined) {
@@ -3275,6 +3452,56 @@ class RuntimeCore implements TuvrenRuntime {
       messageHashes,
       messages: await this.readMessages(messageHashes),
       turnNode,
+    };
+  }
+
+  private async readRecoveredActiveAgentName(
+    turnTreeHash: HashString
+  ): Promise<string | undefined> {
+    return (await this.readRecoveredRuntimeStatus(turnTreeHash))?.activeAgent;
+  }
+
+  private async readRecoveredRuntimeStatus(
+    turnTreeHash: HashString
+  ): Promise<DurableRuntimeStatus | undefined> {
+    const runtimeStatusHash = toOptionalHash(
+      await this.options.kernel.tree.resolve(turnTreeHash, "runtime.status")
+    );
+
+    if (runtimeStatusHash === null) {
+      return undefined;
+    }
+
+    const payload = await this.options.kernel.store.get(runtimeStatusHash);
+
+    if (payload === null) {
+      return undefined;
+    }
+
+    const runtimeStatus = decodeDeterministicKernelRecord(payload);
+
+    if (
+      !isRecord(runtimeStatus) ||
+      typeof runtimeStatus.state !== "string" ||
+      (runtimeStatus.state !== "completed" &&
+        runtimeStatus.state !== "failed" &&
+        runtimeStatus.state !== "paused" &&
+        runtimeStatus.state !== "running")
+    ) {
+      return undefined;
+    }
+
+    return {
+      ...(typeof runtimeStatus.activeAgent === "string"
+        ? { activeAgent: runtimeStatus.activeAgent }
+        : {}),
+      ...(typeof runtimeStatus.partial === "boolean"
+        ? { partial: runtimeStatus.partial }
+        : {}),
+      ...(typeof runtimeStatus.pauseReason === "string"
+        ? { pauseReason: runtimeStatus.pauseReason }
+        : {}),
+      state: runtimeStatus.state,
     };
   }
 
@@ -3550,6 +3777,7 @@ class RuntimeCore implements TuvrenRuntime {
       undefined,
       nextTreeHash
     );
+    this.syncRunLeaseStateFromStepResult(handle, runId, stepResult);
     await this.completeTrackedRun(handle, runId, "completed");
 
     if (stepResult.turnNodeHash !== undefined) {
@@ -3605,15 +3833,203 @@ class RuntimeCore implements TuvrenRuntime {
       sideEffects: boolean;
     }>
   ): Promise<void> {
-    await this.options.kernel.run.create(
-      runId,
-      turnId,
+    this.stopRunLeaseLoop(handle);
+    const leasedRun = await this.createTrackedRunOnce({
       branchId,
+      runId,
       schemaId,
       startTurnNodeHash,
-      steps
-    );
+      steps,
+      turnId,
+    });
     handle.setActiveRunId(runId);
+    if (leasedRun !== undefined) {
+      this.startRunLeaseLoop(handle, leasedRun);
+    }
+  }
+
+  private async createTrackedRunOnce(input: {
+    branchId: string;
+    runId: string;
+    schemaId: string;
+    startTurnNodeHash: HashString;
+    steps: Array<{
+      deterministic: boolean;
+      id: string;
+      sideEffects: boolean;
+    }>;
+    turnId: string;
+  }): Promise<RunRecord | undefined> {
+    const livenessKernel = this.resolveRunLivenessKernel();
+    const leasedRun =
+      livenessKernel === undefined || this.options.runLiveness === undefined
+        ? undefined
+        : await livenessKernel.runLiveness.createLeasedRun({
+            branchId: input.branchId,
+            executionOwnerId: this.options.runLiveness.executionOwnerId,
+            leaseExpiresAtMs:
+              (this.now() + this.options.runLiveness.leaseDurationMs) as EpochMs,
+            runId: input.runId,
+            schemaId: input.schemaId,
+            startTurnNodeHash: input.startTurnNodeHash,
+            steps: input.steps,
+            turnId: input.turnId,
+          });
+
+    if (leasedRun === undefined) {
+      await this.options.kernel.run.create(
+        input.runId,
+        input.turnId,
+        input.branchId,
+        input.schemaId,
+        input.startTurnNodeHash,
+        input.steps
+      );
+    }
+
+    return leasedRun;
+  }
+
+  private async recoverExpiredExecutionBranchIfNeeded(
+    branchId: string,
+    signal: InputSignal
+  ): Promise<ExpiredExecutionRecovery | undefined> {
+    const livenessKernel = this.resolveRunLivenessKernel();
+    const livenessOptions = this.options.runLiveness;
+
+    if (livenessKernel === undefined || livenessOptions === undefined) {
+      return undefined;
+    }
+
+    // Recovery has to happen before we resolve the branch head and parent turn,
+    // otherwise the replacement turn would be anchored to pre-recovery lineage.
+    const expiredRun = (await livenessKernel.runLiveness.listExpired(this.now()))
+      .filter((candidate) => candidate.branchId === branchId)
+      .at(0);
+
+    if (expiredRun === undefined) {
+      return undefined;
+    }
+
+    let recoveryState: RecoveryState;
+
+    try {
+      recoveryState = await livenessKernel.runLiveness.preemptExpired(
+        expiredRun.runId,
+        livenessOptions.executionOwnerId,
+        this.now(),
+        "stale_running_recovery"
+      );
+    } catch (error: unknown) {
+      const raceResolution = classifyStaleRecoveryRace(error);
+
+      if (raceResolution === undefined) {
+        throw error;
+      }
+
+      return raceResolution;
+    }
+
+    const recoveredHeadState = await this.loadHeadState(branchId);
+    const recoveredMode = classifyRecoveredExecutionMode(recoveryState);
+
+    if (recoveredMode === "reuse_turn") {
+      switch (
+        classifyRecoveredTurnSignalState(signal, recoveredHeadState.messages)
+      ) {
+        case "match":
+          return {
+            iterationCount: 0,
+            mode: recoveredMode,
+            needsInputReincorporation: false,
+            preempted: true,
+            turnId: expiredRun.turnId,
+          };
+        case "missing":
+          return {
+            iterationCount: 0,
+            mode: recoveredMode,
+            needsInputReincorporation: true,
+            preempted: true,
+            turnId: expiredRun.turnId,
+          };
+        case "mismatch":
+          return {
+            preempted: true,
+          };
+      }
+    }
+
+    // Without a durable request identity, the best available recovery signal is
+    // the last durable user message on the recovered head. A different signal
+    // always starts a fresh turn after fencing the stale owner.
+    if (
+      !doesSignalMatchRecoveredTurn(signal, recoveredHeadState.messages)
+    ) {
+      return {
+        preempted: true,
+      };
+    }
+
+    return {
+      activeAgentName: await this.readRecoveredActiveAgentName(
+        recoveredHeadState.turnNode.turnTreeHash
+      ),
+      iterationCount: await this.estimateRecoveredIterationCount(
+        expiredRun.turnId,
+        recoveredMode,
+        recoveredHeadState
+      ),
+      mode: recoveredMode,
+      preempted: true,
+      runtimeStatus: await this.readRecoveredRuntimeStatus(
+        recoveredHeadState.turnNode.turnTreeHash
+      ),
+      turnId: expiredRun.turnId,
+    };
+  }
+
+  private async estimateRecoveredIterationCount(
+    turnId: string,
+    _recoveredMode: Exclude<ExpiredExecutionRecovery["mode"], "reuse_turn">,
+    recoveredHeadState: HeadState
+  ): Promise<number> {
+    const turn = await this.options.kernel.turn.get(turnId);
+
+    if (turn === null) {
+      return 1;
+    }
+
+    const startTurnNode = await this.options.kernel.node.get(turn.startTurnNodeHash);
+
+    if (startTurnNode === null) {
+      return 1;
+    }
+
+    const startMessageHashes = toOrderedHashArray(
+      await this.options.kernel.tree.resolve(startTurnNode.turnTreeHash, "messages")
+    );
+
+    if (
+      recoveredHeadState.messageHashes.length >= startMessageHashes.length &&
+      startMessageHashes.every(
+        (hash, index) => recoveredHeadState.messageHashes[index] === hash
+      )
+    ) {
+      const assistantIterations = recoveredHeadState.messages
+        .slice(startMessageHashes.length)
+        .filter((message) => message.role === "assistant").length;
+
+      if (assistantIterations > 0) {
+        return assistantIterations;
+      }
+    }
+
+    // Context-engineering and other same-turn recovery steps may rewrite the
+    // message array, so the branch head is not guaranteed to retain the original
+    // prefix needed for exact counting. These modes still imply that at least
+    // one iteration already completed before the stale run was fenced.
+    return 1;
   }
 
   private async completeTrackedRun(
@@ -3622,6 +4038,7 @@ class RuntimeCore implements TuvrenRuntime {
     status: RunCompletionStatus,
     event?: KernelRecord
   ): Promise<{ turnNodeHash?: HashString }> {
+    this.stopRunLeaseLoop(handle, runId);
     const eventHash =
       event === undefined ? undefined : await this.storeEventRecord(event);
     const completion = await this.options.kernel.run.complete(
@@ -3635,6 +4052,188 @@ class RuntimeCore implements TuvrenRuntime {
     }
 
     return completion;
+  }
+
+  private async completeRecoveredTerminalExecution(
+    handle: RuntimeExecutionHandle,
+    loopState: LoopState,
+    recoveredExecution: ExpiredExecutionRecovery
+  ): Promise<void> {
+    const recoveredRuntimeStatus = recoveredExecution.runtimeStatus;
+
+    if (
+      recoveredRuntimeStatus === undefined ||
+      (recoveredRuntimeStatus.state !== "completed" &&
+        recoveredRuntimeStatus.state !== "failed")
+    ) {
+      throw new TuvrenRuntimeError(
+        "recovered terminal execution requires a durable terminal runtime status",
+        { code: "missing_recovered_terminal_status" }
+      );
+    }
+
+    const recoveredHeadState = await this.loadHeadState(handle.request.branchId);
+    handle.replaceStatus({
+      activeAgent:
+        recoveredRuntimeStatus.activeAgent ?? loopState.activeConfig.name,
+      iterationCount: handle.status().iterationCount,
+      manifest: recoveredHeadState.manifest,
+      phase: recoveredRuntimeStatus.state,
+    });
+    this.publishEvent(
+      handle,
+      {
+        status: recoveredRuntimeStatus.state,
+        timestamp: this.now(),
+        turnId: handle.turnId,
+        type: "turn.end",
+      },
+      loopState
+    );
+  }
+
+  private resolveRunLivenessKernel():
+    | (KrakenKernel & RuntimeKernelRunLiveness)
+    | undefined {
+    if (!hasRunLivenessKernel(this.options.kernel)) {
+      return undefined;
+    }
+
+    return this.options.kernel;
+  }
+
+  private startRunLeaseLoop(
+    handle: RuntimeExecutionHandle,
+    run: RunRecord
+  ): void {
+    const livenessOptions = this.options.runLiveness;
+    const livenessKernel = this.resolveRunLivenessKernel();
+
+    if (
+      livenessOptions === undefined ||
+      livenessKernel === undefined ||
+      run.executionOwnerId === undefined ||
+      run.fencingToken === undefined ||
+      run.leaseExpiresAtMs === undefined
+    ) {
+      return;
+    }
+
+    this.stopRunLeaseLoop(handle);
+    const abortController = new AbortController();
+    const activeLease = {
+      abortController,
+      executionOwnerId: run.executionOwnerId,
+      fencingToken: run.fencingToken,
+      leaseExpiresAtMs: run.leaseExpiresAtMs,
+      runId: run.runId,
+    };
+    this.activeRunLeaseControllers.set(handle, activeLease);
+    detachPromise(
+      this.runLeaseLoop({
+        activeLease,
+        handle,
+        kernel: livenessKernel,
+        runId: run.runId,
+        signal: abortController.signal,
+      })
+    );
+  }
+
+  private stopRunLeaseLoop(
+    handle: RuntimeExecutionHandle,
+    runId?: string
+  ): void {
+    const activeLease = this.activeRunLeaseControllers.get(handle);
+
+    if (activeLease === undefined) {
+      return;
+    }
+
+    if (runId !== undefined && activeLease.runId !== runId) {
+      return;
+    }
+
+    activeLease.abortController.abort();
+    this.activeRunLeaseControllers.delete(handle);
+  }
+
+  private async runLeaseLoop(input: {
+    activeLease: {
+      abortController: AbortController;
+      executionOwnerId: string;
+      fencingToken: string;
+      leaseExpiresAtMs: EpochMs;
+      runId: string;
+    };
+    handle: RuntimeExecutionHandle;
+    kernel: KrakenKernel & RuntimeKernelRunLiveness;
+    runId: string;
+    signal: AbortSignal;
+  }): Promise<void> {
+    const livenessOptions = this.options.runLiveness;
+
+    if (livenessOptions === undefined) {
+      return;
+    }
+
+    while (!input.signal.aborted) {
+      const delayMs = Math.max(
+        0,
+        input.activeLease.leaseExpiresAtMs -
+          this.now() -
+          livenessOptions.renewBeforeMs
+      );
+      await waitForDelay(delayMs, input.signal);
+
+      if (
+        input.signal.aborted ||
+        input.handle.getActiveRunId() !== input.runId ||
+        input.handle.status().phase !== "running"
+      ) {
+        return;
+      }
+
+      try {
+        const renewed = await input.kernel.runLiveness.renewLease(
+          input.runId,
+          input.activeLease.executionOwnerId,
+          input.activeLease.fencingToken,
+          (this.now() + livenessOptions.leaseDurationMs) as EpochMs
+        );
+        input.activeLease.fencingToken = renewed.fencingToken;
+        input.activeLease.leaseExpiresAtMs = renewed.leaseExpiresAtMs;
+      } catch (error: unknown) {
+        if (input.signal.aborted) {
+          return;
+        }
+
+        input.handle.abortWithError(createRunLeaseLostError(error));
+        return;
+      }
+    }
+  }
+
+  private syncRunLeaseStateFromStepResult(
+    handle: RuntimeExecutionHandle,
+    runId: string,
+    stepResult: { lease?: { fencingToken: string; leaseExpiresAtMs: EpochMs } }
+  ): void {
+    const activeLease = this.activeRunLeaseControllers.get(handle);
+
+    if (
+      activeLease === undefined ||
+      activeLease.runId !== runId ||
+      stepResult.lease === undefined
+    ) {
+      return;
+    }
+
+    // The kernel rotates fencing tokens on durable running writes. The local
+    // renewal loop must immediately adopt the returned token to keep heartbeats
+    // authoritative across later renewals and terminal completion.
+    activeLease.fencingToken = stepResult.lease.fencingToken;
+    activeLease.leaseExpiresAtMs = stepResult.lease.leaseExpiresAtMs;
   }
 
   private async advanceTurnAndBranchHead(
@@ -4279,6 +4878,47 @@ function normalizeManifestExtensionStateWarningBudget(
   return value;
 }
 
+function normalizeRunLivenessOptions(
+  value: RuntimeRunLivenessOptions
+): ResolvedRuntimeRunLivenessOptions {
+  if (value.executionOwnerId.length === 0) {
+    throw new TuvrenRuntimeError(
+      "runLiveness.executionOwnerId must be a non-empty string",
+      {
+        code: "invalid_runtime_options",
+      }
+    );
+  }
+
+  const leaseDurationMs = normalizeMaxParallelToolCalls(
+    value.leaseDurationMs,
+    "runLiveness.leaseDurationMs"
+  );
+  const renewBeforeMs = normalizeMaxParallelToolCalls(
+    value.renewBeforeMs ?? Math.max(1, Math.floor(leaseDurationMs / 2)),
+    "runLiveness.renewBeforeMs"
+  );
+
+  if (renewBeforeMs >= leaseDurationMs) {
+    throw new TuvrenRuntimeError(
+      "runLiveness.renewBeforeMs must be smaller than runLiveness.leaseDurationMs",
+      {
+        code: "invalid_runtime_options",
+        details: {
+          leaseDurationMs,
+          renewBeforeMs,
+        },
+      }
+    );
+  }
+
+  return {
+    executionOwnerId: value.executionOwnerId,
+    leaseDurationMs,
+    renewBeforeMs,
+  };
+}
+
 function approximateSerializedByteLength(value: unknown): number | undefined {
   try {
     const serialized = JSON.stringify(value);
@@ -4584,6 +5224,104 @@ function createCancelledResolution(
     fatality: "hard",
     type: "fail",
   };
+}
+
+function shouldDiscardDriverProgressAfterLeaseLoss(
+  handle: RuntimeExecutionHandle
+): boolean {
+  const resolution = createCancelledResolution(handle);
+
+  if (resolution === undefined) {
+    return false;
+  }
+
+  if (resolution.type !== "fail") {
+    return false;
+  }
+
+  return isRunLeaseLostError(resolution.error);
+}
+
+function isRunLeaseLostError(error: unknown): boolean {
+  if (!isRecord(error)) {
+    return false;
+  }
+
+  return error.code === "runtime_execution_lease_lost";
+}
+
+function doesSignalMatchRecoveredTurn(
+  signal: InputSignal,
+  messages: readonly TuvrenMessage[]
+): boolean {
+  return classifyRecoveredTurnSignalState(signal, messages) === "match";
+}
+
+function classifyRecoveredTurnSignalState(
+  signal: InputSignal,
+  messages: readonly TuvrenMessage[]
+): "match" | "mismatch" | "missing" {
+  const recoveredUserMessage = [...messages]
+    .reverse()
+    .find((message) => message.role === "user");
+
+  if (recoveredUserMessage === undefined) {
+    return "missing";
+  }
+
+  return isDeepStrictEqual(recoveredUserMessage.parts, signal.parts)
+    ? "match"
+    : "mismatch";
+}
+
+function classifyRecoveredExecutionMode(
+  recoveryState: RecoveryState
+): ExpiredExecutionRecovery["mode"] {
+  const recoveredStepId = recoveryState.stepSequence[0]?.id;
+
+  switch (recoveredStepId) {
+    case "incorporate_input":
+      return "reuse_turn";
+    case "iterate":
+    case "commit_extension_state":
+    case "context_engineering":
+    case "incorporate_steering":
+    case "handoff_context":
+    case "resume_running_status":
+      return "skip_fresh_prelude";
+    case "finalize_turn_status":
+      return "complete_terminal_status";
+    default:
+      throw new TuvrenRuntimeError(
+        "stale run recovery cannot safely resume the recovered phase",
+        {
+          code: "unsupported_stale_run_recovery_phase",
+          details: {
+            lastCompletedStepId: recoveryState.lastCompletedStepId,
+            recoveredStepId: recoveredStepId ?? null,
+          },
+        }
+      );
+  }
+}
+
+function classifyStaleRecoveryRace(
+  error: unknown
+): ExpiredExecutionRecovery | undefined {
+  if (!isRecord(error) || typeof error.code !== "string") {
+    return undefined;
+  }
+
+  switch (error.code) {
+    case "kernel_runtime_run_not_running":
+    case "kernel_runtime_run_lease_not_expired":
+      return {
+        preempted: false,
+        recoveryContended: true,
+      };
+    default:
+      return undefined;
+  }
 }
 
 function shouldSuppressBufferedDriverEvents(
@@ -5880,6 +6618,87 @@ function isTurnLineageRecord(value: unknown): value is TurnLineageRecord {
 
 function hasAssistantOutputMessages(messages: TuvrenMessage[]): boolean {
   return messages.some((message) => message.role === "assistant");
+}
+
+function hasRunLivenessKernel(
+  kernel: KrakenKernel
+): kernel is KrakenKernel & RuntimeKernelRunLiveness {
+  return (
+    typeof kernel === "object" &&
+    kernel !== null &&
+    "runLiveness" in kernel &&
+    typeof kernel.runLiveness === "object" &&
+    kernel.runLiveness !== null
+  );
+}
+
+function createRunLeaseLostError(error: unknown): Error {
+  const normalizedError = normalizeError(error);
+
+  if (!isRunLeaseFenceError(normalizedError)) {
+    return normalizedError;
+  }
+
+  return new TuvrenRuntimeError("execution lease lost", {
+    code: "runtime_execution_lease_lost",
+    details: {
+      cause:
+        isRecord(normalizedError) && typeof normalizedError.code === "string"
+          ? normalizedError.code
+          : undefined,
+      message: normalizedError.message,
+    },
+  });
+}
+
+function createStaleRecoveryContendedError(): Error {
+  return new TuvrenRuntimeError(
+    "stale run recovery was claimed by another owner",
+    {
+      code: "runtime_execution_recovery_contended",
+    }
+  );
+}
+
+function isRunLeaseFenceError(error: unknown): boolean {
+  if (!isRecord(error) || typeof error.code !== "string") {
+    return false;
+  }
+
+  return (
+    error.code === "kernel_runtime_run_lease_expired" ||
+    error.code === "kernel_runtime_run_not_leased" ||
+    error.code === "kernel_runtime_run_lease_owner_mismatch" ||
+    error.code === "kernel_runtime_run_lease_token_mismatch"
+  );
+}
+
+function waitForDelay(durationMs: number, signal: AbortSignal): Promise<void> {
+  if (durationMs <= 0 || signal.aborted) {
+    return Promise.resolve();
+  }
+
+  return awaitableDelay(durationMs, signal);
+}
+
+function awaitableDelay(
+  durationMs: number,
+  signal: AbortSignal
+): Promise<void> {
+  return new Promise((resolve) => {
+    const timeoutId = setTimeout(() => {
+      signal.removeEventListener("abort", onAbort);
+      resolve();
+    }, durationMs);
+
+    const onAbort = () => {
+      clearTimeout(timeoutId);
+      signal.removeEventListener("abort", onAbort);
+      resolve();
+    };
+
+    signal.addEventListener("abort", onAbort, { once: true });
+  });
 }
 
 function assertFrameworkSchemaCompatibility(schema: TurnTreeSchema): void {
