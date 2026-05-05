@@ -29,6 +29,7 @@ import type {
   RunRecord,
   TurnTreeSchema,
 } from "@tuvren/kernel-protocol";
+import { encodeDeterministicKernelRecord } from "@tuvren/kernel-protocol";
 import type {
   AgentConfig,
   AroundToolContext,
@@ -106,7 +107,7 @@ interface FakeRunLivenessKernelHarness {
 }
 
 function hasAssistantTextMessage(
-  messages: unknown[],
+  messages: readonly unknown[],
   expectedText: string
 ): boolean {
   return messages.some((message) => {
@@ -214,12 +215,19 @@ function createFakeRunLivenessKernelHarness(
           }
 
           preemptCalls += 1;
-          await baseKernel.run.complete(runId, "failed");
+          const completion = await baseKernel.run.complete(runId, "failed");
+          const recoveredBranch = await baseKernel.branch.get(leasedRun.branchId);
+
+          if (recoveredBranch === null) {
+            throw new Error(`expected branch "${leasedRun.branchId}"`);
+          }
+
           leasedRuns.delete(runId);
           return {
             consumedStagedResults: [],
             lastCompletedStepId: null,
-            lastTurnNodeHash: leasedRun.startTurnNodeHash,
+            lastTurnNodeHash:
+              completion.turnNodeHash ?? recoveredBranch.headTurnNodeHash,
             stepSequence: leasedRun.stepSequence,
             uncommittedStagedResults: [],
           } satisfies RecoveryState;
@@ -464,7 +472,13 @@ describe("framework-runtime-core", () => {
     const harness = createFakeKernelHarness();
     const livenessHarness = createFakeRunLivenessKernelHarness(harness);
     const driver = {
-      async execute() {
+      async execute(context) {
+        expect(
+          hasAssistantTextMessage(
+            context.messages,
+            "Recovered durable assistant output."
+          )
+        ).toBe(true);
         return {
           messages: [assistantText("Replacement execution succeeded.")],
           resolution: {
@@ -505,6 +519,21 @@ describe("framework-runtime-core", () => {
       steps: [{ deterministic: false, id: "iterate", sideEffects: true }],
       turnId: staleTurn.turnId,
     });
+    await livenessHarness.kernel.staging.stage(
+      "run_stale_leased_execution",
+      encodeDeterministicKernelRecord({
+        parts: [
+          {
+            text: "Recovered durable assistant output.",
+            type: "text",
+          },
+        ],
+        role: "assistant",
+      }),
+      "stale_assistant_message",
+      "message",
+      "completed"
+    );
 
     const handle = runtime.executeTurn({
       branchId: thread.branchId,
@@ -522,6 +551,12 @@ describe("framework-runtime-core", () => {
         (run) => run.runId === "run_stale_leased_execution"
       )?.status
     ).toBe("failed");
+    expect(
+      hasAssistantTextMessage(
+        await harness.readBranchMessages(thread.branchId),
+        "Recovered durable assistant output."
+      )
+    ).toBe(true);
   });
 
   test("drops driver output that arrives after lease loss aborts the execution", async () => {

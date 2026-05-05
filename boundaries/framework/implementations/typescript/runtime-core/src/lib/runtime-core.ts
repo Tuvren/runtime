@@ -493,6 +493,7 @@ class RuntimeCore implements TuvrenRuntime {
 
       const schemaId = await this.resolveExecutionSchemaId(handle.request);
       handle.setSchemaId(schemaId);
+      await this.recoverExpiredExecutionBranchIfNeeded(handle.request.branchId);
       const branchHeadHash = await this.resolveExecutionBranchHead(handle);
       await this.createExecutionTurnIfNeeded(handle, branchHeadHash);
       const loopState = this.createExecutionLoopState(handle);
@@ -3671,7 +3672,7 @@ class RuntimeCore implements TuvrenRuntime {
     }>
   ): Promise<void> {
     this.stopRunLeaseLoop(handle);
-    const leasedRun = await this.createTrackedRunWithStaleRecovery({
+    const leasedRun = await this.createTrackedRunOnce({
       branchId,
       runId,
       schemaId,
@@ -3683,36 +3684,6 @@ class RuntimeCore implements TuvrenRuntime {
     if (leasedRun !== undefined) {
       this.startRunLeaseLoop(handle, leasedRun);
     }
-  }
-
-  private async createTrackedRunWithStaleRecovery(input: {
-    branchId: string;
-    runId: string;
-    schemaId: string;
-    startTurnNodeHash: HashString;
-    steps: Array<{
-      deterministic: boolean;
-      id: string;
-      sideEffects: boolean;
-    }>;
-    turnId: string;
-  }): Promise<RunRecord | undefined> {
-    try {
-      return await this.createTrackedRunOnce(input);
-    } catch (error: unknown) {
-      const recovered = await this.tryPreemptExpiredBranchRun(
-        input.branchId,
-        error
-      );
-
-      if (!recovered) {
-        throw error;
-      }
-    }
-
-    // We retry only once after fencing the matching expired owner so unrelated
-    // active-run failures still surface instead of being masked by a loop.
-    return await this.createTrackedRunOnce(input);
   }
 
   private async createTrackedRunOnce(input: {
@@ -3757,27 +3728,24 @@ class RuntimeCore implements TuvrenRuntime {
     return leasedRun;
   }
 
-  private async tryPreemptExpiredBranchRun(
-    branchId: string,
-    error: unknown
-  ): Promise<boolean> {
+  private async recoverExpiredExecutionBranchIfNeeded(
+    branchId: string
+  ): Promise<void> {
     const livenessKernel = this.resolveRunLivenessKernel();
     const livenessOptions = this.options.runLiveness;
 
-    if (
-      livenessKernel === undefined ||
-      livenessOptions === undefined ||
-      !isKernelActiveRunError(error)
-    ) {
-      return false;
+    if (livenessKernel === undefined || livenessOptions === undefined) {
+      return;
     }
 
+    // Recovery has to happen before we resolve the branch head and parent turn,
+    // otherwise the replacement turn would be anchored to pre-recovery lineage.
     const expiredRun = (await livenessKernel.runLiveness.listExpired(this.now()))
       .filter((candidate) => candidate.branchId === branchId)
       .at(0);
 
     if (expiredRun === undefined) {
-      return false;
+      return;
     }
 
     await livenessKernel.runLiveness.preemptExpired(
@@ -3786,7 +3754,6 @@ class RuntimeCore implements TuvrenRuntime {
       this.now(),
       "stale_running_recovery"
     );
-    return true;
   }
 
   private async completeTrackedRun(
@@ -4940,14 +4907,6 @@ function isRunLeaseLostError(error: unknown): boolean {
   }
 
   return error.code === "runtime_execution_lease_lost";
-}
-
-function isKernelActiveRunError(error: unknown): boolean {
-  if (!isRecord(error)) {
-    return false;
-  }
-
-  return error.code === "kernel_runtime_branch_already_active";
 }
 
 function shouldSuppressBufferedDriverEvents(
