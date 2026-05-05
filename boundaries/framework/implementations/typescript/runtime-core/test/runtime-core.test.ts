@@ -126,6 +126,26 @@ function hasAssistantTextMessage(
   });
 }
 
+function countUserTextMessages(
+  messages: readonly unknown[],
+  expectedText: string
+): number {
+  return messages.filter((message) => {
+    const record = toOptionalRecord(message);
+
+    if (record?.role !== "user" || !Array.isArray(record.parts)) {
+      return false;
+    }
+
+    return record.parts.some((part) => {
+      const partRecord = toOptionalRecord(part);
+      return (
+        partRecord?.type === "text" && partRecord.text === expectedText
+      );
+    });
+  }).length;
+}
+
 function createFakeRunLivenessKernelHarness(
   harness: FakeKernelHarness,
   options?: {
@@ -473,6 +493,9 @@ describe("framework-runtime-core", () => {
     const livenessHarness = createFakeRunLivenessKernelHarness(harness);
     const driver = {
       async execute(context) {
+        expect(countUserTextMessages(context.messages, "Replace the stale run")).toBe(
+          1
+        );
         expect(
           hasAssistantTextMessage(
             context.messages,
@@ -524,6 +547,21 @@ describe("framework-runtime-core", () => {
       encodeDeterministicKernelRecord({
         parts: [
           {
+            text: "Replace the stale run",
+            type: "text",
+          },
+        ],
+        role: "user",
+      }),
+      "stale_user_message",
+      "message",
+      "completed"
+    );
+    await livenessHarness.kernel.staging.stage(
+      "run_stale_leased_execution",
+      encodeDeterministicKernelRecord({
+        parts: [
+          {
             text: "Recovered durable assistant output.",
             type: "text",
           },
@@ -558,6 +596,160 @@ describe("framework-runtime-core", () => {
         "Recovered durable assistant output."
       )
     ).toBe(true);
+  });
+
+  test("starts a fresh turn when the incoming signal does not match the recovered stale turn", async () => {
+    const harness = createFakeKernelHarness();
+    const livenessHarness = createFakeRunLivenessKernelHarness(harness);
+    const driver = {
+      async execute(context) {
+        expect(countUserTextMessages(context.messages, "Original request")).toBe(
+          1
+        );
+        expect(
+          countUserTextMessages(context.messages, "Different fresh request")
+        ).toBe(1);
+        return {
+          messages: [assistantText("Fresh turn executed.")],
+          resolution: {
+            reason: "done",
+            type: "end_turn",
+          },
+        };
+      },
+      id: "fake",
+      async resume() {
+        throw new Error("resume was not expected");
+      },
+    } satisfies KrakenDriver;
+    const runtime = createTuvrenRuntimeCore({
+      defaultDriverId: "fake",
+      driverRegistry: createDriverRegistry([driver]),
+      kernel: livenessHarness.kernel,
+      runLiveness: {
+        executionOwnerId: "worker-1",
+        leaseDurationMs: 50,
+      },
+    });
+    const thread = await runtime.createThread({});
+    const staleTurn = await livenessHarness.kernel.turn.create(
+      "turn_stale_signal_mismatch",
+      thread.threadId,
+      thread.branchId,
+      null,
+      thread.rootTurnNodeHash
+    );
+    await livenessHarness.kernel.runLiveness.createLeasedRun({
+      branchId: thread.branchId,
+      executionOwnerId: "worker-stale",
+      leaseExpiresAtMs: 1,
+      runId: "run_stale_signal_mismatch",
+      schemaId: DEFAULT_AGENT_SCHEMA.schemaId,
+      startTurnNodeHash: thread.rootTurnNodeHash,
+      steps: [{ deterministic: false, id: "iterate", sideEffects: true }],
+      turnId: staleTurn.turnId,
+    });
+    await livenessHarness.kernel.staging.stage(
+      "run_stale_signal_mismatch",
+      encodeDeterministicKernelRecord({
+        parts: [
+          {
+            text: "Original request",
+            type: "text",
+          },
+        ],
+        role: "user",
+      }),
+      "stale_user_message",
+      "message",
+      "completed"
+    );
+
+    const handle = runtime.executeTurn({
+      branchId: thread.branchId,
+      config: { name: "primary" },
+      signal: textSignal("Different fresh request"),
+      threadId: thread.threadId,
+    });
+    const events = await collectEvents(handle.events());
+    const branchMessages = await harness.readBranchMessages(thread.branchId);
+
+    expect(handle.status().phase).toBe("completed");
+    expect(extractTurnId(events)).not.toBe(staleTurn.turnId);
+    expect(countUserTextMessages(branchMessages, "Original request")).toBe(1);
+    expect(
+      countUserTextMessages(branchMessages, "Different fresh request")
+    ).toBe(1);
+  });
+
+  test("rejects branch and thread mismatches before stale-run recovery can preempt", async () => {
+    const harness = createFakeKernelHarness();
+    const livenessHarness = createFakeRunLivenessKernelHarness(harness);
+    const driver = {
+      async execute() {
+        return {
+          messages: [assistantText("This turn should not start.")],
+          resolution: {
+            reason: "done",
+            type: "end_turn",
+          },
+        };
+      },
+      id: "fake",
+      async resume() {
+        throw new Error("resume was not expected");
+      },
+    } satisfies KrakenDriver;
+    const runtime = createTuvrenRuntimeCore({
+      defaultDriverId: "fake",
+      driverRegistry: createDriverRegistry([driver]),
+      kernel: livenessHarness.kernel,
+      runLiveness: {
+        executionOwnerId: "worker-1",
+        leaseDurationMs: 50,
+      },
+    });
+    const threadA = await runtime.createThread({});
+    const threadB = await runtime.createThread({});
+    const staleTurn = await livenessHarness.kernel.turn.create(
+      "turn_cross_thread_recovery_guard",
+      threadA.threadId,
+      threadA.branchId,
+      null,
+      threadA.rootTurnNodeHash
+    );
+    await livenessHarness.kernel.runLiveness.createLeasedRun({
+      branchId: threadA.branchId,
+      executionOwnerId: "worker-stale",
+      leaseExpiresAtMs: 1,
+      runId: "run_cross_thread_recovery_guard",
+      schemaId: DEFAULT_AGENT_SCHEMA.schemaId,
+      startTurnNodeHash: threadA.rootTurnNodeHash,
+      steps: [{ deterministic: false, id: "iterate", sideEffects: true }],
+      turnId: staleTurn.turnId,
+    });
+    const originalBranchHead = (
+      await livenessHarness.kernel.branch.get(threadA.branchId)
+    )?.headTurnNodeHash;
+    const handle = runtime.executeTurn({
+      branchId: threadA.branchId,
+      config: { name: "primary" },
+      signal: textSignal("Cross the streams"),
+      threadId: threadB.threadId,
+    });
+    const events = await collectEvents(handle.events());
+    const errorEvent = events.find(
+      (event): event is Extract<(typeof events)[number], { type: "error" }> =>
+        event.type === "error"
+    );
+
+    expect(handle.status().phase).toBe("failed");
+    expect(errorEvent?.error.code).toBe("branch_thread_mismatch");
+    expect(livenessHarness.getPreemptCalls()).toBe(0);
+    expect(
+      (await livenessHarness.kernel.branch.get(threadA.branchId))
+        ?.headTurnNodeHash
+    ).toBe(originalBranchHead);
   });
 
   test("drops driver output that arrives after lease loss aborts the execution", async () => {

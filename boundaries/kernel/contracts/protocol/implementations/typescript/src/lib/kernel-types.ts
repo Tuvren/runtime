@@ -178,6 +178,17 @@ export interface RecoveryState {
   uncommittedStagedResults: StagedResult[];
 }
 
+export interface RunLeaseState {
+  fencingToken: string;
+  leaseExpiresAtMs: EpochMs;
+}
+
+export interface RunStepCompletion {
+  checkpointed: boolean;
+  lease?: RunLeaseState;
+  turnNodeHash?: HashString;
+}
+
 export interface ThreadCreateResult {
   branchId: string;
   rootTurnNodeHash: HashString;
@@ -469,7 +480,7 @@ export interface RuntimeKernel {
       eventHash?: HashString,
       observeResults?: ObserveResult[],
       treeHash?: HashString
-    ): Promise<{ checkpointed: boolean; turnNodeHash?: HashString }>;
+    ): Promise<RunStepCompletion>;
     complete(
       runId: string,
       status: RunCompletionStatus,

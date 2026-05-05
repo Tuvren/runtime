@@ -349,9 +349,13 @@ export function createRuntimeKernel(
               : [...run.createdTurnNodes, turnNodeHash];
 
           const { pendingSignalsCbor: _s, ...coreRun } = storedRun;
+          const leaseUpdate = createRunningLeaseUpdate(
+            storedRun,
+            createFencingToken
+          );
           const updatedRun: StoredRun = {
             ...coreRun,
-            ...createRunningLeaseUpdate(storedRun, createFencingToken),
+            ...leaseUpdate,
             createdTurnNodesCbor: encodeRecord(nextCreatedTurnNodes),
             currentStepIndex: Math.min(
               run.currentStepIndex + 1,
@@ -371,6 +375,7 @@ export function createRuntimeKernel(
 
           return {
             checkpointed: turnNodeHash !== undefined,
+            ...(isRunLeaseState(leaseUpdate) ? { lease: leaseUpdate } : {}),
             turnNodeHash,
           };
         });
@@ -2049,6 +2054,26 @@ function createRunningLeaseUpdate(
     fencingToken: createFencingToken(),
     leaseExpiresAtMs: run.leaseExpiresAtMs,
   };
+}
+
+function isRunLeaseState(
+  value:
+    | {
+        executionOwnerId: string;
+        fencingToken: string;
+        leaseExpiresAtMs: EpochMs;
+      }
+    | {}
+): value is {
+  executionOwnerId: string;
+  fencingToken: string;
+  leaseExpiresAtMs: EpochMs;
+} {
+  return (
+    "executionOwnerId" in value &&
+    "fencingToken" in value &&
+    "leaseExpiresAtMs" in value
+  );
 }
 
 function assertLeasedRunCreateInput(input: {

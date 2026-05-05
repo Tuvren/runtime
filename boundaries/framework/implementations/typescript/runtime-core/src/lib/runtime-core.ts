@@ -269,8 +269,9 @@ interface HelperBundle {
   resolveHashes(hashes: HashString[]): HashString[];
 }
 
-interface RecoveredExecutionStart {
-  turnId: string;
+interface ExpiredExecutionRecovery {
+  preempted: boolean;
+  turnId?: string;
 }
 
 class FinalizationFailure extends Error {
@@ -290,6 +291,9 @@ class RuntimeCore implements TuvrenRuntime {
     RuntimeExecutionHandle,
     {
       abortController: AbortController;
+      executionOwnerId: string;
+      fencingToken: string;
+      leaseExpiresAtMs: EpochMs;
       runId: string;
     }
   >();
@@ -497,19 +501,26 @@ class RuntimeCore implements TuvrenRuntime {
 
       const schemaId = await this.resolveExecutionSchemaId(handle.request);
       handle.setSchemaId(schemaId);
+      const initialBranchHeadHash = await this.resolveExecutionBranchHead(
+        handle
+      );
       const recoveredExecution = await this.recoverExpiredExecutionBranchIfNeeded(
-        handle.request.branchId
+        handle.request.branchId,
+        handle.request.signal
       );
 
-      if (recoveredExecution !== undefined) {
+      if (recoveredExecution?.turnId !== undefined) {
         handle.setTurnId(recoveredExecution.turnId);
       }
 
-      const branchHeadHash = await this.resolveExecutionBranchHead(handle);
+      const branchHeadHash =
+        recoveredExecution?.preempted === true
+          ? await this.resolveExecutionBranchHead(handle)
+          : initialBranchHeadHash;
       await this.createExecutionTurnIfNeeded(
         handle,
         branchHeadHash,
-        recoveredExecution
+        recoveredExecution?.turnId !== undefined
       );
       const loopState = this.createExecutionLoopState(handle);
 
@@ -559,7 +570,7 @@ class RuntimeCore implements TuvrenRuntime {
           handle,
           schemaId,
           loopState,
-          recoveredExecution
+          recoveredExecution?.turnId !== undefined
         ))
       ) {
         return;
@@ -622,9 +633,9 @@ class RuntimeCore implements TuvrenRuntime {
   private async createExecutionTurnIfNeeded(
     handle: RuntimeExecutionHandle,
     branchHeadHash: HashString,
-    recoveredExecution: RecoveredExecutionStart | undefined
+    reuseRecoveredTurn: boolean
   ): Promise<void> {
-    if (handle.resumedFrom !== undefined || recoveredExecution !== undefined) {
+    if (handle.resumedFrom !== undefined || reuseRecoveredTurn) {
       return;
     }
 
@@ -683,9 +694,9 @@ class RuntimeCore implements TuvrenRuntime {
     handle: RuntimeExecutionHandle,
     schemaId: string,
     loopState: LoopState,
-    recoveredExecution: RecoveredExecutionStart | undefined
+    reuseRecoveredTurn: boolean
   ): Promise<boolean> {
-    if (recoveredExecution === undefined) {
+    if (!reuseRecoveredTurn) {
       await this.incorporateInput(handle, schemaId, loopState);
     }
 
@@ -2443,6 +2454,7 @@ class RuntimeCore implements TuvrenRuntime {
         undefined,
         treeHash
       );
+      this.syncRunLeaseStateFromStepResult(handle, runId, stepResult);
       const completion = await this.completeTrackedRun(
         handle,
         runId,
@@ -2587,6 +2599,7 @@ class RuntimeCore implements TuvrenRuntime {
         type: "input_received",
       })
     );
+    this.syncRunLeaseStateFromStepResult(handle, runId, stepResult);
     await this.completeTrackedRun(handle, runId, "completed");
 
     if (stepResult.turnNodeHash !== undefined) {
@@ -2656,6 +2669,7 @@ class RuntimeCore implements TuvrenRuntime {
         type: "steering_incorporated",
       })
     );
+    this.syncRunLeaseStateFromStepResult(handle, runId, stepResult);
     await this.completeTrackedRun(handle, runId, "completed");
 
     if (stepResult.turnNodeHash !== undefined) {
@@ -2726,6 +2740,7 @@ class RuntimeCore implements TuvrenRuntime {
         type: "extension_state_committed",
       })
     );
+    this.syncRunLeaseStateFromStepResult(handle, runId, stepResult);
     await this.completeTrackedRun(handle, runId, "completed");
 
     if (stepResult.turnNodeHash !== undefined) {
@@ -2818,6 +2833,7 @@ class RuntimeCore implements TuvrenRuntime {
       undefined,
       nextTreeHash
     );
+    this.syncRunLeaseStateFromStepResult(handle, runId, stepResult);
     await this.completeTrackedRun(handle, runId, "completed");
     if (stepResult.turnNodeHash !== undefined) {
       await this.advanceTurnAndBranchHead(handle, stepResult.turnNodeHash);
@@ -2963,6 +2979,7 @@ class RuntimeCore implements TuvrenRuntime {
       undefined,
       nextTreeHash
     );
+    this.syncRunLeaseStateFromStepResult(handle, runId, stepResult);
     await this.completeTrackedRun(handle, runId, "completed");
 
     if (stepResult.turnNodeHash !== undefined) {
@@ -3170,6 +3187,7 @@ class RuntimeCore implements TuvrenRuntime {
         type: "turn_status_finalized",
       })
     );
+    this.syncRunLeaseStateFromStepResult(handle, runId, stepResult);
     await this.completeTrackedRun(handle, runId, "completed");
 
     if (stepResult.turnNodeHash !== undefined) {
@@ -3641,6 +3659,7 @@ class RuntimeCore implements TuvrenRuntime {
       undefined,
       nextTreeHash
     );
+    this.syncRunLeaseStateFromStepResult(handle, runId, stepResult);
     await this.completeTrackedRun(handle, runId, "completed");
 
     if (stepResult.turnNodeHash !== undefined) {
@@ -3754,8 +3773,9 @@ class RuntimeCore implements TuvrenRuntime {
   }
 
   private async recoverExpiredExecutionBranchIfNeeded(
-    branchId: string
-  ): Promise<RecoveredExecutionStart | undefined> {
+    branchId: string,
+    signal: InputSignal
+  ): Promise<ExpiredExecutionRecovery | undefined> {
     const livenessKernel = this.resolveRunLivenessKernel();
     const livenessOptions = this.options.runLiveness;
 
@@ -3779,7 +3799,21 @@ class RuntimeCore implements TuvrenRuntime {
       this.now(),
       "stale_running_recovery"
     );
+    const recoveredHeadState = await this.loadHeadState(branchId);
+
+    // Only the original request may rebind onto the recovered turn. A different
+    // incoming signal still benefits from fencing the stale owner, but it must
+    // start a fresh turn on the recovered head instead of silently resuming.
+    if (
+      !doesSignalMatchRecoveredTurn(signal, recoveredHeadState.messages)
+    ) {
+      return {
+        preempted: true,
+      };
+    }
+
     return {
+      preempted: true,
       turnId: expiredRun.turnId,
     };
   }
@@ -3835,17 +3869,19 @@ class RuntimeCore implements TuvrenRuntime {
 
     this.stopRunLeaseLoop(handle);
     const abortController = new AbortController();
-    this.activeRunLeaseControllers.set(handle, {
+    const activeLease = {
       abortController,
+      executionOwnerId: run.executionOwnerId,
+      fencingToken: run.fencingToken,
+      leaseExpiresAtMs: run.leaseExpiresAtMs,
       runId: run.runId,
-    });
+    };
+    this.activeRunLeaseControllers.set(handle, activeLease);
     detachPromise(
       this.runLeaseLoop({
-        executionOwnerId: run.executionOwnerId,
-        fencingToken: run.fencingToken,
+        activeLease,
         handle,
         kernel: livenessKernel,
-        leaseExpiresAtMs: run.leaseExpiresAtMs,
         runId: run.runId,
         signal: abortController.signal,
       })
@@ -3871,11 +3907,15 @@ class RuntimeCore implements TuvrenRuntime {
   }
 
   private async runLeaseLoop(input: {
-    executionOwnerId: string;
-    fencingToken: string;
+    activeLease: {
+      abortController: AbortController;
+      executionOwnerId: string;
+      fencingToken: string;
+      leaseExpiresAtMs: EpochMs;
+      runId: string;
+    };
     handle: RuntimeExecutionHandle;
     kernel: KrakenKernel & RuntimeKernelRunLiveness;
-    leaseExpiresAtMs: EpochMs;
     runId: string;
     signal: AbortSignal;
   }): Promise<void> {
@@ -3885,13 +3925,12 @@ class RuntimeCore implements TuvrenRuntime {
       return;
     }
 
-    let fencingToken = input.fencingToken;
-    let leaseExpiresAtMs = input.leaseExpiresAtMs;
-
     while (!input.signal.aborted) {
       const delayMs = Math.max(
         0,
-        leaseExpiresAtMs - this.now() - livenessOptions.renewBeforeMs
+        input.activeLease.leaseExpiresAtMs -
+          this.now() -
+          livenessOptions.renewBeforeMs
       );
       await waitForDelay(delayMs, input.signal);
 
@@ -3906,12 +3945,12 @@ class RuntimeCore implements TuvrenRuntime {
       try {
         const renewed = await input.kernel.runLiveness.renewLease(
           input.runId,
-          input.executionOwnerId,
-          fencingToken,
+          input.activeLease.executionOwnerId,
+          input.activeLease.fencingToken,
           (this.now() + livenessOptions.leaseDurationMs) as EpochMs
         );
-        fencingToken = renewed.fencingToken;
-        leaseExpiresAtMs = renewed.leaseExpiresAtMs;
+        input.activeLease.fencingToken = renewed.fencingToken;
+        input.activeLease.leaseExpiresAtMs = renewed.leaseExpiresAtMs;
       } catch (error: unknown) {
         if (input.signal.aborted) {
           return;
@@ -3921,6 +3960,28 @@ class RuntimeCore implements TuvrenRuntime {
         return;
       }
     }
+  }
+
+  private syncRunLeaseStateFromStepResult(
+    handle: RuntimeExecutionHandle,
+    runId: string,
+    stepResult: { lease?: { fencingToken: string; leaseExpiresAtMs: EpochMs } }
+  ): void {
+    const activeLease = this.activeRunLeaseControllers.get(handle);
+
+    if (
+      activeLease === undefined ||
+      activeLease.runId !== runId ||
+      stepResult.lease === undefined
+    ) {
+      return;
+    }
+
+    // The kernel rotates fencing tokens on durable running writes. The local
+    // renewal loop must immediately adopt the returned token to keep heartbeats
+    // authoritative across later renewals and terminal completion.
+    activeLease.fencingToken = stepResult.lease.fencingToken;
+    activeLease.leaseExpiresAtMs = stepResult.lease.leaseExpiresAtMs;
   }
 
   private async advanceTurnAndBranchHead(
@@ -4935,6 +4996,21 @@ function isRunLeaseLostError(error: unknown): boolean {
   }
 
   return error.code === "runtime_execution_lease_lost";
+}
+
+function doesSignalMatchRecoveredTurn(
+  signal: InputSignal,
+  messages: readonly TuvrenMessage[]
+): boolean {
+  const recoveredUserMessage = [...messages]
+    .reverse()
+    .find((message) => message.role === "user");
+
+  if (recoveredUserMessage === undefined) {
+    return false;
+  }
+
+  return isDeepStrictEqual(recoveredUserMessage.parts, signal.parts);
 }
 
 function shouldSuppressBufferedDriverEvents(

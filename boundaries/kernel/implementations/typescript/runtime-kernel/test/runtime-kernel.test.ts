@@ -337,7 +337,7 @@ describe("createRuntimeKernel", () => {
     expect(renewed.fencingToken).not.toBe(run.fencingToken);
   });
 
-  test("run.completeStep rotates the fencing token for leased running runs", async () => {
+  test("run.completeStep returns the rotated lease token for leased running runs", async () => {
     const fixture = await createThreadFixture({
       branchId: "branch_leased_complete_step",
       now: () => 10,
@@ -362,7 +362,14 @@ describe("createRuntimeKernel", () => {
     });
 
     await fixture.kernel.run.beginStep(leasedRun.runId, "iterate");
-    await fixture.kernel.run.completeStep(leasedRun.runId, "iterate");
+    const stepResult = await fixture.kernel.run.completeStep(
+      leasedRun.runId,
+      "iterate"
+    );
+
+    expect(stepResult.lease?.fencingToken).toBeTruthy();
+    expect(stepResult.lease?.fencingToken).not.toBe(leasedRun.fencingToken);
+    expect(stepResult.lease?.leaseExpiresAtMs).toBe(50);
 
     await expect(
       fixture.kernel.runLiveness.renewLease(
@@ -372,6 +379,18 @@ describe("createRuntimeKernel", () => {
         75
       )
     ).rejects.toThrow("fencing token");
+
+    await expect(
+      fixture.kernel.runLiveness.renewLease(
+        leasedRun.runId,
+        "owner-alpha",
+        stepResult.lease?.fencingToken ?? "",
+        75
+      )
+    ).resolves.toEqual({
+      fencingToken: expect.any(String),
+      leaseExpiresAtMs: 75,
+    });
   });
 
   test("runLiveness.listExpired excludes paused and non-expired runs", async () => {
