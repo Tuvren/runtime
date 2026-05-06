@@ -1,4 +1,5 @@
 {
+  "duplicateNormativeClaims": 3,
   "generatedBy": "bun tools/scripts/docs-authority-freeze-gate.ts",
   "normativePattern": "\\b(must|must not|should|cannot|can not|never|always|required|requires|required|guarantee|guarantees|only|canonical|authoritative|valid|invalid|deferred|MUST|SHOULD|MAY)\\b|\\bdoes not define\\b",
   "rationaleSections": [
@@ -1239,13 +1240,14 @@
     "docs/KrakenFrameworkSpecification.md",
     "docs/KrakenKernelSpecification.md"
   ],
+  "totalIndependentClaims": 223,
   "totalNormativeClaims": 226,
   "claims": [
     {
       "affectedBoundary": "framework",
       "adapterCapability": "N/A",
-      "claimFingerprint": "b994696268e339c0619801ab91d3305172d7cf0a34ad004fe03bf926642da38d",
-      "claimId": "FWK-B994696268E3",
+      "claimFingerprint": "8f7e9e0d5582db738d0031cc133b4987067d2948e7d9c1dbd6c811cee44fd7a2",
+      "claimId": "FWK-8F7E9E0D5582",
       "duplicateOf": null,
       "line": 11,
       "rationaleContext": "normative",
@@ -1254,7 +1256,7 @@
       "sectionKey": "kraken-framework-specification",
       "sourceFile": "docs/KrakenFrameworkSpecification.md",
       "surface": "framework driver framing",
-      "text": "Epic AD freezes the portability reading of this Markdown. Portable cross-implementation meaning is freeze-covered when the docs-to-authority matrix maps the claim to boundary-owned authority packets, generated artifacts where applicable, conformance plans, fixtures, adapter capabilities, and compatibility evidence. Claims classified as missing-conformance-follow-up, implementation-local, implementation-defined, explicitly deferred, or stale-corrected in `constitution/spikes/epic-ad-docs-to-authority-coverage-matrix.json` are not portable machine authority until a later packet and conformance change promotes them."
+      "text": "Epic AD freezes the portability reading of this Markdown. Portable cross-implementation meaning is freeze-covered when the docs-to-authority matrix maps the claim to boundary-owned authority packets, generated artifacts where applicable, conformance plans, fixtures, adapter capabilities, and compatibility evidence. Claims classified as missing-conformance-follow-up, implementation-local-evidence, implementation-defined, explicitly deferred, or stale-corrected in `constitution/spikes/epic-ad-docs-to-authority-coverage-matrix.json` are not portable machine authority until a later packet and conformance change promotes them."
     },
     {
       "affectedBoundary": "framework",
@@ -2443,7 +2445,7 @@
     },
     {
       "affectedBoundary": "framework",
-      "adapterCapability": "framework.event-stream",
+      "adapterCapability": "framework.runtime-api",
       "claimFingerprint": "bc7142393baa1f9b46a63a3f30deb16f1f87971d56d158b1252d0bebed16a236",
       "claimId": "FWK-BC7142393BAA",
       "duplicateOf": null,
@@ -2453,12 +2455,12 @@
       "sectionHeading": "6.4 Tool Execution Events",
       "sectionKey": "6.4",
       "sourceFile": "docs/KrakenFrameworkSpecification.md",
-      "surface": "framework event stream",
+      "surface": "tool parallelism and event ordering",
       "text": "The shared runtime applies a host-configurable cap to concurrently executing parallel tool calls. Default: `10`. `AgentConfig.maxParallelToolCalls` may override that default for the active agent. When a parallel batch has more executable calls than the cap, execution proceeds in waves: all `tool.start` events for a wave are emitted before any `tool.result` in that wave, then the next wave begins. Durable result ordering still follows the original tool-call order."
     },
     {
       "affectedBoundary": "framework",
-      "adapterCapability": "framework.event-stream",
+      "adapterCapability": "framework.runtime-api",
       "claimFingerprint": "4193d2a613e04f24519c7222334df417b3968327ef3e5d654a26326fd6f81a8b",
       "claimId": "FWK-4193D2A613E0",
       "duplicateOf": null,
@@ -2468,7 +2470,7 @@
       "sectionHeading": "6.4 Tool Execution Events",
       "sectionKey": "6.4",
       "sourceFile": "docs/KrakenFrameworkSpecification.md",
-      "surface": "framework event stream",
+      "surface": "tool parallelism and event ordering",
       "text": "For any batch mode, non-executed outcomes that are already known (for example invalid input, unknown tool, or explicit rejection) may emit and stage `tool.result` as soon as they are known; they are not artificially delayed behind slower executable siblings."
     },
     {
@@ -2488,7 +2490,7 @@
     },
     {
       "affectedBoundary": "framework",
-      "adapterCapability": "framework.event-stream",
+      "adapterCapability": "framework.react-driver",
       "claimFingerprint": "607fbc20fd59aae06d573b065e3467a17bceea4df612fbea5c0f462d5f700b35",
       "claimId": "FWK-607FBC20FD59",
       "duplicateOf": null,
@@ -2498,12 +2500,12 @@
       "sectionHeading": "6.5 aroundModel Interaction with Streaming",
       "sectionKey": "6.5",
       "sourceFile": "docs/KrakenFrameworkSpecification.md",
-      "surface": "framework event stream",
+      "surface": "aroundModel live/durable reconciliation",
       "text": "**Replacement**: If aroundModel modifies the response after calling `next()`, stream events from `next()` are already emitted and cannot be recalled. The durable path uses the modified response, even when that differs materially from the already-emitted live assistant content. This live-versus-durable divergence is intentional for post-stream replacement and is validated through the explicit `assistantEventReconciliation` contract rather than by forcing the durable checkpoint to match the earlier live stream. This exception is limited to non-tool-call assistant content; if either the final live sequence or the durable replacement requests tools, shared core rejects the result as an invalid stream event."
     },
     {
       "affectedBoundary": "framework",
-      "adapterCapability": "framework.event-stream",
+      "adapterCapability": "framework.react-driver",
       "claimFingerprint": "af60c9581babea8a88b3abc4464d5a8062e7213d5d85373ce97b77cc52c27fe1",
       "claimId": "FWK-AF60C9581BAB",
       "duplicateOf": null,
@@ -2513,12 +2515,12 @@
       "sectionHeading": "6.5 aroundModel Interaction with Streaming",
       "sectionKey": "6.5",
       "sourceFile": "docs/KrakenFrameworkSpecification.md",
-      "surface": "framework event stream",
+      "surface": "aroundModel live/durable reconciliation",
       "text": "**Retry**: If aroundModel calls `next()` multiple times (fallback to different provider), each call produces its own stream event sequence with a new `messageId`. The consumer sees multiple message sequences. Only the final response (from the last `next()` call) is staged on the durable path."
     },
     {
       "affectedBoundary": "framework",
-      "adapterCapability": "framework.event-stream",
+      "adapterCapability": "framework.orchestration",
       "claimFingerprint": "c6917e7e9d81a3d37316bd12dcce649a7eb72f5bf494b7189e3fbdd6a3e3eb01",
       "claimId": "FWK-C6917E7E9D81",
       "duplicateOf": null,
@@ -2528,7 +2530,7 @@
       "sectionHeading": "6.7 Custom Event Emission",
       "sectionKey": "6.7",
       "sourceFile": "docs/KrakenFrameworkSpecification.md",
-      "surface": "framework event stream",
+      "surface": "worker subtree event forwarding",
       "text": "**`ctx.forward(event, source)`** — injects any `TuvrenStreamEvent` into the output stream with the `source` field set (§1.8). Available only on `AroundToolContext` and `ToolExecutionContext`. This is the mechanism for worker sub-agent streaming — a tool call that internally runs a sub-agent forwards its events with source attribution."
     },
     {

@@ -147,18 +147,22 @@ interface RationaleSection {
 
 interface ClaimInventory {
   claims: ClaimInventoryEntry[];
+  duplicateNormativeClaims: number;
   generatedBy: string;
   normativePattern: string;
   rationaleSections: RationaleSection[];
   sources: string[];
+  totalIndependentClaims: number;
   totalNormativeClaims: number;
 }
 
 interface CoverageMatrix {
+  duplicateClaims: number;
   entries: CoverageEntry[];
   generatedBy: string;
   primaryClassificationRule: string;
   totalClaims: number;
+  totalIndependentClaims: number;
   unclassifiedClaims: number;
 }
 
@@ -337,18 +341,22 @@ async function main(): Promise<void> {
 
   await mkdir(OUTPUT_DIR, { recursive: true });
   await writeJson(INVENTORY_PATH, {
+    duplicateNormativeClaims: duplicateClaimCount(claimsWithDuplicates),
     generatedBy: "bun tools/scripts/docs-authority-freeze-gate.ts",
     normativePattern: NORMATIVE_PATTERN.source,
     rationaleSections,
     sources: DOC_SOURCES.map((source) => source.path),
+    totalIndependentClaims: independentClaimCount(claimsWithDuplicates),
     totalNormativeClaims: claimsWithDuplicates.length,
     claims: inventoryClaims,
   } satisfies ClaimInventory);
   await writeJson(MATRIX_PATH, {
+    duplicateClaims: duplicateClaimCount(matrixEntries),
     generatedBy: "bun tools/scripts/docs-authority-freeze-gate.ts",
     primaryClassificationRule:
       "Each normative claim receives exactly one primary classification derived from its source section and explicit text markers.",
     totalClaims: matrixEntries.length,
+    totalIndependentClaims: independentClaimCount(matrixEntries),
     unclassifiedClaims: unclassifiedEntries.length,
     entries: matrixEntries,
   } satisfies CoverageMatrix);
@@ -935,6 +943,11 @@ function classifyFrameworkCoreSection(
     );
   }
 
+  const eventSectionDecision = classifyFrameworkEventStreamSection(section);
+  if (eventSectionDecision != null) {
+    return eventSectionDecision;
+  }
+
   if (isSection(section, "1.8") || isSectionMajor(section, "6")) {
     return authorityDecision("framework event stream", EVIDENCE.eventStream);
   }
@@ -973,6 +986,39 @@ function classifyFrameworkCoreSection(
   }
 
   return classifyFrameworkIntegrationSection(section, text);
+}
+
+function classifyFrameworkEventStreamSection(
+  section: string
+): ClassificationDecision | null {
+  if (isSection(section, "6.4")) {
+    return missingConformanceDecision(
+      "tool parallelism and event ordering",
+      EVIDENCE.runtimeApi,
+      "KRT-AF004",
+      "Parallel tool caps, known non-executed outcomes, and mixed approval ordering need AF tool/approval checks before freeze closure."
+    );
+  }
+
+  if (isSection(section, "6.5")) {
+    return missingConformanceDecision(
+      "aroundModel live/durable reconciliation",
+      EVIDENCE.reactDriver,
+      "KRT-AF003",
+      "aroundModel replacement, retry, and durable/live response reconciliation need AF ReAct and extension-hook promotion before freeze closure."
+    );
+  }
+
+  if (isSection(section, "6.7")) {
+    return missingConformanceDecision(
+      "worker subtree event forwarding",
+      EVIDENCE.runtimeOrchestration,
+      "KRT-AF005",
+      "Worker subtree event forwarding is orchestration behavior that needs AF leftover closure before freeze coverage."
+    );
+  }
+
+  return null;
 }
 
 function classifyFrameworkIntegrationSection(
@@ -1503,8 +1549,15 @@ function unclassifiedDecision(
 }
 
 function renderSummary(entries: readonly CoverageEntry[]): string {
-  const byClassification = groupCount(entries, (entry) => entry.classification);
-  const byBoundary = groupCount(entries, (entry) => entry.affectedBoundary);
+  const independentEntries = uniqueClaimEntries(entries);
+  const byClassification = groupCount(
+    independentEntries,
+    (entry) => entry.classification
+  );
+  const byBoundary = groupCount(
+    independentEntries,
+    (entry) => entry.affectedBoundary
+  );
 
   return [
     "# Epic AD Docs-to-Authority Freeze Gate Summary",
@@ -1523,9 +1576,15 @@ function renderSummary(entries: readonly CoverageEntry[]): string {
     "",
     "## Claim Counts",
     "",
+    `- Matrix rows: ${entries.length}`,
+    `- Independent claims: ${independentEntries.length}`,
+    `- Duplicate rows linked by \`duplicateOf\`: ${duplicateClaimCount(entries)}`,
+    "",
+    "## Independent Claims By Boundary",
+    "",
     renderCountTable(byBoundary, "Boundary"),
     "",
-    "## Primary Classification Counts",
+    "## Independent Claims By Primary Classification",
     "",
     renderCountTable(byClassification, "Classification"),
     "",
@@ -1597,22 +1656,23 @@ function renderLocalSurfaceDecisions(
 }
 
 function renderFreezeGateReport(entries: readonly CoverageEntry[]): string {
-  const authorityCount = entries.filter(
+  const independentEntries = uniqueClaimEntries(entries);
+  const authorityCount = independentEntries.filter(
     (entry) => entry.classification === "authority-backed-conformance-covered"
   ).length;
-  const blocking = entries.filter((entry) =>
+  const blocking = independentEntries.filter((entry) =>
     [
       "implementation-local-evidence",
       "missing-conformance-follow-up",
       "stale-docs-corrected",
     ].includes(entry.classification)
   );
-  const nonBlocking = entries.filter((entry) =>
+  const nonBlocking = independentEntries.filter((entry) =>
     ["implementation-defined", "explicitly-deferred"].includes(
       entry.classification
     )
   );
-  const remaining = entries.filter(
+  const remaining = independentEntries.filter(
     (entry) => entry.classification !== "authority-backed-conformance-covered"
   );
   const remainingSurfaces = groupBy(remaining, (entry) => entry.surface);
@@ -1628,7 +1688,8 @@ function renderFreezeGateReport(entries: readonly CoverageEntry[]): string {
     "",
     "## Authority-Backed and Conformance-Covered Claims",
     "",
-    `- Claims currently classified as authority-backed and conformance-covered: ${authorityCount}`,
+    `- Independent claims currently classified as authority-backed and conformance-covered: ${authorityCount}`,
+    `- Duplicate matrix rows linked by \`duplicateOf\`: ${duplicateClaimCount(entries)}`,
     "- Evidence anchors: framework, provider, and kernel authority packets; shared conformance plans; boundary fixtures/scenarios; adapter capabilities; and compatibility evidence under `reports/compatibility/evidence/`.",
     "",
     "## Remaining Surfaces",
@@ -1659,6 +1720,8 @@ function renderFreezeGateReport(entries: readonly CoverageEntry[]): string {
 }
 
 function renderClosureInventory(entries: readonly CoverageEntry[]): string {
+  const independentEntries = uniqueClaimEntries(entries);
+
   return [
     "# Epic AD Docs-to-Authority Freeze Gate Closure Inventory",
     "",
@@ -1669,9 +1732,9 @@ function renderClosureInventory(entries: readonly CoverageEntry[]): string {
     "## Delivered Scope",
     "",
     "- The active freeze-readiness scope was already activated in `constitution/Tasks.md` and `constitution/TechSpec.md` before this closure pass.",
-    `- The normative docs claim inventory covers ${entries.length} claims from ` +
+    `- The normative docs claim inventory covers ${entries.length} matrix rows and ${independentEntries.length} independent claims from ` +
       "`docs/KrakenFrameworkSpecification.md` and `docs/KrakenKernelSpecification.md`.",
-    "- The docs-to-authority coverage matrix assigns exactly one primary classification to every claim.",
+    "- The docs-to-authority coverage matrix assigns exactly one primary classification to every row and links duplicate rows through `duplicateOf` instead of treating them as separate independent requirements.",
     "- Framework deferred-surface decisions and kernel/backend/provider local-surface decisions are checked in as Epic AD handoff records.",
     "- Docs preambles now distinguish human semantic authority from machine portability authority and point readers to the AD matrix for freeze-readiness classification.",
     "- The freeze gate report records that TypeScript is not freeze-ready from AD alone and that Rust framework remains blocked until AE/AF and a later planning revision close the gate.",
@@ -1699,22 +1762,23 @@ function renderSurfaceTable(
   groups: ReadonlyMap<string, readonly CoverageEntry[]>
 ): string {
   const lines = [
-    "| Surface | Claims | Classifications | Follow-up | Blocks future implementation line? |",
+    "| Surface | Independent Claims | Classifications | Follow-up | Blocks future implementation line? |",
     "| --- | ---: | --- | --- | --- |",
   ];
 
   for (const [surface, surfaceEntries] of [...groups.entries()].sort(
     ([left], [right]) => left.localeCompare(right)
   )) {
+    const independentEntries = uniqueClaimEntries(surfaceEntries);
     const classifications = [
-      ...new Set(surfaceEntries.map((entry) => entry.classification)),
+      ...new Set(independentEntries.map((entry) => entry.classification)),
     ].join(", ");
     const followUps = [
-      ...new Set(surfaceEntries.map((entry) => entry.followUpTicket)),
+      ...new Set(independentEntries.map((entry) => entry.followUpTicket)),
     ]
       .filter((value) => value !== "N/A")
       .join(", ");
-    const blocks = surfaceEntries.some((entry) =>
+    const blocks = independentEntries.some((entry) =>
       [
         "implementation-local-evidence",
         "missing-conformance-follow-up",
@@ -1725,7 +1789,7 @@ function renderSurfaceTable(
       : "No, if kept local/deferred";
 
     lines.push(
-      `| ${escapeTableCell(surface)} | ${surfaceEntries.length} | ${escapeTableCell(classifications)} | ${escapeTableCell(followUps || "N/A")} | ${blocks} |`
+      `| ${escapeTableCell(surface)} | ${independentEntries.length} | ${escapeTableCell(classifications)} | ${escapeTableCell(followUps || "N/A")} | ${blocks} |`
     );
   }
 
@@ -1776,6 +1840,24 @@ function groupCount<T>(
   }
 
   return counts;
+}
+
+function duplicateClaimCount(
+  entries: readonly Pick<NormativeClaim, "duplicateOf">[]
+): number {
+  return entries.filter((entry) => entry.duplicateOf != null).length;
+}
+
+function independentClaimCount(
+  entries: readonly Pick<NormativeClaim, "duplicateOf">[]
+): number {
+  return uniqueClaimEntries(entries).length;
+}
+
+function uniqueClaimEntries<T extends Pick<NormativeClaim, "duplicateOf">>(
+  entries: readonly T[]
+): T[] {
+  return entries.filter((entry) => entry.duplicateOf == null);
 }
 
 function normalizeClaimText(text: string): string {

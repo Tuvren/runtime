@@ -8,22 +8,24 @@ Rust framework product work remains blocked until Epic AF closes and a later Tec
 
 ## Authority-Backed and Conformance-Covered Claims
 
-- Claims currently classified as authority-backed and conformance-covered: 105
+- Independent claims currently classified as authority-backed and conformance-covered: 100
+- Duplicate matrix rows linked by `duplicateOf`: 3
 - Evidence anchors: framework, provider, and kernel authority packets; shared conformance plans; boundary fixtures/scenarios; adapter capabilities; and compatibility evidence under `reports/compatibility/evidence/`.
 
 ## Remaining Surfaces
 
-- Potentially blocking until AE/AF or docs correction evidence closes: 94
+- Potentially blocking until AE/AF or docs correction evidence closes: 96
 - Non-blocking because they are explicitly implementation-defined or deferred: 27
 
 ## Remaining Surface Detail
 
 Every remaining non-authority surface is listed below with its current blocker posture. `missing-conformance-follow-up` rows are blocking until AF either promotes checks or explicitly leaves the behavior local/deferred.
 
-| Surface | Claims | Classifications | Follow-up | Blocks future implementation line? |
+| Surface | Independent Claims | Classifications | Follow-up | Blocks future implementation line? |
 | --- | ---: | --- | --- | --- |
 | approval and cancellation control | 26 | missing-conformance-follow-up | KRT-AF004 | Yes, until AF/docs evidence resolves it |
 | approval resume semantics | 1 | missing-conformance-follow-up | KRT-AF004 | Yes, until AF/docs evidence resolves it |
+| aroundModel live/durable reconciliation | 2 | missing-conformance-follow-up | KRT-AF003 | Yes, until AF/docs evidence resolves it |
 | extension contracts | 5 | implementation-defined | N/A unless AF promotes the surface | No, if kept local/deferred |
 | extension state and prompt contracts | 4 | implementation-defined | N/A unless AF promotes the surface | No, if kept local/deferred |
 | framework driver framing | 2 | implementation-defined | N/A unless AF promotes the surface | No, if kept local/deferred |
@@ -39,12 +41,14 @@ Every remaining non-authority surface is listed below with its current blocker p
 | orchestration optional worker modes | 1 | implementation-defined | N/A unless AF promotes the surface | No, if kept local/deferred |
 | orchestration out-of-core boundaries | 8 | explicitly-deferred | Future TechSpec/Tasks revision after TypeScript freeze closure | No, if kept local/deferred |
 | orchestration static config and extension scoping | 1 | implementation-defined | N/A unless AF promotes the surface | No, if kept local/deferred |
-| ReAct and extension hooks | 11 | missing-conformance-follow-up | KRT-AF003 | Yes, until AF/docs evidence resolves it |
+| ReAct and extension hooks | 8 | missing-conformance-follow-up | KRT-AF003 | Yes, until AF/docs evidence resolves it |
 | runtime loop policy | 1 | missing-conformance-follow-up | KRT-AF003 | Yes, until AF/docs evidence resolves it |
 | shared framework type shapes | 8 | missing-conformance-follow-up | KRT-AF001 | Yes, until AF/docs evidence resolves it |
 | stream adapter package topology | 1 | implementation-local-evidence | KRT-AF001 if portability is selected | Yes, until AF/docs evidence resolves it |
 | structured output contract | 7 | missing-conformance-follow-up | KRT-AF004 | Yes, until AF/docs evidence resolves it |
 | tool and approval contracts | 7 | missing-conformance-follow-up | KRT-AF004 | Yes, until AF/docs evidence resolves it |
+| tool parallelism and event ordering | 2 | missing-conformance-follow-up | KRT-AF004 | Yes, until AF/docs evidence resolves it |
+| worker subtree event forwarding | 1 | missing-conformance-follow-up | KRT-AF005 | Yes, until AF/docs evidence resolves it |
 
 ## Exact Evidence Required for Freeze Closure
 

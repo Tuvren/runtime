@@ -4,7 +4,7 @@
 
 Kernel, backend, provider, and tool surfaces are separated from cross-language authority unless the matrix maps them to a packet, shared plan, fixture, adapter capability, and compatibility evidence.
 
-| Surface | Claims | Classifications | Follow-up | Blocks future implementation line? |
+| Surface | Independent Claims | Classifications | Follow-up | Blocks future implementation line? |
 | --- | ---: | --- | --- | --- |
 | kernel appendix validation matrix | 20 | missing-conformance-follow-up | KRT-AF006 | Yes, until AF/docs evidence resolves it |
 | kernel backend acceleration indexes | 2 | implementation-defined | N/A unless AF promotes the surface | No, if kept local/deferred |
@@ -19,6 +19,7 @@ Kernel, backend, provider, and tool surfaces are separated from cross-language a
 | kernel storage structural sharing | 1 | implementation-defined | N/A unless AF promotes the surface | No, if kept local/deferred |
 | provider API bridge | 2 | authority-backed-conformance-covered | N/A | No, if kept local/deferred |
 | tool and approval contracts | 7 | missing-conformance-follow-up | KRT-AF004 | Yes, until AF/docs evidence resolves it |
+| tool parallelism and event ordering | 2 | missing-conformance-follow-up | KRT-AF004 | Yes, until AF/docs evidence resolves it |
 
 ## Decisions
 
