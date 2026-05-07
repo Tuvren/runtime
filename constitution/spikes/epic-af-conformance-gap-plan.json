@@ -149,11 +149,11 @@
         "context.snapshotMessageCounts",
         "context.driverObservedMessageCount"
       ],
-      "adapterCapability": "N/A",
+      "adapterCapability": "framework.runtime-api",
       "claimIds": ["FWK-0A368D92CB9D", "FWK-A346B29D8195", "FWK-A9611C7D2C6F"],
       "classifications": ["authority-backed-conformance-covered"],
-      "compatibilityEvidence": "N/A",
-      "generatedArtifact": "N/A",
+      "compatibilityEvidence": "reports/compatibility/evidence/shared-conformance-runner.typescript-framework.json",
+      "generatedArtifact": "boundaries/framework/contracts/runtime-api/artifacts/json-schema",
       "matrixFollowUpTickets": ["KRT-AF001 if portability is selected"],
       "surface": "framework state schema"
     },
@@ -396,12 +396,12 @@
       "adapterCapability": "N/A",
       "authorityPacket": "N/A",
       "claimIds": ["FWK-D021530B1987"],
-      "classifications": ["implementation-local-evidence"],
+      "classifications": ["implementation-defined"],
       "compatibilityEvidence": "N/A",
       "conformancePlan": "N/A",
       "fixture": "N/A",
       "generatedArtifact": "N/A",
-      "matrixFollowUpTickets": ["KRT-AF001 if portability is selected"],
+      "matrixFollowUpTickets": ["N/A unless AF promotes the surface"],
       "surface": "stream adapter package topology"
     },
     {

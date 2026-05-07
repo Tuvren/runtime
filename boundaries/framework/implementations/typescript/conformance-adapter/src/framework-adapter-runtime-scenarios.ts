@@ -93,7 +93,7 @@ export interface FrameworkAdapterRuntimeScenarioDependencies {
     record: Record<string, unknown>,
     property: string,
     path: string
-  ): import("@tuvren/runtime-api").StructuredOutputRequest | undefined;
+  ): import("@tuvren/runtime-api").StructuredOutputRequest;
   readScenarioToolCall(
     record: Record<string, unknown>,
     path: string
@@ -560,7 +560,9 @@ export function createFrameworkAdapterRuntimeScenarios(
       kernel: harness.kernel,
     });
     const thread = await runtime.createThread({});
-    const emptySignal: InputSignal = { parts: [] };
+    // This scenario intentionally crosses the typed boundary with malformed
+    // input so the shared runner can observe runtime validation behavior.
+    const emptySignal = { parts: [] } as unknown as InputSignal;
 
     try {
       runtime.executeTurn({
@@ -752,16 +754,26 @@ export function createFrameworkAdapterRuntimeScenarios(
   }
 
   function readToolResultParts(
-    messages: readonly TuvrenMessage[]
+    messages: readonly unknown[]
   ): Record<string, unknown>[] {
     const results: Record<string, unknown>[] = [];
 
     for (const message of messages) {
-      if (message.role !== "tool") {
+      if (!dependencies.isRecord(message) || message.role !== "tool") {
         continue;
       }
 
-      for (const part of message.parts) {
+      const parts = message.parts;
+
+      if (!Array.isArray(parts)) {
+        continue;
+      }
+
+      for (const part of parts) {
+        if (!dependencies.isRecord(part)) {
+          continue;
+        }
+
         results.push({
           callId: part.callId,
           isError: part.isError === true,

@@ -172,7 +172,7 @@ This plan is generated from the Epic AD docs-to-authority coverage matrix. It is
 
 - Disposition: `exclude`
 - Delivery ticket: `KRT-AF001`
-- Matrix follow-up tickets: `KRT-AF001 if portability is selected`
+- Matrix follow-up tickets: `N/A unless AF promotes the surface`
 - Claim IDs: `FWK-D021530B1987`
 - Authority packet: `N/A`
 - Conformance plan: `N/A`

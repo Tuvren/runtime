@@ -676,16 +676,15 @@ async function runProtocolEdgeValidation(): Promise<Record<string, unknown>> {
       forkEventHash
     );
 
-    if (forkCheckpoint.turnNodeHash === undefined) {
+    const forkTurnNodeHash = forkCheckpoint.turnNodeHash;
+
+    if (forkTurnNodeHash === undefined) {
       throw new Error("expected fork lateral checkpoint");
     }
 
     await kernel.run.complete("run_edge_lateral_fork", "completed");
     const lateralHeadCode = await captureSemanticErrorCode(async () => {
-      await kernel.branch.setHead(
-        lateralThread.branchId,
-        forkCheckpoint.turnNodeHash
-      );
+      await kernel.branch.setHead(lateralThread.branchId, forkTurnNodeHash);
     });
 
     return {

@@ -640,12 +640,15 @@ async function findConformancePlanPaths(directory: string): Promise<string[]> {
 function createPlannedSurfaces(
   entries: readonly CoverageEntry[]
 ): PlannedSurface[] {
-  const selected = entries.filter(
-    (entry) =>
-      SURFACE_PLANS[entry.surface] !== undefined &&
-      (PROMOTED_CLASSIFICATIONS.has(entry.classification) ||
+  const selected = entries.filter((entry) => {
+    const plan = SURFACE_PLANS[entry.surface];
+    return (
+      plan !== undefined &&
+      (plan.disposition === "exclude" ||
+        PROMOTED_CLASSIFICATIONS.has(entry.classification) ||
         entry.followUpTicket.startsWith(EPIC_AF_FOLLOW_UP_PREFIX))
-  );
+    );
+  });
   const grouped = new Map<string, CoverageEntry[]>();
 
   for (const entry of selected) {

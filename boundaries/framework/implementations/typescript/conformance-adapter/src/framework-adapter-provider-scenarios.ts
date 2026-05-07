@@ -20,7 +20,6 @@ import { assertDriverExecutionResult } from "@tuvren/driver-api";
 import type { ProviderStreamChunk, TuvrenProvider } from "@tuvren/provider-api";
 import type {
   StructuredOutputRequest,
-  TuvrenMessage,
   TuvrenModelResponse,
   TuvrenPrompt,
   TuvrenStreamEvent,
@@ -84,7 +83,7 @@ export interface FrameworkAdapterProviderScenarioDependencies {
     record: Record<string, unknown>,
     property: string,
     path: string
-  ): StructuredOutputRequest | undefined;
+  ): StructuredOutputRequest;
   readScenarioToolCall(
     record: Record<string, unknown>,
     path: string
@@ -722,16 +721,26 @@ function readEventType(event: unknown): string | undefined {
 }
 
 function readToolResultParts(
-  messages: readonly TuvrenMessage[]
+  messages: readonly unknown[]
 ): Record<string, unknown>[] {
   const results: Record<string, unknown>[] = [];
 
   for (const message of messages) {
-    if (message.role !== "tool") {
+    if (!isRecord(message) || message.role !== "tool") {
       continue;
     }
 
-    for (const part of message.parts) {
+    const parts = message.parts;
+
+    if (!Array.isArray(parts)) {
+      continue;
+    }
+
+    for (const part of parts) {
+      if (!isRecord(part)) {
+        continue;
+      }
+
       results.push({
         callId: part.callId,
         isError: part.isError === true,
