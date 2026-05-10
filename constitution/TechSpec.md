@@ -2,12 +2,9 @@
 
 ## 0. Version History & Changelog
 
-- v0.15.0 - Closed Epic AF in current repo reality through the generated conformance gap plan, promoted conformance-depth checks, freshness guardrails, refreshed compatibility evidence, and clean freeze validation; TypeScript is freeze-ready for the currently promoted surfaces.
-- v0.14.0 - Closed Epic AE in current repo reality through modular boundary hardening, repo-wide TypeScript size audit, and a clean `bun run verify`; TypeScript remains blocked only on Epic AF conformance/fresh-evidence closure.
-- v0.13.0 - Closed Epic AD in current repo reality through the docs-to-authority claim inventory, coverage matrix, deferred/local surface decisions, docs cleanup, and freeze gate report; at that time, TypeScript remained blocked on Epic AE modular hardening and Epic AF conformance/fresh-evidence closure.
-- v0.12.0 - Activated TypeScript freeze-readiness closure after Epic AC, added the gate that blocks new framework implementation lines until docs/authority coverage, modular hardening, and clean evidence converge, and opened Epics AD, AE, and AF as the next authorized implementation scope.
-- v0.11.0 - Closed Epic AC in current repo reality by promoting framework orchestration into runtime-api authority, shared conformance, TypeScript adapter capability evidence, and compatibility reporting, and updated the current-state posture accordingly.
-- v0.10.0 - Closed Epics Z, AA, and AB in current repo reality, updated current-state kernel and liveness posture to match checked-in evidence, and opened Epic AC for framework orchestration authority promotion.
+- v0.16.0 - Activated Epic AG non-self-attesting conformance hardening, suspended the TypeScript freeze-readiness posture, and tightened promoted conformance, adapter, compatibility-ledger, guardrail, and closure-claim contracts.
+- v0.15.0 - Closed Epic AF in current repo reality through the generated conformance gap plan, promoted conformance-depth checks, freshness guardrails, refreshed compatibility evidence, and clean freeze validation; TypeScript was considered freeze-ready for the then-promoted surfaces, subject to later reassessment.
+- v0.14.0 - Closed Epic AE in current repo reality through modular boundary hardening, repo-wide TypeScript size audit, and a clean `bun run verify`; TypeScript remained blocked only on Epic AF conformance/fresh-evidence closure at that time.
 - ... [Older history truncated, refer to git logs]
 
 ## 1. Stack Specification (Bill of Materials)
@@ -26,7 +23,7 @@
 - **Semantic authority posture:** `docs/` and `constitution/` are the human semantic authorities. Boundary-owned machine-readable contract, conformance, and interop assets are downstream projections of that authority unless explicitly promoted as normative in the same change.
 - **Portability posture:** Core packages stay runtime-portable where practical; backend packages and provider bridges may have narrower runtime support when their dependencies require it.
 - **Multilanguage posture:** Tuvren is one semantic ecosystem with multiple implementations, not multiple independent ports. Shape contracts, behavioral conformance, and cross-process transport are separate authority layers.
-- **Freeze-readiness posture:** TypeScript is freeze-ready for the currently promoted framework, provider, and kernel surfaces. Epic AD supplies the checked-in docs-to-authority coverage matrix, Epic AE records modular hardening, and Epic AF records conformance-depth promotion, freshness guardrails, refreshed compatibility evidence, and clean validation through `bun run verify`, `bun run release-check`, `bun run conformance`, `bun run codegen`, and `bun run interop-smoke`. Future semantic expansion must refresh the same authority, conformance, generated-artifact, and evidence layers.
+- **Freeze-readiness posture:** TypeScript freeze-readiness is suspended as of Epic AG. Epic AF remains historical evidence only. TypeScript freeze-readiness must not be reaffirmed until AG proves that promoted checks no longer depend on adapter-supplied evidence, fake-kernel-carried proof, unsupported-as-pass semantics, stale closure prose, or adapter-side semantic assertions. Future freeze-readiness claims require fresh AG-gated `bun run verify`, `bun run release-check`, `bun run conformance`, `bun run codegen`, and `bun run interop-smoke` evidence plus regenerated compatibility evidence.
 - **Authority stack posture:** Cross-implementation meaning is carried by a layered authority stack — TypeSpec for the logical contract spine; CDDL for deterministic CBOR/kernel binary-record grammar; Protobuf/Buf for transport projections where gRPC is the chosen transport; JSON Schema 2020-12 for portable validation artifacts; conformance-plan JSON for executable behavior assertions; OpenTelemetry semconv via Weaver for telemetry vocabulary. TypeScript and Rust are implementation languages and binding-projection surfaces, not authority. Markdown is governance and rationale prose, not authority. Authority Packet manifests under `boundaries/<area>/contracts/<surface>/spec/authority-packet.json` declare which of these formats together carry one cross-implementation semantic surface and which sources are forbidden authority for that surface.
 - **Framework posture:** The framework layer is driver-oriented. Shared framework contracts and runtime services stay driver-neutral where practical, while concrete execution semantics live in driver implementations.
 - **Initial driver posture:** The first production-depth driver is the ReAct Driver. It is the baseline implementation, not the whole framework ontology.
@@ -41,10 +38,10 @@
 - **Current TypeScript kernel closure posture:** `@tuvren/kernel-runtime` now exists under `boundaries/kernel/implementations/typescript/runtime-kernel` as the boundary-owned TypeScript adapter from `RuntimeBackend` to `RuntimeKernel`, exported through `createRuntimeKernel()`. Playground local memory and SQLite modes now obtain syscall behavior from that package, while host-owned playground code is limited to inspectors and host wiring rather than private syscall semantics.
 - **Current kernel conformance posture:** `tuvren.kernel.protocol` now references promoted kernel protocol core, kernel protocol extended, run-liveness, and restart-recovery plans. The TypeScript memory and SQLite kernel adapters execute native `@tuvren/kernel-runtime` behavior under the shared runner, TypeScript SQLite evidence is full-pass for its advertised capability set, TypeScript memory evidence is pass for its advertised capability subset without durable restart-recovery, and Rust remains capability-scoped and non-applicable where it does not advertise the relevant extension.
 - **Current semantic-evidence posture:** The boundary-owned semantic evidence posture from Epic W remains intact after Epic X and final Epic Y closure. The TypeScript testkits still act as helper and facade packages for TypeScript-local testing, but they now live under implementation-owned paths. TypeScript and Rust conformance entry points are wrappers or native adapter hosts; `tools/conformance/runner/` owns assertion evaluation, required evidence, capability selection, adapter-error isolation, trace execution, and compatibility evidence emission.
-- **Current freeze-readiness posture:** `reports/compatibility/compatibility-matrix.json` currently records refreshed check-level evidence for the promoted surfaces: `typescript-framework` passes `265/265` applicable shared framework checks, `typescript-kernel-sqlite` passes `55/55` kernel checks, `typescript-providers` passes `28/28` provider checks, and `rust-framework` remains unsupported with `0/265` applicable framework checks. Epic AD classifies framework and kernel docs claims in `constitution/spikes/epic-ad-docs-to-authority-coverage-matrix.json`, Epic AE records modular hardening in `constitution/spikes/epic-ae-modular-boundary-hardening-inventory.md`, and Epic AF records TypeScript freeze closure in `constitution/spikes/epic-af-conformance-depth-freeze-evidence-closure-inventory.md`.
+- **Current freeze-readiness posture:** `reports/compatibility/compatibility-matrix.json` currently records Epic AF historical evidence for the promoted surfaces, but AG suspends reliance on that evidence for freeze-readiness until the non-self-attesting gates are implemented and evidence is regenerated. Epic AD classifies framework and kernel docs claims in `constitution/spikes/epic-ad-docs-to-authority-coverage-matrix.json`, Epic AE records modular hardening in `constitution/spikes/epic-ae-modular-boundary-hardening-inventory.md`, and Epic AF records historical TypeScript freeze closure in `constitution/spikes/epic-af-conformance-depth-freeze-evidence-closure-inventory.md`.
 - **Current TypeScript provider-bridge evidence posture:** The shared provider and framework compatibility evidence now describes TypeScript guarantees with framework-mediated capability labels instead of broad native-provider labels. The active TypeScript lane advertises `providers.framework-owned-tool-execution`, `providers.framework-owned-approval-boundary`, and `providers.rejects-native-strict-structured-output`, and the promoted provider or framework plans now prove the fail-closed bridge behavior for strict structured-output requests, provider-owned tool execution or approval surfaces, approval-resume continuity, and resumed event-stream checkpoint or thread association semantics.
 - **Current framework orchestration authority posture:** The framework spec, the runtime-api authority packet, the shared orchestration conformance plan, the TypeScript binding appendix, and refreshed compatibility evidence now align on orchestration semantics such as `spawn()`, `allEvents()`, `awaitResult()`, descendant source attribution, run-local worker lifecycle behavior, explicit execution-surface inheritance, nested descendant attribution, handoff resolution boundaries, and worker-forwarded event sources. Static config snapshotting and extension scoping remain implementation-defined/local unless a later revision promotes them, and TypeScript `runtime-core` tests remain implementation evidence only.
-- **Current implementation-line gate posture:** Rust framework product work remains blocked until a later TechSpec revision explicitly activates it. TypeScript freeze-readiness is closed for the currently promoted surfaces, but no later framework, driver, backend, provider, language, or host protocol line is activated by that closure alone.
+- **Current implementation-line gate posture:** Rust framework product work remains blocked until a later TechSpec revision explicitly activates it. TypeScript freeze-readiness is suspended pending Epic AG, and no later framework, driver, backend, provider, language, or host protocol line is activated by Epic AF historical evidence alone.
 - **Current topology posture:** Epic X is closed in current repo reality. Boundary-root testkits now live under `boundaries/<area>/implementations/typescript/testkit/`, contract roots now expose only language-neutral assets plus README placeholders, and the TypeScript package guts for moved contract packages live under sibling `implementations/typescript/` subtrees. Path topology now reveals language ownership without opening files.
 - **Target implementation state:** The package layout and interfaces defined below are the intended implementation target for the first authoritative TypeScript line plus the post-Epic-Q multi-language transition foundation.
 - **Drift rule:** The future codebase must conform to this TechSpec. The TechSpec must not be treated as a loose commentary on whatever structure happens to emerge.
@@ -254,8 +251,22 @@
 
 - **Status:** accepted
 - **Context:** The compatibility matrix proves that the promoted framework, kernel, and provider subsets are green for TypeScript, and that Rust framework remains unsupported. That is strong evidence, but future implementation maintainers still need a boundary-owned authority trail rather than required behavior that can be discovered only by reading TypeScript modules or TypeScript tests. Activating Rust framework work without that trail would reintroduce `runtime-core`, `sqlite-backend`, the framework adapter, provider bridge, or their tests as hidden semantic or structural oracles.
-- **Decision:** The TypeScript freeze-readiness closure from Epics AD, AE, and AF is now complete for the currently promoted surfaces. Epic AD classified every normative claim in `docs/KrakenFrameworkSpecification.md` and `docs/KrakenKernelSpecification.md`; Epic AE split the identified large TypeScript semantic gravity wells behind stable seams without public API churn; Epic AF promoted only the selected portable negative/interleaving behavior into shared conformance and regenerated clean `verify`, `release-check`, `conformance`, `codegen`, and `interop-smoke` evidence. Before any new framework implementation line, future driver line, future official backend line, or future host/protocol expansion is activated, a later TechSpec/Tasks revision must name the line and define its evidence gates.
-- **Consequences:** Epic AD, Epic AE, and Epic AF are closed in current repo reality. Rust framework remains evidence-only and unsupported until a later TechSpec revision intentionally activates product behavior. A `full_pass` compatibility entry remains necessary evidence for freeze-readiness, but it is not sufficient by itself without the docs-to-authority matrix, modular-hardening results, conformance-depth evidence, and clean-checkout validation.
+- **Decision:** The TypeScript freeze-readiness closure from Epics AD, AE, and AF is historical evidence, not an active readiness claim. Epic AG supersedes the readiness conclusion and must prove the promoted conformance system is non-self-attesting before TypeScript freeze-readiness can be reaffirmed. Before any new framework implementation line, future driver line, future official backend line, or future host/protocol expansion is activated, a later TechSpec/Tasks revision must name the line and define its evidence gates.
+- **Consequences:** Epic AD, Epic AE, and Epic AF remain closed in current repo reality and are not reopened by AG. Rust framework remains evidence-only and unsupported until a later TechSpec revision intentionally activates product behavior. A raw compatibility `pass` entry remains necessary evidence for freeze-readiness, but it is not sufficient without AG-gated proof that promoted checks are runner-observed and not adapter-self-attested.
+
+### ADR-030 Adapter Evidence Is Not a Semantic Oracle
+
+- **Status:** accepted
+- **Context:** Promoted checks can appear to pass while relying on adapter-provided `evidence` fields, implementation-local verifier helpers, fake-kernel harness output, or check-result proxy fields. That recreates an implementation oracle inside the adapter even when the shared runner owns formal pass/fail mechanics.
+- **Decision:** Adapter-supplied `Observation.evidence` is diagnostic and provenance material only. A promoted conformance pass must be decided from runner-observed `Observation.result`, `Observation.events`, `Observation.state`, schema validity over those domains, error-envelope shape, event ordering, terminality, or explicit absence of runner-observed events. `evidenceField` assertions may exist only as diagnostics and can never be the only semantic proof for a promoted check.
+- **Consequences:** Authority Packet-referenced promoted plans must reject evidence-only checks. Promoted adapters must not return semantic verdict fields through evidence, import semantic verifier/assertion helpers, or use implementation-local `/test/` harnesses as the main proof path unless that harness is promoted as a boundary-owned testkit with a bounded contract.
+
+### ADR-031 Raw Compatibility Status Uses Four Truthful States
+
+- **Status:** accepted
+- **Context:** Treating unsupported or non-applicable suites as `pass`, especially with `applicableChecks === 0`, makes compatibility evidence overstate readiness and hides whether a suite actually exercised a boundary.
+- **Decision:** Raw compatibility status is exactly `pass`, `fail`, `unsupported`, or `not_applicable`. `pass` requires `applicableChecks > 0`, `failedChecks === 0`, and `passedChecks === applicableChecks`. `fail` means `failedChecks > 0`. `unsupported` means the suite is relevant to the implementation boundary but the implementation advertises no capabilities required by the suite. `not_applicable` means the suite does not target the implementation boundary, surface, or authority packet. `status: "pass"` with `applicableChecks === 0` is invalid.
+- **Consequences:** Compatibility reporting must preserve the difference between "nothing to run because this implementation does not support the suite" and "the suite does not apply here." `reportStatus` may remain a presentation/classification field, but it must not contradict raw `status`.
 
 ### 2.1 Compatibility Record
 
@@ -1553,13 +1564,15 @@ service KernelRunService {
         {
           "checkIds": [""],
           "checkSummary": {
+            "applicableChecks": 1,
             "failedChecks": 0,
-            "passedChecks": 0,
+            "passedChecks": 1,
             "totalChecks": 1
           },
           "suiteId": "",
           "suiteVersion": "",
           "status": "pass",
+          "reportStatus": "full_pass",
           "evidencePath": ""
         }
       ]
@@ -1570,13 +1583,15 @@ service KernelRunService {
       "pairId": "",
       "checkIds": [""],
       "checkSummary": {
+        "applicableChecks": 1,
         "failedChecks": 0,
-        "passedChecks": 0,
+        "passedChecks": 1,
         "totalChecks": 1
       },
       "suiteId": "",
       "suiteVersion": "",
       "status": "pass",
+      "reportStatus": "full_pass",
       "evidencePath": ""
     }
   ]
@@ -1586,7 +1601,14 @@ service KernelRunService {
 - `reports/compatibility/compatibility-matrix.json` is generated from actual conformance and interop-smoke runs.
 - The ledger must answer whether a named implementation passes a named suite version, whether a named cross-language pairing passes its interop-smoke suite, and which evidence artifact supports each claim.
 - Every implementation and interop result must name the executed `checkIds` and a `checkSummary` so reviewers can distinguish check-level semantic evidence from coarse suite success.
-- A ledger `full_pass` status is necessary but not sufficient for TypeScript freeze-readiness. Freeze closure additionally requires the docs-to-authority coverage matrix, explicit local/deferred classifications, modular-hardening verification, and clean-checkout validation named by the active build sequence.
+- Raw `status` is exactly `pass`, `fail`, `unsupported`, or `not_applicable`.
+- `pass` requires `applicableChecks > 0`, `failedChecks === 0`, and `passedChecks === applicableChecks`.
+- `fail` means `failedChecks > 0`.
+- `unsupported` means the implementation advertises no capabilities required by the suite, while the suite is otherwise relevant to that implementation boundary.
+- `not_applicable` means the suite does not target the implementation boundary, surface, or authority packet.
+- `status: "pass"` with `applicableChecks === 0` is invalid and must fail report generation.
+- `reportStatus` may remain as a presentation/classification field such as `full_pass`, `partial`, `unsupported`, or `not_applicable`, but it must not contradict raw `status`.
+- A raw `pass` status is necessary but not sufficient for TypeScript freeze-readiness. Freeze closure additionally requires AG-gated non-self-attesting conformance evidence, the docs-to-authority coverage matrix, explicit local/deferred classifications, modular-hardening verification, and clean-checkout validation named by the active build sequence.
 - Ledger wording must stay conservative and measured enough that the file can move toward external readiness signaling without later semantic cleanup.
 
 ### 4.11 Authority Packet Manifest Contract
@@ -1827,6 +1849,7 @@ A conformance plan is data-owned per ADR-025. Plans live alongside the surface t
                 "kind": {
                   "type": "string",
                   "enum": [
+                    "resultField",
                     "eventSequence",
                     "terminalEvent",
                     "schemaValid",
@@ -1880,7 +1903,11 @@ A conformance plan is data-owned per ADR-025. Plans live alongside the surface t
 
 - `operation` is a neutral operation name resolved by the Implementation Adapter Protocol (§4.13). The plan never names a TypeScript function or a Rust trait method directly; it names the neutral operation declared by the authority packet.
 - `applicability.capabilities` and `checks[].capabilities` are executable. The shared runner selects checks by intersecting plan-required capabilities with capabilities declared by the adapter manifest or initialization response; promoted plans must not select by implementation ID, language, runner name, or adapter name.
-- `assertions[].kind` covers shape (`schemaValid`, `errorEnvelope`), behavior (`eventSequence`, `terminalEvent`, `ordering`, `noEvent`), durable state (`stateField`), and evidence (`evidenceField`). The shared semantic runner implements these kinds once; product-specific assertion logic must be expressed through these operators rather than added as runner-side or adapter-side bespoke code.
+- `assertions[].kind` covers decisive result observations (`resultField` over `$.result`), durable state (`stateField` over `$.state`), event-stream behavior (`eventSequence`, `terminalEvent`, `ordering`, and `noEvent` over `$.events`), shape (`schemaValid` over `$.result`, `$.events`, or `$.state`, plus `errorEnvelope`), and diagnostics (`evidenceField` over `$.evidence`).
+- Decisive assertion kinds are `resultField`, `stateField`, `eventSequence`, `terminalEvent`, `schemaValid` over `$.result` / `$.events` / `$.state`, `errorEnvelope`, `ordering`, and `noEvent`. A conformance plan referenced by an Authority Packet must reject any promoted check that lacks at least one decisive non-evidence assertion.
+- `evidenceField` is never decisive. `schemaValid` over `$.evidence` is diagnostic and cannot satisfy the decisive-assertion requirement.
+- `noEvent` must inspect the runner-owned event observation stream, not adapter evidence arrays or adapter-reported event-type summaries.
+- The shared semantic runner implements assertion kinds once; product-specific assertion logic must be expressed through these operators rather than added as runner-side or adapter-side bespoke code.
 - `equalsPath` and `containsPath` resolve against the runner-owned assertion context (`$.input`, `$.fixture`, `$.scenario`, `$.result`, `$.events`, `$.state`, and `$.evidence`) so plans can compare raw observations to fixture or prior-step values without moving comparison logic into adapters.
 - `controls` covers cancellation injection and deadlines; additional generic mechanics may be added through capability selectors and adapter-declared capabilities rather than by hard-coding new control semantics in runner or adapter source.
 - `evidence[]` lists the evidence artifact paths the runner must emit for the Compatibility Reporting Boundary; missing required evidence is a check failure.
@@ -1930,7 +1957,11 @@ AdapterErrorEnvelope ::= { code: string, message: string, details?: JsonValue, c
 ```
 
 - Operations are named by the authority packet, not by a TypeScript or Rust signature. The same operation name resolves to the language-native call inside the adapter.
+- `Observation.result`, `Observation.events`, and `Observation.state` are the only semantic observation domains. `Observation.evidence` and `Observation.diagnostics` are diagnostic/provenance domains only.
 - Adapter hosts do not receive `checkId`, do not emit check-scoped evidence, and do not decide pass/fail. The shared runner maps raw observations to required evidence paths and assertion results.
+- Promoted implementation adapters must not return semantic verdict fields through evidence, including fields equivalent to `passed`, `matches`, `valid`, `verified`, or any check-result proxy.
+- Promoted implementation adapters must not import semantic verifier/assertion helpers whose job is to decide whether expected runtime semantics matched. Expected behavior belongs in conformance plans and must be evaluated by the shared runner.
+- Promoted framework conformance must not depend on implementation-local `/test/` harnesses as the main proof path unless that harness is promoted as an explicit boundary-owned testkit with a bounded contract.
 - Event observations are ordered neutral event arrays; per ADR-025 the runner asserts the event sequence rather than the adapter implementing the expected sequence.
 - Cancellation and deadlines are control inputs, not derived from `AbortSignal` or a Rust cancellation token at the protocol level. Adapters bridge to language-native cancellation internally.
 - Byte payloads cross the seam as base64-encoded JSON strings or as opaque JSON values; the adapter is responsible for converting to or from `Uint8Array`, `Buffer`, `Vec<u8>`, or any other language-native byte container.
@@ -2105,6 +2136,7 @@ conformance-plan JSON Schemas live under `tools/schemas/`.
 - Where a stable language-neutral structure exists, TypeScript adopts it first so later languages inherit a real system rather than a permanent TypeScript exception.
 - Per ADR-023, ADR-024, ADR-025, ADR-026, ADR-027, and ADR-028, every cross-implementation semantic surface must own one Authority Packet manifest declaring its authoritative sources, generated artifacts, conformance plans, binding projections, and forbidden authority sources. Implementation-language source trees, generic conformance runner source, and Markdown documents are forbidden authority sources for any cross-implementation semantic; they may project, validate, or describe authority but cannot become it. Generic runners must own only generic mechanics and consume product semantics from conformance plans referenced by an authority packet.
 - Per the final Epic Y conformance-engine adjustment, implementation language trees may host `conformance-adapter/` code that invokes native logic and returns neutral observations. Assertion evaluation, required-evidence enforcement, capability selection, adapter-error isolation, and compatibility evidence emission belong in the shared runner under `tools/conformance/runner/`, not in language adapter hosts.
+- Per Epic AG, promoted conformance adapters must expose raw `result`, `events`, and `state` observations and may expose diagnostic/provenance `evidence`; they must not expose semantic verdict proxies through evidence, import semantic verifier/assertion helpers, or depend on implementation-local `/test/` harnesses as the main proof path unless a boundary-owned testkit contract explicitly allows it.
 
 ### 5.2 Coding Standards
 
@@ -2169,8 +2201,9 @@ conformance-plan JSON Schemas live under `tools/schemas/`.
 - Normative claims in `docs/KrakenFrameworkSpecification.md` and `docs/KrakenKernelSpecification.md` must be inventoried and classified in a checked-in docs-to-authority coverage matrix before a future framework implementation line is activated.
 - Any claim that remains implementation-defined, explicitly deferred, stale, or backed only by implementation-local evidence must be labeled at the nearest relevant docs or constitution section rather than implied as portable.
 - When a shared contract adds a host-owned control or policy seam, the baseline ReAct/runtime path must either wire it through in the same change or document the limitation explicitly in `docs/` and `constitution/`.
-- Adding, removing, or changing an Authority Packet manifest, a referenced Conformance Plan, a generated artifact declared in a manifest, or the Implementation Adapter Protocol requires a TechSpec update in the same change. ADR-023 through ADR-029 are not advisory: a future contributor may not satisfy a cross-implementation semantic claim by editing implementation source, runner source, or Markdown alone.
-- Freeze-readiness or future implementation-line activation claims require fresh `bun run verify`, `bun run release-check`, `bun run conformance`, `bun run codegen`, and `bun run interop-smoke` evidence from a clean checkout, plus refreshed compatibility evidence and closure reporting that cite the affected check IDs.
+- Adding, removing, or changing an Authority Packet manifest, a referenced Conformance Plan, a generated artifact declared in a manifest, the Compatibility Ledger Contract, or the Implementation Adapter Protocol requires a TechSpec update in the same change. ADR-023 through ADR-031 are not advisory: a future contributor may not satisfy a cross-implementation semantic claim by editing implementation source, runner source, adapter evidence, or Markdown alone.
+- `bun run codegen` and `bun run verify` must reject promoted evidence-only checks; `schemaValid` over `$.evidence` as the only decisive-looking assertion; `noEvent` over adapter evidence arrays; raw compatibility evidence with `status: "pass"` and `applicableChecks: 0`; promoted adapter imports of implementation-local `/test/` harnesses unless explicitly allowed by a boundary-owned testkit contract; promoted adapter imports of semantic verifier/assertion helpers; and measurable closure claims that are not generated from live checks.
+- Freeze-readiness or future implementation-line activation claims require fresh `bun run verify`, `bun run release-check`, `bun run conformance`, `bun run codegen`, and `bun run interop-smoke` evidence from a clean checkout, plus refreshed AG-compatible compatibility evidence and closure reporting that cite the affected check IDs.
 
 ### 5.4 Initial Build Sequence
 
@@ -2191,8 +2224,9 @@ conformance-plan JSON Schemas live under `tools/schemas/`.
 15. Epic AB is closed: stale-running recovery now lives as the optional advertised `kernel.run-liveness` extension, with TypeScript memory and SQLite backends plus shared framework stale-recovery behavior aligned on promoted conformance and compatibility evidence. Rust remains non-applicable unless it advertises the extension.
 16. Epic AC is closed: framework orchestration is now promoted from TypeScript-local and prose-described behavior into boundary-owned authority and shared-runner evidence through the Epic AC inventory, runtime-api packet extension, shared orchestration plan, TypeScript adapter capability evidence, and refreshed compatibility reporting for `framework.orchestration`.
 17. Epic AD is closed: normative framework and kernel docs claims are inventoried and classified in the docs-to-authority matrix, framework deferred-surface decisions and kernel/backend/provider local-surface decisions are checked in, docs preambles clarify that Markdown is not machine portability authority, and the freeze gate report keeps TypeScript blocked on AE/AF evidence.
-18. Epics AE and AF are closed: the TypeScript structural seams are hardened, the selected portable negative/interleaving behaviors are promoted into shared conformance, freshness guardrails are wired, compatibility evidence is refreshed, and TypeScript is freeze-ready for the currently promoted surfaces.
-19. Rust framework implementation, future framework language lines, future concrete drivers, peer backends such as PostgreSQL and MySQL/MariaDB, provider expansions, or additional host protocols remain blocked until a later TechSpec revision intentionally activates the next line and defines its evidence gates.
+18. Epics AE and AF are closed as historical work: the TypeScript structural seams were hardened, the selected portable negative/interleaving behaviors were promoted into shared conformance, freshness guardrails were wired, and compatibility evidence was refreshed.
+19. Epic AG is active before any future implementation-line activation or renewed freeze-readiness claim. AG hardens non-self-attesting conformance across authority packets, conformance plans, implementation adapters, the generic runner, compatibility reporting, and live closure claims. Rust framework remains unsupported unless a later TechSpec revision activates real product behavior.
+20. Rust framework implementation, future framework language lines, future concrete drivers, peer backends such as PostgreSQL and MySQL/MariaDB, provider expansions, or additional host protocols remain blocked until a later TechSpec revision intentionally activates the next line and defines its evidence gates.
 
 ### 5.4.1 ReAct and Multilanguage Epic Partition Status
 
@@ -2211,5 +2245,5 @@ conformance-plan JSON Schemas live under `tools/schemas/`.
 - **Epic AC — Framework Orchestration Authority Promotion:** Closed in current repo reality through `constitution/spikes/epic-ac-framework-orchestration-authority-inventory.md` and `constitution/spikes/epic-ac-framework-orchestration-authority-closure-inventory.md`. The runtime-api packet now owns the orchestration plan family, the TypeScript framework adapter advertises and exercises `framework.orchestration`, and compatibility reporting records the promoted capability without introducing new kernel concepts, a global worker scheduler, A2A/ACP, provider-native handoff/tool routing, or Rust framework implementation work.
 - **Epic AD — Docs-to-Authority Freeze Gate:** Closed in current repo reality through `constitution/spikes/epic-ad-docs-to-authority-freeze-gate-closure-inventory.md`. The docs-to-authority matrix now classifies every normative framework and kernel docs claim against authority packets, conformance plans, fixtures, compatibility evidence, implementation-local evidence, deferral, missing conformance, or staleness before any new framework implementation line is activated.
 - **Epic AE — TypeScript Modular Boundary Hardening:** Closed in current repo reality through `constitution/spikes/epic-ae-modular-boundary-hardening-inventory.md`. The TypeScript semantic gravity wells are split behind stable seams, no `boundaries/**/*.ts` file remains over the `1000` hard ceiling, and the closure was verified with `bun run verify`.
-- **Epic AF — Conformance Depth and Freeze Evidence:** Closed in current repo reality through `constitution/spikes/epic-af-conformance-gap-plan.md` and `constitution/spikes/epic-af-conformance-depth-freeze-evidence-closure-inventory.md`. The selected portable negative/interleaving behaviors are promoted into shared conformance, authority/freshness guardrails are wired into validation, compatibility evidence is refreshed, and TypeScript is freeze-ready for the currently promoted surfaces.
+- **Epic AF — Conformance Depth and Freeze Evidence:** Closed in current repo reality through `constitution/spikes/epic-af-conformance-gap-plan.md` and `constitution/spikes/epic-af-conformance-depth-freeze-evidence-closure-inventory.md`. The selected portable negative/interleaving behaviors were promoted into shared conformance, authority/freshness guardrails were wired into validation, compatibility evidence was refreshed, and TypeScript was considered freeze-ready for the then-promoted surfaces until Epic AG suspended that conclusion pending regenerated evidence.
 - **Later driver, backend, provider, language, and host protocol expansion:** Deferred unless the TechSpec is revised again. This includes Rust framework work, `LanguageModelV2` compatibility, provider-native tools, AI SDK agent loops/UI transports, LangChain bridge work, first-class Tuvren provider packages, ACP, future non-ReAct drivers, future official backends, and future language lines beyond Rust.
