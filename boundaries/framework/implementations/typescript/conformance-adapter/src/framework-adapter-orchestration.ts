@@ -15,6 +15,7 @@
  */
 
 import type { RuntimeDriver } from "@tuvren/driver-api";
+import { TuvrenRuntimeError } from "@tuvren/core-types";
 import type { AgentConfig } from "@tuvren/runtime-api";
 import {
   createDriverRegistry,
@@ -1121,12 +1122,19 @@ export function createFrameworkAdapterOrchestration(
       try {
         return handle.spawn(input);
       } catch (error: unknown) {
-        const message = error instanceof Error ? error.message : String(error);
+        const phase = handle.status().phase;
+        const shouldRetry =
+          error instanceof TuvrenRuntimeError &&
+          error.code === "orchestration_parent_inactive" &&
+          phase === "running";
 
-        if (!message.includes("requires a running orchestration handle")) {
+        if (!shouldRetry) {
           throw error;
         }
 
+        // Only retry the brief "running but not ready yet" race; if the phase
+        // has already moved away from running, retrying would turn a real
+        // pause/completion into a false positive.
         if (Date.now() - start > timeoutMs) {
           throw error;
         }
