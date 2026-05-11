@@ -105,6 +105,17 @@ export function createFrameworkAdapterEventStream(
         sourceThreadIds,
         threadIds,
       },
+      result: {
+        checkpointHashes,
+        frameEvents: frames.map((frame) => frame.event),
+        framePayloads: frames.map((frame) =>
+          dependencies.parseJsonValue(frame.data)
+        ),
+        resumedFromHashes,
+        sourceEventTypes: events.map((event) => event.type),
+        sourceThreadIds,
+        threadIds,
+      },
     };
   }
 
@@ -133,6 +144,13 @@ export function createFrameworkAdapterEventStream(
             : undefined,
         firstFrameEvent: frames[0]?.event,
       },
+      result: {
+        firstDirectEventType:
+          firstDirectEvent.done === false
+            ? dependencies.readRecordString(firstDirectEvent.value, "type")
+            : undefined,
+        firstFrameEvent: frames[0]?.event,
+      },
     };
   }
 
@@ -149,6 +167,12 @@ export function createFrameworkAdapterEventStream(
 
     return {
       evidence: {
+        eventTypes: events.map((event) => event.type),
+        events,
+        sourceEventTypes: sourceEvents.map((event) => event.type),
+        warningCodes,
+      },
+      result: {
         eventTypes: events.map((event) => event.type),
         events,
         sourceEventTypes: sourceEvents.map((event) => event.type),

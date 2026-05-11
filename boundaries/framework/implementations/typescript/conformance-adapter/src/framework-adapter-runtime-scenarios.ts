@@ -205,6 +205,12 @@ export function createFrameworkAdapterRuntimeScenarios(
           phase: handle.status().phase,
         },
       },
+      result: {
+        runtime: {
+          eventCount: events.length,
+          phase: handle.status().phase,
+        },
+      },
     };
   }
 
@@ -435,6 +441,22 @@ export function createFrameworkAdapterRuntimeScenarios(
             },
           },
         },
+        result: {
+          approval: {
+            pausedApprovalCallIds,
+            pausedEventTypes: pausedEvents.map((event) =>
+              dependencies.readRecordString(event, "type")
+            ),
+            pausedPhase,
+          },
+          tool: {
+            execution: {
+              executedNames,
+              executedNamesAfterResume: [...executedNames],
+              executedNamesBeforeResume,
+            },
+          },
+        },
         state: {
           approval: pausedHandle.status(),
           approvalError: readFirstErrorEnvelope(pausedEvents),
@@ -467,6 +489,24 @@ export function createFrameworkAdapterRuntimeScenarios(
             },
           },
         },
+        result: {
+          approval: {
+            cancelledPhase: pausedHandle.status().phase,
+            cancelledToolResults: toolResults,
+            pausedApprovalCallIds,
+            pausedEventTypes: pausedEvents.map((event) =>
+              dependencies.readRecordString(event, "type")
+            ),
+            pausedPhase,
+            resumedTextAbsent: !hasAssistantText(messages, finalText),
+          },
+          tool: {
+            execution: {
+              executedNamesAfterCancel: [...executedNames],
+              executedNamesBeforeResume,
+            },
+          },
+        },
       };
     }
 
@@ -481,6 +521,39 @@ export function createFrameworkAdapterRuntimeScenarios(
 
     return {
       evidence: {
+        approval: {
+          decisions,
+          gatedToolStartAfterResume: didEventOccurAfter(
+            resumedEvents,
+            "approval.resolved",
+            "tool.start",
+            "call-email"
+          ),
+          handleOwnership,
+          messageAttachment: readFirstApprovalMessage(toolResults),
+          pausedApprovalCallIds,
+          pausedEventTypes: pausedEvents.map((event) =>
+            dependencies.readRecordString(event, "type")
+          ),
+          pausedPhase,
+          pausedTurnIds: readEventStringValues(pausedEvents, "turnId"),
+          resumedEventTypes: resumedEvents.map((event) =>
+            dependencies.readRecordString(event, "type")
+          ),
+          resumedPhase: resumedHandle.status().phase,
+          resumedTurnIds: readEventStringValues(resumedEvents, "turnId"),
+          sameTurn: eventStreamsShareTurn(pausedEvents, resumedEvents),
+          toolResults,
+        },
+        tool: {
+          execution: {
+            executedNames,
+            executedNamesAfterResume: [...executedNames],
+            executedNamesBeforeResume,
+          },
+        },
+      },
+      result: {
         approval: {
           decisions,
           gatedToolStartAfterResume: didEventOccurAfter(
@@ -558,6 +631,16 @@ export function createFrameworkAdapterRuntimeScenarios(
           sourceMessageCount: sourceMessages.length,
         },
       },
+      result: {
+        branch: {
+          completedTurnPhase: handle.status().phase,
+          createdBranchId: branch.branchId,
+          createdHeadTurnNodeHash: branch.headTurnNodeHash,
+          sourceBranchId: thread.branchId,
+          sourceHeadTurnNodeHash: completedHeadTurnNodeHash,
+          sourceMessageCount: sourceMessages.length,
+        },
+      },
     };
   }
 
@@ -596,10 +679,21 @@ export function createFrameworkAdapterRuntimeScenarios(
             accepted: true,
           },
         },
+        result: {
+          inputSignal: {
+            accepted: true,
+          },
+        },
       };
     } catch (error: unknown) {
       return {
         evidence: {
+          inputSignal: {
+            accepted: false,
+            error: readErrorEnvelope(error),
+          },
+        },
+        result: {
           inputSignal: {
             accepted: false,
             error: readErrorEnvelope(error),

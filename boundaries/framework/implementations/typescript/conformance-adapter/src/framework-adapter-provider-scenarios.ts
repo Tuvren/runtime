@@ -166,6 +166,16 @@ export function createFrameworkAdapterProviderScenarios(
           },
         },
       },
+      result: {
+        provider: {
+          generate: {
+            callCount: generateCalls,
+            eventTypes: sequence.events.map((event) => event.type),
+            partKeys: sequence.response.parts.map((part) => Object.keys(part)),
+            response: sequence.response,
+          },
+        },
+      },
     };
   }
 
@@ -214,6 +224,27 @@ export function createFrameworkAdapterProviderScenarios(
 
     return {
       evidence: {
+        provider: {
+          stream: {
+            callCount: streamCalls,
+            chunkTypes: chunks.map((chunk) => chunk.type),
+            emittedEventTypes: emittedEvents.map((event) => event.type),
+            structuredDeltaIndex: findEventIndex(
+              emittedEvents,
+              "structured.delta"
+            ),
+            structuredDoneIndex: findEventIndex(
+              emittedEvents,
+              "structured.done"
+            ),
+            toolCallIdOwnedByFramework: isFirstToolCallIdOwnedByFramework(
+              sequence.response
+            ),
+            response: sequence.response,
+          },
+        },
+      },
+      result: {
         provider: {
           stream: {
             callCount: streamCalls,
@@ -342,6 +373,26 @@ export function createFrameworkAdapterProviderScenarios(
           },
         },
       },
+      result: {
+        tool: {
+          execution: {
+            callCount: toolCalls,
+            eventTypes: events.map((event) => readEventType(event)),
+            firstToolResultIndex: findEventIndex(events, "tool.result"),
+            parallelWaveStartedBeforeResults:
+              didParallelWaveStartBeforeResults(events),
+            secondToolStartIndex: findEventIndex(
+              events,
+              "tool.start",
+              "call-email"
+            ),
+            failureNames: toolFailures,
+            inputs: toolInputs,
+            outputs: toolOutputs,
+            toolResults: readToolResultParts(messages),
+          },
+        },
+      },
       state: {
         toolExecution: {
           error: dependencies.readFirstErrorEnvelope(events),
@@ -396,6 +447,19 @@ export function createFrameworkAdapterProviderScenarios(
 
     return {
       evidence: {
+        validation: {
+          error:
+            result.resolution.type === "fail"
+              ? {
+                  code: readErrorCode(result.resolution.error),
+                  message: result.resolution.error.message,
+                }
+              : undefined,
+          dialect: resolveSchemaDialect(responseFormat.schema),
+          resolutionType: result.resolution.type,
+        },
+      },
+      result: {
         validation: {
           error:
             result.resolution.type === "fail"
@@ -505,6 +569,28 @@ export function createFrameworkAdapterProviderScenarios(
     return {
       events,
       evidence: {
+        context: {
+          checkpointHashes,
+          createdNewHead:
+            sourceTurnNodeHash !== undefined &&
+            rewrittenTurnNodeHash !== undefined &&
+            sourceTurnNodeHash !== rewrittenTurnNodeHash,
+          driverObservedMessageCount: readDriverObservedMessageCount(events),
+          finalHeadChanged:
+            rewrittenTurnNodeHash !== undefined &&
+            finalTurnNodeHash !== undefined &&
+            rewrittenTurnNodeHash !== finalTurnNodeHash,
+          messageCount: messages.length,
+          rewrittenMessageCount: rewrittenMessages.length,
+          snapshotMessageCounts: readSnapshotMessageCounts(events),
+          sourceMessageCount: sourceMessages.length,
+          summaryText: dependencies.readAssistantText(messages, summaryText),
+        },
+        runtime: {
+          phase: handle.status().phase,
+        },
+      },
+      result: {
         context: {
           checkpointHashes,
           createdNewHead:
