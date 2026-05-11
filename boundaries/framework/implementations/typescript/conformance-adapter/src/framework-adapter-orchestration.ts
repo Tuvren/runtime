@@ -160,23 +160,22 @@ export function createFrameworkAdapterOrchestration(
     ]);
     const childThreadId = findThreadId(childEvents);
 
-    return withResult({
-      evidence: {
-        orchestration: {
-          launch: {
-            childResult,
-            childRunsOnOwnThread:
-              childThreadId !== undefined && childThreadId !== thread.threadId,
-            childThreadId,
-            descendantThreadId: findDescendantThreadId(subtreeEvents),
-            parentThreadId: thread.threadId,
-            postAwaitSpawnError,
-            preStartAwaitResultError,
-            preStartSpawnError,
-          },
-        },
-      },
-    });
+    const launch = {
+      childResult,
+      childRunsOnOwnThread:
+        childThreadId !== undefined && childThreadId !== thread.threadId,
+      childThreadId,
+      descendantThreadId: findDescendantThreadId(subtreeEvents),
+      parentThreadId: thread.threadId,
+      postAwaitSpawnError,
+      preStartAwaitResultError,
+      preStartSpawnError,
+    };
+
+    return {
+      evidence: { orchestration: { launch } },
+      result: { orchestration: { launch } },
+    };
   }
 
   async function runOrchestrationLifecycleLocality(
@@ -288,42 +287,34 @@ export function createFrameworkAdapterOrchestration(
     const failedAwaitResultError =
       await runFailedOrchestrationAwaitResult(failureMessage);
 
-    return withResult({
-      evidence: {
-        orchestration: {
-          surfaces: {
-            allEventsIncludeDescendants: descendantEvent !== undefined,
-            childAllEventsRemainAvailable:
-              findTextEvent(childSubtreeEvents, childText) !== undefined,
-            childResult,
-            descendantSourceAttributed:
-              dependencies.readRecordString(
-                descendantEvent?.source,
-                "agent"
-              ) !== undefined &&
-              dependencies.readRecordString(
-                descendantEvent?.source,
-                "threadId"
-              ) !== undefined &&
-              dependencies.readRecordString(
-                descendantEvent?.source,
-                "workerId"
-              ) !== undefined,
-            descendantSource: descendantEvent?.source,
-            eventsSelfOnly: !parentEvents.some(
-              (event) =>
-                dependencies.readRecordString(event, "type") === "text.done" &&
-                dependencies.readRecordString(event, "text") === childText
-            ),
-            failedAwaitResultError,
-            failedAwaitResultRejected:
-              failedAwaitResultError?.message === failureMessage,
-            noCanonicalWorkerResultInjection:
-              !containsWorkerResult(parentMessages),
-          },
-        },
-      },
-    });
+    const surfaces = {
+      allEventsIncludeDescendants: descendantEvent !== undefined,
+      childAllEventsRemainAvailable:
+        findTextEvent(childSubtreeEvents, childText) !== undefined,
+      childResult,
+      descendantSourceAttributed:
+        dependencies.readRecordString(descendantEvent?.source, "agent") !==
+          undefined &&
+        dependencies.readRecordString(descendantEvent?.source, "threadId") !==
+          undefined &&
+        dependencies.readRecordString(descendantEvent?.source, "workerId") !==
+          undefined,
+      descendantSource: descendantEvent?.source,
+      eventsSelfOnly: !parentEvents.some(
+        (event) =>
+          dependencies.readRecordString(event, "type") === "text.done" &&
+          dependencies.readRecordString(event, "text") === childText
+      ),
+      failedAwaitResultError,
+      failedAwaitResultRejected:
+        failedAwaitResultError?.message === failureMessage,
+      noCanonicalWorkerResultInjection: !containsWorkerResult(parentMessages),
+    };
+
+    return {
+      evidence: { orchestration: { surfaces } },
+      result: { orchestration: { surfaces } },
+    };
   }
 
   async function runOrchestrationExecutionInheritance(
@@ -466,25 +457,23 @@ export function createFrameworkAdapterOrchestration(
         ? null
         : await framework.getThread(childThreadId);
 
-    return withResult({
-      evidence: {
-        orchestration: {
-          inheritance: {
-            childResult,
-            childThreadId,
-            driverIdInherited: childEvents.some(
-              (event) =>
-                dependencies.readRecordString(event, "type") ===
-                  "tool.result" &&
-                dependencies.isRecord(event.source) &&
-                event.source.driver === "special"
-            ),
-            schemaInherited: childThread?.schemaId === "custom.agent.v1",
-            toolsInherited: firstVisiblePartType(childResult) === "tool_result",
-          },
-        },
-      },
-    });
+    const inheritance = {
+      childResult,
+      childThreadId,
+      driverIdInherited: childEvents.some(
+        (event) =>
+          dependencies.readRecordString(event, "type") === "tool.result" &&
+          dependencies.isRecord(event.source) &&
+          event.source.driver === "special"
+      ),
+      schemaInherited: childThread?.schemaId === "custom.agent.v1",
+      toolsInherited: firstVisiblePartType(childResult) === "tool_result",
+    };
+
+    return {
+      evidence: { orchestration: { inheritance } },
+      result: { orchestration: { inheritance } },
+    };
   }
 
   async function runOrchestrationNestedAttribution(
@@ -577,19 +566,18 @@ export function createFrameworkAdapterOrchestration(
     const rootGrandchildEvent = findTextEvent(rootEvents, grandchildText);
     const childGrandchildEvent = findTextEvent(childEvents, grandchildText);
 
-    return withResult({
-      evidence: {
-        orchestration: {
-          nested: {
-            childGrandchildSource: childGrandchildEvent?.source,
-            childReceivesGrandchild: childGrandchildEvent !== undefined,
-            grandchildResult,
-            rootGrandchildSource: rootGrandchildEvent?.source,
-            rootReceivesGrandchild: rootGrandchildEvent !== undefined,
-          },
-        },
-      },
-    });
+    const nested = {
+      childGrandchildSource: childGrandchildEvent?.source,
+      childReceivesGrandchild: childGrandchildEvent !== undefined,
+      grandchildResult,
+      rootGrandchildSource: rootGrandchildEvent?.source,
+      rootReceivesGrandchild: rootGrandchildEvent !== undefined,
+    };
+
+    return {
+      evidence: { orchestration: { nested } },
+      result: { orchestration: { nested } },
+    };
   }
 
   return {
@@ -743,28 +731,25 @@ export function createFrameworkAdapterOrchestration(
         typeof event.source.workerId === "string"
     );
 
-    return withResult({
-      evidence: {
-        orchestration: {
-          surfaces: {
-            childResult,
-            handoffDescendantAgentPreserved:
-              readSourceAgent(childReviewerEvent) === "reviewer" &&
-              readSourceAgent(rootReviewerEvent) === "reviewer",
-            handoffHistoryControlEntryAbsent:
-              lastOutputOnlyEvidence.historyControlEntryAbsent,
-            handoffInvalidCompositionError:
-              await runInvalidHandoffCompositionError(),
-            handoffLastOutputOnlyNoSourceSignal:
-              lastOutputOnlyEvidence.noSourceSignal,
-            handoffLastOutputOnlyText: lastOutputOnlyEvidence.firstUserText,
-            handoffRootSource: dependencies.isRecord(rootReviewerEvent)
-              ? rootReviewerEvent.source
-              : undefined,
-          },
-        },
-      },
-    });
+    const surfaces = {
+      childResult,
+      handoffDescendantAgentPreserved:
+        readSourceAgent(childReviewerEvent) === "reviewer" &&
+        readSourceAgent(rootReviewerEvent) === "reviewer",
+      handoffHistoryControlEntryAbsent:
+        lastOutputOnlyEvidence.historyControlEntryAbsent,
+      handoffInvalidCompositionError: await runInvalidHandoffCompositionError(),
+      handoffLastOutputOnlyNoSourceSignal: lastOutputOnlyEvidence.noSourceSignal,
+      handoffLastOutputOnlyText: lastOutputOnlyEvidence.firstUserText,
+      handoffRootSource: dependencies.isRecord(rootReviewerEvent)
+        ? rootReviewerEvent.source
+        : undefined,
+    };
+
+    return {
+      evidence: { orchestration: { surfaces } },
+      result: { orchestration: { surfaces } },
+    };
   }
 
   async function runInvalidHandoffCompositionError(): Promise<
@@ -1109,14 +1094,6 @@ export function createFrameworkAdapterOrchestration(
     return new Promise((resolve) => {
       setTimeout(resolve, ms);
     });
-  }
-
-  function withResult(
-    projection: AdapterProjection & { evidence: Record<string, unknown> }
-  ): AdapterProjection {
-    return projection.result === undefined
-      ? { ...projection, result: projection.evidence }
-      : projection;
   }
 
   async function spawnWhenRunning(

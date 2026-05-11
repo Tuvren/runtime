@@ -232,20 +232,18 @@ export function createFrameworkAdapterOrchestrationLifecycle(
     const resumedResult = await resumedHandle.awaitResult();
     await subtreeEventsPromise;
 
-    return withResult({
-      evidence: {
-        orchestration: {
-          lifecycle: {
-            childResult,
-            parentPausedWhileChildCompleted:
-              pausedPhase === "paused" &&
-              firstVisibleText(childResult) === childText,
-            resumedParentPhase: resumedHandle.status().phase,
-            resumedParentResult: resumedResult,
-          },
-        },
-      },
-    });
+    const lifecycle = {
+      childResult,
+      parentPausedWhileChildCompleted:
+        pausedPhase === "paused" && firstVisibleText(childResult) === childText,
+      resumedParentPhase: resumedHandle.status().phase,
+      resumedParentResult: resumedResult,
+    };
+
+    return {
+      evidence: { orchestration: { lifecycle } },
+      result: { orchestration: { lifecycle } },
+    };
   }
 
   async function runOrchestrationChildPauseParentCompletes(
@@ -352,21 +350,20 @@ export function createFrameworkAdapterOrchestrationLifecycle(
     const resumedChildResult = await resumedChildHandle.awaitResult();
     await parentEventsPromise;
 
-    return withResult({
-      evidence: {
-        orchestration: {
-          lifecycle: {
-            childPausedPhase: pausedPhase,
-            childResumedPhase: resumedChildHandle.status().phase,
-            parentCompletedWhileChildPaused:
-              pausedPhase === "paused" &&
-              handle.status().phase === "completed" &&
-              firstVisibleText(parentResult) === parentText,
-            resumedChildResult,
-          },
-        },
-      },
-    });
+    const lifecycle = {
+      childPausedPhase: pausedPhase,
+      childResumedPhase: resumedChildHandle.status().phase,
+      parentCompletedWhileChildPaused:
+        pausedPhase === "paused" &&
+        handle.status().phase === "completed" &&
+        firstVisibleText(parentResult) === parentText,
+      resumedChildResult,
+    };
+
+    return {
+      evidence: { orchestration: { lifecycle } },
+      result: { orchestration: { lifecycle } },
+    };
   }
 
   async function runOrchestrationChildCancelParentCompletes(
@@ -432,19 +429,18 @@ export function createFrameworkAdapterOrchestrationLifecycle(
     const parentResult = await handle.awaitResult();
     await parentEventsPromise;
 
-    return withResult({
-      evidence: {
-        orchestration: {
-          lifecycle: {
-            childCancelError: childError,
-            childCancelledWhileParentCompleted:
-              childHandle.status().phase === "failed" &&
-              handle.status().phase === "completed" &&
-              firstVisibleText(parentResult) === parentText,
-          },
-        },
-      },
-    });
+    const lifecycle = {
+      childCancelError: childError,
+      childCancelledWhileParentCompleted:
+        childHandle.status().phase === "failed" &&
+        handle.status().phase === "completed" &&
+        firstVisibleText(parentResult) === parentText,
+    };
+
+    return {
+      evidence: { orchestration: { lifecycle } },
+      result: { orchestration: { lifecycle } },
+    };
   }
 
   async function runOrchestrationParentCancelChildCompletes(
@@ -510,36 +506,34 @@ export function createFrameworkAdapterOrchestrationLifecycle(
     const childResult = await childHandle.awaitResult();
     await parentEventsPromise;
 
-    return withResult({
-      evidence: {
-        orchestration: {
-          lifecycle: {
-            childResult,
-            parentCancelError,
-            parentCancelledWhileChildCompleted:
-              handle.status().phase === "failed" &&
-              childHandle.status().phase === "completed" &&
-              firstVisibleText(childResult) === childText,
-          },
-        },
-      },
-    });
+    const lifecycle = {
+      childResult,
+      parentCancelError,
+      parentCancelledWhileChildCompleted:
+        handle.status().phase === "failed" &&
+        childHandle.status().phase === "completed" &&
+        firstVisibleText(childResult) === childText,
+    };
+
+    return {
+      evidence: { orchestration: { lifecycle } },
+      result: { orchestration: { lifecycle } },
+    };
   }
 
   async function runOrchestrationSpawnRequiresRunningHandle(): Promise<AdapterProjection> {
     const pausedSpawnError = await runPausedParentSpawnRejection();
     const completedSpawnError = await runCompletedParentSpawnRejection();
 
-    return withResult({
-      evidence: {
-        orchestration: {
-          lifecycle: {
-            completedSpawnError,
-            pausedSpawnError,
-          },
-        },
-      },
-    });
+    const lifecycle = {
+      completedSpawnError,
+      pausedSpawnError,
+    };
+
+    return {
+      evidence: { orchestration: { lifecycle } },
+      result: { orchestration: { lifecycle } },
+    };
   }
 
   async function runPausedParentSpawnRejection(): Promise<
@@ -742,11 +736,4 @@ export function createFrameworkAdapterOrchestrationLifecycle(
     });
   }
 
-  function withResult(
-    projection: AdapterProjection & { evidence: Record<string, unknown> }
-  ): AdapterProjection {
-    return projection.result === undefined
-      ? { ...projection, result: projection.evidence }
-      : projection;
-  }
 }
