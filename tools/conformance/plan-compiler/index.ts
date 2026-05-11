@@ -305,13 +305,9 @@ function assertionRequiredEvidencePath(
         ? undefined
         : normalizeEvidencePath(assertion.field);
     case "resultField":
-      if (assertion.field === undefined) {
-        return undefined;
-      }
-
-      return assertion.field === "$"
-        ? "result"
-        : normalizeEvidencePath(assertion.field);
+      return assertion.field === undefined
+        ? undefined
+        : resultFieldRequiredEvidencePath(assertion.field);
     case "errorEnvelope":
       return normalizeEvidencePath(assertion.path ?? "$.result.error");
     default:
@@ -335,9 +331,13 @@ function stepAssertionRequiredEvidencePath(
       // is checked against the final trace context after the lifecycle finishes.
       return `trace.${stepId}.evidence.${path}`;
     case "resultField":
+      if (assertion.field === undefined) {
+        return undefined;
+      }
+
       return assertion.field === "$"
         ? `trace.${stepId}.result`
-        : `trace.${stepId}.result.${path}`;
+        : `trace.${stepId}.result.${normalizeEvidencePath(assertion.field)}`;
     case "stateField":
       return `trace.${stepId}.state.${path}`;
     case "errorEnvelope":
@@ -349,4 +349,15 @@ function stepAssertionRequiredEvidencePath(
 
 function normalizeEvidencePath(path: string): string {
   return path.startsWith("$.") ? path.slice(2) : path;
+}
+
+function resultFieldRequiredEvidencePath(field: string): string {
+  if (field === "$") {
+    return "result";
+  }
+
+  // Required evidence is evaluated against the whole assertion context, so
+  // resultField paths must be rooted under `result` to avoid mirroring the
+  // evidence/state surface and accidentally accepting the wrong namespace.
+  return `result.${normalizeEvidencePath(field)}`;
 }

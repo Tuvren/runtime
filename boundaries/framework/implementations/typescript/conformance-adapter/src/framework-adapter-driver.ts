@@ -673,6 +673,14 @@ function assertDriverExecutionResultShape(
   if (typeof value.resolution.type !== "string") {
     throw new Error(`${label}.resolution.type must be a string`);
   }
+
+  if (
+    value.resolution.type === "fail" &&
+    (!isRecord(value.resolution.error) ||
+      typeof value.resolution.error.message !== "string")
+  ) {
+    throw new Error(`${label}.resolution.error must be an error object`);
+  }
 }
 
 function assertHashStringShape(value: unknown, label: string): void {
