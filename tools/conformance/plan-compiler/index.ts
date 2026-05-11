@@ -336,8 +336,10 @@ function stepAssertionRequiredEvidencePath(
       }
 
       return assertion.field === "$"
-        ? `trace.${stepId}.result`
-        : `trace.${stepId}.result.${normalizeEvidencePath(assertion.field)}`;
+        ? `result.trace.${stepId}.result`
+        : `result.trace.${stepId}.result.${normalizeEvidencePath(
+            assertion.field
+          )}`;
     case "stateField":
       return `trace.${stepId}.state.${path}`;
     case "errorEnvelope":

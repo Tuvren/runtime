@@ -38,6 +38,14 @@ import type {
 } from "./framework-adapter-runtime.ts";
 import { createFrameworkAdapterRuntimeScenarios } from "./framework-adapter-runtime-scenarios.ts";
 
+const PROVIDER_FINISH_REASONS = new Set([
+  "stop",
+  "tool_call",
+  "length",
+  "error",
+  "content_filter",
+]);
+
 export type {
   AdapterCapabilities,
   AdapterControls,
@@ -546,8 +554,21 @@ function assertTuvrenModelResponseShape(
     throw new Error(`${label} must be a provider response object`);
   }
 
+  if (
+    typeof value.finishReason !== "string" ||
+    !PROVIDER_FINISH_REASONS.has(value.finishReason)
+  ) {
+    throw new Error(`${label} must include a finish reason`);
+  }
+
   if (!Array.isArray(value.parts)) {
     throw new Error(`${label} must include response parts`);
+  }
+
+  for (const [index, part] of value.parts.entries()) {
+    if (!isRecord(part) || typeof part.type !== "string") {
+      throw new Error(`${label}.parts[${index}] must be a content part`);
+    }
   }
 }
 
@@ -561,6 +582,73 @@ function assertProviderStreamChunkShape(
 
   if (typeof value.type !== "string") {
     throw new Error(`${label} must include a chunk type`);
+  }
+
+  switch (value.type) {
+    case "text_delta":
+      if (typeof value.text !== "string") {
+        throw new Error(`${label} must include chunk text`);
+      }
+      return;
+    case "reasoning_delta":
+      if (typeof value.text !== "string") {
+        throw new Error(`${label} must include reasoning text`);
+      }
+      return;
+    case "reasoning_done":
+      return;
+    case "structured_delta":
+      if (typeof value.delta !== "string") {
+        throw new Error(`${label} must include structured delta`);
+      }
+      return;
+    case "structured_done":
+      if (value.data === undefined) {
+        throw new Error(`${label} must include structured data`);
+      }
+      return;
+    case "tool_call_start":
+      if (
+        typeof value.providerCallId !== "string" ||
+        typeof value.name !== "string"
+      ) {
+        throw new Error(`${label} must include a provider call id and name`);
+      }
+      return;
+    case "tool_call_args_delta":
+      if (
+        typeof value.providerCallId !== "string" ||
+        typeof value.delta !== "string"
+      ) {
+        throw new Error(`${label} must include a provider call id and delta`);
+      }
+      return;
+    case "tool_call_done":
+      if (
+        typeof value.providerCallId !== "string" ||
+        typeof value.name !== "string" ||
+        value.input === undefined
+      ) {
+        throw new Error(
+          `${label} must include a provider call id, name, and input`
+        );
+      }
+      return;
+    case "finish":
+      if (
+        typeof value.finishReason !== "string" ||
+        !PROVIDER_FINISH_REASONS.has(value.finishReason)
+      ) {
+        throw new Error(`${label} must include a finish reason`);
+      }
+      return;
+    case "error":
+      if (value.error === undefined) {
+        throw new Error(`${label} must include an error payload`);
+      }
+      return;
+    default:
+      throw new Error(`${label} has unsupported chunk type ${value.type}`);
   }
 }
 

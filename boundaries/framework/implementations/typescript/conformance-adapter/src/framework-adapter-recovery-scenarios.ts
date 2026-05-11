@@ -335,10 +335,7 @@ export function createFrameworkAdapterRecoveryScenarios(
         "activeAgent"
       ),
       driverExecuteCalls: executeCalls,
-      freshUserMessageCount:
-        recoveryCase === "signal_mismatch"
-          ? 1
-          : countUserTextMessages(branchMessages, signalText),
+      freshUserMessageCount: countUserTextMessages(branchMessages, signalText),
       originalUserMessageCount: countUserTextMessages(branchMessages, prompt),
       phase: handle.status().phase,
       preemptCalls: livenessHarness.getPreemptCalls(),

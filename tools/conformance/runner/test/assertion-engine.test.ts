@@ -15,8 +15,14 @@
  */
 
 import { describe, expect, test } from "bun:test";
-import type { ConformancePlanCheck } from "../../plan-compiler/index.ts";
-import { evaluateAssertions } from "../assertion-engine/index.ts";
+import type {
+  CompiledConformancePlanCheck,
+  ConformancePlanCheck,
+} from "../../plan-compiler/index.ts";
+import {
+  evaluateAssertions,
+  evaluateRequiredEvidence,
+} from "../assertion-engine/index.ts";
 
 function buildCheck(
   assertions: ConformancePlanCheck["assertions"]
@@ -119,5 +125,29 @@ describe("resultField assertions", () => {
       { evidence: { answer: "ready" } }
     );
     expect(evaluation?.status).toBe("fail");
+  });
+
+  test("required evidence only passes from the result surface", () => {
+    const compiledCheck: CompiledConformancePlanCheck = {
+      check: buildCheck([
+        { equals: "ready", field: "$.answer", kind: "resultField" },
+      ]),
+      requiredEvidence: ["result.answer"],
+    };
+
+    const mirroredSurfaces = {
+      evidence: { answer: "ready" },
+      state: { answer: "ready" },
+    };
+
+    expect(
+      evaluateRequiredEvidence(compiledCheck, mirroredSurfaces)[0]?.status
+    ).toBe("fail");
+    expect(
+      evaluateRequiredEvidence(compiledCheck, {
+        ...mirroredSurfaces,
+        result: { answer: "ready" },
+      })[0]?.status
+    ).toBe("pass");
   });
 });
