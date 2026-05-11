@@ -232,7 +232,7 @@ export function createFrameworkAdapterOrchestrationLifecycle(
     const resumedResult = await resumedHandle.awaitResult();
     await subtreeEventsPromise;
 
-    return {
+    return withResult({
       evidence: {
         orchestration: {
           lifecycle: {
@@ -245,7 +245,7 @@ export function createFrameworkAdapterOrchestrationLifecycle(
           },
         },
       },
-    };
+    });
   }
 
   async function runOrchestrationChildPauseParentCompletes(
@@ -352,7 +352,7 @@ export function createFrameworkAdapterOrchestrationLifecycle(
     const resumedChildResult = await resumedChildHandle.awaitResult();
     await parentEventsPromise;
 
-    return {
+    return withResult({
       evidence: {
         orchestration: {
           lifecycle: {
@@ -366,7 +366,7 @@ export function createFrameworkAdapterOrchestrationLifecycle(
           },
         },
       },
-    };
+    });
   }
 
   async function runOrchestrationChildCancelParentCompletes(
@@ -432,7 +432,7 @@ export function createFrameworkAdapterOrchestrationLifecycle(
     const parentResult = await handle.awaitResult();
     await parentEventsPromise;
 
-    return {
+    return withResult({
       evidence: {
         orchestration: {
           lifecycle: {
@@ -444,7 +444,7 @@ export function createFrameworkAdapterOrchestrationLifecycle(
           },
         },
       },
-    };
+    });
   }
 
   async function runOrchestrationParentCancelChildCompletes(
@@ -510,7 +510,7 @@ export function createFrameworkAdapterOrchestrationLifecycle(
     const childResult = await childHandle.awaitResult();
     await parentEventsPromise;
 
-    return {
+    return withResult({
       evidence: {
         orchestration: {
           lifecycle: {
@@ -523,14 +523,14 @@ export function createFrameworkAdapterOrchestrationLifecycle(
           },
         },
       },
-    };
+    });
   }
 
   async function runOrchestrationSpawnRequiresRunningHandle(): Promise<AdapterProjection> {
     const pausedSpawnError = await runPausedParentSpawnRejection();
     const completedSpawnError = await runCompletedParentSpawnRejection();
 
-    return {
+    return withResult({
       evidence: {
         orchestration: {
           lifecycle: {
@@ -539,7 +539,7 @@ export function createFrameworkAdapterOrchestrationLifecycle(
           },
         },
       },
-    };
+    });
   }
 
   async function runPausedParentSpawnRejection(): Promise<
@@ -740,5 +740,13 @@ export function createFrameworkAdapterOrchestrationLifecycle(
     return new Promise((resolve) => {
       setTimeout(resolve, ms);
     });
+  }
+
+  function withResult(
+    projection: AdapterProjection & { evidence: Record<string, unknown> }
+  ): AdapterProjection {
+    return projection.result === undefined
+      ? { ...projection, result: projection.evidence }
+      : projection;
   }
 }

@@ -1515,7 +1515,7 @@ function buildEventStreamExtended(): Plan {
     ),
     sseProjection(
       "completed-turn-no-error-event",
-      { eventType: "error", field: "$.frameEvents", kind: "noEvent" },
+      { eventType: "error", kind: "noEvent" },
       ["frameEvents"],
       "$.completed-tool-turn"
     ),

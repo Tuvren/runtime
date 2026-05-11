@@ -160,7 +160,7 @@ export function createFrameworkAdapterOrchestration(
     ]);
     const childThreadId = findThreadId(childEvents);
 
-    return {
+    return withResult({
       evidence: {
         orchestration: {
           launch: {
@@ -176,7 +176,7 @@ export function createFrameworkAdapterOrchestration(
           },
         },
       },
-    };
+    });
   }
 
   async function runOrchestrationLifecycleLocality(
@@ -288,7 +288,7 @@ export function createFrameworkAdapterOrchestration(
     const failedAwaitResultError =
       await runFailedOrchestrationAwaitResult(failureMessage);
 
-    return {
+    return withResult({
       evidence: {
         orchestration: {
           surfaces: {
@@ -323,7 +323,7 @@ export function createFrameworkAdapterOrchestration(
           },
         },
       },
-    };
+    });
   }
 
   async function runOrchestrationExecutionInheritance(
@@ -468,7 +468,7 @@ export function createFrameworkAdapterOrchestration(
         ? null
         : await framework.getThread(childThreadId);
 
-    return {
+    return withResult({
       evidence: {
         orchestration: {
           inheritance: {
@@ -486,7 +486,7 @@ export function createFrameworkAdapterOrchestration(
           },
         },
       },
-    };
+    });
   }
 
   async function runOrchestrationNestedAttribution(
@@ -579,7 +579,7 @@ export function createFrameworkAdapterOrchestration(
     const rootGrandchildEvent = findTextEvent(rootEvents, grandchildText);
     const childGrandchildEvent = findTextEvent(childEvents, grandchildText);
 
-    return {
+    return withResult({
       evidence: {
         orchestration: {
           nested: {
@@ -591,7 +591,7 @@ export function createFrameworkAdapterOrchestration(
           },
         },
       },
-    };
+    });
   }
 
   return {
@@ -745,7 +745,7 @@ export function createFrameworkAdapterOrchestration(
         typeof event.source.workerId === "string"
     );
 
-    return {
+    return withResult({
       evidence: {
         orchestration: {
           surfaces: {
@@ -766,7 +766,7 @@ export function createFrameworkAdapterOrchestration(
           },
         },
       },
-    };
+    });
   }
 
   async function runInvalidHandoffCompositionError(): Promise<
@@ -1117,16 +1117,25 @@ export function createFrameworkAdapterOrchestration(
     handle: {
       status(): { phase: "completed" | "failed" | "paused" | "running" };
     },
-    phase: "completed" | "failed" | "paused" | "running"
+    phase: "completed" | "failed" | "paused" | "running",
+    timeoutMs = 1000
   ): Promise<void> {
-    for (let attempt = 0; attempt < 50; attempt += 1) {
-      if (handle.status().phase === phase) {
-        return;
+    const start = Date.now();
+
+    while (handle.status().phase !== phase) {
+      if (Date.now() - start > timeoutMs) {
+        throw new Error(`orchestration handle did not reach ${phase} phase`);
       }
 
-      await sleep(1);
+      await sleep(5);
     }
+  }
 
-    throw new Error(`orchestration handle did not reach ${phase} phase`);
+  function withResult(
+    projection: AdapterProjection & { evidence: Record<string, unknown> }
+  ): AdapterProjection {
+    return projection.result === undefined
+      ? { ...projection, result: projection.evidence }
+      : projection;
   }
 }

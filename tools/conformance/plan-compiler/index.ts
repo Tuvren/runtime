@@ -296,6 +296,7 @@ function assertionRequiredEvidencePath(
 ): string | undefined {
   switch (assertion.kind) {
     case "evidenceField":
+    case "resultField":
     case "stateField":
       return assertion.field === undefined
         ? undefined
@@ -322,6 +323,8 @@ function stepAssertionRequiredEvidencePath(
       // Step assertions run against a step-local context, but required evidence
       // is checked against the final trace context after the lifecycle finishes.
       return `trace.${stepId}.evidence.${path}`;
+    case "resultField":
+      return `trace.${stepId}.result.${path}`;
     case "stateField":
       return `trace.${stepId}.state.${path}`;
     case "errorEnvelope":
