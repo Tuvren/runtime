@@ -39,7 +39,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "driver-api.execute.resolution.1.evidenceField",
+          "assertionId": "driver-api.execute.resolution.1.resultField",
           "status": "pass"
         },
         {
@@ -57,16 +57,16 @@
     {
       "assertionResults": [
         {
-          "assertionId": "driver-api.resume.approval.1.evidenceField",
-          "status": "pass"
+          "assertionId": "driver-api.resume.approval.1.resultField",
+          "status": "fail"
         },
         {
-          "assertionId": "driver-api.resume.approval.2.evidenceField",
-          "status": "pass"
+          "assertionId": "driver-api.resume.approval.2.resultField",
+          "status": "fail"
         },
         {
-          "assertionId": "driver-api.resume.approval.3.evidenceField",
-          "status": "pass"
+          "assertionId": "driver-api.resume.approval.3.resultField",
+          "status": "fail"
         },
         {
           "assertionId": "driver-api.resume.approval.requiredEvidence.driver.approvalDecisionCallIds",
@@ -86,13 +86,13 @@
         "adapterId": "typescript-framework",
         "planId": "tuvren.framework.driver-api.core"
       },
-      "status": "pass"
+      "status": "fail"
     },
     {
       "assertionResults": [
         {
-          "assertionId": "driver-api.resume.requires-pending-call.1.evidenceField",
-          "status": "pass"
+          "assertionId": "driver-api.resume.requires-pending-call.1.resultField",
+          "status": "fail"
         },
         {
           "assertionId": "driver-api.resume.requires-pending-call.2.errorEnvelope",
@@ -116,17 +116,17 @@
         "adapterId": "typescript-framework",
         "planId": "tuvren.framework.driver-api.core"
       },
-      "status": "pass"
+      "status": "fail"
     },
     {
       "assertionResults": [
         {
-          "assertionId": "driver-api-af.invalid-loop-policy-tool-call-hard-fail.1.evidenceField",
-          "status": "pass"
+          "assertionId": "driver-api-af.invalid-loop-policy-tool-call-hard-fail.1.resultField",
+          "status": "fail"
         },
         {
-          "assertionId": "driver-api-af.invalid-loop-policy-tool-call-hard-fail.2.evidenceField",
-          "status": "pass"
+          "assertionId": "driver-api-af.invalid-loop-policy-tool-call-hard-fail.2.resultField",
+          "status": "fail"
         },
         {
           "assertionId": "driver-api-af.invalid-loop-policy-tool-call-hard-fail.requiredEvidence.driver.errorCode",
@@ -146,12 +146,12 @@
         "adapterId": "typescript-framework",
         "planId": "tuvren.framework.driver-api.extended"
       },
-      "status": "pass"
+      "status": "fail"
     },
     {
       "assertionResults": [
         {
-          "assertionId": "driver-api-ext.execute.hook-turn-phase-completed.1.evidenceField",
+          "assertionId": "driver-api-ext.execute.hook-turn-phase-completed.1.resultField",
           "status": "pass"
         },
         {
@@ -169,7 +169,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "driver-api-ext.execute.hook-turn-phase-string.1.evidenceField",
+          "assertionId": "driver-api-ext.execute.hook-turn-phase-string.1.resultField",
           "status": "pass"
         },
         {
@@ -209,8 +209,8 @@
     {
       "assertionResults": [
         {
-          "assertionId": "driver-api-ext.resume.approval-decision-call-id-includes-call-search.1.evidenceField",
-          "status": "pass"
+          "assertionId": "driver-api-ext.resume.approval-decision-call-id-includes-call-search.1.resultField",
+          "status": "fail"
         },
         {
           "assertionId": "driver-api-ext.resume.approval-decision-call-id-includes-call-search.requiredEvidence.driver.approvalDecisionCallIds",
@@ -222,13 +222,13 @@
         "adapterId": "typescript-framework",
         "planId": "tuvren.framework.driver-api.extended"
       },
-      "status": "pass"
+      "status": "fail"
     },
     {
       "assertionResults": [
         {
-          "assertionId": "driver-api-ext.resume.approval-pending-call-id-list-non-empty.1.evidenceField",
-          "status": "pass"
+          "assertionId": "driver-api-ext.resume.approval-pending-call-id-list-non-empty.1.resultField",
+          "status": "fail"
         },
         {
           "assertionId": "driver-api-ext.resume.approval-pending-call-id-list-non-empty.requiredEvidence.driver.pendingToolCallIds",
@@ -240,13 +240,13 @@
         "adapterId": "typescript-framework",
         "planId": "tuvren.framework.driver-api.extended"
       },
-      "status": "pass"
+      "status": "fail"
     },
     {
       "assertionResults": [
         {
-          "assertionId": "driver-api-ext.resume.approval-resolution-end-turn.1.evidenceField",
-          "status": "pass"
+          "assertionId": "driver-api-ext.resume.approval-resolution-end-turn.1.resultField",
+          "status": "fail"
         },
         {
           "assertionId": "driver-api-ext.resume.approval-resolution-end-turn.requiredEvidence.driver.resolutionType",
@@ -258,7 +258,7 @@
         "adapterId": "typescript-framework",
         "planId": "tuvren.framework.driver-api.extended"
       },
-      "status": "pass"
+      "status": "fail"
     },
     {
       "assertionResults": [
@@ -285,8 +285,8 @@
     {
       "assertionResults": [
         {
-          "assertionId": "driver-api-ext.resume.missing-pending-call-resolution-fail.1.evidenceField",
-          "status": "pass"
+          "assertionId": "driver-api-ext.resume.missing-pending-call-resolution-fail.1.resultField",
+          "status": "fail"
         },
         {
           "assertionId": "driver-api-ext.resume.missing-pending-call-resolution-fail.requiredEvidence.driver.resolutionType",
@@ -298,20 +298,20 @@
         "adapterId": "typescript-framework",
         "planId": "tuvren.framework.driver-api.extended"
       },
-      "status": "pass"
+      "status": "fail"
     },
     {
       "assertionResults": [
         {
-          "assertionId": "event-stream.agui.failed-turn-error-projection.1.evidenceField",
+          "assertionId": "event-stream.agui.failed-turn-error-projection.1.resultField",
           "status": "pass"
         },
         {
-          "assertionId": "event-stream.agui.failed-turn-error-projection.2.evidenceField",
+          "assertionId": "event-stream.agui.failed-turn-error-projection.2.resultField",
           "status": "pass"
         },
         {
-          "assertionId": "event-stream.agui.failed-turn-error-projection.3.evidenceField",
+          "assertionId": "event-stream.agui.failed-turn-error-projection.3.resultField",
           "status": "pass"
         },
         {
@@ -320,14 +320,6 @@
         },
         {
           "assertionId": "event-stream.agui.failed-turn-error-projection.requiredEvidence.events",
-          "status": "pass"
-        },
-        {
-          "assertionId": "event-stream.agui.failed-turn-error-projection.requiredEvidence.events.8.rawEvent.error.code",
-          "status": "pass"
-        },
-        {
-          "assertionId": "event-stream.agui.failed-turn-error-projection.requiredEvidence.events.8.rawEvent.type",
           "status": "pass"
         },
         {
@@ -345,15 +337,15 @@
     {
       "assertionResults": [
         {
-          "assertionId": "event-stream.agui.paused-turn-fallback.1.evidenceField",
+          "assertionId": "event-stream.agui.paused-turn-fallback.1.resultField",
           "status": "pass"
         },
         {
-          "assertionId": "event-stream.agui.paused-turn-fallback.2.evidenceField",
+          "assertionId": "event-stream.agui.paused-turn-fallback.2.resultField",
           "status": "pass"
         },
         {
-          "assertionId": "event-stream.agui.paused-turn-fallback.3.evidenceField",
+          "assertionId": "event-stream.agui.paused-turn-fallback.3.resultField",
           "status": "pass"
         },
         {
@@ -362,10 +354,6 @@
         },
         {
           "assertionId": "event-stream.agui.paused-turn-fallback.requiredEvidence.events",
-          "status": "pass"
-        },
-        {
-          "assertionId": "event-stream.agui.paused-turn-fallback.requiredEvidence.events.11.rawEvent.type",
           "status": "pass"
         },
         {
@@ -387,15 +375,15 @@
     {
       "assertionResults": [
         {
-          "assertionId": "event-stream.agui.projection.1.evidenceField",
+          "assertionId": "event-stream.agui.projection.1.resultField",
           "status": "pass"
         },
         {
-          "assertionId": "event-stream.agui.projection.2.evidenceField",
+          "assertionId": "event-stream.agui.projection.2.resultField",
           "status": "pass"
         },
         {
-          "assertionId": "event-stream.agui.projection.3.evidenceField",
+          "assertionId": "event-stream.agui.projection.3.resultField",
           "status": "pass"
         },
         {
@@ -408,10 +396,6 @@
         },
         {
           "assertionId": "event-stream.agui.projection.requiredEvidence.sourceEventTypes",
-          "status": "pass"
-        },
-        {
-          "assertionId": "event-stream.agui.projection.requiredEvidence.sourceEventTypes.0",
           "status": "pass"
         },
         {
@@ -429,11 +413,11 @@
     {
       "assertionResults": [
         {
-          "assertionId": "event-stream.sse.eager-subscription.1.evidenceField",
+          "assertionId": "event-stream.sse.eager-subscription.1.resultField",
           "status": "pass"
         },
         {
-          "assertionId": "event-stream.sse.eager-subscription.2.evidenceField",
+          "assertionId": "event-stream.sse.eager-subscription.2.resultField",
           "status": "pass"
         },
         {
@@ -455,15 +439,15 @@
     {
       "assertionResults": [
         {
-          "assertionId": "event-stream.sse.projection.1.evidenceField",
+          "assertionId": "event-stream.sse.projection.1.resultField",
           "status": "pass"
         },
         {
-          "assertionId": "event-stream.sse.projection.2.evidenceField",
+          "assertionId": "event-stream.sse.projection.2.resultField",
           "status": "pass"
         },
         {
-          "assertionId": "event-stream.sse.projection.3.evidenceField",
+          "assertionId": "event-stream.sse.projection.3.resultField",
           "status": "pass"
         },
         {
@@ -475,15 +459,7 @@
           "status": "pass"
         },
         {
-          "assertionId": "event-stream.sse.projection.requiredEvidence.framePayloads.10.output.source",
-          "status": "pass"
-        },
-        {
           "assertionId": "event-stream.sse.projection.requiredEvidence.sourceEventTypes",
-          "status": "pass"
-        },
-        {
-          "assertionId": "event-stream.sse.projection.requiredEvidence.sourceEventTypes.0",
           "status": "pass"
         }
       ],
@@ -497,7 +473,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "event-stream-ext.agui.completed-turn-event-00.1.evidenceField",
+          "assertionId": "event-stream-ext.agui.completed-turn-event-00.1.resultField",
           "status": "pass"
         },
         {
@@ -515,7 +491,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "event-stream-ext.agui.completed-turn-event-01.1.evidenceField",
+          "assertionId": "event-stream-ext.agui.completed-turn-event-01.1.resultField",
           "status": "pass"
         },
         {
@@ -533,7 +509,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "event-stream-ext.agui.completed-turn-event-02.1.evidenceField",
+          "assertionId": "event-stream-ext.agui.completed-turn-event-02.1.resultField",
           "status": "pass"
         },
         {
@@ -551,7 +527,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "event-stream-ext.agui.completed-turn-event-03.1.evidenceField",
+          "assertionId": "event-stream-ext.agui.completed-turn-event-03.1.resultField",
           "status": "pass"
         },
         {
@@ -569,7 +545,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "event-stream-ext.agui.completed-turn-event-04.1.evidenceField",
+          "assertionId": "event-stream-ext.agui.completed-turn-event-04.1.resultField",
           "status": "pass"
         },
         {
@@ -587,7 +563,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "event-stream-ext.agui.completed-turn-event-05.1.evidenceField",
+          "assertionId": "event-stream-ext.agui.completed-turn-event-05.1.resultField",
           "status": "pass"
         },
         {
@@ -605,7 +581,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "event-stream-ext.agui.completed-turn-event-06.1.evidenceField",
+          "assertionId": "event-stream-ext.agui.completed-turn-event-06.1.resultField",
           "status": "pass"
         },
         {
@@ -623,7 +599,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "event-stream-ext.agui.completed-turn-event-07.1.evidenceField",
+          "assertionId": "event-stream-ext.agui.completed-turn-event-07.1.resultField",
           "status": "pass"
         },
         {
@@ -641,7 +617,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "event-stream-ext.agui.completed-turn-event-08.1.evidenceField",
+          "assertionId": "event-stream-ext.agui.completed-turn-event-08.1.resultField",
           "status": "pass"
         },
         {
@@ -659,7 +635,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "event-stream-ext.agui.completed-turn-event-09.1.evidenceField",
+          "assertionId": "event-stream-ext.agui.completed-turn-event-09.1.resultField",
           "status": "pass"
         },
         {
@@ -677,7 +653,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "event-stream-ext.agui.completed-turn-event-10.1.evidenceField",
+          "assertionId": "event-stream-ext.agui.completed-turn-event-10.1.resultField",
           "status": "pass"
         },
         {
@@ -695,7 +671,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "event-stream-ext.agui.completed-turn-event-11.1.evidenceField",
+          "assertionId": "event-stream-ext.agui.completed-turn-event-11.1.resultField",
           "status": "pass"
         },
         {
@@ -713,7 +689,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "event-stream-ext.agui.completed-turn-event-12.1.evidenceField",
+          "assertionId": "event-stream-ext.agui.completed-turn-event-12.1.resultField",
           "status": "pass"
         },
         {
@@ -731,7 +707,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "event-stream-ext.agui.completed-turn-event-13.1.evidenceField",
+          "assertionId": "event-stream-ext.agui.completed-turn-event-13.1.resultField",
           "status": "pass"
         },
         {
@@ -749,7 +725,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "event-stream-ext.agui.completed-turn-event-14.1.evidenceField",
+          "assertionId": "event-stream-ext.agui.completed-turn-event-14.1.resultField",
           "status": "pass"
         },
         {
@@ -767,7 +743,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "event-stream-ext.agui.completed-turn-event-15.1.evidenceField",
+          "assertionId": "event-stream-ext.agui.completed-turn-event-15.1.resultField",
           "status": "pass"
         },
         {
@@ -785,7 +761,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "event-stream-ext.agui.completed-turn-event-16.1.evidenceField",
+          "assertionId": "event-stream-ext.agui.completed-turn-event-16.1.resultField",
           "status": "pass"
         },
         {
@@ -803,7 +779,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "event-stream-ext.agui.completed-turn-event-17.1.evidenceField",
+          "assertionId": "event-stream-ext.agui.completed-turn-event-17.1.resultField",
           "status": "pass"
         },
         {
@@ -821,7 +797,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "event-stream-ext.agui.completed-turn-event-18.1.evidenceField",
+          "assertionId": "event-stream-ext.agui.completed-turn-event-18.1.resultField",
           "status": "pass"
         },
         {
@@ -839,7 +815,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "event-stream-ext.agui.completed-turn-event-19.1.evidenceField",
+          "assertionId": "event-stream-ext.agui.completed-turn-event-19.1.resultField",
           "status": "pass"
         },
         {
@@ -857,7 +833,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "event-stream-ext.agui.completed-turn-event-20.1.evidenceField",
+          "assertionId": "event-stream-ext.agui.completed-turn-event-20.1.resultField",
           "status": "pass"
         },
         {
@@ -875,7 +851,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "event-stream-ext.agui.completed-turn-event-21.1.evidenceField",
+          "assertionId": "event-stream-ext.agui.completed-turn-event-21.1.resultField",
           "status": "pass"
         },
         {
@@ -893,7 +869,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "event-stream-ext.agui.completed-turn-event-22.1.evidenceField",
+          "assertionId": "event-stream-ext.agui.completed-turn-event-22.1.resultField",
           "status": "pass"
         },
         {
@@ -911,7 +887,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "event-stream-ext.agui.completed-turn-event-types-include-run-finished.1.evidenceField",
+          "assertionId": "event-stream-ext.agui.completed-turn-event-types-include-run-finished.1.resultField",
           "status": "pass"
         },
         {
@@ -929,7 +905,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "event-stream-ext.agui.completed-turn-event-types-include-run-started.1.evidenceField",
+          "assertionId": "event-stream-ext.agui.completed-turn-event-types-include-run-started.1.resultField",
           "status": "pass"
         },
         {
@@ -947,11 +923,11 @@
     {
       "assertionResults": [
         {
-          "assertionId": "event-stream-ext.agui.completed-turn-event-types-include-run-started-and-finished.1.evidenceField",
+          "assertionId": "event-stream-ext.agui.completed-turn-event-types-include-run-started-and-finished.1.resultField",
           "status": "pass"
         },
         {
-          "assertionId": "event-stream-ext.agui.completed-turn-event-types-include-run-started-and-finished.2.evidenceField",
+          "assertionId": "event-stream-ext.agui.completed-turn-event-types-include-run-started-and-finished.2.resultField",
           "status": "pass"
         },
         {
@@ -969,7 +945,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "event-stream-ext.agui.completed-turn-event-types-include-state-snapshot.1.evidenceField",
+          "assertionId": "event-stream-ext.agui.completed-turn-event-types-include-state-snapshot.1.resultField",
           "status": "pass"
         },
         {
@@ -987,7 +963,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "event-stream-ext.agui.completed-turn-event-types-include-text-message-start.1.evidenceField",
+          "assertionId": "event-stream-ext.agui.completed-turn-event-types-include-text-message-start.1.resultField",
           "status": "pass"
         },
         {
@@ -1005,7 +981,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "event-stream-ext.agui.completed-turn-event-types-include-tool-call-result.1.evidenceField",
+          "assertionId": "event-stream-ext.agui.completed-turn-event-types-include-tool-call-result.1.resultField",
           "status": "pass"
         },
         {
@@ -1023,7 +999,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "event-stream-ext.agui.completed-turn-event-types-include-tool-call-start.1.evidenceField",
+          "assertionId": "event-stream-ext.agui.completed-turn-event-types-include-tool-call-start.1.resultField",
           "status": "pass"
         },
         {
@@ -1041,7 +1017,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "event-stream-ext.agui.completed-turn-warnings-include-checkpoint-fallback.1.evidenceField",
+          "assertionId": "event-stream-ext.agui.completed-turn-warnings-include-checkpoint-fallback.1.resultField",
           "status": "pass"
         },
         {
@@ -1059,7 +1035,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "event-stream-ext.agui.failed-turn-error-code-snake-case.1.evidenceField",
+          "assertionId": "event-stream-ext.agui.failed-turn-error-code-snake-case.1.resultField",
           "status": "pass"
         },
         {
@@ -1077,7 +1053,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "event-stream-ext.agui.failed-turn-event-00.1.evidenceField",
+          "assertionId": "event-stream-ext.agui.failed-turn-event-00.1.resultField",
           "status": "pass"
         },
         {
@@ -1095,7 +1071,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "event-stream-ext.agui.failed-turn-event-01.1.evidenceField",
+          "assertionId": "event-stream-ext.agui.failed-turn-event-01.1.resultField",
           "status": "pass"
         },
         {
@@ -1113,7 +1089,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "event-stream-ext.agui.failed-turn-event-02.1.evidenceField",
+          "assertionId": "event-stream-ext.agui.failed-turn-event-02.1.resultField",
           "status": "pass"
         },
         {
@@ -1131,7 +1107,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "event-stream-ext.agui.failed-turn-event-03.1.evidenceField",
+          "assertionId": "event-stream-ext.agui.failed-turn-event-03.1.resultField",
           "status": "pass"
         },
         {
@@ -1149,7 +1125,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "event-stream-ext.agui.failed-turn-event-04.1.evidenceField",
+          "assertionId": "event-stream-ext.agui.failed-turn-event-04.1.resultField",
           "status": "pass"
         },
         {
@@ -1167,7 +1143,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "event-stream-ext.agui.failed-turn-event-05.1.evidenceField",
+          "assertionId": "event-stream-ext.agui.failed-turn-event-05.1.resultField",
           "status": "pass"
         },
         {
@@ -1185,7 +1161,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "event-stream-ext.agui.failed-turn-event-06.1.evidenceField",
+          "assertionId": "event-stream-ext.agui.failed-turn-event-06.1.resultField",
           "status": "pass"
         },
         {
@@ -1203,7 +1179,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "event-stream-ext.agui.failed-turn-event-07.1.evidenceField",
+          "assertionId": "event-stream-ext.agui.failed-turn-event-07.1.resultField",
           "status": "pass"
         },
         {
@@ -1221,7 +1197,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "event-stream-ext.agui.failed-turn-event-08.1.evidenceField",
+          "assertionId": "event-stream-ext.agui.failed-turn-event-08.1.resultField",
           "status": "pass"
         },
         {
@@ -1239,7 +1215,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "event-stream-ext.agui.failed-turn-event-types-end-with-run-error.1.evidenceField",
+          "assertionId": "event-stream-ext.agui.failed-turn-event-types-end-with-run-error.1.resultField",
           "status": "pass"
         },
         {
@@ -1257,7 +1233,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "event-stream-ext.agui.paused-turn-event-00.1.evidenceField",
+          "assertionId": "event-stream-ext.agui.paused-turn-event-00.1.resultField",
           "status": "pass"
         },
         {
@@ -1275,7 +1251,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "event-stream-ext.agui.paused-turn-event-01.1.evidenceField",
+          "assertionId": "event-stream-ext.agui.paused-turn-event-01.1.resultField",
           "status": "pass"
         },
         {
@@ -1293,7 +1269,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "event-stream-ext.agui.paused-turn-event-02.1.evidenceField",
+          "assertionId": "event-stream-ext.agui.paused-turn-event-02.1.resultField",
           "status": "pass"
         },
         {
@@ -1311,7 +1287,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "event-stream-ext.agui.paused-turn-event-03.1.evidenceField",
+          "assertionId": "event-stream-ext.agui.paused-turn-event-03.1.resultField",
           "status": "pass"
         },
         {
@@ -1329,7 +1305,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "event-stream-ext.agui.paused-turn-event-04.1.evidenceField",
+          "assertionId": "event-stream-ext.agui.paused-turn-event-04.1.resultField",
           "status": "pass"
         },
         {
@@ -1347,7 +1323,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "event-stream-ext.agui.paused-turn-event-05.1.evidenceField",
+          "assertionId": "event-stream-ext.agui.paused-turn-event-05.1.resultField",
           "status": "pass"
         },
         {
@@ -1365,7 +1341,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "event-stream-ext.agui.paused-turn-event-06.1.evidenceField",
+          "assertionId": "event-stream-ext.agui.paused-turn-event-06.1.resultField",
           "status": "pass"
         },
         {
@@ -1383,7 +1359,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "event-stream-ext.agui.paused-turn-event-07.1.evidenceField",
+          "assertionId": "event-stream-ext.agui.paused-turn-event-07.1.resultField",
           "status": "pass"
         },
         {
@@ -1401,7 +1377,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "event-stream-ext.agui.paused-turn-event-08.1.evidenceField",
+          "assertionId": "event-stream-ext.agui.paused-turn-event-08.1.resultField",
           "status": "pass"
         },
         {
@@ -1419,7 +1395,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "event-stream-ext.agui.paused-turn-event-09.1.evidenceField",
+          "assertionId": "event-stream-ext.agui.paused-turn-event-09.1.resultField",
           "status": "pass"
         },
         {
@@ -1437,7 +1413,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "event-stream-ext.agui.paused-turn-event-10.1.evidenceField",
+          "assertionId": "event-stream-ext.agui.paused-turn-event-10.1.resultField",
           "status": "pass"
         },
         {
@@ -1455,7 +1431,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "event-stream-ext.agui.paused-turn-event-11.1.evidenceField",
+          "assertionId": "event-stream-ext.agui.paused-turn-event-11.1.resultField",
           "status": "pass"
         },
         {
@@ -1473,7 +1449,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "event-stream-ext.agui.paused-turn-event-12.1.evidenceField",
+          "assertionId": "event-stream-ext.agui.paused-turn-event-12.1.resultField",
           "status": "pass"
         },
         {
@@ -1491,7 +1467,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "event-stream-ext.agui.paused-turn-event-13.1.evidenceField",
+          "assertionId": "event-stream-ext.agui.paused-turn-event-13.1.resultField",
           "status": "pass"
         },
         {
@@ -1509,7 +1485,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "event-stream-ext.agui.paused-turn-warnings-include-paused-coercion.1.evidenceField",
+          "assertionId": "event-stream-ext.agui.paused-turn-warnings-include-paused-coercion.1.resultField",
           "status": "pass"
         },
         {
@@ -1527,7 +1503,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "event-stream-ext.sse-eager.failed-turn-first-direct-event-turn-start.1.evidenceField",
+          "assertionId": "event-stream-ext.sse-eager.failed-turn-first-direct-event-turn-start.1.resultField",
           "status": "pass"
         },
         {
@@ -1545,7 +1521,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "event-stream-ext.sse-eager.first-direct-event-turn-start.1.evidenceField",
+          "assertionId": "event-stream-ext.sse-eager.first-direct-event-turn-start.1.resultField",
           "status": "pass"
         },
         {
@@ -1563,7 +1539,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "event-stream-ext.sse-eager.first-frame-event-turn-start.1.evidenceField",
+          "assertionId": "event-stream-ext.sse-eager.first-frame-event-turn-start.1.resultField",
           "status": "pass"
         },
         {
@@ -1581,7 +1557,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "event-stream-ext.sse-eager.paused-turn-first-frame-event-turn-start.1.evidenceField",
+          "assertionId": "event-stream-ext.sse-eager.paused-turn-first-frame-event-turn-start.1.resultField",
           "status": "pass"
         },
         {
@@ -1599,7 +1575,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "event-stream-ext.sse.completed-turn-frame-event-00.1.evidenceField",
+          "assertionId": "event-stream-ext.sse.completed-turn-frame-event-00.1.resultField",
           "status": "pass"
         },
         {
@@ -1617,7 +1593,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "event-stream-ext.sse.completed-turn-frame-event-01.1.evidenceField",
+          "assertionId": "event-stream-ext.sse.completed-turn-frame-event-01.1.resultField",
           "status": "pass"
         },
         {
@@ -1635,7 +1611,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "event-stream-ext.sse.completed-turn-frame-event-02.1.evidenceField",
+          "assertionId": "event-stream-ext.sse.completed-turn-frame-event-02.1.resultField",
           "status": "pass"
         },
         {
@@ -1653,7 +1629,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "event-stream-ext.sse.completed-turn-frame-event-03.1.evidenceField",
+          "assertionId": "event-stream-ext.sse.completed-turn-frame-event-03.1.resultField",
           "status": "pass"
         },
         {
@@ -1671,7 +1647,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "event-stream-ext.sse.completed-turn-frame-event-04.1.evidenceField",
+          "assertionId": "event-stream-ext.sse.completed-turn-frame-event-04.1.resultField",
           "status": "pass"
         },
         {
@@ -1689,7 +1665,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "event-stream-ext.sse.completed-turn-frame-event-05.1.evidenceField",
+          "assertionId": "event-stream-ext.sse.completed-turn-frame-event-05.1.resultField",
           "status": "pass"
         },
         {
@@ -1707,7 +1683,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "event-stream-ext.sse.completed-turn-frame-event-06.1.evidenceField",
+          "assertionId": "event-stream-ext.sse.completed-turn-frame-event-06.1.resultField",
           "status": "pass"
         },
         {
@@ -1725,7 +1701,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "event-stream-ext.sse.completed-turn-frame-event-07.1.evidenceField",
+          "assertionId": "event-stream-ext.sse.completed-turn-frame-event-07.1.resultField",
           "status": "pass"
         },
         {
@@ -1743,7 +1719,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "event-stream-ext.sse.completed-turn-frame-event-08.1.evidenceField",
+          "assertionId": "event-stream-ext.sse.completed-turn-frame-event-08.1.resultField",
           "status": "pass"
         },
         {
@@ -1761,7 +1737,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "event-stream-ext.sse.completed-turn-frame-event-09.1.evidenceField",
+          "assertionId": "event-stream-ext.sse.completed-turn-frame-event-09.1.resultField",
           "status": "pass"
         },
         {
@@ -1779,7 +1755,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "event-stream-ext.sse.completed-turn-frame-event-10.1.evidenceField",
+          "assertionId": "event-stream-ext.sse.completed-turn-frame-event-10.1.resultField",
           "status": "pass"
         },
         {
@@ -1797,7 +1773,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "event-stream-ext.sse.completed-turn-frame-event-11.1.evidenceField",
+          "assertionId": "event-stream-ext.sse.completed-turn-frame-event-11.1.resultField",
           "status": "pass"
         },
         {
@@ -1815,7 +1791,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "event-stream-ext.sse.completed-turn-frame-event-12.1.evidenceField",
+          "assertionId": "event-stream-ext.sse.completed-turn-frame-event-12.1.resultField",
           "status": "pass"
         },
         {
@@ -1833,7 +1809,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "event-stream-ext.sse.completed-turn-frame-event-13.1.evidenceField",
+          "assertionId": "event-stream-ext.sse.completed-turn-frame-event-13.1.resultField",
           "status": "pass"
         },
         {
@@ -1851,7 +1827,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "event-stream-ext.sse.completed-turn-frame-event-14.1.evidenceField",
+          "assertionId": "event-stream-ext.sse.completed-turn-frame-event-14.1.resultField",
           "status": "pass"
         },
         {
@@ -1869,7 +1845,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "event-stream-ext.sse.completed-turn-frame-event-15.1.evidenceField",
+          "assertionId": "event-stream-ext.sse.completed-turn-frame-event-15.1.resultField",
           "status": "pass"
         },
         {
@@ -1887,7 +1863,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "event-stream-ext.sse.completed-turn-frame-event-16.1.evidenceField",
+          "assertionId": "event-stream-ext.sse.completed-turn-frame-event-16.1.resultField",
           "status": "pass"
         },
         {
@@ -1905,7 +1881,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "event-stream-ext.sse.completed-turn-frame-event-17.1.evidenceField",
+          "assertionId": "event-stream-ext.sse.completed-turn-frame-event-17.1.resultField",
           "status": "pass"
         },
         {
@@ -1923,7 +1899,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "event-stream-ext.sse.completed-turn-frame-event-18.1.evidenceField",
+          "assertionId": "event-stream-ext.sse.completed-turn-frame-event-18.1.resultField",
           "status": "pass"
         },
         {
@@ -1941,7 +1917,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "event-stream-ext.sse.completed-turn-frame-event-19.1.evidenceField",
+          "assertionId": "event-stream-ext.sse.completed-turn-frame-event-19.1.resultField",
           "status": "pass"
         },
         {
@@ -1959,7 +1935,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "event-stream-ext.sse.completed-turn-frame-event-20.1.evidenceField",
+          "assertionId": "event-stream-ext.sse.completed-turn-frame-event-20.1.resultField",
           "status": "pass"
         },
         {
@@ -1977,7 +1953,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "event-stream-ext.sse.completed-turn-frame-event-21.1.evidenceField",
+          "assertionId": "event-stream-ext.sse.completed-turn-frame-event-21.1.resultField",
           "status": "pass"
         },
         {
@@ -1995,7 +1971,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "event-stream-ext.sse.completed-turn-frame-event-22.1.evidenceField",
+          "assertionId": "event-stream-ext.sse.completed-turn-frame-event-22.1.resultField",
           "status": "pass"
         },
         {
@@ -2013,7 +1989,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "event-stream-ext.sse.completed-turn-frame-event-23.1.evidenceField",
+          "assertionId": "event-stream-ext.sse.completed-turn-frame-event-23.1.resultField",
           "status": "pass"
         },
         {
@@ -2031,7 +2007,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "event-stream-ext.sse.completed-turn-frame-events-contain-iteration-end.1.evidenceField",
+          "assertionId": "event-stream-ext.sse.completed-turn-frame-events-contain-iteration-end.1.resultField",
           "status": "pass"
         },
         {
@@ -2049,7 +2025,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "event-stream-ext.sse.completed-turn-frame-events-contain-tool-call-start.1.evidenceField",
+          "assertionId": "event-stream-ext.sse.completed-turn-frame-events-contain-tool-call-start.1.resultField",
           "status": "pass"
         },
         {
@@ -2067,7 +2043,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "event-stream-ext.sse.completed-turn-frame-events-contain-turn-end.1.evidenceField",
+          "assertionId": "event-stream-ext.sse.completed-turn-frame-events-contain-turn-end.1.resultField",
           "status": "pass"
         },
         {
@@ -2085,7 +2061,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "event-stream-ext.sse.completed-turn-frame-events-contain-turn-start.1.evidenceField",
+          "assertionId": "event-stream-ext.sse.completed-turn-frame-events-contain-turn-start.1.resultField",
           "status": "pass"
         },
         {
@@ -2103,7 +2079,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "event-stream-ext.sse.completed-turn-frame-events-end-with-turn-end.1.evidenceField",
+          "assertionId": "event-stream-ext.sse.completed-turn-frame-events-end-with-turn-end.1.resultField",
           "status": "pass"
         },
         {
@@ -2121,7 +2097,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "event-stream-ext.sse.completed-turn-frame-events-include-iteration-start.1.evidenceField",
+          "assertionId": "event-stream-ext.sse.completed-turn-frame-events-include-iteration-start.1.resultField",
           "status": "pass"
         },
         {
@@ -2139,7 +2115,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "event-stream-ext.sse.completed-turn-frame-events-include-state-snapshot.1.evidenceField",
+          "assertionId": "event-stream-ext.sse.completed-turn-frame-events-include-state-snapshot.1.resultField",
           "status": "pass"
         },
         {
@@ -2157,7 +2133,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "event-stream-ext.sse.completed-turn-frame-events-include-text-delta.1.evidenceField",
+          "assertionId": "event-stream-ext.sse.completed-turn-frame-events-include-text-delta.1.resultField",
           "status": "pass"
         },
         {
@@ -2175,7 +2151,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "event-stream-ext.sse.completed-turn-frame-events-include-tool-result.1.evidenceField",
+          "assertionId": "event-stream-ext.sse.completed-turn-frame-events-include-tool-result.1.resultField",
           "status": "pass"
         },
         {
@@ -2197,7 +2173,7 @@
           "status": "pass"
         },
         {
-          "assertionId": "event-stream-ext.sse.completed-turn-no-error-event.requiredEvidence.frameEvents",
+          "assertionId": "event-stream-ext.sse.completed-turn-no-error-event.requiredEvidence.sourceEventTypes",
           "status": "pass"
         }
       ],
@@ -2211,7 +2187,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "event-stream-ext.sse.completed-turn-source-event-types-start-with-turn-start.1.evidenceField",
+          "assertionId": "event-stream-ext.sse.completed-turn-source-event-types-start-with-turn-start.1.resultField",
           "status": "pass"
         },
         {
@@ -2229,7 +2205,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "event-stream-ext.sse.failed-provider-turn-frame-events-include-error.1.evidenceField",
+          "assertionId": "event-stream-ext.sse.failed-provider-turn-frame-events-include-error.1.resultField",
           "status": "pass"
         },
         {
@@ -2247,7 +2223,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "event-stream-ext.sse.paused-approval-turn-source-events-include-approval-requested.1.evidenceField",
+          "assertionId": "event-stream-ext.sse.paused-approval-turn-source-events-include-approval-requested.1.resultField",
           "status": "pass"
         },
         {
@@ -2265,7 +2241,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "event-stream-ext.sse.resumed-approval-turn-checkpoint-hash-format.1.evidenceField",
+          "assertionId": "event-stream-ext.sse.resumed-approval-turn-checkpoint-hash-format.1.resultField",
           "status": "pass"
         },
         {
@@ -2283,7 +2259,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "event-stream-ext.sse.resumed-approval-turn-frame-events-contain-turn-end.1.evidenceField",
+          "assertionId": "event-stream-ext.sse.resumed-approval-turn-frame-events-contain-turn-end.1.resultField",
           "status": "pass"
         },
         {
@@ -2301,7 +2277,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "event-stream-ext.sse.resumed-approval-turn-resumed-from-hash-format.1.evidenceField",
+          "assertionId": "event-stream-ext.sse.resumed-approval-turn-resumed-from-hash-format.1.resultField",
           "status": "pass"
         },
         {
@@ -2319,7 +2295,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "event-stream-ext.sse.resumed-approval-turn-source-events-include-approval-requested.1.evidenceField",
+          "assertionId": "event-stream-ext.sse.resumed-approval-turn-source-events-include-approval-requested.1.resultField",
           "status": "pass"
         },
         {
@@ -2337,7 +2313,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "event-stream-ext.sse.resumed-approval-turn-source-events-include-approval-resolved.1.evidenceField",
+          "assertionId": "event-stream-ext.sse.resumed-approval-turn-source-events-include-approval-resolved.1.resultField",
           "status": "pass"
         },
         {
@@ -2355,7 +2331,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "event-stream-ext.sse.resumed-approval-turn-source-events-include-text-delta.1.evidenceField",
+          "assertionId": "event-stream-ext.sse.resumed-approval-turn-source-events-include-text-delta.1.resultField",
           "status": "pass"
         },
         {
@@ -2373,7 +2349,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "event-stream-ext.sse.resumed-approval-turn-source-thread-id-present.1.evidenceField",
+          "assertionId": "event-stream-ext.sse.resumed-approval-turn-source-thread-id-present.1.resultField",
           "status": "pass"
         },
         {
@@ -2391,7 +2367,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "event-stream-ext.sse.resumed-approval-turn-thread-id-present.1.evidenceField",
+          "assertionId": "event-stream-ext.sse.resumed-approval-turn-thread-id-present.1.resultField",
           "status": "pass"
         },
         {
@@ -2409,7 +2385,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "react-driver-callable.after-iteration.1.evidenceField",
+          "assertionId": "react-driver-callable.after-iteration.1.resultField",
           "status": "pass"
         },
         {
@@ -2427,7 +2403,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "react-driver-callable.around-model.1.evidenceField",
+          "assertionId": "react-driver-callable.around-model.1.resultField",
           "status": "pass"
         },
         {
@@ -2445,7 +2421,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "react-driver-callable.around-tool.1.evidenceField",
+          "assertionId": "react-driver-callable.around-tool.1.resultField",
           "status": "pass"
         },
         {
@@ -2463,7 +2439,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "react-driver-callable.before-iteration.1.evidenceField",
+          "assertionId": "react-driver-callable.before-iteration.1.resultField",
           "status": "pass"
         },
         {
@@ -2500,15 +2476,15 @@
     {
       "assertionResults": [
         {
-          "assertionId": "react-driver-af.around-model-post-stream-replacement.1.evidenceField",
+          "assertionId": "react-driver-af.around-model-post-stream-replacement.1.resultField",
           "status": "pass"
         },
         {
-          "assertionId": "react-driver-af.around-model-post-stream-replacement.2.evidenceField",
+          "assertionId": "react-driver-af.around-model-post-stream-replacement.2.resultField",
           "status": "pass"
         },
         {
-          "assertionId": "react-driver-af.around-model-post-stream-replacement.3.evidenceField",
+          "assertionId": "react-driver-af.around-model-post-stream-replacement.3.resultField",
           "status": "pass"
         },
         {
@@ -2534,11 +2510,11 @@
     {
       "assertionResults": [
         {
-          "assertionId": "react-driver-af.around-model-retry-final-response-durable.1.evidenceField",
+          "assertionId": "react-driver-af.around-model-retry-final-response-durable.1.resultField",
           "status": "pass"
         },
         {
-          "assertionId": "react-driver-af.around-model-retry-final-response-durable.2.evidenceField",
+          "assertionId": "react-driver-af.around-model-retry-final-response-durable.2.resultField",
           "status": "pass"
         },
         {
@@ -2560,11 +2536,11 @@
     {
       "assertionResults": [
         {
-          "assertionId": "react-driver-af.extension.after-iteration-terminal-state-nondurable.1.evidenceField",
+          "assertionId": "react-driver-af.extension.after-iteration-terminal-state-nondurable.1.resultField",
           "status": "pass"
         },
         {
-          "assertionId": "react-driver-af.extension.after-iteration-terminal-state-nondurable.2.evidenceField",
+          "assertionId": "react-driver-af.extension.after-iteration-terminal-state-nondurable.2.resultField",
           "status": "pass"
         },
         {
@@ -2586,7 +2562,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "react-driver-af.extension.around-tool-nesting.1.evidenceField",
+          "assertionId": "react-driver-af.extension.around-tool-nesting.1.resultField",
           "status": "pass"
         },
         {
@@ -2604,7 +2580,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "react-driver-af.extension.phase-order-before-around-after.1.evidenceField",
+          "assertionId": "react-driver-af.extension.phase-order-before-around-after.1.resultField",
           "status": "pass"
         },
         {
@@ -2622,7 +2598,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "react-driver-ext.after-iteration-twice.1.evidenceField",
+          "assertionId": "react-driver-ext.after-iteration-twice.1.resultField",
           "status": "pass"
         },
         {
@@ -2640,7 +2616,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "react-driver-ext.around-model-twice.1.evidenceField",
+          "assertionId": "react-driver-ext.around-model-twice.1.resultField",
           "status": "pass"
         },
         {
@@ -2658,7 +2634,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "react-driver-ext.around-tool-once.1.evidenceField",
+          "assertionId": "react-driver-ext.around-tool-once.1.resultField",
           "status": "pass"
         },
         {
@@ -2676,7 +2652,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "react-driver-ext.before-iteration-twice.1.evidenceField",
+          "assertionId": "react-driver-ext.before-iteration-twice.1.resultField",
           "status": "pass"
         },
         {
@@ -2713,7 +2689,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "react-driver-ext.hook-field-present.after-iteration-present.1.evidenceField",
+          "assertionId": "react-driver-ext.hook-field-present.after-iteration-present.1.resultField",
           "status": "pass"
         },
         {
@@ -2731,7 +2707,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "react-driver-ext.hook-field-present.around-model-present.1.evidenceField",
+          "assertionId": "react-driver-ext.hook-field-present.around-model-present.1.resultField",
           "status": "pass"
         },
         {
@@ -2749,7 +2725,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "react-driver-ext.hook-field-present.around-tool-present.1.evidenceField",
+          "assertionId": "react-driver-ext.hook-field-present.around-tool-present.1.resultField",
           "status": "pass"
         },
         {
@@ -2767,7 +2743,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "react-driver-ext.hook-field-present.before-iteration-present.1.evidenceField",
+          "assertionId": "react-driver-ext.hook-field-present.before-iteration-present.1.resultField",
           "status": "pass"
         },
         {
@@ -2785,19 +2761,19 @@
     {
       "assertionResults": [
         {
-          "assertionId": "runtime-callable.approval-resolve.1.evidenceField",
+          "assertionId": "runtime-callable.approval-resolve.1.resultField",
           "status": "pass"
         },
         {
-          "assertionId": "runtime-callable.approval-resolve.2.evidenceField",
+          "assertionId": "runtime-callable.approval-resolve.2.resultField",
           "status": "pass"
         },
         {
-          "assertionId": "runtime-callable.approval-resolve.3.evidenceField",
+          "assertionId": "runtime-callable.approval-resolve.3.resultField",
           "status": "pass"
         },
         {
-          "assertionId": "runtime-callable.approval-resolve.4.evidenceField",
+          "assertionId": "runtime-callable.approval-resolve.4.resultField",
           "status": "pass"
         },
         {
@@ -2827,15 +2803,15 @@
     {
       "assertionResults": [
         {
-          "assertionId": "runtime-callable.provider-generate.1.evidenceField",
+          "assertionId": "runtime-callable.provider-generate.1.resultField",
           "status": "pass"
         },
         {
-          "assertionId": "runtime-callable.provider-generate.2.evidenceField",
+          "assertionId": "runtime-callable.provider-generate.2.resultField",
           "status": "pass"
         },
         {
-          "assertionId": "runtime-callable.provider-generate.3.evidenceField",
+          "assertionId": "runtime-callable.provider-generate.3.resultField",
           "status": "pass"
         },
         {
@@ -2861,19 +2837,19 @@
     {
       "assertionResults": [
         {
-          "assertionId": "runtime-callable.provider-stream.1.evidenceField",
+          "assertionId": "runtime-callable.provider-stream.1.resultField",
           "status": "pass"
         },
         {
-          "assertionId": "runtime-callable.provider-stream.2.evidenceField",
+          "assertionId": "runtime-callable.provider-stream.2.resultField",
           "status": "pass"
         },
         {
-          "assertionId": "runtime-callable.provider-stream.3.evidenceField",
+          "assertionId": "runtime-callable.provider-stream.3.resultField",
           "status": "pass"
         },
         {
-          "assertionId": "runtime-callable.provider-stream.4.evidenceField",
+          "assertionId": "runtime-callable.provider-stream.4.resultField",
           "status": "pass"
         },
         {
@@ -2903,24 +2879,24 @@
     {
       "assertionResults": [
         {
-          "assertionId": "runtime-callable.timeout-retry-cancellation-idempotency.1.evidenceField",
-          "status": "pass"
+          "assertionId": "runtime-callable.timeout-retry-cancellation-idempotency.1.resultField",
+          "status": "fail"
         },
         {
-          "assertionId": "runtime-callable.timeout-retry-cancellation-idempotency.2.evidenceField",
-          "status": "pass"
+          "assertionId": "runtime-callable.timeout-retry-cancellation-idempotency.2.resultField",
+          "status": "fail"
         },
         {
-          "assertionId": "runtime-callable.timeout-retry-cancellation-idempotency.3.evidenceField",
-          "status": "pass"
+          "assertionId": "runtime-callable.timeout-retry-cancellation-idempotency.3.resultField",
+          "status": "fail"
         },
         {
-          "assertionId": "runtime-callable.timeout-retry-cancellation-idempotency.4.evidenceField",
-          "status": "pass"
+          "assertionId": "runtime-callable.timeout-retry-cancellation-idempotency.4.resultField",
+          "status": "fail"
         },
         {
-          "assertionId": "runtime-callable.timeout-retry-cancellation-idempotency.5.evidenceField",
-          "status": "pass"
+          "assertionId": "runtime-callable.timeout-retry-cancellation-idempotency.5.resultField",
+          "status": "fail"
         },
         {
           "assertionId": "runtime-callable.timeout-retry-cancellation-idempotency.requiredEvidence.cancellation.cancelInvocations",
@@ -2948,20 +2924,20 @@
         "adapterId": "typescript-framework",
         "planId": "tuvren.framework.runtime-api.callables"
       },
-      "status": "pass"
+      "status": "fail"
     },
     {
       "assertionResults": [
         {
-          "assertionId": "runtime-callable.tool-execute.1.evidenceField",
+          "assertionId": "runtime-callable.tool-execute.1.resultField",
           "status": "pass"
         },
         {
-          "assertionId": "runtime-callable.tool-execute.2.evidenceField",
+          "assertionId": "runtime-callable.tool-execute.2.resultField",
           "status": "pass"
         },
         {
-          "assertionId": "runtime-callable.tool-execute.3.evidenceField",
+          "assertionId": "runtime-callable.tool-execute.3.resultField",
           "status": "pass"
         },
         {
@@ -3003,7 +2979,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "runtime-callable.validation-failure.1.evidenceField",
+          "assertionId": "runtime-callable.validation-failure.1.resultField",
           "status": "pass"
         },
         {
@@ -3021,7 +2997,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "runtime-callable-af.approval-message-attaches-to-tool-result.1.evidenceField",
+          "assertionId": "runtime-callable-af.approval-message-attaches-to-tool-result.1.resultField",
           "status": "pass"
         },
         {
@@ -3039,15 +3015,15 @@
     {
       "assertionResults": [
         {
-          "assertionId": "runtime-callable-af.approval-reject-stages-tool-result.1.evidenceField",
+          "assertionId": "runtime-callable-af.approval-reject-stages-tool-result.1.resultField",
           "status": "pass"
         },
         {
-          "assertionId": "runtime-callable-af.approval-reject-stages-tool-result.2.evidenceField",
+          "assertionId": "runtime-callable-af.approval-reject-stages-tool-result.2.resultField",
           "status": "pass"
         },
         {
-          "assertionId": "runtime-callable-af.approval-reject-stages-tool-result.3.evidenceField",
+          "assertionId": "runtime-callable-af.approval-reject-stages-tool-result.3.resultField",
           "status": "pass"
         },
         {
@@ -3073,11 +3049,11 @@
     {
       "assertionResults": [
         {
-          "assertionId": "runtime-callable-af.approval-resume-new-handle-only.1.evidenceField",
+          "assertionId": "runtime-callable-af.approval-resume-new-handle-only.1.resultField",
           "status": "pass"
         },
         {
-          "assertionId": "runtime-callable-af.approval-resume-new-handle-only.2.evidenceField",
+          "assertionId": "runtime-callable-af.approval-resume-new-handle-only.2.resultField",
           "status": "pass"
         },
         {
@@ -3099,11 +3075,11 @@
     {
       "assertionResults": [
         {
-          "assertionId": "runtime-callable-af.approval-resume-reruns-unfinished-tools-only.1.evidenceField",
+          "assertionId": "runtime-callable-af.approval-resume-reruns-unfinished-tools-only.1.resultField",
           "status": "pass"
         },
         {
-          "assertionId": "runtime-callable-af.approval-resume-reruns-unfinished-tools-only.2.evidenceField",
+          "assertionId": "runtime-callable-af.approval-resume-reruns-unfinished-tools-only.2.resultField",
           "status": "pass"
         },
         {
@@ -3125,7 +3101,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "runtime-callable-af.approval-resume-same-turn.1.evidenceField",
+          "assertionId": "runtime-callable-af.approval-resume-same-turn.1.resultField",
           "status": "pass"
         },
         {
@@ -3151,7 +3127,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "runtime-callable-af.content-structured-data-parsed.1.evidenceField",
+          "assertionId": "runtime-callable-af.content-structured-data-parsed.1.resultField",
           "status": "pass"
         },
         {
@@ -3169,7 +3145,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "runtime-callable-af.content-tool-call-input-parsed.1.evidenceField",
+          "assertionId": "runtime-callable-af.content-tool-call-input-parsed.1.resultField",
           "status": "pass"
         },
         {
@@ -3187,11 +3163,11 @@
     {
       "assertionResults": [
         {
-          "assertionId": "runtime-callable-af.input-signal-empty-parts-rejected.1.evidenceField",
+          "assertionId": "runtime-callable-af.input-signal-empty-parts-rejected.1.resultField",
           "status": "pass"
         },
         {
-          "assertionId": "runtime-callable-af.input-signal-empty-parts-rejected.2.evidenceField",
+          "assertionId": "runtime-callable-af.input-signal-empty-parts-rejected.2.resultField",
           "status": "pass"
         },
         {
@@ -3213,7 +3189,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "runtime-callable-af.mixed-approval-gated-tool-start-after-resume.1.evidenceField",
+          "assertionId": "runtime-callable-af.mixed-approval-gated-tool-start-after-resume.1.resultField",
           "status": "pass"
         },
         {
@@ -3235,19 +3211,19 @@
     {
       "assertionResults": [
         {
-          "assertionId": "runtime-callable-af.paused-cancel-rejection-and-stop.1.evidenceField",
+          "assertionId": "runtime-callable-af.paused-cancel-rejection-and-stop.1.resultField",
           "status": "pass"
         },
         {
-          "assertionId": "runtime-callable-af.paused-cancel-rejection-and-stop.2.evidenceField",
+          "assertionId": "runtime-callable-af.paused-cancel-rejection-and-stop.2.resultField",
           "status": "pass"
         },
         {
-          "assertionId": "runtime-callable-af.paused-cancel-rejection-and-stop.3.evidenceField",
+          "assertionId": "runtime-callable-af.paused-cancel-rejection-and-stop.3.resultField",
           "status": "pass"
         },
         {
-          "assertionId": "runtime-callable-af.paused-cancel-rejection-and-stop.4.evidenceField",
+          "assertionId": "runtime-callable-af.paused-cancel-rejection-and-stop.4.resultField",
           "status": "pass"
         },
         {
@@ -3277,7 +3253,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "runtime-callable-af.structured-output-default-draft07.1.evidenceField",
+          "assertionId": "runtime-callable-af.structured-output-default-draft07.1.resultField",
           "status": "pass"
         },
         {
@@ -3295,7 +3271,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "runtime-callable-af.structured-provider-native-type-hidden.1.evidenceField",
+          "assertionId": "runtime-callable-af.structured-provider-native-type-hidden.1.resultField",
           "status": "pass"
         },
         {
@@ -3313,11 +3289,11 @@
     {
       "assertionResults": [
         {
-          "assertionId": "runtime-callable-af.structured-stream-synthesizes-delta-before-done.1.evidenceField",
+          "assertionId": "runtime-callable-af.structured-stream-synthesizes-delta-before-done.1.resultField",
           "status": "pass"
         },
         {
-          "assertionId": "runtime-callable-af.structured-stream-synthesizes-delta-before-done.2.evidenceField",
+          "assertionId": "runtime-callable-af.structured-stream-synthesizes-delta-before-done.2.resultField",
           "status": "pass"
         },
         {
@@ -3339,11 +3315,11 @@
     {
       "assertionResults": [
         {
-          "assertionId": "runtime-callable-af.structured-validation-hard-fail-code.1.evidenceField",
+          "assertionId": "runtime-callable-af.structured-validation-hard-fail-code.1.resultField",
           "status": "pass"
         },
         {
-          "assertionId": "runtime-callable-af.structured-validation-hard-fail-code.2.evidenceField",
+          "assertionId": "runtime-callable-af.structured-validation-hard-fail-code.2.resultField",
           "status": "pass"
         },
         {
@@ -3365,7 +3341,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "runtime-callable-af.tool-call-id-owned-by-framework.1.evidenceField",
+          "assertionId": "runtime-callable-af.tool-call-id-owned-by-framework.1.resultField",
           "status": "pass"
         },
         {
@@ -3387,11 +3363,11 @@
     {
       "assertionResults": [
         {
-          "assertionId": "runtime-callable-af.tool-failure-produces-error-result-not-run-fail.1.evidenceField",
+          "assertionId": "runtime-callable-af.tool-failure-produces-error-result-not-run-fail.1.resultField",
           "status": "pass"
         },
         {
-          "assertionId": "runtime-callable-af.tool-failure-produces-error-result-not-run-fail.2.evidenceField",
+          "assertionId": "runtime-callable-af.tool-failure-produces-error-result-not-run-fail.2.resultField",
           "status": "pass"
         },
         {
@@ -3421,7 +3397,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "runtime-callable-af.tool-parallel-wave-starts-before-results.1.evidenceField",
+          "assertionId": "runtime-callable-af.tool-parallel-wave-starts-before-results.1.resultField",
           "status": "pass"
         },
         {
@@ -3443,7 +3419,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "runtime-callable-ext.approval-resolve.decision-call-id-matches.1.evidenceField",
+          "assertionId": "runtime-callable-ext.approval-resolve.decision-call-id-matches.1.resultField",
           "status": "pass"
         },
         {
@@ -3461,7 +3437,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "runtime-callable-ext.approval-resolve.decision-type-approve.1.evidenceField",
+          "assertionId": "runtime-callable-ext.approval-resolve.decision-type-approve.1.resultField",
           "status": "pass"
         },
         {
@@ -3479,7 +3455,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "runtime-callable-ext.approval-resolve.executed-after-resume-includes-approved-tool.1.evidenceField",
+          "assertionId": "runtime-callable-ext.approval-resolve.executed-after-resume-includes-approved-tool.1.resultField",
           "status": "pass"
         },
         {
@@ -3497,7 +3473,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "runtime-callable-ext.approval-resolve.executed-before-resume-stays-pre-approval.1.evidenceField",
+          "assertionId": "runtime-callable-ext.approval-resolve.executed-before-resume-stays-pre-approval.1.resultField",
           "status": "pass"
         },
         {
@@ -3515,7 +3491,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "runtime-callable-ext.approval-resolve.executed-tools-include-email.1.evidenceField",
+          "assertionId": "runtime-callable-ext.approval-resolve.executed-tools-include-email.1.resultField",
           "status": "pass"
         },
         {
@@ -3533,7 +3509,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "runtime-callable-ext.approval-resolve.executed-tools-include-search.1.evidenceField",
+          "assertionId": "runtime-callable-ext.approval-resolve.executed-tools-include-search.1.resultField",
           "status": "pass"
         },
         {
@@ -3551,7 +3527,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "runtime-callable-ext.approval-resolve.paused-approval-call-id-matches.1.evidenceField",
+          "assertionId": "runtime-callable-ext.approval-resolve.paused-approval-call-id-matches.1.resultField",
           "status": "pass"
         },
         {
@@ -3569,7 +3545,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "runtime-callable-ext.approval-resolve.paused-event-types-include-approval-requested.1.evidenceField",
+          "assertionId": "runtime-callable-ext.approval-resolve.paused-event-types-include-approval-requested.1.resultField",
           "status": "pass"
         },
         {
@@ -3587,7 +3563,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "runtime-callable-ext.approval-resolve.paused-phase-paused.1.evidenceField",
+          "assertionId": "runtime-callable-ext.approval-resolve.paused-phase-paused.1.resultField",
           "status": "pass"
         },
         {
@@ -3605,7 +3581,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "runtime-callable-ext.approval-resolve.resumed-event-types-include-approval-resolved.1.evidenceField",
+          "assertionId": "runtime-callable-ext.approval-resolve.resumed-event-types-include-approval-resolved.1.resultField",
           "status": "pass"
         },
         {
@@ -3623,7 +3599,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "runtime-callable-ext.approval-resolve.resumed-phase-completed.1.evidenceField",
+          "assertionId": "runtime-callable-ext.approval-resolve.resumed-phase-completed.1.resultField",
           "status": "pass"
         },
         {
@@ -3641,8 +3617,8 @@
     {
       "assertionResults": [
         {
-          "assertionId": "runtime-callable-ext.cancel-execution.cancel-invocation-count.1.evidenceField",
-          "status": "pass"
+          "assertionId": "runtime-callable-ext.cancel-execution.cancel-invocation-count.1.resultField",
+          "status": "fail"
         },
         {
           "assertionId": "runtime-callable-ext.cancel-execution.cancel-invocation-count.requiredEvidence.cancellation.cancelInvocations",
@@ -3654,13 +3630,13 @@
         "adapterId": "typescript-framework",
         "planId": "tuvren.framework.runtime-api.callables-extended"
       },
-      "status": "pass"
+      "status": "fail"
     },
     {
       "assertionResults": [
         {
-          "assertionId": "runtime-callable-ext.cancel-execution.error-event-count-one.1.evidenceField",
-          "status": "pass"
+          "assertionId": "runtime-callable-ext.cancel-execution.error-event-count-one.1.resultField",
+          "status": "fail"
         },
         {
           "assertionId": "runtime-callable-ext.cancel-execution.error-event-count-one.requiredEvidence.cancellation.errorEventCount",
@@ -3672,13 +3648,13 @@
         "adapterId": "typescript-framework",
         "planId": "tuvren.framework.runtime-api.callables-extended"
       },
-      "status": "pass"
+      "status": "fail"
     },
     {
       "assertionResults": [
         {
-          "assertionId": "runtime-callable-ext.cancel-execution.observed-event-index-zero.1.evidenceField",
-          "status": "pass"
+          "assertionId": "runtime-callable-ext.cancel-execution.observed-event-index-zero.1.resultField",
+          "status": "fail"
         },
         {
           "assertionId": "runtime-callable-ext.cancel-execution.observed-event-index-zero.requiredEvidence.cancellation.observedEventIndex",
@@ -3690,13 +3666,13 @@
         "adapterId": "typescript-framework",
         "planId": "tuvren.framework.runtime-api.callables-extended"
       },
-      "status": "pass"
+      "status": "fail"
     },
     {
       "assertionResults": [
         {
-          "assertionId": "runtime-callable-ext.cancel-execution.observed-event-type.1.evidenceField",
-          "status": "pass"
+          "assertionId": "runtime-callable-ext.cancel-execution.observed-event-type.1.resultField",
+          "status": "fail"
         },
         {
           "assertionId": "runtime-callable-ext.cancel-execution.observed-event-type.requiredEvidence.cancellation.observedEventType",
@@ -3708,13 +3684,13 @@
         "adapterId": "typescript-framework",
         "planId": "tuvren.framework.runtime-api.callables-extended"
       },
-      "status": "pass"
+      "status": "fail"
     },
     {
       "assertionResults": [
         {
-          "assertionId": "runtime-callable-ext.cancel-execution.runtime-phase-failed.1.evidenceField",
-          "status": "pass"
+          "assertionId": "runtime-callable-ext.cancel-execution.runtime-phase-failed.1.resultField",
+          "status": "fail"
         },
         {
           "assertionId": "runtime-callable-ext.cancel-execution.runtime-phase-failed.requiredEvidence.runtime.phase",
@@ -3726,12 +3702,12 @@
         "adapterId": "typescript-framework",
         "planId": "tuvren.framework.runtime-api.callables-extended"
       },
-      "status": "pass"
+      "status": "fail"
     },
     {
       "assertionResults": [
         {
-          "assertionId": "runtime-callable-ext.provider-generate.call-count-positive.1.evidenceField",
+          "assertionId": "runtime-callable-ext.provider-generate.call-count-positive.1.resultField",
           "status": "pass"
         },
         {
@@ -3749,7 +3725,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "runtime-callable-ext.provider-generate.finish-reason-string.1.evidenceField",
+          "assertionId": "runtime-callable-ext.provider-generate.finish-reason-string.1.resultField",
           "status": "pass"
         },
         {
@@ -3767,7 +3743,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "runtime-callable-ext.provider-generate.first-part-text-shape.1.evidenceField",
+          "assertionId": "runtime-callable-ext.provider-generate.first-part-text-shape.1.resultField",
           "status": "pass"
         },
         {
@@ -3785,7 +3761,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "runtime-callable-ext.provider-generate.response-finish-reason-equals-stop.1.evidenceField",
+          "assertionId": "runtime-callable-ext.provider-generate.response-finish-reason-equals-stop.1.resultField",
           "status": "pass"
         },
         {
@@ -3803,7 +3779,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "runtime-callable-ext.provider-generate.response-parts-first-present.1.evidenceField",
+          "assertionId": "runtime-callable-ext.provider-generate.response-parts-first-present.1.resultField",
           "status": "pass"
         },
         {
@@ -3821,7 +3797,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "runtime-callable-ext.provider-stream.chunk-types-include-finish.1.evidenceField",
+          "assertionId": "runtime-callable-ext.provider-stream.chunk-types-include-finish.1.resultField",
           "status": "pass"
         },
         {
@@ -3839,7 +3815,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "runtime-callable-ext.provider-stream.chunk-types-text-delta-first.1.evidenceField",
+          "assertionId": "runtime-callable-ext.provider-stream.chunk-types-text-delta-first.1.resultField",
           "status": "pass"
         },
         {
@@ -3857,7 +3833,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "runtime-callable-ext.provider-stream.emitted-event-types-include-message-done.1.evidenceField",
+          "assertionId": "runtime-callable-ext.provider-stream.emitted-event-types-include-message-done.1.resultField",
           "status": "pass"
         },
         {
@@ -3875,7 +3851,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "runtime-callable-ext.provider-stream.emitted-event-types-include-message-start.1.evidenceField",
+          "assertionId": "runtime-callable-ext.provider-stream.emitted-event-types-include-message-start.1.resultField",
           "status": "pass"
         },
         {
@@ -3893,7 +3869,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "runtime-callable-ext.provider-stream.emitted-event-types-text-delta.1.evidenceField",
+          "assertionId": "runtime-callable-ext.provider-stream.emitted-event-types-text-delta.1.resultField",
           "status": "pass"
         },
         {
@@ -3911,7 +3887,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "runtime-callable-ext.provider-stream.response-text-matches-scenario.1.evidenceField",
+          "assertionId": "runtime-callable-ext.provider-stream.response-text-matches-scenario.1.resultField",
           "status": "pass"
         },
         {
@@ -3929,7 +3905,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "runtime-callable-ext.tool-execute.call-count-equals-one.1.evidenceField",
+          "assertionId": "runtime-callable-ext.tool-execute.call-count-equals-one.1.resultField",
           "status": "pass"
         },
         {
@@ -3947,7 +3923,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "runtime-callable-ext.tool-execute.input-query-matches.1.evidenceField",
+          "assertionId": "runtime-callable-ext.tool-execute.input-query-matches.1.resultField",
           "status": "pass"
         },
         {
@@ -3983,7 +3959,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "runtime-callable-ext.tool-execute.output-source-matches.1.evidenceField",
+          "assertionId": "runtime-callable-ext.tool-execute.output-source-matches.1.resultField",
           "status": "pass"
         },
         {
@@ -4037,7 +4013,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "runtime-callable-ext.validate-structured-output.resolution-fail.1.evidenceField",
+          "assertionId": "runtime-callable-ext.validate-structured-output.resolution-fail.1.resultField",
           "status": "pass"
         },
         {
@@ -4055,7 +4031,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "runtime-callable-ext.validate-structured-output.resolution-type-string.1.evidenceField",
+          "assertionId": "runtime-callable-ext.validate-structured-output.resolution-type-string.1.resultField",
           "status": "pass"
         },
         {
@@ -4209,7 +4185,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "runtime-api.execute-turn.lifecycle.1.evidenceField",
+          "assertionId": "runtime-api.execute-turn.lifecycle.1.resultField",
           "status": "pass"
         },
         {
@@ -4232,54 +4208,64 @@
       "assertionResults": [
         {
           "assertionId": "runtime-api.recover-result.staged-result.1.stateField",
-          "status": "pass"
+          "status": "fail"
         },
         {
           "assertionId": "runtime-api.recover-result.staged-result.2.stateField",
-          "status": "pass"
+          "status": "fail"
         },
         {
           "assertionId": "runtime-api.recover-result.staged-result.3.stateField",
-          "status": "pass"
+          "status": "fail"
         },
         {
           "assertionId": "runtime-api.recover-result.staged-result.requiredEvidence.trace.recovery.evidence.recovery.firstObjectType",
-          "status": "pass"
+          "message": "missing required evidence trace.recovery.evidence.recovery.firstObjectType",
+          "status": "fail"
         },
         {
           "assertionId": "runtime-api.recover-result.staged-result.requiredEvidence.trace.recovery.evidence.recovery.firstTaskId",
-          "status": "pass"
+          "message": "missing required evidence trace.recovery.evidence.recovery.firstTaskId",
+          "status": "fail"
         },
         {
           "assertionId": "runtime-api.recover-result.staged-result.requiredEvidence.trace.recovery.evidence.recovery.lastTurnNodeHash",
-          "status": "pass"
+          "message": "missing required evidence trace.recovery.evidence.recovery.lastTurnNodeHash",
+          "status": "fail"
         },
         {
           "assertionId": "runtime-api.recover-result.staged-result.requiredEvidence.trace.recovery.evidence.recovery.uncommittedStagedResults",
-          "status": "pass"
+          "message": "missing required evidence trace.recovery.evidence.recovery.uncommittedStagedResults",
+          "status": "fail"
         }
       ],
       "checkId": "runtime-api.recover-result.staged-result",
       "details": {
         "adapterId": "typescript-framework",
         "planId": "tuvren.framework.runtime-api.lifecycle",
+        "adapterErrors": {
+          "recovery": {
+            "code": "adapter_operation_failed",
+            "message": "unknown turn \"shared-recovery-turn\""
+          }
+        },
         "traceStepIds": ["recovery"]
       },
-      "status": "pass"
+      "status": "fail"
     },
     {
       "assertionResults": [
         {
-          "assertionId": "runtime-lifecycle-af.cancel-running-idempotent-fails-once.1.evidenceField",
-          "status": "pass"
+          "assertionId": "runtime-lifecycle-af.cancel-running-idempotent-fails-once.1.resultField",
+          "status": "fail"
         },
         {
-          "assertionId": "runtime-lifecycle-af.cancel-running-idempotent-fails-once.2.evidenceField",
-          "status": "pass"
+          "assertionId": "runtime-lifecycle-af.cancel-running-idempotent-fails-once.2.resultField",
+          "status": "fail"
         },
         {
-          "assertionId": "runtime-lifecycle-af.cancel-running-idempotent-fails-once.3.evidenceField",
-          "status": "pass"
+          "assertionId": "runtime-lifecycle-af.cancel-running-idempotent-fails-once.3.resultField",
+          "status": "fail"
         },
         {
           "assertionId": "runtime-lifecycle-af.cancel-running-idempotent-fails-once.requiredEvidence.cancellation.cancelInvocations",
@@ -4299,21 +4285,21 @@
         "adapterId": "typescript-framework",
         "planId": "tuvren.framework.runtime-api.lifecycle-extended"
       },
-      "status": "pass"
+      "status": "fail"
     },
     {
       "assertionResults": [
         {
-          "assertionId": "runtime-lifecycle-af.cancel-running-stages-partial-status.1.evidenceField",
-          "status": "pass"
+          "assertionId": "runtime-lifecycle-af.cancel-running-stages-partial-status.1.resultField",
+          "status": "fail"
         },
         {
-          "assertionId": "runtime-lifecycle-af.cancel-running-stages-partial-status.2.evidenceField",
-          "status": "pass"
+          "assertionId": "runtime-lifecycle-af.cancel-running-stages-partial-status.2.resultField",
+          "status": "fail"
         },
         {
-          "assertionId": "runtime-lifecycle-af.cancel-running-stages-partial-status.3.evidenceField",
-          "status": "pass"
+          "assertionId": "runtime-lifecycle-af.cancel-running-stages-partial-status.3.resultField",
+          "status": "fail"
         },
         {
           "assertionId": "runtime-lifecycle-af.cancel-running-stages-partial-status.requiredEvidence.cancellation.partialAssistantText",
@@ -4333,20 +4319,20 @@
         "adapterId": "typescript-framework",
         "planId": "tuvren.framework.runtime-api.lifecycle-extended"
       },
-      "status": "pass"
+      "status": "fail"
     },
     {
       "assertionResults": [
         {
-          "assertionId": "runtime-lifecycle-af.context-transform-creates-new-tree-heads.1.evidenceField",
+          "assertionId": "runtime-lifecycle-af.context-transform-creates-new-tree-heads.1.resultField",
           "status": "pass"
         },
         {
-          "assertionId": "runtime-lifecycle-af.context-transform-creates-new-tree-heads.2.evidenceField",
+          "assertionId": "runtime-lifecycle-af.context-transform-creates-new-tree-heads.2.resultField",
           "status": "pass"
         },
         {
-          "assertionId": "runtime-lifecycle-af.context-transform-creates-new-tree-heads.3.evidenceField",
+          "assertionId": "runtime-lifecycle-af.context-transform-creates-new-tree-heads.3.resultField",
           "status": "pass"
         },
         {
@@ -4376,7 +4362,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "runtime-lifecycle-af.context-transform-driver-sees-rewritten-context.1.evidenceField",
+          "assertionId": "runtime-lifecycle-af.context-transform-driver-sees-rewritten-context.1.resultField",
           "status": "pass"
         },
         {
@@ -4394,15 +4380,15 @@
     {
       "assertionResults": [
         {
-          "assertionId": "runtime-lifecycle-af.context-transform-preserves-source-checkpoint.1.evidenceField",
+          "assertionId": "runtime-lifecycle-af.context-transform-preserves-source-checkpoint.1.resultField",
           "status": "pass"
         },
         {
-          "assertionId": "runtime-lifecycle-af.context-transform-preserves-source-checkpoint.2.evidenceField",
+          "assertionId": "runtime-lifecycle-af.context-transform-preserves-source-checkpoint.2.resultField",
           "status": "pass"
         },
         {
-          "assertionId": "runtime-lifecycle-af.context-transform-preserves-source-checkpoint.3.evidenceField",
+          "assertionId": "runtime-lifecycle-af.context-transform-preserves-source-checkpoint.3.resultField",
           "status": "pass"
         },
         {
@@ -4538,7 +4524,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "runtime-lifecycle-ext.context-transform.message-count.1.evidenceField",
+          "assertionId": "runtime-lifecycle-ext.context-transform.message-count.1.resultField",
           "status": "pass"
         },
         {
@@ -4556,7 +4542,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "runtime-lifecycle-ext.context-transform.runtime-phase-completed.1.evidenceField",
+          "assertionId": "runtime-lifecycle-ext.context-transform.runtime-phase-completed.1.resultField",
           "status": "pass"
         },
         {
@@ -4574,7 +4560,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "runtime-lifecycle-ext.context-transform.summary-text.1.evidenceField",
+          "assertionId": "runtime-lifecycle-ext.context-transform.summary-text.1.resultField",
           "status": "pass"
         },
         {
@@ -4592,7 +4578,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "runtime-lifecycle-ext.execute-turn.phase-completed.1.evidenceField",
+          "assertionId": "runtime-lifecycle-ext.execute-turn.phase-completed.1.resultField",
           "status": "pass"
         },
         {
@@ -4610,7 +4596,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "runtime-lifecycle-ext.execute-turn.phase-enum.1.evidenceField",
+          "assertionId": "runtime-lifecycle-ext.execute-turn.phase-enum.1.resultField",
           "status": "pass"
         },
         {
@@ -4628,95 +4614,115 @@
     {
       "assertionResults": [
         {
-          "assertionId": "runtime-lifecycle-ext.recover-result.first-object-type.1.evidenceField",
-          "status": "pass"
+          "assertionId": "runtime-lifecycle-ext.recover-result.first-object-type.1.resultField",
+          "status": "fail"
         },
         {
           "assertionId": "runtime-lifecycle-ext.recover-result.first-object-type.requiredEvidence.recovery.firstObjectType",
-          "status": "pass"
+          "message": "missing required evidence recovery.firstObjectType",
+          "status": "fail"
         }
       ],
       "checkId": "runtime-lifecycle-ext.recover-result.first-object-type",
       "details": {
+        "adapterError": {
+          "code": "adapter_operation_failed",
+          "message": "unknown turn \"shared-recovery-turn\""
+        },
         "adapterId": "typescript-framework",
         "planId": "tuvren.framework.runtime-api.lifecycle-extended"
       },
-      "status": "pass"
+      "status": "fail"
     },
     {
       "assertionResults": [
         {
-          "assertionId": "runtime-lifecycle-ext.recover-result.first-task-id.1.evidenceField",
-          "status": "pass"
+          "assertionId": "runtime-lifecycle-ext.recover-result.first-task-id.1.resultField",
+          "status": "fail"
         },
         {
           "assertionId": "runtime-lifecycle-ext.recover-result.first-task-id.requiredEvidence.recovery.firstTaskId",
-          "status": "pass"
+          "message": "missing required evidence recovery.firstTaskId",
+          "status": "fail"
         }
       ],
       "checkId": "runtime-lifecycle-ext.recover-result.first-task-id",
       "details": {
+        "adapterError": {
+          "code": "adapter_operation_failed",
+          "message": "unknown turn \"shared-recovery-turn\""
+        },
         "adapterId": "typescript-framework",
         "planId": "tuvren.framework.runtime-api.lifecycle-extended"
       },
-      "status": "pass"
+      "status": "fail"
     },
     {
       "assertionResults": [
         {
-          "assertionId": "runtime-lifecycle-ext.recover-result.last-turn-node-hash-format.1.evidenceField",
-          "status": "pass"
+          "assertionId": "runtime-lifecycle-ext.recover-result.last-turn-node-hash-format.1.resultField",
+          "status": "fail"
         },
         {
           "assertionId": "runtime-lifecycle-ext.recover-result.last-turn-node-hash-format.requiredEvidence.recovery.lastTurnNodeHash",
-          "status": "pass"
+          "message": "missing required evidence recovery.lastTurnNodeHash",
+          "status": "fail"
         }
       ],
       "checkId": "runtime-lifecycle-ext.recover-result.last-turn-node-hash-format",
       "details": {
+        "adapterError": {
+          "code": "adapter_operation_failed",
+          "message": "unknown turn \"shared-recovery-turn\""
+        },
         "adapterId": "typescript-framework",
         "planId": "tuvren.framework.runtime-api.lifecycle-extended"
       },
-      "status": "pass"
+      "status": "fail"
     },
     {
       "assertionResults": [
         {
-          "assertionId": "runtime-lifecycle-ext.recover-result.uncommitted-count.1.evidenceField",
-          "status": "pass"
+          "assertionId": "runtime-lifecycle-ext.recover-result.uncommitted-count.1.resultField",
+          "status": "fail"
         },
         {
           "assertionId": "runtime-lifecycle-ext.recover-result.uncommitted-count.requiredEvidence.recovery.uncommittedStagedResults",
-          "status": "pass"
+          "message": "missing required evidence recovery.uncommittedStagedResults",
+          "status": "fail"
         }
       ],
       "checkId": "runtime-lifecycle-ext.recover-result.uncommitted-count",
       "details": {
+        "adapterError": {
+          "code": "adapter_operation_failed",
+          "message": "unknown turn \"shared-recovery-turn\""
+        },
         "adapterId": "typescript-framework",
         "planId": "tuvren.framework.runtime-api.lifecycle-extended"
       },
-      "status": "pass"
+      "status": "fail"
     },
     {
       "assertionResults": [
         {
-          "assertionId": "runtime-lifecycle-ext.stale-recovery.finalize-terminal-status.1.evidenceField",
+          "assertionId": "runtime-lifecycle-ext.stale-recovery.finalize-terminal-status.1.resultField",
           "status": "pass"
         },
         {
-          "assertionId": "runtime-lifecycle-ext.stale-recovery.finalize-terminal-status.2.evidenceField",
+          "assertionId": "runtime-lifecycle-ext.stale-recovery.finalize-terminal-status.2.resultField",
           "status": "pass"
         },
         {
-          "assertionId": "runtime-lifecycle-ext.stale-recovery.finalize-terminal-status.3.evidenceField",
+          "assertionId": "runtime-lifecycle-ext.stale-recovery.finalize-terminal-status.3.resultField",
           "status": "pass"
         },
         {
-          "assertionId": "runtime-lifecycle-ext.stale-recovery.finalize-terminal-status.4.evidenceField",
+          "assertionId": "runtime-lifecycle-ext.stale-recovery.finalize-terminal-status.4.resultField",
           "status": "pass"
         },
         {
-          "assertionId": "runtime-lifecycle-ext.stale-recovery.finalize-terminal-status.5.evidenceField",
+          "assertionId": "runtime-lifecycle-ext.stale-recovery.finalize-terminal-status.5.resultField",
           "status": "pass"
         },
         {
@@ -4750,23 +4756,23 @@
     {
       "assertionResults": [
         {
-          "assertionId": "runtime-lifecycle-ext.stale-recovery.handoff-context-active-agent.1.evidenceField",
+          "assertionId": "runtime-lifecycle-ext.stale-recovery.handoff-context-active-agent.1.resultField",
           "status": "pass"
         },
         {
-          "assertionId": "runtime-lifecycle-ext.stale-recovery.handoff-context-active-agent.2.evidenceField",
+          "assertionId": "runtime-lifecycle-ext.stale-recovery.handoff-context-active-agent.2.resultField",
           "status": "pass"
         },
         {
-          "assertionId": "runtime-lifecycle-ext.stale-recovery.handoff-context-active-agent.3.evidenceField",
+          "assertionId": "runtime-lifecycle-ext.stale-recovery.handoff-context-active-agent.3.resultField",
           "status": "pass"
         },
         {
-          "assertionId": "runtime-lifecycle-ext.stale-recovery.handoff-context-active-agent.4.evidenceField",
+          "assertionId": "runtime-lifecycle-ext.stale-recovery.handoff-context-active-agent.4.resultField",
           "status": "pass"
         },
         {
-          "assertionId": "runtime-lifecycle-ext.stale-recovery.handoff-context-active-agent.5.evidenceField",
+          "assertionId": "runtime-lifecycle-ext.stale-recovery.handoff-context-active-agent.5.resultField",
           "status": "pass"
         },
         {
@@ -4800,23 +4806,23 @@
     {
       "assertionResults": [
         {
-          "assertionId": "runtime-lifecycle-ext.stale-recovery.same-signal-iterate.1.evidenceField",
+          "assertionId": "runtime-lifecycle-ext.stale-recovery.same-signal-iterate.1.resultField",
           "status": "pass"
         },
         {
-          "assertionId": "runtime-lifecycle-ext.stale-recovery.same-signal-iterate.2.evidenceField",
+          "assertionId": "runtime-lifecycle-ext.stale-recovery.same-signal-iterate.2.resultField",
           "status": "pass"
         },
         {
-          "assertionId": "runtime-lifecycle-ext.stale-recovery.same-signal-iterate.3.evidenceField",
+          "assertionId": "runtime-lifecycle-ext.stale-recovery.same-signal-iterate.3.resultField",
           "status": "pass"
         },
         {
-          "assertionId": "runtime-lifecycle-ext.stale-recovery.same-signal-iterate.4.evidenceField",
+          "assertionId": "runtime-lifecycle-ext.stale-recovery.same-signal-iterate.4.resultField",
           "status": "pass"
         },
         {
-          "assertionId": "runtime-lifecycle-ext.stale-recovery.same-signal-iterate.5.evidenceField",
+          "assertionId": "runtime-lifecycle-ext.stale-recovery.same-signal-iterate.5.resultField",
           "status": "pass"
         },
         {
@@ -4850,23 +4856,23 @@
     {
       "assertionResults": [
         {
-          "assertionId": "runtime-lifecycle-ext.stale-recovery.signal-mismatch-fresh-turn.1.evidenceField",
+          "assertionId": "runtime-lifecycle-ext.stale-recovery.signal-mismatch-fresh-turn.1.resultField",
           "status": "pass"
         },
         {
-          "assertionId": "runtime-lifecycle-ext.stale-recovery.signal-mismatch-fresh-turn.2.evidenceField",
+          "assertionId": "runtime-lifecycle-ext.stale-recovery.signal-mismatch-fresh-turn.2.resultField",
           "status": "pass"
         },
         {
-          "assertionId": "runtime-lifecycle-ext.stale-recovery.signal-mismatch-fresh-turn.3.evidenceField",
+          "assertionId": "runtime-lifecycle-ext.stale-recovery.signal-mismatch-fresh-turn.3.resultField",
+          "status": "fail"
+        },
+        {
+          "assertionId": "runtime-lifecycle-ext.stale-recovery.signal-mismatch-fresh-turn.4.resultField",
           "status": "pass"
         },
         {
-          "assertionId": "runtime-lifecycle-ext.stale-recovery.signal-mismatch-fresh-turn.4.evidenceField",
-          "status": "pass"
-        },
-        {
-          "assertionId": "runtime-lifecycle-ext.stale-recovery.signal-mismatch-fresh-turn.5.evidenceField",
+          "assertionId": "runtime-lifecycle-ext.stale-recovery.signal-mismatch-fresh-turn.5.resultField",
           "status": "pass"
         },
         {
@@ -4895,16 +4901,16 @@
         "adapterId": "typescript-framework",
         "planId": "tuvren.framework.runtime-api.lifecycle-extended"
       },
-      "status": "pass"
+      "status": "fail"
     },
     {
       "assertionResults": [
         {
-          "assertionId": "runtime-orchestration-af.handoff-last-output-only-builder.1.evidenceField",
+          "assertionId": "runtime-orchestration-af.handoff-last-output-only-builder.1.resultField",
           "status": "pass"
         },
         {
-          "assertionId": "runtime-orchestration-af.handoff-last-output-only-builder.2.evidenceField",
+          "assertionId": "runtime-orchestration-af.handoff-last-output-only-builder.2.resultField",
           "status": "pass"
         },
         {
@@ -4926,7 +4932,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "runtime-orchestration-af.handoff-rejects-multiple-intents.1.evidenceField",
+          "assertionId": "runtime-orchestration-af.handoff-rejects-multiple-intents.1.resultField",
           "status": "pass"
         },
         {
@@ -4944,7 +4950,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "runtime-orchestration-af.handoff-resolution-not-history-entry.1.evidenceField",
+          "assertionId": "runtime-orchestration-af.handoff-resolution-not-history-entry.1.resultField",
           "status": "pass"
         },
         {
@@ -4962,15 +4968,15 @@
     {
       "assertionResults": [
         {
-          "assertionId": "runtime-orchestration-af.worker-forwarded-event-source.1.evidenceField",
+          "assertionId": "runtime-orchestration-af.worker-forwarded-event-source.1.resultField",
           "status": "pass"
         },
         {
-          "assertionId": "runtime-orchestration-af.worker-forwarded-event-source.2.evidenceField",
+          "assertionId": "runtime-orchestration-af.worker-forwarded-event-source.2.resultField",
           "status": "pass"
         },
         {
-          "assertionId": "runtime-orchestration-af.worker-forwarded-event-source.3.evidenceField",
+          "assertionId": "runtime-orchestration-af.worker-forwarded-event-source.3.resultField",
           "status": "pass"
         },
         {
@@ -4996,61 +5002,76 @@
     {
       "assertionResults": [
         {
-          "assertionId": "runtime-orchestration.inheritance.driver-id.1.evidenceField",
-          "status": "pass"
+          "assertionId": "runtime-orchestration.inheritance.driver-id.1.resultField",
+          "status": "fail"
         },
         {
           "assertionId": "runtime-orchestration.inheritance.driver-id.requiredEvidence.orchestration.inheritance.driverIdInherited",
-          "status": "pass"
+          "message": "missing required evidence orchestration.inheritance.driverIdInherited",
+          "status": "fail"
         }
       ],
       "checkId": "runtime-orchestration.inheritance.driver-id",
       "details": {
+        "adapterError": {
+          "code": "adapter_operation_failed",
+          "message": "spawn() requires a running orchestration handle"
+        },
         "adapterId": "typescript-framework",
         "planId": "tuvren.framework.runtime-api.orchestration"
       },
-      "status": "pass"
+      "status": "fail"
     },
     {
       "assertionResults": [
         {
-          "assertionId": "runtime-orchestration.inheritance.schema-id.1.evidenceField",
-          "status": "pass"
+          "assertionId": "runtime-orchestration.inheritance.schema-id.1.resultField",
+          "status": "fail"
         },
         {
           "assertionId": "runtime-orchestration.inheritance.schema-id.requiredEvidence.orchestration.inheritance.schemaInherited",
-          "status": "pass"
+          "message": "missing required evidence orchestration.inheritance.schemaInherited",
+          "status": "fail"
         }
       ],
       "checkId": "runtime-orchestration.inheritance.schema-id",
       "details": {
+        "adapterError": {
+          "code": "adapter_operation_failed",
+          "message": "spawn() requires a running orchestration handle"
+        },
         "adapterId": "typescript-framework",
         "planId": "tuvren.framework.runtime-api.orchestration"
       },
-      "status": "pass"
+      "status": "fail"
     },
     {
       "assertionResults": [
         {
-          "assertionId": "runtime-orchestration.inheritance.tools.1.evidenceField",
-          "status": "pass"
+          "assertionId": "runtime-orchestration.inheritance.tools.1.resultField",
+          "status": "fail"
         },
         {
           "assertionId": "runtime-orchestration.inheritance.tools.requiredEvidence.orchestration.inheritance.toolsInherited",
-          "status": "pass"
+          "message": "missing required evidence orchestration.inheritance.toolsInherited",
+          "status": "fail"
         }
       ],
       "checkId": "runtime-orchestration.inheritance.tools",
       "details": {
+        "adapterError": {
+          "code": "adapter_operation_failed",
+          "message": "spawn() requires a running orchestration handle"
+        },
         "adapterId": "typescript-framework",
         "planId": "tuvren.framework.runtime-api.orchestration"
       },
-      "status": "pass"
+      "status": "fail"
     },
     {
       "assertionResults": [
         {
-          "assertionId": "runtime-orchestration.launch.await-result-does-not-start-parent.1.evidenceField",
+          "assertionId": "runtime-orchestration.launch.await-result-does-not-start-parent.1.resultField",
           "status": "pass"
         },
         {
@@ -5068,7 +5089,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "runtime-orchestration.launch.await-result-rejects-before-parent-start.1.evidenceField",
+          "assertionId": "runtime-orchestration.launch.await-result-rejects-before-parent-start.1.resultField",
           "status": "pass"
         },
         {
@@ -5086,7 +5107,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "runtime-orchestration.launch.child-runs-on-own-thread.1.evidenceField",
+          "assertionId": "runtime-orchestration.launch.child-runs-on-own-thread.1.resultField",
           "status": "pass"
         },
         {
@@ -5104,7 +5125,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "runtime-orchestration.launch.spawn-rejects-before-parent-start.1.evidenceField",
+          "assertionId": "runtime-orchestration.launch.spawn-rejects-before-parent-start.1.resultField",
           "status": "pass"
         },
         {
@@ -5122,7 +5143,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "runtime-orchestration.lifecycle.child-cancel-parent-completes.1.evidenceField",
+          "assertionId": "runtime-orchestration.lifecycle.child-cancel-parent-completes.1.resultField",
           "status": "pass"
         },
         {
@@ -5140,7 +5161,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "runtime-orchestration.lifecycle.child-pause-parent-completes.1.evidenceField",
+          "assertionId": "runtime-orchestration.lifecycle.child-pause-parent-completes.1.resultField",
           "status": "pass"
         },
         {
@@ -5158,7 +5179,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "runtime-orchestration.lifecycle.child-resume-stays-local.1.evidenceField",
+          "assertionId": "runtime-orchestration.lifecycle.child-resume-stays-local.1.resultField",
           "status": "pass"
         },
         {
@@ -5176,7 +5197,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "runtime-orchestration.lifecycle.completed-parent-rejects-spawn.1.evidenceField",
+          "assertionId": "runtime-orchestration.lifecycle.completed-parent-rejects-spawn.1.resultField",
           "status": "pass"
         },
         {
@@ -5194,7 +5215,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "runtime-orchestration.lifecycle.parent-cancel-child-completes.1.evidenceField",
+          "assertionId": "runtime-orchestration.lifecycle.parent-cancel-child-completes.1.resultField",
           "status": "pass"
         },
         {
@@ -5212,7 +5233,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "runtime-orchestration.lifecycle.parent-pause-child-continues.1.evidenceField",
+          "assertionId": "runtime-orchestration.lifecycle.parent-pause-child-continues.1.resultField",
           "status": "pass"
         },
         {
@@ -5230,7 +5251,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "runtime-orchestration.lifecycle.paused-parent-rejects-spawn.1.evidenceField",
+          "assertionId": "runtime-orchestration.lifecycle.paused-parent-rejects-spawn.1.resultField",
           "status": "pass"
         },
         {
@@ -5248,7 +5269,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "runtime-orchestration.nested.child-receives-grandchild.1.evidenceField",
+          "assertionId": "runtime-orchestration.nested.child-receives-grandchild.1.resultField",
           "status": "pass"
         },
         {
@@ -5266,7 +5287,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "runtime-orchestration.nested.child-source-agent.1.evidenceField",
+          "assertionId": "runtime-orchestration.nested.child-source-agent.1.resultField",
           "status": "pass"
         },
         {
@@ -5284,7 +5305,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "runtime-orchestration.nested.child-source-thread-id-present.1.evidenceField",
+          "assertionId": "runtime-orchestration.nested.child-source-thread-id-present.1.resultField",
           "status": "pass"
         },
         {
@@ -5302,7 +5323,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "runtime-orchestration.nested.child-source-worker-id-present.1.evidenceField",
+          "assertionId": "runtime-orchestration.nested.child-source-worker-id-present.1.resultField",
           "status": "pass"
         },
         {
@@ -5320,7 +5341,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "runtime-orchestration.nested.root-receives-grandchild.1.evidenceField",
+          "assertionId": "runtime-orchestration.nested.root-receives-grandchild.1.resultField",
           "status": "pass"
         },
         {
@@ -5338,7 +5359,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "runtime-orchestration.nested.root-source-agent.1.evidenceField",
+          "assertionId": "runtime-orchestration.nested.root-source-agent.1.resultField",
           "status": "pass"
         },
         {
@@ -5356,7 +5377,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "runtime-orchestration.nested.root-source-thread-id-present.1.evidenceField",
+          "assertionId": "runtime-orchestration.nested.root-source-thread-id-present.1.resultField",
           "status": "pass"
         },
         {
@@ -5374,7 +5395,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "runtime-orchestration.nested.root-source-worker-id-present.1.evidenceField",
+          "assertionId": "runtime-orchestration.nested.root-source-worker-id-present.1.resultField",
           "status": "pass"
         },
         {
@@ -5392,7 +5413,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "runtime-orchestration.surfaces.all-events-include-descendants.1.evidenceField",
+          "assertionId": "runtime-orchestration.surfaces.all-events-include-descendants.1.resultField",
           "status": "pass"
         },
         {
@@ -5410,7 +5431,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "runtime-orchestration.surfaces.await-result-failure-rejects.1.evidenceField",
+          "assertionId": "runtime-orchestration.surfaces.await-result-failure-rejects.1.resultField",
           "status": "pass"
         },
         {
@@ -5428,7 +5449,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "runtime-orchestration.surfaces.await-result-visible-result.1.evidenceField",
+          "assertionId": "runtime-orchestration.surfaces.await-result-visible-result.1.resultField",
           "status": "pass"
         },
         {
@@ -5446,7 +5467,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "runtime-orchestration.surfaces.child-all-events-remains-available.1.evidenceField",
+          "assertionId": "runtime-orchestration.surfaces.child-all-events-remains-available.1.resultField",
           "status": "pass"
         },
         {
@@ -5464,7 +5485,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "runtime-orchestration.surfaces.descendant-source-attributed.1.evidenceField",
+          "assertionId": "runtime-orchestration.surfaces.descendant-source-attributed.1.resultField",
           "status": "pass"
         },
         {
@@ -5482,7 +5503,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "runtime-orchestration.surfaces.events-self-only.1.evidenceField",
+          "assertionId": "runtime-orchestration.surfaces.events-self-only.1.resultField",
           "status": "pass"
         },
         {
@@ -5500,7 +5521,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "runtime-orchestration.surfaces.handoff-descendant-agent-preserved.1.evidenceField",
+          "assertionId": "runtime-orchestration.surfaces.handoff-descendant-agent-preserved.1.resultField",
           "status": "pass"
         },
         {
@@ -5518,7 +5539,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "runtime-orchestration.surfaces.no-worker-result-injection.1.evidenceField",
+          "assertionId": "runtime-orchestration.surfaces.no-worker-result-injection.1.resultField",
           "status": "pass"
         },
         {
@@ -5540,16 +5561,16 @@
     "--adapter",
     "[adapter-manifest]"
   ],
-  "exitCode": 0,
+  "exitCode": 1,
   "implementationId": "typescript-framework",
   "nonApplicableCheckIds": [],
   "project": "framework-typescript-conformance-runner",
   "reportLabel": "TypeScript framework runtime baseline",
-  "reportStatus": "full_pass",
-  "status": "pass",
+  "reportStatus": "unexpected_fail",
+  "status": "fail",
   "summary": {
-    "failedChecks": 0,
-    "passedChecks": 265,
+    "failedChecks": 24,
+    "passedChecks": 241,
     "totalChecks": 265,
     "applicableChecks": 265,
     "nonApplicableChecks": 0

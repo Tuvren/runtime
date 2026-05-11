@@ -22,13 +22,11 @@ import {
   DEFAULT_AGENT_SCHEMA,
 } from "../../runtime-core/src/index.ts";
 import {
-  createFakeKernelHarness,
-  createFakeRunLivenessKernelHarness,
-} from "../../runtime-core/test/fake-kernel.ts";
-import {
   type AdapterProjection,
   assistantText,
   collectValues,
+  createConformanceKernelHarness,
+  createConformanceRunLivenessKernelHarness,
   createConformanceIdFactory,
   createStaticDriver,
   DRIVER_ID,
@@ -90,7 +88,7 @@ export function createFrameworkAdapterRecoveryScenarios(
       "payload",
       "runtime.recover-result.stagedObject.payload"
     );
-    const harness = createFakeKernelHarness();
+    const harness = createConformanceKernelHarness();
     const runtime = createTuvrenRuntimeCore({
       createId: createConformanceIdFactory(),
       defaultDriverId: DRIVER_ID,
@@ -161,8 +159,8 @@ export function createFrameworkAdapterRecoveryScenarios(
       typeof scenario.recoveredAssistantText === "string"
         ? scenario.recoveredAssistantText
         : undefined;
-    const harness = createFakeKernelHarness();
-    const livenessHarness = createFakeRunLivenessKernelHarness(harness);
+    const harness = createConformanceKernelHarness();
+    const livenessHarness = createConformanceRunLivenessKernelHarness(harness);
     let executeCalls = 0;
 
     const driver = {
@@ -397,7 +395,7 @@ export function createFrameworkAdapterRecoveryScenarios(
   }
 
   async function stageRecoveredMessage(
-    livenessHarness: ReturnType<typeof createFakeRunLivenessKernelHarness>,
+    livenessHarness: ReturnType<typeof createConformanceRunLivenessKernelHarness>,
     runId: string,
     taskId: string,
     text: string,
@@ -416,7 +414,7 @@ export function createFrameworkAdapterRecoveryScenarios(
   }
 
   async function stageRecoveredRuntimeStatus(
-    livenessHarness: ReturnType<typeof createFakeRunLivenessKernelHarness>,
+    livenessHarness: ReturnType<typeof createConformanceRunLivenessKernelHarness>,
     runId: string,
     taskId: string,
     status: { activeAgent: string; state: "completed" | "running" }

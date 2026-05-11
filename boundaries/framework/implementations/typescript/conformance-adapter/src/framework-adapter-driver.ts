@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 
-import { assertHashString } from "@tuvren/core-types";
-import { assertDriverExecutionResult } from "@tuvren/driver-api";
 import type { ProviderStreamChunk, TuvrenProvider } from "@tuvren/provider-api";
 import type {
   ApprovalDecision,
@@ -30,13 +28,13 @@ import {
   createDriverRegistry,
   createTuvrenRuntimeCore,
 } from "../../runtime-core/src/index.ts";
-import { createFakeKernelHarness } from "../../runtime-core/test/fake-kernel.ts";
 import {
   type AdapterProjection,
   AGENT_NAME,
   assistantText,
   assistantToolCalls,
   collectValues,
+  createConformanceKernelHarness,
   createConformanceIdFactory,
   createDriverExecutionContext,
   createScenarioProvider,
@@ -131,7 +129,7 @@ export function createFrameworkAdapterDriver(
       "toolResult",
       "driver.execute.toolResult"
     );
-    const harness = createFakeKernelHarness();
+    const harness = createConformanceKernelHarness();
     const hooks = createHookCounters();
     let generateCalls = 0;
     let toolCalls = 0;
@@ -254,7 +252,7 @@ export function createFrameworkAdapterDriver(
       })
     );
 
-    assertDriverExecutionResult(result, "driver aroundModel replacement");
+    assertDriverExecutionResultShape(result, "driver aroundModel replacement");
 
     return {
       evidence: {
@@ -309,7 +307,7 @@ export function createFrameworkAdapterDriver(
       })
     );
 
-    assertDriverExecutionResult(result, "driver aroundModel retry");
+    assertDriverExecutionResultShape(result, "driver aroundModel retry");
 
     return {
       evidence: {
@@ -345,7 +343,7 @@ export function createFrameworkAdapterDriver(
       })
     );
 
-    assertDriverExecutionResult(result, "driver execute result");
+    assertDriverExecutionResultShape(result, "driver execute result");
 
     return {
       evidence: {
@@ -390,7 +388,7 @@ export function createFrameworkAdapterDriver(
     }
 
     const resumedFrom = "0".repeat(64);
-    assertHashString(resumedFrom, "driver.resume.resumedFrom");
+    assertHashStringShape(resumedFrom, "driver.resume.resumedFrom");
 
     const result = await driver.resume({
       ...createDriverExecutionContext(),
@@ -411,7 +409,7 @@ export function createFrameworkAdapterDriver(
       resumedFrom,
     });
 
-    assertDriverExecutionResult(result, "driver resume result");
+    assertDriverExecutionResultShape(result, "driver resume result");
 
     return {
       evidence: {
@@ -442,7 +440,7 @@ export function createFrameworkAdapterDriver(
       "finalText",
       "driver.checkpoint.finalText"
     );
-    const harness = createFakeKernelHarness();
+    const harness = createConformanceKernelHarness();
     const runtime = createTuvrenRuntimeCore({
       createId: createConformanceIdFactory(),
       defaultDriverId: DRIVER_ID,
@@ -624,6 +622,29 @@ function readAssistantText(messages: readonly unknown[]): string | undefined {
   }
 
   return undefined;
+}
+
+function assertDriverExecutionResultShape(
+  value: unknown,
+  label: string
+): void {
+  if (!isRecord(value)) {
+    throw new Error(`${label} must be an object`);
+  }
+
+  if (!isRecord(value.resolution)) {
+    throw new Error(`${label} must include a resolution`);
+  }
+
+  if (typeof value.resolution.type !== "string") {
+    throw new Error(`${label}.resolution.type must be a string`);
+  }
+}
+
+function assertHashStringShape(value: unknown, label: string): void {
+  if (typeof value !== "string" || !/^[0-9a-f]{64}$/i.test(value)) {
+    throw new Error(`${label} must be a hex hash string`);
+  }
 }
 
 function createMeasuredExtension(hooks: HookCounters): TuvrenExtension {

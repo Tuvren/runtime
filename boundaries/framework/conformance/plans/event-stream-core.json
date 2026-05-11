@@ -16,7 +16,7 @@
       "input": { "scenarioPath": "$.completed-tool-turn" },
       "assertions": [
         {
-          "kind": "evidenceField",
+          "kind": "resultField",
           "field": "$.frameEvents",
           "equals": [
             "turn.start",
@@ -46,12 +46,12 @@
           ]
         },
         {
-          "kind": "evidenceField",
+          "kind": "resultField",
           "field": "$.sourceEventTypes.0",
           "equals": "turn.start"
         },
         {
-          "kind": "evidenceField",
+          "kind": "resultField",
           "field": "$.framePayloads.10.output.source",
           "equals": "shared event stream scenario"
         }
@@ -65,12 +65,12 @@
       "input": { "scenarioPath": "$.completed-tool-turn" },
       "assertions": [
         {
-          "kind": "evidenceField",
+          "kind": "resultField",
           "field": "$.firstDirectEventType",
           "equals": "turn.start"
         },
         {
-          "kind": "evidenceField",
+          "kind": "resultField",
           "field": "$.firstFrameEvent",
           "equals": "turn.start"
         }
@@ -84,7 +84,7 @@
       "input": { "scenarioPath": "$.completed-tool-turn" },
       "assertions": [
         {
-          "kind": "evidenceField",
+          "kind": "resultField",
           "field": "$.eventTypes",
           "equals": [
             "RUN_STARTED",
@@ -113,12 +113,12 @@
           ]
         },
         {
-          "kind": "evidenceField",
+          "kind": "resultField",
           "field": "$.sourceEventTypes.0",
           "equals": "turn.start"
         },
         {
-          "kind": "evidenceField",
+          "kind": "resultField",
           "field": "$.warningCodes",
           "equals": [
             "agui_state_checkpoint_custom_fallback",
@@ -136,7 +136,7 @@
       "input": { "scenarioPath": "$.failed-provider-turn" },
       "assertions": [
         {
-          "kind": "evidenceField",
+          "kind": "resultField",
           "field": "$.eventTypes",
           "equals": [
             "RUN_STARTED",
@@ -151,12 +151,12 @@
           ]
         },
         {
-          "kind": "evidenceField",
+          "kind": "resultField",
           "field": "$.events.8.rawEvent.type",
           "equals": "error"
         },
         {
-          "kind": "evidenceField",
+          "kind": "resultField",
           "field": "$.events.8.rawEvent.error.code",
           "matches": "^[a-z0-9]+(?:_[a-z0-9]+)*$"
         }
@@ -170,7 +170,7 @@
       "input": { "scenarioPath": "$.paused-approval-turn" },
       "assertions": [
         {
-          "kind": "evidenceField",
+          "kind": "resultField",
           "field": "$.eventTypes",
           "equals": [
             "RUN_STARTED",
@@ -190,12 +190,12 @@
           ]
         },
         {
-          "kind": "evidenceField",
+          "kind": "resultField",
           "field": "$.events.11.rawEvent.type",
           "equals": "approval.requested"
         },
         {
-          "kind": "evidenceField",
+          "kind": "resultField",
           "field": "$.warningCodes",
           "equals": [
             "agui_state_checkpoint_custom_fallback",

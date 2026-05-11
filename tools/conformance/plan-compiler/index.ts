@@ -25,6 +25,7 @@ export type AssertionKind =
   | "terminalEvent"
   | "schemaValid"
   | "errorEnvelope"
+  | "resultField"
   | "stateField"
   | "evidenceField"
   | "ordering"
@@ -230,7 +231,15 @@ function validatePlanIntegrity(plan: ConformancePlan, label: string): void {
         );
       }
 
+      for (const assertion of step.assertions ?? []) {
+        assertValidAssertion(assertion, `${label} check ${check.checkId}`);
+      }
+
       stepIds.add(step.stepId);
+    }
+
+    for (const assertion of check.assertions) {
+      assertValidAssertion(assertion, `${label} check ${check.checkId}`);
     }
 
     if (check.fixture !== undefined && !fixtureIds.has(check.fixture)) {
@@ -244,6 +253,15 @@ function validatePlanIntegrity(plan: ConformancePlan, label: string): void {
         `${label} check ${check.checkId} references unknown scenario ${check.scenario}`
       );
     }
+  }
+}
+
+function assertValidAssertion(
+  assertion: ConformancePlanAssertion,
+  context: string
+): void {
+  if (assertion.kind === "noEvent" && assertion.field !== undefined) {
+    throw new Error(`${context} has field configured on noEvent assertion`);
   }
 }
 

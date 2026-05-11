@@ -274,8 +274,8 @@
             "runtime-orchestration.surfaces.no-worker-result-injection"
           ],
           "checkSummary": {
-            "failedChecks": 0,
-            "passedChecks": 265,
+            "failedChecks": 24,
+            "passedChecks": 241,
             "totalChecks": 265,
             "applicableChecks": 265,
             "nonApplicableChecks": 0
@@ -294,8 +294,8 @@
           ],
           "evidencePath": "reports/compatibility/evidence/shared-conformance-runner.typescript-framework.json",
           "reportLabel": "TypeScript framework runtime baseline",
-          "reportStatus": "full_pass",
-          "status": "pass",
+          "reportStatus": "unexpected_fail",
+          "status": "fail",
           "suiteId": "tuvren.framework.promoted-authority",
           "suiteVersion": "0.1.0"
         }
@@ -619,7 +619,7 @@
           "evidencePath": "reports/compatibility/evidence/shared-conformance-runner.rust-framework.json",
           "reportLabel": "Rust framework unsupported stub",
           "reportStatus": "unsupported",
-          "status": "pass",
+          "status": "unsupported",
           "suiteId": "tuvren.framework.promoted-authority",
           "suiteVersion": "0.1.0"
         }

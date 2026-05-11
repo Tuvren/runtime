@@ -71,6 +71,7 @@
                     "terminalEvent",
                     "schemaValid",
                     "errorEnvelope",
+                    "resultField",
                     "stateField",
                     "evidenceField",
                     "ordering",
@@ -87,7 +88,8 @@
                 "field": { "type": "string", "minLength": 1 },
                 "eventType": { "type": "string", "minLength": 1 }
               }
-            }
+            },
+            "default": []
           },
           "steps": {
             "type": "array",
@@ -122,6 +124,7 @@
                           "terminalEvent",
                           "schemaValid",
                           "errorEnvelope",
+                          "resultField",
                           "stateField",
                           "evidenceField",
                           "ordering",

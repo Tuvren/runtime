@@ -14,9 +14,7 @@
  * limitations under the License.
  */
 
-import { assertHashString, type HashString } from "@tuvren/core-types";
 import type { DriverExecutionContext } from "@tuvren/driver-api";
-import { assertDriverExecutionResult } from "@tuvren/driver-api";
 import type { ProviderStreamChunk, TuvrenProvider } from "@tuvren/provider-api";
 import type {
   StructuredOutputRequest,
@@ -33,7 +31,6 @@ import {
   createDriverRegistry,
   createTuvrenRuntimeCore,
 } from "../../runtime-core/src/index.ts";
-import { createFakeKernelHarness } from "../../runtime-core/test/fake-kernel.ts";
 import {
   type AdapterProjection,
   AGENT_NAME,
@@ -41,6 +38,7 @@ import {
   assistantToolCalls,
   collectValues,
   createClock,
+  createConformanceKernelHarness,
   createConformanceIdFactory,
   createDriverExecutionContext,
   createStaticDriver,
@@ -260,7 +258,7 @@ export function createFrameworkAdapterProviderScenarios(
       "finalText",
       "runtime.tool-execute.finalText"
     );
-    const harness = createFakeKernelHarness();
+    const harness = createConformanceKernelHarness();
     let toolCalls = 0;
     const toolInputs: unknown[] = [];
     const toolOutputs: unknown[] = [];
@@ -391,7 +389,10 @@ export function createFrameworkAdapterProviderScenarios(
       })
     );
 
-    assertDriverExecutionResult(result, "structured validation result");
+    assertDriverExecutionResultShape(
+      result,
+      "structured validation result"
+    );
 
     return {
       evidence: {
@@ -432,7 +433,7 @@ export function createFrameworkAdapterProviderScenarios(
       "finalText",
       "runtime.context-transform.finalText"
     );
-    const harness = createFakeKernelHarness();
+    const harness = createConformanceKernelHarness();
     const runtime = createTuvrenRuntimeCore({
       createId: createConformanceIdFactory(),
       defaultDriverId: DRIVER_ID,
@@ -541,8 +542,8 @@ export function createFrameworkAdapterProviderScenarios(
     runToolExecution,
   };
 
-  function readCheckpointHashes(events: readonly unknown[]): HashString[] {
-    const hashes: HashString[] = [];
+  function readCheckpointHashes(events: readonly unknown[]): string[] {
+    const hashes: string[] = [];
 
     for (const event of events) {
       if (!isRecord(event) || event.type !== "state.checkpoint") {
@@ -555,7 +556,7 @@ export function createFrameworkAdapterProviderScenarios(
         continue;
       }
 
-      assertHashString(turnNodeHash, "state.checkpoint.turnNodeHash");
+      assertHashStringShape(turnNodeHash, "state.checkpoint.turnNodeHash");
       hashes.push(turnNodeHash);
     }
 
@@ -623,6 +624,29 @@ export function createFrameworkAdapterProviderScenarios(
         "runtime.tool-execute.toolCall"
       ),
     ];
+  }
+
+  function assertDriverExecutionResultShape(
+    value: unknown,
+    label: string
+  ): void {
+    if (!isRecord(value)) {
+      throw new Error(`${label} must be an object`);
+    }
+
+    if (!isRecord(value.resolution)) {
+      throw new Error(`${label} must include a resolution`);
+    }
+
+    if (typeof value.resolution.type !== "string") {
+      throw new Error(`${label}.resolution.type must be a string`);
+    }
+  }
+
+  function assertHashStringShape(value: unknown, label: string): void {
+    if (typeof value !== "string" || !/^[0-9a-f]{64}$/i.test(value)) {
+      throw new Error(`${label} must be a hex hash string`);
+    }
   }
 }
 

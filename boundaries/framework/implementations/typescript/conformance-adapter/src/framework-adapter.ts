@@ -22,11 +22,7 @@ import type {
   TuvrenModelResponse,
   TuvrenPrompt,
 } from "@tuvren/runtime-api";
-import {
-  assertProviderStreamChunk,
-  assertTuvrenMessage,
-  assertTuvrenModelResponse,
-} from "@tuvren/runtime-api";
+import { assertTuvrenMessage } from "@tuvren/runtime-api";
 import {
   type AdapterCapabilities,
   type AdapterControls,
@@ -458,7 +454,7 @@ function readModelResponseProperty(
   label: string
 ): TuvrenModelResponse {
   const value = readRecordProperty(source, key, label);
-  assertTuvrenModelResponse(value, label);
+  assertTuvrenModelResponseShape(value, label);
   return structuredClone(value);
 }
 
@@ -468,7 +464,7 @@ function readModelResponseArrayProperty(
   label: string
 ): TuvrenModelResponse[] {
   return readArrayProperty(source, key, label).map((value, index) => {
-    assertTuvrenModelResponse(value, `${label}[${index}]`);
+    assertTuvrenModelResponseShape(value, `${label}[${index}]`);
     return structuredClone(value);
   });
 }
@@ -507,7 +503,7 @@ function readProviderStreamChunks(
 ): ProviderStreamChunk[] {
   const values = readArrayProperty(scenario, "streamChunks", label);
   return values.map((value, index) => {
-    assertProviderStreamChunk(value, `${label}[${index}]`);
+    assertProviderStreamChunkShape(value, `${label}[${index}]`);
     return structuredClone(value);
   });
 }
@@ -540,6 +536,32 @@ function readResponseFormat(
     schema,
     ...(strict === undefined ? {} : { strict }),
   };
+}
+
+function assertTuvrenModelResponseShape(
+  value: unknown,
+  label: string
+): asserts value is TuvrenModelResponse {
+  if (!isRecord(value)) {
+    throw new Error(`${label} must be a provider response object`);
+  }
+
+  if (!Array.isArray(value.parts)) {
+    throw new Error(`${label} must include response parts`);
+  }
+}
+
+function assertProviderStreamChunkShape(
+  value: unknown,
+  label: string
+): asserts value is ProviderStreamChunk {
+  if (!isRecord(value)) {
+    throw new Error(`${label} must be a provider stream chunk`);
+  }
+
+  if (typeof value.type !== "string") {
+    throw new Error(`${label} must include a chunk type`);
+  }
 }
 
 function readScenarioToolCalls(

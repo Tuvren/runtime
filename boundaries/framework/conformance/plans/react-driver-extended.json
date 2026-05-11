@@ -8,7 +8,7 @@
         {
           "equals": 2,
           "field": "$.hooks.beforeIteration",
-          "kind": "evidenceField"
+          "kind": "resultField"
         }
       ],
       "checkId": "react-driver-ext.before-iteration-twice",
@@ -24,7 +24,7 @@
         {
           "equals": 2,
           "field": "$.hooks.aroundModel",
-          "kind": "evidenceField"
+          "kind": "resultField"
         }
       ],
       "checkId": "react-driver-ext.around-model-twice",
@@ -40,7 +40,7 @@
         {
           "equals": 2,
           "field": "$.hooks.afterIteration",
-          "kind": "evidenceField"
+          "kind": "resultField"
         }
       ],
       "checkId": "react-driver-ext.after-iteration-twice",
@@ -56,7 +56,7 @@
         {
           "equals": 1,
           "field": "$.hooks.aroundTool",
-          "kind": "evidenceField"
+          "kind": "resultField"
         }
       ],
       "checkId": "react-driver-ext.around-tool-once",
@@ -71,7 +71,7 @@
       "assertions": [
         {
           "field": "$.hooks.beforeIteration",
-          "kind": "evidenceField"
+          "kind": "resultField"
         }
       ],
       "checkId": "react-driver-ext.hook-field-present.before-iteration-present",
@@ -86,7 +86,7 @@
       "assertions": [
         {
           "field": "$.hooks.afterIteration",
-          "kind": "evidenceField"
+          "kind": "resultField"
         }
       ],
       "checkId": "react-driver-ext.hook-field-present.after-iteration-present",
@@ -101,7 +101,7 @@
       "assertions": [
         {
           "field": "$.hooks.aroundModel",
-          "kind": "evidenceField"
+          "kind": "resultField"
         }
       ],
       "checkId": "react-driver-ext.hook-field-present.around-model-present",
@@ -116,7 +116,7 @@
       "assertions": [
         {
           "field": "$.hooks.aroundTool",
-          "kind": "evidenceField"
+          "kind": "resultField"
         }
       ],
       "checkId": "react-driver-ext.hook-field-present.around-tool-present",
@@ -168,7 +168,7 @@
             "afterIteration"
           ],
           "field": "$.hooks.phaseTrace",
-          "kind": "evidenceField"
+          "kind": "resultField"
         }
       ],
       "checkId": "react-driver-af.extension.phase-order-before-around-after",
@@ -184,7 +184,7 @@
         {
           "equals": ["aroundTool.before", "tool.execute", "aroundTool.after"],
           "field": "$.hooks.aroundToolTrace",
-          "kind": "evidenceField"
+          "kind": "resultField"
         }
       ],
       "checkId": "react-driver-af.extension.around-tool-nesting",
@@ -200,17 +200,17 @@
         {
           "equals": "modified",
           "field": "$.aroundModel.finalAssistantText",
-          "kind": "evidenceField"
+          "kind": "resultField"
         },
         {
           "equals": ["provider"],
           "field": "$.aroundModel.streamedTextDone",
-          "kind": "evidenceField"
+          "kind": "resultField"
         },
         {
           "equals": 1,
           "field": "$.aroundModel.messageStartCount",
-          "kind": "evidenceField"
+          "kind": "resultField"
         }
       ],
       "checkId": "react-driver-af.around-model-post-stream-replacement",
@@ -230,12 +230,12 @@
         {
           "equals": 2,
           "field": "$.provider.generate.callCount",
-          "kind": "evidenceField"
+          "kind": "resultField"
         },
         {
           "equals": "second attempt",
           "field": "$.aroundModel.finalAssistantText",
-          "kind": "evidenceField"
+          "kind": "resultField"
         }
       ],
       "checkId": "react-driver-af.around-model-retry-final-response-durable",
@@ -254,12 +254,12 @@
         {
           "equals": true,
           "field": "$.hooks.terminalMutationAttempted",
-          "kind": "evidenceField"
+          "kind": "resultField"
         },
         {
           "equals": "driver hook turn completed",
           "field": "$.hooks.terminalMutationDurableText",
-          "kind": "evidenceField"
+          "kind": "resultField"
         }
       ],
       "checkId": "react-driver-af.extension.after-iteration-terminal-state-nondurable",

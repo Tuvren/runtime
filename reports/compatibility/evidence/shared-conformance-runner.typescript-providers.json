@@ -12,7 +12,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "providers-ext.approval.error-code-stable.1.evidenceField",
+          "assertionId": "providers-ext.approval.error-code-stable.1.resultField",
           "status": "pass"
         },
         {
@@ -30,7 +30,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "providers-ext.approval.error-reason-stable.1.evidenceField",
+          "assertionId": "providers-ext.approval.error-reason-stable.1.resultField",
           "status": "pass"
         },
         {
@@ -48,7 +48,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "providers-ext.strict.error-code-stable.1.evidenceField",
+          "assertionId": "providers-ext.strict.error-code-stable.1.resultField",
           "status": "pass"
         },
         {
@@ -66,7 +66,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "providers-ext.strict.error-reason-stable.1.evidenceField",
+          "assertionId": "providers-ext.strict.error-reason-stable.1.resultField",
           "status": "pass"
         },
         {
@@ -84,7 +84,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "providers-ext.strict.provider-call-count-zero.1.evidenceField",
+          "assertionId": "providers-ext.strict.provider-call-count-zero.1.resultField",
           "status": "pass"
         },
         {
@@ -102,7 +102,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "providers-ext.strict.stream-call-count-zero.1.evidenceField",
+          "assertionId": "providers-ext.strict.stream-call-count-zero.1.resultField",
           "status": "pass"
         },
         {
@@ -120,7 +120,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "providers-ext.strict.stream-error-code-stable.1.evidenceField",
+          "assertionId": "providers-ext.strict.stream-error-code-stable.1.resultField",
           "status": "pass"
         },
         {
@@ -138,7 +138,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "providers-ext.strict.stream-error-reason-stable.1.evidenceField",
+          "assertionId": "providers-ext.strict.stream-error-reason-stable.1.resultField",
           "status": "pass"
         },
         {
@@ -156,7 +156,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "providers-ext.tool-execution.generate-error-code-stable.1.evidenceField",
+          "assertionId": "providers-ext.tool-execution.generate-error-code-stable.1.resultField",
           "status": "pass"
         },
         {
@@ -174,7 +174,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "providers-ext.tool-execution.generate-error-reason-stable.1.evidenceField",
+          "assertionId": "providers-ext.tool-execution.generate-error-reason-stable.1.resultField",
           "status": "pass"
         },
         {
@@ -192,7 +192,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "providers-ext.tool-execution.stream-error-code-stable.1.evidenceField",
+          "assertionId": "providers-ext.tool-execution.stream-error-code-stable.1.resultField",
           "status": "pass"
         },
         {
@@ -210,7 +210,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "providers-ext.tool-execution.stream-error-reason-stable.1.evidenceField",
+          "assertionId": "providers-ext.tool-execution.stream-error-reason-stable.1.resultField",
           "status": "pass"
         },
         {
@@ -228,7 +228,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "providers-ext.tool-result.generate-does-not-resolve.1.evidenceField",
+          "assertionId": "providers-ext.tool-result.generate-does-not-resolve.1.resultField",
           "status": "pass"
         },
         {
@@ -246,7 +246,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "providers-ext.tool-result.generate-error-code-stable.1.evidenceField",
+          "assertionId": "providers-ext.tool-result.generate-error-code-stable.1.resultField",
           "status": "pass"
         },
         {
@@ -264,7 +264,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "providers-ext.tool-result.generate-error-reason-stable.1.evidenceField",
+          "assertionId": "providers-ext.tool-result.generate-error-reason-stable.1.resultField",
           "status": "pass"
         },
         {
@@ -282,7 +282,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "providers-ext.tool-result.stream-emits-no-canonical-chunks.1.evidenceField",
+          "assertionId": "providers-ext.tool-result.stream-emits-no-canonical-chunks.1.resultField",
           "status": "pass"
         },
         {
@@ -300,7 +300,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "providers-ext.tool-result.stream-error-code-stable.1.evidenceField",
+          "assertionId": "providers-ext.tool-result.stream-error-code-stable.1.resultField",
           "status": "pass"
         },
         {
@@ -318,7 +318,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "providers-ext.tool-result.stream-error-reason-stable.1.evidenceField",
+          "assertionId": "providers-ext.tool-result.stream-error-reason-stable.1.resultField",
           "status": "pass"
         },
         {
@@ -336,19 +336,19 @@
     {
       "assertionResults": [
         {
-          "assertionId": "providers.bridge.generate_mapping.1.evidenceField",
+          "assertionId": "providers.bridge.generate_mapping.1.resultField",
           "status": "pass"
         },
         {
-          "assertionId": "providers.bridge.generate_mapping.2.evidenceField",
+          "assertionId": "providers.bridge.generate_mapping.2.resultField",
           "status": "pass"
         },
         {
-          "assertionId": "providers.bridge.generate_mapping.3.evidenceField",
+          "assertionId": "providers.bridge.generate_mapping.3.resultField",
           "status": "pass"
         },
         {
-          "assertionId": "providers.bridge.generate_mapping.4.evidenceField",
+          "assertionId": "providers.bridge.generate_mapping.4.resultField",
           "status": "pass"
         },
         {
@@ -378,11 +378,11 @@
     {
       "assertionResults": [
         {
-          "assertionId": "providers.bridge.provider_failure_normalization.1.evidenceField",
+          "assertionId": "providers.bridge.provider_failure_normalization.1.resultField",
           "status": "pass"
         },
         {
-          "assertionId": "providers.bridge.provider_failure_normalization.2.evidenceField",
+          "assertionId": "providers.bridge.provider_failure_normalization.2.resultField",
           "status": "pass"
         },
         {
@@ -404,11 +404,11 @@
     {
       "assertionResults": [
         {
-          "assertionId": "providers.bridge.stream_metadata_continuity.1.evidenceField",
+          "assertionId": "providers.bridge.stream_metadata_continuity.1.resultField",
           "status": "pass"
         },
         {
-          "assertionId": "providers.bridge.stream_metadata_continuity.2.evidenceField",
+          "assertionId": "providers.bridge.stream_metadata_continuity.2.resultField",
           "status": "pass"
         },
         {
@@ -430,15 +430,15 @@
     {
       "assertionResults": [
         {
-          "assertionId": "providers.bridge.structured_output_stream.1.evidenceField",
+          "assertionId": "providers.bridge.structured_output_stream.1.resultField",
           "status": "pass"
         },
         {
-          "assertionId": "providers.bridge.structured_output_stream.2.evidenceField",
+          "assertionId": "providers.bridge.structured_output_stream.2.resultField",
           "status": "pass"
         },
         {
-          "assertionId": "providers.bridge.structured_output_stream.3.evidenceField",
+          "assertionId": "providers.bridge.structured_output_stream.3.resultField",
           "status": "pass"
         },
         {
@@ -460,7 +460,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "providers-ext.failure.error-code-snake-case.1.evidenceField",
+          "assertionId": "providers-ext.failure.error-code-snake-case.1.resultField",
           "status": "pass"
         },
         {
@@ -478,7 +478,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "providers-ext.failure.error-name-pascal-case.1.evidenceField",
+          "assertionId": "providers-ext.failure.error-name-pascal-case.1.resultField",
           "status": "pass"
         },
         {
@@ -496,7 +496,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "providers-ext.generate.response-format-name-matches-pattern.1.evidenceField",
+          "assertionId": "providers-ext.generate.response-format-name-matches-pattern.1.resultField",
           "status": "pass"
         },
         {
@@ -514,7 +514,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "providers-ext.generate.response-part-types-shape-array.1.evidenceField",
+          "assertionId": "providers-ext.generate.response-part-types-shape-array.1.resultField",
           "status": "pass"
         },
         {
@@ -532,7 +532,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "providers-ext.structured.done-name-matches-identifier.1.evidenceField",
+          "assertionId": "providers-ext.structured.done-name-matches-identifier.1.resultField",
           "status": "pass"
         },
         {
@@ -550,7 +550,7 @@
     {
       "assertionResults": [
         {
-          "assertionId": "providers-ext.structured.first-chunk-is-structured-delta-or-text-delta.1.evidenceField",
+          "assertionId": "providers-ext.structured.first-chunk-is-structured-delta-or-text-delta.1.resultField",
           "status": "pass"
         },
         {

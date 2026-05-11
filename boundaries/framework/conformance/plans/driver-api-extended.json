@@ -8,7 +8,7 @@
         {
           "equals": "completed",
           "field": "$.driver.phase",
-          "kind": "evidenceField"
+          "kind": "resultField"
         }
       ],
       "checkId": "driver-api-ext.execute.hook-turn-phase-completed",
@@ -23,7 +23,7 @@
       "assertions": [
         {
           "field": "$.driver.phase",
-          "kind": "evidenceField",
+          "kind": "resultField",
           "matches": "^(running|paused|completed|failed)$"
         }
       ],
@@ -55,7 +55,7 @@
         {
           "equals": "end_turn",
           "field": "$.driver.resolutionType",
-          "kind": "evidenceField"
+          "kind": "resultField"
         }
       ],
       "checkId": "driver-api-ext.resume.approval-resolution-end-turn",
@@ -71,7 +71,7 @@
         {
           "contains": "call-search",
           "field": "$.driver.pendingToolCallIds",
-          "kind": "evidenceField"
+          "kind": "resultField"
         }
       ],
       "checkId": "driver-api-ext.resume.approval-pending-call-id-list-non-empty",
@@ -87,7 +87,7 @@
         {
           "contains": "call-search",
           "field": "$.driver.approvalDecisionCallIds",
-          "kind": "evidenceField"
+          "kind": "resultField"
         }
       ],
       "checkId": "driver-api-ext.resume.approval-decision-call-id-includes-call-search",
@@ -103,7 +103,7 @@
         {
           "equals": "fail",
           "field": "$.driver.resolutionType",
-          "kind": "evidenceField"
+          "kind": "resultField"
         }
       ],
       "checkId": "driver-api-ext.resume.missing-pending-call-resolution-fail",
@@ -134,12 +134,12 @@
         {
           "equals": "fail",
           "field": "$.driver.resolutionType",
-          "kind": "evidenceField"
+          "kind": "resultField"
         },
         {
           "equals": "invalid_loop_policy",
           "field": "$.driver.errorCode",
-          "kind": "evidenceField"
+          "kind": "resultField"
         }
       ],
       "checkId": "driver-api-af.invalid-loop-policy-tool-call-hard-fail",

@@ -8,7 +8,7 @@
         {
           "contains": "state.snapshot",
           "field": "$.frameEvents",
-          "kind": "evidenceField"
+          "kind": "resultField"
         }
       ],
       "checkId": "event-stream-ext.sse.completed-turn-frame-events-include-state-snapshot",
@@ -24,7 +24,7 @@
         {
           "contains": "iteration.start",
           "field": "$.frameEvents",
-          "kind": "evidenceField"
+          "kind": "resultField"
         }
       ],
       "checkId": "event-stream-ext.sse.completed-turn-frame-events-include-iteration-start",
@@ -40,7 +40,7 @@
         {
           "contains": "tool.result",
           "field": "$.frameEvents",
-          "kind": "evidenceField"
+          "kind": "resultField"
         }
       ],
       "checkId": "event-stream-ext.sse.completed-turn-frame-events-include-tool-result",
@@ -56,7 +56,7 @@
         {
           "contains": "text.delta",
           "field": "$.frameEvents",
-          "kind": "evidenceField"
+          "kind": "resultField"
         }
       ],
       "checkId": "event-stream-ext.sse.completed-turn-frame-events-include-text-delta",
@@ -72,7 +72,7 @@
         {
           "equals": "turn.start",
           "field": "$.sourceEventTypes.0",
-          "kind": "evidenceField"
+          "kind": "resultField"
         }
       ],
       "checkId": "event-stream-ext.sse.completed-turn-source-event-types-start-with-turn-start",
@@ -88,7 +88,7 @@
         {
           "equals": "turn.end",
           "field": "$.frameEvents.23",
-          "kind": "evidenceField"
+          "kind": "resultField"
         }
       ],
       "checkId": "event-stream-ext.sse.completed-turn-frame-events-end-with-turn-end",
@@ -104,7 +104,7 @@
         {
           "contains": "turn.start",
           "field": "$.frameEvents",
-          "kind": "evidenceField"
+          "kind": "resultField"
         }
       ],
       "checkId": "event-stream-ext.sse.completed-turn-frame-events-contain-turn-start",
@@ -120,7 +120,7 @@
         {
           "contains": "turn.end",
           "field": "$.frameEvents",
-          "kind": "evidenceField"
+          "kind": "resultField"
         }
       ],
       "checkId": "event-stream-ext.sse.completed-turn-frame-events-contain-turn-end",
@@ -136,7 +136,7 @@
         {
           "contains": "tool_call.start",
           "field": "$.frameEvents",
-          "kind": "evidenceField"
+          "kind": "resultField"
         }
       ],
       "checkId": "event-stream-ext.sse.completed-turn-frame-events-contain-tool-call-start",
@@ -152,7 +152,7 @@
         {
           "contains": "iteration.end",
           "field": "$.frameEvents",
-          "kind": "evidenceField"
+          "kind": "resultField"
         }
       ],
       "checkId": "event-stream-ext.sse.completed-turn-frame-events-contain-iteration-end",
@@ -164,15 +164,14 @@
       "scenario": "event-stream-scenarios"
     },
     {
+      "evidence": ["sourceEventTypes"],
       "assertions": [
         {
           "eventType": "error",
-          "field": "$.frameEvents",
           "kind": "noEvent"
         }
       ],
       "checkId": "event-stream-ext.sse.completed-turn-no-error-event",
-      "evidence": ["frameEvents"],
       "input": {
         "scenarioPath": "$.completed-tool-turn"
       },
@@ -184,7 +183,7 @@
         {
           "contains": "error",
           "field": "$.frameEvents",
-          "kind": "evidenceField"
+          "kind": "resultField"
         }
       ],
       "checkId": "event-stream-ext.sse.failed-provider-turn-frame-events-include-error",
@@ -200,7 +199,7 @@
         {
           "contains": "approval.requested",
           "field": "$.sourceEventTypes",
-          "kind": "evidenceField"
+          "kind": "resultField"
         }
       ],
       "checkId": "event-stream-ext.sse.paused-approval-turn-source-events-include-approval-requested",
@@ -216,7 +215,7 @@
         {
           "contains": "approval.requested",
           "field": "$.sourceEventTypes",
-          "kind": "evidenceField"
+          "kind": "resultField"
         }
       ],
       "checkId": "event-stream-ext.sse.resumed-approval-turn-source-events-include-approval-requested",
@@ -232,7 +231,7 @@
         {
           "contains": "approval.resolved",
           "field": "$.sourceEventTypes",
-          "kind": "evidenceField"
+          "kind": "resultField"
         }
       ],
       "checkId": "event-stream-ext.sse.resumed-approval-turn-source-events-include-approval-resolved",
@@ -248,7 +247,7 @@
         {
           "contains": "turn.end",
           "field": "$.frameEvents",
-          "kind": "evidenceField"
+          "kind": "resultField"
         }
       ],
       "checkId": "event-stream-ext.sse.resumed-approval-turn-frame-events-contain-turn-end",
@@ -263,7 +262,7 @@
       "assertions": [
         {
           "field": "$.threadIds.0",
-          "kind": "evidenceField"
+          "kind": "resultField"
         }
       ],
       "checkId": "event-stream-ext.sse.resumed-approval-turn-thread-id-present",
@@ -278,7 +277,7 @@
       "assertions": [
         {
           "field": "$.sourceThreadIds.0",
-          "kind": "evidenceField"
+          "kind": "resultField"
         }
       ],
       "checkId": "event-stream-ext.sse.resumed-approval-turn-source-thread-id-present",
@@ -293,7 +292,7 @@
       "assertions": [
         {
           "field": "$.checkpointHashes.0",
-          "kind": "evidenceField",
+          "kind": "resultField",
           "matches": "^[a-f0-9]{64}$"
         }
       ],
@@ -309,7 +308,7 @@
       "assertions": [
         {
           "field": "$.resumedFromHashes.0",
-          "kind": "evidenceField",
+          "kind": "resultField",
           "matches": "^[a-f0-9]{64}$"
         }
       ],
@@ -326,7 +325,7 @@
         {
           "contains": "text.delta",
           "field": "$.sourceEventTypes",
-          "kind": "evidenceField"
+          "kind": "resultField"
         }
       ],
       "checkId": "event-stream-ext.sse.resumed-approval-turn-source-events-include-text-delta",
@@ -342,7 +341,7 @@
         {
           "equals": "turn.start",
           "field": "$.firstDirectEventType",
-          "kind": "evidenceField"
+          "kind": "resultField"
         }
       ],
       "checkId": "event-stream-ext.sse-eager.first-direct-event-turn-start",
@@ -358,7 +357,7 @@
         {
           "equals": "turn.start",
           "field": "$.firstFrameEvent",
-          "kind": "evidenceField"
+          "kind": "resultField"
         }
       ],
       "checkId": "event-stream-ext.sse-eager.first-frame-event-turn-start",
@@ -374,7 +373,7 @@
         {
           "equals": "turn.start",
           "field": "$.firstDirectEventType",
-          "kind": "evidenceField"
+          "kind": "resultField"
         }
       ],
       "checkId": "event-stream-ext.sse-eager.failed-turn-first-direct-event-turn-start",
@@ -390,7 +389,7 @@
         {
           "equals": "turn.start",
           "field": "$.firstFrameEvent",
-          "kind": "evidenceField"
+          "kind": "resultField"
         }
       ],
       "checkId": "event-stream-ext.sse-eager.paused-turn-first-frame-event-turn-start",
@@ -406,7 +405,7 @@
         {
           "contains": "RUN_STARTED",
           "field": "$.eventTypes",
-          "kind": "evidenceField"
+          "kind": "resultField"
         }
       ],
       "checkId": "event-stream-ext.agui.completed-turn-event-types-include-run-started",
@@ -422,7 +421,7 @@
         {
           "contains": "RUN_FINISHED",
           "field": "$.eventTypes",
-          "kind": "evidenceField"
+          "kind": "resultField"
         }
       ],
       "checkId": "event-stream-ext.agui.completed-turn-event-types-include-run-finished",
@@ -438,7 +437,7 @@
         {
           "contains": "STATE_SNAPSHOT",
           "field": "$.eventTypes",
-          "kind": "evidenceField"
+          "kind": "resultField"
         }
       ],
       "checkId": "event-stream-ext.agui.completed-turn-event-types-include-state-snapshot",
@@ -454,7 +453,7 @@
         {
           "contains": "TOOL_CALL_START",
           "field": "$.eventTypes",
-          "kind": "evidenceField"
+          "kind": "resultField"
         }
       ],
       "checkId": "event-stream-ext.agui.completed-turn-event-types-include-tool-call-start",
@@ -470,7 +469,7 @@
         {
           "contains": "TOOL_CALL_RESULT",
           "field": "$.eventTypes",
-          "kind": "evidenceField"
+          "kind": "resultField"
         }
       ],
       "checkId": "event-stream-ext.agui.completed-turn-event-types-include-tool-call-result",
@@ -486,7 +485,7 @@
         {
           "contains": "TEXT_MESSAGE_START",
           "field": "$.eventTypes",
-          "kind": "evidenceField"
+          "kind": "resultField"
         }
       ],
       "checkId": "event-stream-ext.agui.completed-turn-event-types-include-text-message-start",
@@ -502,12 +501,12 @@
         {
           "contains": "RUN_STARTED",
           "field": "$.eventTypes",
-          "kind": "evidenceField"
+          "kind": "resultField"
         },
         {
           "contains": "RUN_FINISHED",
           "field": "$.eventTypes",
-          "kind": "evidenceField"
+          "kind": "resultField"
         }
       ],
       "checkId": "event-stream-ext.agui.completed-turn-event-types-include-run-started-and-finished",
@@ -523,7 +522,7 @@
         {
           "contains": "agui_state_checkpoint_custom_fallback",
           "field": "$.warningCodes",
-          "kind": "evidenceField"
+          "kind": "resultField"
         }
       ],
       "checkId": "event-stream-ext.agui.completed-turn-warnings-include-checkpoint-fallback",
@@ -539,7 +538,7 @@
         {
           "equals": "RUN_ERROR",
           "field": "$.eventTypes.8",
-          "kind": "evidenceField"
+          "kind": "resultField"
         }
       ],
       "checkId": "event-stream-ext.agui.failed-turn-event-types-end-with-run-error",
@@ -554,7 +553,7 @@
       "assertions": [
         {
           "field": "$.events.8.rawEvent.error.code",
-          "kind": "evidenceField",
+          "kind": "resultField",
           "matches": "^[a-z0-9]+(?:_[a-z0-9]+)*$"
         }
       ],
@@ -571,7 +570,7 @@
         {
           "contains": "agui_paused_turn_coerced_to_run_finished",
           "field": "$.warningCodes",
-          "kind": "evidenceField"
+          "kind": "resultField"
         }
       ],
       "checkId": "event-stream-ext.agui.paused-turn-warnings-include-paused-coercion",
@@ -587,7 +586,7 @@
         {
           "equals": "turn.start",
           "field": "$.frameEvents.0",
-          "kind": "evidenceField"
+          "kind": "resultField"
         }
       ],
       "checkId": "event-stream-ext.sse.completed-turn-frame-event-00",
@@ -603,7 +602,7 @@
         {
           "equals": "state.checkpoint",
           "field": "$.frameEvents.1",
-          "kind": "evidenceField"
+          "kind": "resultField"
         }
       ],
       "checkId": "event-stream-ext.sse.completed-turn-frame-event-01",
@@ -619,7 +618,7 @@
         {
           "equals": "state.snapshot",
           "field": "$.frameEvents.2",
-          "kind": "evidenceField"
+          "kind": "resultField"
         }
       ],
       "checkId": "event-stream-ext.sse.completed-turn-frame-event-02",
@@ -635,7 +634,7 @@
         {
           "equals": "iteration.start",
           "field": "$.frameEvents.3",
-          "kind": "evidenceField"
+          "kind": "resultField"
         }
       ],
       "checkId": "event-stream-ext.sse.completed-turn-frame-event-03",
@@ -651,7 +650,7 @@
         {
           "equals": "message.start",
           "field": "$.frameEvents.4",
-          "kind": "evidenceField"
+          "kind": "resultField"
         }
       ],
       "checkId": "event-stream-ext.sse.completed-turn-frame-event-04",
@@ -667,7 +666,7 @@
         {
           "equals": "tool_call.start",
           "field": "$.frameEvents.5",
-          "kind": "evidenceField"
+          "kind": "resultField"
         }
       ],
       "checkId": "event-stream-ext.sse.completed-turn-frame-event-05",
@@ -683,7 +682,7 @@
         {
           "equals": "tool_call.args_delta",
           "field": "$.frameEvents.6",
-          "kind": "evidenceField"
+          "kind": "resultField"
         }
       ],
       "checkId": "event-stream-ext.sse.completed-turn-frame-event-06",
@@ -699,7 +698,7 @@
         {
           "equals": "tool_call.done",
           "field": "$.frameEvents.7",
-          "kind": "evidenceField"
+          "kind": "resultField"
         }
       ],
       "checkId": "event-stream-ext.sse.completed-turn-frame-event-07",
@@ -715,7 +714,7 @@
         {
           "equals": "message.done",
           "field": "$.frameEvents.8",
-          "kind": "evidenceField"
+          "kind": "resultField"
         }
       ],
       "checkId": "event-stream-ext.sse.completed-turn-frame-event-08",
@@ -731,7 +730,7 @@
         {
           "equals": "tool.start",
           "field": "$.frameEvents.9",
-          "kind": "evidenceField"
+          "kind": "resultField"
         }
       ],
       "checkId": "event-stream-ext.sse.completed-turn-frame-event-09",
@@ -747,7 +746,7 @@
         {
           "equals": "tool.result",
           "field": "$.frameEvents.10",
-          "kind": "evidenceField"
+          "kind": "resultField"
         }
       ],
       "checkId": "event-stream-ext.sse.completed-turn-frame-event-10",
@@ -763,7 +762,7 @@
         {
           "equals": "state.checkpoint",
           "field": "$.frameEvents.11",
-          "kind": "evidenceField"
+          "kind": "resultField"
         }
       ],
       "checkId": "event-stream-ext.sse.completed-turn-frame-event-11",
@@ -779,7 +778,7 @@
         {
           "equals": "state.snapshot",
           "field": "$.frameEvents.12",
-          "kind": "evidenceField"
+          "kind": "resultField"
         }
       ],
       "checkId": "event-stream-ext.sse.completed-turn-frame-event-12",
@@ -795,7 +794,7 @@
         {
           "equals": "iteration.end",
           "field": "$.frameEvents.13",
-          "kind": "evidenceField"
+          "kind": "resultField"
         }
       ],
       "checkId": "event-stream-ext.sse.completed-turn-frame-event-13",
@@ -811,7 +810,7 @@
         {
           "equals": "iteration.start",
           "field": "$.frameEvents.14",
-          "kind": "evidenceField"
+          "kind": "resultField"
         }
       ],
       "checkId": "event-stream-ext.sse.completed-turn-frame-event-14",
@@ -827,7 +826,7 @@
         {
           "equals": "message.start",
           "field": "$.frameEvents.15",
-          "kind": "evidenceField"
+          "kind": "resultField"
         }
       ],
       "checkId": "event-stream-ext.sse.completed-turn-frame-event-15",
@@ -843,7 +842,7 @@
         {
           "equals": "text.delta",
           "field": "$.frameEvents.16",
-          "kind": "evidenceField"
+          "kind": "resultField"
         }
       ],
       "checkId": "event-stream-ext.sse.completed-turn-frame-event-16",
@@ -859,7 +858,7 @@
         {
           "equals": "text.done",
           "field": "$.frameEvents.17",
-          "kind": "evidenceField"
+          "kind": "resultField"
         }
       ],
       "checkId": "event-stream-ext.sse.completed-turn-frame-event-17",
@@ -875,7 +874,7 @@
         {
           "equals": "message.done",
           "field": "$.frameEvents.18",
-          "kind": "evidenceField"
+          "kind": "resultField"
         }
       ],
       "checkId": "event-stream-ext.sse.completed-turn-frame-event-18",
@@ -891,7 +890,7 @@
         {
           "equals": "state.checkpoint",
           "field": "$.frameEvents.19",
-          "kind": "evidenceField"
+          "kind": "resultField"
         }
       ],
       "checkId": "event-stream-ext.sse.completed-turn-frame-event-19",
@@ -907,7 +906,7 @@
         {
           "equals": "state.snapshot",
           "field": "$.frameEvents.20",
-          "kind": "evidenceField"
+          "kind": "resultField"
         }
       ],
       "checkId": "event-stream-ext.sse.completed-turn-frame-event-20",
@@ -923,7 +922,7 @@
         {
           "equals": "iteration.end",
           "field": "$.frameEvents.21",
-          "kind": "evidenceField"
+          "kind": "resultField"
         }
       ],
       "checkId": "event-stream-ext.sse.completed-turn-frame-event-21",
@@ -939,7 +938,7 @@
         {
           "equals": "state.checkpoint",
           "field": "$.frameEvents.22",
-          "kind": "evidenceField"
+          "kind": "resultField"
         }
       ],
       "checkId": "event-stream-ext.sse.completed-turn-frame-event-22",
@@ -955,7 +954,7 @@
         {
           "equals": "turn.end",
           "field": "$.frameEvents.23",
-          "kind": "evidenceField"
+          "kind": "resultField"
         }
       ],
       "checkId": "event-stream-ext.sse.completed-turn-frame-event-23",
@@ -971,7 +970,7 @@
         {
           "equals": "RUN_STARTED",
           "field": "$.eventTypes.0",
-          "kind": "evidenceField"
+          "kind": "resultField"
         }
       ],
       "checkId": "event-stream-ext.agui.completed-turn-event-00",
@@ -987,7 +986,7 @@
         {
           "equals": "CUSTOM",
           "field": "$.eventTypes.1",
-          "kind": "evidenceField"
+          "kind": "resultField"
         }
       ],
       "checkId": "event-stream-ext.agui.completed-turn-event-01",
@@ -1003,7 +1002,7 @@
         {
           "equals": "STATE_SNAPSHOT",
           "field": "$.eventTypes.2",
-          "kind": "evidenceField"
+          "kind": "resultField"
         }
       ],
       "checkId": "event-stream-ext.agui.completed-turn-event-02",
@@ -1019,7 +1018,7 @@
         {
           "equals": "STEP_STARTED",
           "field": "$.eventTypes.3",
-          "kind": "evidenceField"
+          "kind": "resultField"
         }
       ],
       "checkId": "event-stream-ext.agui.completed-turn-event-03",
@@ -1035,7 +1034,7 @@
         {
           "equals": "TOOL_CALL_START",
           "field": "$.eventTypes.4",
-          "kind": "evidenceField"
+          "kind": "resultField"
         }
       ],
       "checkId": "event-stream-ext.agui.completed-turn-event-04",
@@ -1051,7 +1050,7 @@
         {
           "equals": "TOOL_CALL_ARGS",
           "field": "$.eventTypes.5",
-          "kind": "evidenceField"
+          "kind": "resultField"
         }
       ],
       "checkId": "event-stream-ext.agui.completed-turn-event-05",
@@ -1067,7 +1066,7 @@
         {
           "equals": "TOOL_CALL_END",
           "field": "$.eventTypes.6",
-          "kind": "evidenceField"
+          "kind": "resultField"
         }
       ],
       "checkId": "event-stream-ext.agui.completed-turn-event-06",
@@ -1083,7 +1082,7 @@
         {
           "equals": "CUSTOM",
           "field": "$.eventTypes.7",
-          "kind": "evidenceField"
+          "kind": "resultField"
         }
       ],
       "checkId": "event-stream-ext.agui.completed-turn-event-07",
@@ -1099,7 +1098,7 @@
         {
           "equals": "CUSTOM",
           "field": "$.eventTypes.8",
-          "kind": "evidenceField"
+          "kind": "resultField"
         }
       ],
       "checkId": "event-stream-ext.agui.completed-turn-event-08",
@@ -1115,7 +1114,7 @@
         {
           "equals": "TOOL_CALL_RESULT",
           "field": "$.eventTypes.9",
-          "kind": "evidenceField"
+          "kind": "resultField"
         }
       ],
       "checkId": "event-stream-ext.agui.completed-turn-event-09",
@@ -1131,7 +1130,7 @@
         {
           "equals": "CUSTOM",
           "field": "$.eventTypes.10",
-          "kind": "evidenceField"
+          "kind": "resultField"
         }
       ],
       "checkId": "event-stream-ext.agui.completed-turn-event-10",
@@ -1147,7 +1146,7 @@
         {
           "equals": "STATE_SNAPSHOT",
           "field": "$.eventTypes.11",
-          "kind": "evidenceField"
+          "kind": "resultField"
         }
       ],
       "checkId": "event-stream-ext.agui.completed-turn-event-11",
@@ -1163,7 +1162,7 @@
         {
           "equals": "STEP_FINISHED",
           "field": "$.eventTypes.12",
-          "kind": "evidenceField"
+          "kind": "resultField"
         }
       ],
       "checkId": "event-stream-ext.agui.completed-turn-event-12",
@@ -1179,7 +1178,7 @@
         {
           "equals": "STEP_STARTED",
           "field": "$.eventTypes.13",
-          "kind": "evidenceField"
+          "kind": "resultField"
         }
       ],
       "checkId": "event-stream-ext.agui.completed-turn-event-13",
@@ -1195,7 +1194,7 @@
         {
           "equals": "TEXT_MESSAGE_START",
           "field": "$.eventTypes.14",
-          "kind": "evidenceField"
+          "kind": "resultField"
         }
       ],
       "checkId": "event-stream-ext.agui.completed-turn-event-14",
@@ -1211,7 +1210,7 @@
         {
           "equals": "TEXT_MESSAGE_CONTENT",
           "field": "$.eventTypes.15",
-          "kind": "evidenceField"
+          "kind": "resultField"
         }
       ],
       "checkId": "event-stream-ext.agui.completed-turn-event-15",
@@ -1227,7 +1226,7 @@
         {
           "equals": "TEXT_MESSAGE_END",
           "field": "$.eventTypes.16",
-          "kind": "evidenceField"
+          "kind": "resultField"
         }
       ],
       "checkId": "event-stream-ext.agui.completed-turn-event-16",
@@ -1243,7 +1242,7 @@
         {
           "equals": "CUSTOM",
           "field": "$.eventTypes.17",
-          "kind": "evidenceField"
+          "kind": "resultField"
         }
       ],
       "checkId": "event-stream-ext.agui.completed-turn-event-17",
@@ -1259,7 +1258,7 @@
         {
           "equals": "CUSTOM",
           "field": "$.eventTypes.18",
-          "kind": "evidenceField"
+          "kind": "resultField"
         }
       ],
       "checkId": "event-stream-ext.agui.completed-turn-event-18",
@@ -1275,7 +1274,7 @@
         {
           "equals": "STATE_SNAPSHOT",
           "field": "$.eventTypes.19",
-          "kind": "evidenceField"
+          "kind": "resultField"
         }
       ],
       "checkId": "event-stream-ext.agui.completed-turn-event-19",
@@ -1291,7 +1290,7 @@
         {
           "equals": "STEP_FINISHED",
           "field": "$.eventTypes.20",
-          "kind": "evidenceField"
+          "kind": "resultField"
         }
       ],
       "checkId": "event-stream-ext.agui.completed-turn-event-20",
@@ -1307,7 +1306,7 @@
         {
           "equals": "CUSTOM",
           "field": "$.eventTypes.21",
-          "kind": "evidenceField"
+          "kind": "resultField"
         }
       ],
       "checkId": "event-stream-ext.agui.completed-turn-event-21",
@@ -1323,7 +1322,7 @@
         {
           "equals": "RUN_FINISHED",
           "field": "$.eventTypes.22",
-          "kind": "evidenceField"
+          "kind": "resultField"
         }
       ],
       "checkId": "event-stream-ext.agui.completed-turn-event-22",
@@ -1339,7 +1338,7 @@
         {
           "equals": "RUN_STARTED",
           "field": "$.eventTypes.0",
-          "kind": "evidenceField"
+          "kind": "resultField"
         }
       ],
       "checkId": "event-stream-ext.agui.failed-turn-event-00",
@@ -1355,7 +1354,7 @@
         {
           "equals": "CUSTOM",
           "field": "$.eventTypes.1",
-          "kind": "evidenceField"
+          "kind": "resultField"
         }
       ],
       "checkId": "event-stream-ext.agui.failed-turn-event-01",
@@ -1371,7 +1370,7 @@
         {
           "equals": "STATE_SNAPSHOT",
           "field": "$.eventTypes.2",
-          "kind": "evidenceField"
+          "kind": "resultField"
         }
       ],
       "checkId": "event-stream-ext.agui.failed-turn-event-02",
@@ -1387,7 +1386,7 @@
         {
           "equals": "STEP_STARTED",
           "field": "$.eventTypes.3",
-          "kind": "evidenceField"
+          "kind": "resultField"
         }
       ],
       "checkId": "event-stream-ext.agui.failed-turn-event-03",
@@ -1403,7 +1402,7 @@
         {
           "equals": "CUSTOM",
           "field": "$.eventTypes.4",
-          "kind": "evidenceField"
+          "kind": "resultField"
         }
       ],
       "checkId": "event-stream-ext.agui.failed-turn-event-04",
@@ -1419,7 +1418,7 @@
         {
           "equals": "STATE_SNAPSHOT",
           "field": "$.eventTypes.5",
-          "kind": "evidenceField"
+          "kind": "resultField"
         }
       ],
       "checkId": "event-stream-ext.agui.failed-turn-event-05",
@@ -1435,7 +1434,7 @@
         {
           "equals": "STEP_FINISHED",
           "field": "$.eventTypes.6",
-          "kind": "evidenceField"
+          "kind": "resultField"
         }
       ],
       "checkId": "event-stream-ext.agui.failed-turn-event-06",
@@ -1451,7 +1450,7 @@
         {
           "equals": "CUSTOM",
           "field": "$.eventTypes.7",
-          "kind": "evidenceField"
+          "kind": "resultField"
         }
       ],
       "checkId": "event-stream-ext.agui.failed-turn-event-07",
@@ -1467,7 +1466,7 @@
         {
           "equals": "RUN_ERROR",
           "field": "$.eventTypes.8",
-          "kind": "evidenceField"
+          "kind": "resultField"
         }
       ],
       "checkId": "event-stream-ext.agui.failed-turn-event-08",
@@ -1483,7 +1482,7 @@
         {
           "equals": "RUN_STARTED",
           "field": "$.eventTypes.0",
-          "kind": "evidenceField"
+          "kind": "resultField"
         }
       ],
       "checkId": "event-stream-ext.agui.paused-turn-event-00",
@@ -1499,7 +1498,7 @@
         {
           "equals": "CUSTOM",
           "field": "$.eventTypes.1",
-          "kind": "evidenceField"
+          "kind": "resultField"
         }
       ],
       "checkId": "event-stream-ext.agui.paused-turn-event-01",
@@ -1515,7 +1514,7 @@
         {
           "equals": "STATE_SNAPSHOT",
           "field": "$.eventTypes.2",
-          "kind": "evidenceField"
+          "kind": "resultField"
         }
       ],
       "checkId": "event-stream-ext.agui.paused-turn-event-02",
@@ -1531,7 +1530,7 @@
         {
           "equals": "STEP_STARTED",
           "field": "$.eventTypes.3",
-          "kind": "evidenceField"
+          "kind": "resultField"
         }
       ],
       "checkId": "event-stream-ext.agui.paused-turn-event-03",
@@ -1547,7 +1546,7 @@
         {
           "equals": "TOOL_CALL_START",
           "field": "$.eventTypes.4",
-          "kind": "evidenceField"
+          "kind": "resultField"
         }
       ],
       "checkId": "event-stream-ext.agui.paused-turn-event-04",
@@ -1563,7 +1562,7 @@
         {
           "equals": "TOOL_CALL_ARGS",
           "field": "$.eventTypes.5",
-          "kind": "evidenceField"
+          "kind": "resultField"
         }
       ],
       "checkId": "event-stream-ext.agui.paused-turn-event-05",
@@ -1579,7 +1578,7 @@
         {
           "equals": "TOOL_CALL_END",
           "field": "$.eventTypes.6",
-          "kind": "evidenceField"
+          "kind": "resultField"
         }
       ],
       "checkId": "event-stream-ext.agui.paused-turn-event-06",
@@ -1595,7 +1594,7 @@
         {
           "equals": "CUSTOM",
           "field": "$.eventTypes.7",
-          "kind": "evidenceField"
+          "kind": "resultField"
         }
       ],
       "checkId": "event-stream-ext.agui.paused-turn-event-07",
@@ -1611,7 +1610,7 @@
         {
           "equals": "CUSTOM",
           "field": "$.eventTypes.8",
-          "kind": "evidenceField"
+          "kind": "resultField"
         }
       ],
       "checkId": "event-stream-ext.agui.paused-turn-event-08",
@@ -1627,7 +1626,7 @@
         {
           "equals": "STATE_SNAPSHOT",
           "field": "$.eventTypes.9",
-          "kind": "evidenceField"
+          "kind": "resultField"
         }
       ],
       "checkId": "event-stream-ext.agui.paused-turn-event-09",
@@ -1643,7 +1642,7 @@
         {
           "equals": "STEP_FINISHED",
           "field": "$.eventTypes.10",
-          "kind": "evidenceField"
+          "kind": "resultField"
         }
       ],
       "checkId": "event-stream-ext.agui.paused-turn-event-10",
@@ -1659,7 +1658,7 @@
         {
           "equals": "CUSTOM",
           "field": "$.eventTypes.11",
-          "kind": "evidenceField"
+          "kind": "resultField"
         }
       ],
       "checkId": "event-stream-ext.agui.paused-turn-event-11",
@@ -1675,7 +1674,7 @@
         {
           "equals": "CUSTOM",
           "field": "$.eventTypes.12",
-          "kind": "evidenceField"
+          "kind": "resultField"
         }
       ],
       "checkId": "event-stream-ext.agui.paused-turn-event-12",
@@ -1691,7 +1690,7 @@
         {
           "equals": "RUN_FINISHED",
           "field": "$.eventTypes.13",
-          "kind": "evidenceField"
+          "kind": "resultField"
         }
       ],
       "checkId": "event-stream-ext.agui.paused-turn-event-13",

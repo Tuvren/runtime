@@ -14,7 +14,6 @@
  * limitations under the License.
  */
 
-import { assertHashString, type HashString } from "@tuvren/core-types";
 import type { RuntimeDriver } from "@tuvren/driver-api";
 import type {
   ApprovalDecision,
@@ -27,7 +26,6 @@ import {
   createDriverRegistry,
   createTuvrenRuntimeCore,
 } from "../../runtime-core/src/index.ts";
-import { createFakeKernelHarness } from "../../runtime-core/test/fake-kernel.ts";
 import { createFrameworkAdapterProviderScenarios } from "./framework-adapter-provider-scenarios.ts";
 import { createFrameworkAdapterRecoveryScenarios } from "./framework-adapter-recovery-scenarios.ts";
 import {
@@ -36,6 +34,7 @@ import {
   assistantText,
   assistantToolCalls,
   collectValues,
+  createConformanceKernelHarness,
   createConformanceIdFactory,
   createStaticDriver,
   DRIVER_ID,
@@ -175,7 +174,7 @@ export function createFrameworkAdapterRuntimeScenarios(
       return await runInputSignalEmptyParts();
     }
 
-    const harness = createFakeKernelHarness();
+    const harness = createConformanceKernelHarness();
     const runtime = createTuvrenRuntimeCore({
       createId: createConformanceIdFactory(),
       defaultDriverId: DRIVER_ID,
@@ -213,7 +212,7 @@ export function createFrameworkAdapterRuntimeScenarios(
     cancelAfterEvent?: string;
     deadlineMs?: number;
   }): Promise<AdapterProjection> {
-    const harness = createFakeKernelHarness();
+    const harness = createConformanceKernelHarness();
     let executeCount = 0;
     const driver = {
       async execute(context) {
@@ -341,7 +340,7 @@ export function createFrameworkAdapterRuntimeScenarios(
       "finalText",
       "runtime.approval-resolve.finalText"
     );
-    const harness = createFakeKernelHarness();
+    const harness = createConformanceKernelHarness();
     const executedNames: string[] = [];
     const driver = {
       async execute(context) {
@@ -499,7 +498,7 @@ export function createFrameworkAdapterRuntimeScenarios(
   }
 
   async function runBranchCreate(): Promise<AdapterProjection> {
-    const harness = createFakeKernelHarness();
+    const harness = createConformanceKernelHarness();
     const runtime = createTuvrenRuntimeCore({
       createId: createConformanceIdFactory(),
       defaultDriverId: DRIVER_ID,
@@ -544,7 +543,7 @@ export function createFrameworkAdapterRuntimeScenarios(
   }
 
   async function runInputSignalEmptyParts(): Promise<AdapterProjection> {
-    const harness = createFakeKernelHarness();
+    const harness = createConformanceKernelHarness();
     const runtime = createTuvrenRuntimeCore({
       createId: createConformanceIdFactory(),
       defaultDriverId: DRIVER_ID,
@@ -690,14 +689,14 @@ export function createFrameworkAdapterRuntimeScenarios(
     return count;
   }
 
-  function readLastCheckpointHash(events: readonly unknown[]): HashString {
-    let checkpointHash: HashString | undefined;
+  function readLastCheckpointHash(events: readonly unknown[]): string {
+    let checkpointHash: string | undefined;
 
     for (const event of events) {
       const turnNodeHash = dependencies.readRecordString(event, "turnNodeHash");
 
       if (turnNodeHash !== undefined) {
-        assertHashString(turnNodeHash, "state.checkpoint.turnNodeHash");
+        assertHashStringShape(turnNodeHash, "state.checkpoint.turnNodeHash");
         checkpointHash = turnNodeHash;
       }
     }
@@ -870,5 +869,11 @@ export function createFrameworkAdapterRuntimeScenarios(
       secondTurnIds.length === 1 &&
       firstTurnIds[0] === secondTurnIds[0]
     );
+  }
+
+  function assertHashStringShape(value: unknown, label: string): void {
+    if (typeof value !== "string" || !/^[0-9a-f]{64}$/i.test(value)) {
+      throw new Error(`${label} must be a hex hash string`);
+    }
   }
 }

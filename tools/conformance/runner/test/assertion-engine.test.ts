@@ -74,23 +74,41 @@ describe("terminalEvent default path", () => {
   });
 });
 
-describe("noEvent evidence field", () => {
-  test("passes when the configured evidence array omits the event type", () => {
+describe("noEvent event assertions", () => {
+  test("passes when the observed event sequence omits the event type", () => {
     const [evaluation] = evaluateAssertions(
       buildCheck([
-        { eventType: "error", field: "$.frameEvents", kind: "noEvent" },
+        { eventType: "error", kind: "noEvent" },
       ]),
-      { evidence: { frameEvents: ["turn.start", "turn.end"] } }
+      { events: [{ type: "turn.start" }, { type: "turn.end" }] }
     );
     expect(evaluation?.status).toBe("pass");
   });
 
-  test("fails when the configured evidence array contains the event type", () => {
+  test("fails when the observed event sequence contains the event type", () => {
     const [evaluation] = evaluateAssertions(
       buildCheck([
-        { eventType: "error", field: "$.frameEvents", kind: "noEvent" },
+        { eventType: "error", kind: "noEvent" },
       ]),
-      { evidence: { frameEvents: ["turn.start", "error", "turn.end"] } }
+      { events: [{ type: "turn.start" }, { type: "error" }, { type: "turn.end" }] }
+    );
+    expect(evaluation?.status).toBe("fail");
+  });
+});
+
+describe("resultField assertions", () => {
+  test("passes when the configured result field matches the expected value", () => {
+    const [evaluation] = evaluateAssertions(
+      buildCheck([{ equals: "ready", field: "$.answer", kind: "resultField" }]),
+      { result: { answer: "ready" } }
+    );
+    expect(evaluation?.status).toBe("pass");
+  });
+
+  test("fails when the configured result field does not match the expected value", () => {
+    const [evaluation] = evaluateAssertions(
+      buildCheck([{ equals: "ready", field: "$.answer", kind: "resultField" }]),
+      { result: { answer: "wait" } }
     );
     expect(evaluation?.status).toBe("fail");
   });

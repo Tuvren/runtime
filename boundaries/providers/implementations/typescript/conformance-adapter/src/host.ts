@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+import { readFileSync } from "node:fs";
 import type {
   LanguageModelV3,
   LanguageModelV3CallOptions,
@@ -21,15 +22,7 @@ import type {
   LanguageModelV3StreamPart,
 } from "@ai-sdk/provider";
 import { TuvrenProviderError } from "@tuvren/core-types";
-import type { ProviderStreamChunk } from "@tuvren/provider-api";
-import {
-  assertProviderFinishChunk,
-  assertProviderStructuredDoneChunk,
-  providerTestkitFixtures,
-  verifyProviderGenerate,
-  verifyProviderRejects,
-  verifyProviderStream,
-} from "@tuvren/provider-testkit";
+import type { TuvrenModelResponse, ProviderStreamChunk } from "@tuvren/provider-api";
 import type {
   AdapterCapabilities,
   AdapterControls,
@@ -38,6 +31,33 @@ import type {
 import { createAdapterErrorEnvelope } from "../../../../../../tools/conformance/adapter-protocol/index.js";
 import { serveStdioAdapter } from "../../../../../../tools/conformance/adapter-protocol/stdio-host.js";
 import { createAiSdkProviderBridge } from "../../bridge-ai-sdk/src/index.ts";
+import { fileURLToPath } from "node:url";
+
+interface ProviderConformanceFixtureSet {
+  prompt: {
+    messages: unknown[];
+  };
+  response: TuvrenModelResponse;
+  structuredPrompt: {
+    messages: unknown[];
+    responseFormat?: Record<string, unknown>;
+  };
+  toolPrompt: {
+    messages: unknown[];
+    tools?: unknown[];
+    responseFormat?: Record<string, unknown>;
+  };
+}
+
+const PROVIDER_FIXTURE_PATH = fileURLToPath(
+  new URL(
+    "../../../../conformance/fixtures/provider-fixtures.json",
+    import.meta.url
+  )
+);
+
+const providerTestkitFixtures: ProviderConformanceFixtureSet =
+  readProviderTestkitFixtures();
 
 class TypeScriptProviderAdapter {
   initialize(
@@ -101,6 +121,57 @@ class TypeScriptProviderAdapter {
 
 await serveStdioAdapter(new TypeScriptProviderAdapter());
 
+function readProviderTestkitFixtures(): ProviderConformanceFixtureSet {
+  const fileText = readFileSync(PROVIDER_FIXTURE_PATH, "utf8");
+  const value = JSON.parse(fileText);
+
+  if (!isRecord(value)) {
+    throw new Error("provider fixture file must contain a JSON object");
+  }
+
+  assertProviderConformanceFixtureSet(value);
+
+  return value;
+}
+
+function assertProviderConformanceFixtureSet(
+  value: unknown
+): asserts value is ProviderConformanceFixtureSet {
+  if (!isRecord(value)) {
+    throw new Error("provider fixture file must be a valid object");
+  }
+
+  if (
+    !isFixturePrompt(value.prompt) ||
+    !isFixturePrompt(value.structuredPrompt) ||
+    !isFixturePrompt(value.toolPrompt)
+  ) {
+    throw new Error("provider fixture prompts must include messages");
+  }
+
+  assertTuvrenModelResponseShape(value.response, "provider fixture response");
+
+  const responseFormat = value.structuredPrompt.responseFormat;
+
+  if (responseFormat !== undefined && !isRecord(responseFormat)) {
+    throw new Error("provider fixture structuredPrompt.responseFormat must be an object");
+  }
+}
+
+function isFixturePrompt(
+  value: unknown
+): value is {
+  messages: unknown[];
+  responseFormat?: Record<string, unknown>;
+  tools?: unknown[];
+} {
+  return (
+    isRecord(value) &&
+    Array.isArray(value.messages) &&
+    value.messages.length > 0
+  );
+}
+
 async function generateMapping(): Promise<Record<string, unknown>> {
   let capturedOptions: LanguageModelV3CallOptions | undefined;
   const bridge = createAiSdkProviderBridge({
@@ -125,10 +196,11 @@ async function generateMapping(): Promise<Record<string, unknown>> {
       },
     }),
   });
-  const response = await verifyProviderGenerate({
-    prompt: providerTestkitFixtures.structuredPrompt,
-    provider: bridge,
-  });
+  const response = await bridge.generate(providerTestkitFixtures.structuredPrompt);
+  assertTuvrenModelResponseShape(
+    response,
+    "providers.bridge.generate-mapping generate response"
+  );
   const providerMetadata = isRecord(response.providerMetadata)
     ? response.providerMetadata
     : {};
@@ -182,11 +254,10 @@ async function streamMetadataContinuity(): Promise<Record<string, unknown>> {
       },
     }),
   });
-  const chunks = await verifyProviderStream({
-    prompt: providerTestkitFixtures.toolPrompt,
-    provider: bridge,
-  });
-  const finishChunk = assertProviderFinishChunk(chunks, "tool_call");
+  const chunks = await collectProviderStreamChunks(
+    bridge.stream(providerTestkitFixtures.toolPrompt)
+  );
+  const finishChunk = findFinishChunk(chunks, "tool_call");
 
   return {
     evidence: {
@@ -223,14 +294,10 @@ async function structuredOutputStream(): Promise<Record<string, unknown>> {
       },
     }),
   });
-  const chunks = await verifyProviderStream({
-    prompt: providerTestkitFixtures.structuredPrompt,
-    provider: bridge,
-  });
-  const structuredDoneChunk = assertProviderStructuredDoneChunk(
-    chunks,
-    "answer"
+  const chunks = await collectProviderStreamChunks(
+    bridge.stream(providerTestkitFixtures.structuredPrompt)
   );
+  const structuredDoneChunk = findStructuredDoneChunk(chunks, "answer");
 
   return {
     evidence: {
@@ -252,9 +319,9 @@ async function providerFailureNormalization(): Promise<
       },
     }),
   });
-  const error = await verifyProviderRejects({
-    run: () => bridge.generate(providerTestkitFixtures.prompt),
-  });
+  const error = await collectProviderOperationError(() =>
+    bridge.generate(providerTestkitFixtures.prompt)
+  );
 
   return {
     evidence: {
@@ -284,16 +351,14 @@ async function strictStructuredOutputRejection(): Promise<
       },
     }),
   });
-  const generateError = await verifyProviderRejects({
-    run: async () => {
-      await generateBridge.generate({
-        ...providerTestkitFixtures.structuredPrompt,
-        responseFormat: {
-          ...responseFormat,
-          strict: true,
-        },
-      });
-    },
+  const generateError = await collectProviderOperationError(async () => {
+    await generateBridge.generate({
+      ...providerTestkitFixtures.structuredPrompt,
+      responseFormat: {
+        ...responseFormat,
+        strict: true,
+      },
+    });
   });
   const streamBridge = createAiSdkProviderBridge({
     model: createMockModel({
@@ -305,18 +370,16 @@ async function strictStructuredOutputRejection(): Promise<
       },
     }),
   });
-  const streamError = await verifyProviderRejects({
-    run: async () => {
-      await collectProviderStreamChunks(
-        streamBridge.stream({
-          ...providerTestkitFixtures.structuredPrompt,
-          responseFormat: {
-            ...responseFormat,
-            strict: true,
-          },
-        })
-      );
-    },
+  const streamError = await collectProviderOperationError(async () => {
+    await collectProviderStreamChunks(
+      streamBridge.stream({
+        ...providerTestkitFixtures.structuredPrompt,
+        responseFormat: {
+          ...responseFormat,
+          strict: true,
+        },
+      })
+    );
   });
 
   return {
@@ -361,10 +424,8 @@ async function providerOwnedToolExecutionRejection(): Promise<
       },
     }),
   });
-  const generateError = await verifyProviderRejects({
-    run: async () => {
-      await generateBridge.generate(providerTestkitFixtures.toolPrompt);
-    },
+  const generateError = await collectProviderOperationError(async () => {
+    await generateBridge.generate(providerTestkitFixtures.toolPrompt);
   });
   const streamBridge = createAiSdkProviderBridge({
     model: createMockModel({
@@ -382,12 +443,8 @@ async function providerOwnedToolExecutionRejection(): Promise<
       },
     }),
   });
-  const streamError = await verifyProviderRejects({
-    run: async () => {
-      await collectProviderStreamChunks(
-        streamBridge.stream(providerTestkitFixtures.toolPrompt)
-      );
-    },
+  const streamError = await collectProviderOperationError(async () => {
+    await collectProviderStreamChunks(streamBridge.stream(providerTestkitFixtures.toolPrompt));
   });
 
   return {
@@ -433,11 +490,9 @@ async function providerOwnedToolResultRejection(): Promise<
       },
     }),
   });
-  const generateError = await verifyProviderRejects({
-    run: async () => {
-      await generateBridge.generate(providerTestkitFixtures.toolPrompt);
-      generateResolved = true;
-    },
+  const generateError = await collectProviderOperationError(async () => {
+    await generateBridge.generate(providerTestkitFixtures.toolPrompt);
+    generateResolved = true;
   });
   const streamBridge = createAiSdkProviderBridge({
     model: createMockModel({
@@ -457,14 +512,12 @@ async function providerOwnedToolResultRejection(): Promise<
       },
     }),
   });
-  const streamError = await verifyProviderRejects({
-    run: async () => {
-      for await (const _chunk of streamBridge.stream(
-        providerTestkitFixtures.toolPrompt
-      )) {
+  const streamError = await collectProviderOperationError(async () => {
+    for await (const _chunk of streamBridge.stream(
+      providerTestkitFixtures.toolPrompt
+    )) {
         streamChunkCount += 1;
       }
-    },
   });
 
   return {
@@ -505,12 +558,8 @@ async function providerApprovalRequestRejection(): Promise<
       },
     }),
   });
-  const error = await verifyProviderRejects({
-    run: async () => {
-      await collectProviderStreamChunks(
-        bridge.stream(providerTestkitFixtures.toolPrompt)
-      );
-    },
+  const error = await collectProviderOperationError(async () => {
+    await collectProviderStreamChunks(bridge.stream(providerTestkitFixtures.toolPrompt));
   });
 
   return {
@@ -607,12 +656,77 @@ async function collectProviderStreamChunks(
   stream: AsyncIterable<ProviderStreamChunk>
 ): Promise<ProviderStreamChunk[]> {
   const chunks: ProviderStreamChunk[] = [];
+  let index = 0;
 
   for await (const chunk of stream) {
-    chunks.push(chunk);
+    assertProviderStreamChunkShape(chunk, `provider stream chunk ${index}`);
+    chunks.push(structuredClone(chunk));
+    index += 1;
   }
 
   return chunks;
+}
+
+async function collectProviderOperationError(
+  run: () => Promise<unknown> | unknown
+): Promise<unknown> {
+  try {
+    await run();
+  } catch (error: unknown) {
+    return error instanceof Error ? error : new Error(String(error));
+  }
+
+  throw new Error("provider operation did not fail");
+}
+
+function findFinishChunk(
+  chunks: readonly ProviderStreamChunk[],
+  expected: "tool_call" | "stop"
+): Extract<ProviderStreamChunk, { type: "finish" }> {
+  const finishChunk = chunks.find(
+    (chunk): chunk is Extract<ProviderStreamChunk, { type: "finish" }> =>
+      chunk.type === "finish"
+  );
+
+  if (finishChunk === undefined) {
+    throw new Error(`provider stream did not emit a finish chunk`);
+  }
+
+  if (finishChunk.finishReason !== expected) {
+    throw new Error(
+      `provider stream finished with ${String(
+        finishChunk.finishReason
+      )}; expected ${expected}`
+    );
+  }
+
+  return finishChunk;
+}
+
+function findStructuredDoneChunk(
+  chunks: readonly ProviderStreamChunk[],
+  expectedName: string
+): Extract<ProviderStreamChunk, { type: "structured_done" }> {
+  const structuredDoneChunk = chunks.find(
+    (
+      chunk
+    ): chunk is Extract<ProviderStreamChunk, { type: "structured_done" }> =>
+      chunk.type === "structured_done"
+  );
+
+  if (structuredDoneChunk === undefined) {
+    throw new Error("provider stream did not emit a structured_done chunk");
+  }
+
+  if (structuredDoneChunk.name !== expectedName) {
+    throw new Error(
+      `provider stream structured_done name was ${String(
+        structuredDoneChunk.name
+      )}; expected ${expectedName}`
+    );
+  }
+
+  return structuredDoneChunk;
 }
 
 function readProviderErrorReason(error: unknown): string | undefined {
@@ -629,9 +743,33 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function readStructuredResponseFormat(): NonNullable<
-  typeof providerTestkitFixtures.structuredPrompt.responseFormat
-> {
+function assertTuvrenModelResponseShape(
+  value: unknown,
+  label: string
+): asserts value is TuvrenModelResponse {
+  if (!isRecord(value)) {
+    throw new Error(`${label} must be a provider response`);
+  }
+
+  if (!Array.isArray(value.parts)) {
+    throw new Error(`${label} must include response parts`);
+  }
+}
+
+function assertProviderStreamChunkShape(
+  value: unknown,
+  label: string
+): asserts value is ProviderStreamChunk {
+  if (!isRecord(value)) {
+    throw new Error(`${label} must be a provider stream chunk`);
+  }
+
+  if (typeof value.type !== "string") {
+    throw new Error(`${label} chunk type must be a string`);
+  }
+}
+
+function readStructuredResponseFormat(): { [key: string]: unknown; name?: string } {
   const { responseFormat } = providerTestkitFixtures.structuredPrompt;
 
   if (responseFormat === undefined) {

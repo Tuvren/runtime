@@ -281,7 +281,7 @@
   "project": "framework-rust-conformance-runner",
   "reportLabel": "Rust framework unsupported stub",
   "reportStatus": "unsupported",
-  "status": "pass",
+  "status": "unsupported",
   "summary": {
     "failedChecks": 0,
     "passedChecks": 0,

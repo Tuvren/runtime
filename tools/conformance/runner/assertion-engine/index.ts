@@ -127,6 +127,8 @@ function evaluateAssertion(
       return assertField(assertion, context.state, context);
     case "evidenceField":
       return assertField(assertion, context.evidence, context);
+    case "resultField":
+      return assertField(assertion, context.result, context);
     case "ordering":
       return assertOrdering(assertion, context);
     case "noEvent":
@@ -240,16 +242,6 @@ function assertNoEvent(
 ): boolean {
   if (assertion.eventType === undefined) {
     throw new Error("noEvent assertion requires eventType");
-  }
-
-  if (assertion.field !== undefined) {
-    const value = readPath(context.evidence, assertion.field);
-
-    if (!Array.isArray(value)) {
-      return value !== assertion.eventType;
-    }
-
-    return value.every((entry) => entry !== assertion.eventType);
   }
 
   const events = readEvents(context);

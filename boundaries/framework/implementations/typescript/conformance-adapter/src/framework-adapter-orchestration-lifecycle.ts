@@ -19,12 +19,12 @@ import {
   createOrchestrationRuntime,
   createTuvrenRuntimeCore,
 } from "../../runtime-core/src/index.ts";
-import { createFakeKernelHarness } from "../../runtime-core/test/fake-kernel.ts";
 import {
   type AdapterProjection,
   assistantText,
   assistantToolCalls,
   collectValues,
+  createConformanceKernelHarness,
   createConformanceIdFactory,
   createStaticDriver,
   DRIVER_ID,
@@ -132,7 +132,7 @@ export function createFrameworkAdapterOrchestrationLifecycle(
     childText: string,
     parentText: string
   ): Promise<AdapterProjection> {
-    const harness = createFakeKernelHarness();
+    const harness = createConformanceKernelHarness();
     const framework = createTuvrenRuntimeCore({
       createId: createConformanceIdFactory(),
       defaultDriverId: DRIVER_ID,
@@ -252,7 +252,7 @@ export function createFrameworkAdapterOrchestrationLifecycle(
     childText: string,
     parentText: string
   ): Promise<AdapterProjection> {
-    const harness = createFakeKernelHarness();
+    const harness = createConformanceKernelHarness();
     const framework = createTuvrenRuntimeCore({
       createId: createConformanceIdFactory(),
       defaultDriverId: DRIVER_ID,
@@ -373,7 +373,7 @@ export function createFrameworkAdapterOrchestrationLifecycle(
     childText: string,
     parentText: string
   ): Promise<AdapterProjection> {
-    const harness = createFakeKernelHarness();
+    const harness = createConformanceKernelHarness();
     const framework = createTuvrenRuntimeCore({
       createId: createConformanceIdFactory(),
       defaultDriverId: DRIVER_ID,
@@ -451,7 +451,7 @@ export function createFrameworkAdapterOrchestrationLifecycle(
     childText: string,
     _parentText: string
   ): Promise<AdapterProjection> {
-    const harness = createFakeKernelHarness();
+    const harness = createConformanceKernelHarness();
     const framework = createTuvrenRuntimeCore({
       createId: createConformanceIdFactory(),
       defaultDriverId: DRIVER_ID,
@@ -545,7 +545,7 @@ export function createFrameworkAdapterOrchestrationLifecycle(
   async function runPausedParentSpawnRejection(): Promise<
     Record<string, unknown> | undefined
   > {
-    const harness = createFakeKernelHarness();
+    const harness = createConformanceKernelHarness();
     const framework = createTuvrenRuntimeCore({
       createId: createConformanceIdFactory(),
       defaultDriverId: DRIVER_ID,
@@ -635,7 +635,7 @@ export function createFrameworkAdapterOrchestrationLifecycle(
   async function runCompletedParentSpawnRejection(): Promise<
     Record<string, unknown> | undefined
   > {
-    const harness = createFakeKernelHarness();
+    const harness = createConformanceKernelHarness();
     const framework = createTuvrenRuntimeCore({
       createId: createConformanceIdFactory(),
       defaultDriverId: DRIVER_ID,

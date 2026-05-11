@@ -22,13 +22,13 @@ import {
   createTuvrenRuntimeCore,
   DEFAULT_AGENT_SCHEMA,
 } from "../../runtime-core/src/index.ts";
-import { createFakeKernelHarness } from "../../runtime-core/test/fake-kernel.ts";
 import { createFrameworkAdapterOrchestrationLifecycle } from "./framework-adapter-orchestration-lifecycle.ts";
 import {
   type AdapterProjection,
   assistantText,
   assistantToolCalls,
   collectValues,
+  createConformanceKernelHarness,
   createConformanceIdFactory,
   createStaticDriver,
   DRIVER_ID,
@@ -86,7 +86,7 @@ export function createFrameworkAdapterOrchestration(
       "childText",
       "runtime.orchestration.launch-preconditions.childText"
     );
-    const harness = createFakeKernelHarness();
+    const harness = createConformanceKernelHarness();
     const framework = createTuvrenRuntimeCore({
       createId: createConformanceIdFactory(),
       defaultDriverId: DRIVER_ID,
@@ -223,7 +223,7 @@ export function createFrameworkAdapterOrchestration(
       "failureMessage",
       "runtime.orchestration.event-surfaces.failureMessage"
     );
-    const harness = createFakeKernelHarness();
+    const harness = createConformanceKernelHarness();
     const framework = createTuvrenRuntimeCore({
       createId: createConformanceIdFactory(),
       defaultDriverId: DRIVER_ID,
@@ -405,7 +405,7 @@ export function createFrameworkAdapterOrchestration(
       },
       id: "special",
     } satisfies RuntimeDriver;
-    const harness = createFakeKernelHarness();
+    const harness = createConformanceKernelHarness();
     await harness.kernel.schema.register({
       ...structuredClone(DEFAULT_AGENT_SCHEMA),
       schemaId: "custom.agent.v1",
@@ -501,7 +501,7 @@ export function createFrameworkAdapterOrchestration(
       "grandchildText",
       "runtime.orchestration.nested-attribution.grandchildText"
     );
-    const harness = createFakeKernelHarness();
+    const harness = createConformanceKernelHarness();
     const framework = createTuvrenRuntimeCore({
       createId: createConformanceIdFactory(),
       defaultDriverId: DRIVER_ID,
@@ -605,7 +605,7 @@ export function createFrameworkAdapterOrchestration(
   async function runFailedOrchestrationAwaitResult(
     failureMessage: string
   ): Promise<Record<string, unknown> | undefined> {
-    const harness = createFakeKernelHarness();
+    const harness = createConformanceKernelHarness();
     const framework = createTuvrenRuntimeCore({
       createId: createConformanceIdFactory(),
       defaultDriverId: DRIVER_ID,
@@ -661,7 +661,7 @@ export function createFrameworkAdapterOrchestration(
     parentText: string,
     reviewerText: string
   ): Promise<AdapterProjection> {
-    const harness = createFakeKernelHarness();
+    const harness = createConformanceKernelHarness();
     const agents: Record<string, AgentConfig> = {
       primary: { name: "primary" },
       reviewer: { name: "reviewer" },
@@ -772,7 +772,7 @@ export function createFrameworkAdapterOrchestration(
   async function runInvalidHandoffCompositionError(): Promise<
     Record<string, unknown> | undefined
   > {
-    const harness = createFakeKernelHarness();
+    const harness = createConformanceKernelHarness();
     const framework = createTuvrenRuntimeCore({
       createId: createConformanceIdFactory(),
       defaultDriverId: DRIVER_ID,
@@ -833,7 +833,7 @@ export function createFrameworkAdapterOrchestration(
     historyControlEntryAbsent: boolean;
     noSourceSignal: boolean;
   }> {
-    const harness = createFakeKernelHarness();
+    const harness = createConformanceKernelHarness();
     const framework = createTuvrenRuntimeCore({
       createId: createConformanceIdFactory(),
       defaultDriverId: DRIVER_ID,

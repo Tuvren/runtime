@@ -428,6 +428,7 @@ async function runTraceCheck(
     evidence: { trace },
     fixture: baseInput.fixture,
     input: baseInput.checkInput,
+    result: { trace },
     scenario: baseInput.scenario,
     state: { trace },
   };
@@ -475,7 +476,10 @@ function createAssertionContext(
     events: readOptionalArray(outcome.value.events),
     fixture: input.fixture,
     input: input.checkInput,
-    result: outcome.value.result,
+    result:
+      outcome.value.result !== undefined
+        ? outcome.value.result
+        : outcome.value.evidence,
     scenario: input.scenario,
     state: readOptionalRecord(outcome.value.state),
   };

@@ -309,6 +309,7 @@ function check(
 async function runPlanCompilerCases(failures: string[]): Promise<void> {
   const directory = await mkdtemp(join(tmpdir(), "tuvren-meta-plan-"));
   const duplicateStepPlanPath = join(directory, "duplicate-step.json");
+  const evidenceOnlyPlanPath = join(directory, "evidence-only.json");
   const stepEvidencePlanPath = join(directory, "step-evidence.json");
 
   try {
@@ -349,6 +350,44 @@ async function runPlanCompilerCases(failures: string[]): Promise<void> {
           `duplicate trace step id produced wrong error: ${message}`
         );
       }
+    }
+
+  await writeFile(
+      evidenceOnlyPlanPath,
+      `${JSON.stringify(
+        {
+          applicability: { capabilities: ["meta"] },
+          checks: [
+            {
+              assertions: [
+                {
+                  field: "$.answer",
+                  kind: "evidenceField",
+                  equals: "ready",
+                },
+              ],
+              checkId: "meta.evidence-only",
+              evidence: ["answer"],
+              operation: "meta.operation",
+            },
+          ],
+          packetId: "tuvren.meta",
+          planId: "tuvren.meta.evidence-only",
+          planVersion: "0.1.0",
+        },
+        null,
+        2
+      )}\n`
+    );
+
+    if (
+      hasDecisiveAssertion({
+        assertions: [{ field: "$.answer", kind: "evidenceField", equals: "ready" }],
+        checkId: "meta.evidence-only",
+        operation: "meta.operation",
+      })
+    ) {
+      failures.push("evidence-only plan unexpectedly deemed decisive");
     }
 
     await writeFile(
@@ -405,6 +444,55 @@ async function runPlanCompilerCases(failures: string[]): Promise<void> {
   } finally {
     await rm(directory, { force: true, recursive: true });
   }
+}
+
+function hasDecisiveAssertion(check: ConformancePlanCheck): boolean {
+  if (assertionsAreDecisive(check.assertions)) {
+    return true;
+  }
+
+  return (check.steps ?? []).some((step) =>
+    assertionsAreDecisive(step.assertions ?? [])
+  );
+}
+
+function assertionsAreDecisive(
+  assertions: ConformancePlanCheck["assertions"]
+): boolean {
+  return assertions.some((assertion) => assertionIsDecisive(assertion));
+}
+
+function assertionIsDecisive(
+  assertion: ConformancePlanCheck["assertions"][number]
+): boolean {
+  if (assertion.kind === "resultField") {
+    return true;
+  }
+
+  if (
+    assertion.kind === "stateField" ||
+    assertion.kind === "eventSequence" ||
+    assertion.kind === "terminalEvent" ||
+    assertion.kind === "ordering" ||
+    assertion.kind === "noEvent" ||
+    assertion.kind === "errorEnvelope"
+  ) {
+    return true;
+  }
+
+  if (assertion.kind !== "schemaValid") {
+    return false;
+  }
+
+  const path = assertion.path ?? "$.result";
+  return (
+    path === "$.result" ||
+    path.startsWith("$.result.") ||
+    path === "$.events" ||
+    path.startsWith("$.events.") ||
+    path === "$.state" ||
+    path.startsWith("$.state.")
+  );
 }
 
 function runEvidenceContractCases(failures: string[]): void {
