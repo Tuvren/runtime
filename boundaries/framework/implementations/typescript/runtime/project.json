@@ -29,6 +29,14 @@
         "command": "bunx --bun @biomejs/biome check boundaries/framework/implementations/typescript/runtime"
       }
     },
+    "test": {
+      "executor": "nx:run-commands",
+      "dependsOn": ["build"],
+      "options": {
+        "cwd": "boundaries/framework/implementations/typescript/runtime",
+        "command": "bun test ./smoke/package-exports.ts"
+      }
+    },
     "typecheck": {
       "executor": "nx:run-commands",
       "dependsOn": ["^build"],

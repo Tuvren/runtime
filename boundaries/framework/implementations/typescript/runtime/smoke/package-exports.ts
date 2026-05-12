@@ -17,16 +17,19 @@
 import { describe, expect, test } from "bun:test";
 import {
   createDriverRegistry,
+  createGrpcRuntimeKernel,
   createReActDriver,
   createRuntimeKernel,
   REACT_DRIVER_ID,
   TUVREN_RUNTIME_TELEMETRY_ATTRIBUTE_KEYS,
   TUVREN_RUNTIME_TELEMETRY_SCHEMA_URL,
+  TuvrenRuntimeError,
 } from "@tuvren/runtime";
 
 describe("runtime package exports", () => {
   test("expose the curated host-facing runtime helpers", () => {
     expect(typeof createDriverRegistry).toBe("function");
+    expect(typeof createGrpcRuntimeKernel).toBe("function");
     expect(typeof createReActDriver).toBe("function");
     expect(typeof createRuntimeKernel).toBe("function");
     expect(REACT_DRIVER_ID.length > 0).toBe(true);
@@ -34,5 +37,6 @@ describe("runtime package exports", () => {
       "tuvren.runtime.turn.id"
     );
     expect(TUVREN_RUNTIME_TELEMETRY_SCHEMA_URL.length > 0).toBe(true);
+    expect(TuvrenRuntimeError.name).toBe("TuvrenRuntimeError");
   });
 });
