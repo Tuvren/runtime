@@ -14,7 +14,11 @@
  * limitations under the License.
  */
 
-import type { ProviderStreamChunk } from "@tuvren/provider-api";
+import {
+  assertProviderStreamChunk,
+  assertTuvrenModelResponse,
+  type ProviderStreamChunk,
+} from "@tuvren/provider-api";
 import type {
   ApprovalDecision,
   StructuredOutputRequest,
@@ -37,14 +41,6 @@ import type {
   ScenarioToolCall,
 } from "./framework-adapter-runtime.ts";
 import { createFrameworkAdapterRuntimeScenarios } from "./framework-adapter-runtime-scenarios.ts";
-
-const PROVIDER_FINISH_REASONS = new Set([
-  "stop",
-  "tool_call",
-  "length",
-  "error",
-  "content_filter",
-]);
 
 export type {
   AdapterCapabilities,
@@ -462,7 +458,7 @@ function readModelResponseProperty(
   label: string
 ): TuvrenModelResponse {
   const value = readRecordProperty(source, key, label);
-  assertTuvrenModelResponseShape(value, label);
+  assertTuvrenModelResponse(value, label);
   return structuredClone(value);
 }
 
@@ -472,7 +468,7 @@ function readModelResponseArrayProperty(
   label: string
 ): TuvrenModelResponse[] {
   return readArrayProperty(source, key, label).map((value, index) => {
-    assertTuvrenModelResponseShape(value, `${label}[${index}]`);
+    assertTuvrenModelResponse(value, `${label}[${index}]`);
     return structuredClone(value);
   });
 }
@@ -511,7 +507,7 @@ function readProviderStreamChunks(
 ): ProviderStreamChunk[] {
   const values = readArrayProperty(scenario, "streamChunks", label);
   return values.map((value, index) => {
-    assertProviderStreamChunkShape(value, `${label}[${index}]`);
+    assertProviderStreamChunk(value, `${label}[${index}]`);
     return structuredClone(value);
   });
 }
@@ -544,152 +540,6 @@ function readResponseFormat(
     schema,
     ...(strict === undefined ? {} : { strict }),
   };
-}
-
-function assertTuvrenModelResponseShape(
-  value: unknown,
-  label: string
-): asserts value is TuvrenModelResponse {
-  if (!isRecord(value)) {
-    throw new Error(`${label} must be a provider response object`);
-  }
-
-  if (
-    typeof value.finishReason !== "string" ||
-    !PROVIDER_FINISH_REASONS.has(value.finishReason)
-  ) {
-    throw new Error(`${label} must include a finish reason`);
-  }
-
-  if (!Array.isArray(value.parts)) {
-    throw new Error(`${label} must include response parts`);
-  }
-
-  for (const [index, part] of value.parts.entries()) {
-    if (!isRecord(part) || typeof part.type !== "string") {
-      throw new Error(`${label}.parts[${index}] must be a content part`);
-    }
-  }
-}
-
-function assertProviderStreamChunkShape(
-  value: unknown,
-  label: string
-): asserts value is ProviderStreamChunk {
-  if (!isRecord(value)) {
-    throw new Error(`${label} must be a provider stream chunk`);
-  }
-
-  if (typeof value.type !== "string") {
-    throw new Error(`${label} must include a chunk type`);
-  }
-
-  switch (value.type) {
-    case "text_delta":
-      assertChunkStringField(value, "text", label, "chunk text");
-      return;
-    case "reasoning_delta":
-      assertChunkStringField(value, "text", label, "reasoning text");
-      return;
-    case "reasoning_done":
-      return;
-    case "structured_delta":
-      assertChunkStringField(value, "delta", label, "structured delta");
-      return;
-    case "structured_done":
-      assertChunkDefinedField(value, "data", label, "structured data");
-      return;
-    case "tool_call_start":
-      assertToolCallStartChunk(value, label);
-      return;
-    case "tool_call_args_delta":
-      assertToolCallArgsDeltaChunk(value, label);
-      return;
-    case "tool_call_done":
-      assertToolCallDoneChunk(value, label);
-      return;
-    case "finish":
-      assertFinishChunk(value, label);
-      return;
-    case "error":
-      assertChunkDefinedField(value, "error", label, "an error payload");
-      return;
-    default:
-      throw new Error(`${label} has unsupported chunk type ${value.type}`);
-  }
-}
-
-function assertChunkStringField(
-  chunk: Record<string, unknown>,
-  field: "delta" | "text",
-  label: string,
-  description: string
-): void {
-  if (typeof chunk[field] !== "string") {
-    throw new Error(`${label} must include ${description}`);
-  }
-}
-
-function assertChunkDefinedField(
-  chunk: Record<string, unknown>,
-  field: "data" | "error",
-  label: string,
-  description: string
-): void {
-  if (chunk[field] === undefined) {
-    throw new Error(`${label} must include ${description}`);
-  }
-}
-
-function assertToolCallStartChunk(
-  chunk: Record<string, unknown>,
-  label: string
-): void {
-  if (
-    typeof chunk.providerCallId !== "string" ||
-    typeof chunk.name !== "string"
-  ) {
-    throw new Error(`${label} must include a provider call id and name`);
-  }
-}
-
-function assertToolCallArgsDeltaChunk(
-  chunk: Record<string, unknown>,
-  label: string
-): void {
-  if (
-    typeof chunk.providerCallId !== "string" ||
-    typeof chunk.delta !== "string"
-  ) {
-    throw new Error(`${label} must include a provider call id and delta`);
-  }
-}
-
-function assertToolCallDoneChunk(
-  chunk: Record<string, unknown>,
-  label: string
-): void {
-  if (
-    typeof chunk.providerCallId !== "string" ||
-    typeof chunk.name !== "string" ||
-    chunk.input === undefined
-  ) {
-    throw new Error(
-      `${label} must include a provider call id, name, and input`
-    );
-  }
-}
-
-function assertFinishChunk(
-  chunk: Record<string, unknown>,
-  label: string
-): void {
-  if (
-    typeof chunk.finishReason !== "string" ||
-    !PROVIDER_FINISH_REASONS.has(chunk.finishReason)
-  ) {
-    throw new Error(`${label} must include a finish reason`);
-  }
 }
 
 function readScenarioToolCalls(

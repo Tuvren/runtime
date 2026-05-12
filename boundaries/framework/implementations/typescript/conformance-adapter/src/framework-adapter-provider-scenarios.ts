@@ -14,7 +14,11 @@
  * limitations under the License.
  */
 
-import type { DriverExecutionContext } from "@tuvren/driver-api";
+import { assertHashString } from "@tuvren/core-types";
+import {
+  assertDriverExecutionResult,
+  type DriverExecutionContext,
+} from "@tuvren/driver-api";
 import type { ProviderStreamChunk, TuvrenProvider } from "@tuvren/provider-api";
 import type {
   StructuredOutputRequest,
@@ -45,8 +49,6 @@ import {
   DRIVER_ID,
   textSignal,
 } from "./framework-adapter-runtime.ts";
-
-const HASH_STRING_PATTERN = /^[0-9a-f]{64}$/i;
 
 export interface FrameworkAdapterProviderScenarioDependencies {
   readAssistantText(
@@ -442,7 +444,7 @@ export function createFrameworkAdapterProviderScenarios(
       })
     );
 
-    assertDriverExecutionResultShape(result, "structured validation result");
+    assertDriverExecutionResult(result, "structured validation result");
 
     return {
       evidence: {
@@ -641,7 +643,7 @@ export function createFrameworkAdapterProviderScenarios(
         continue;
       }
 
-      assertHashStringShape(turnNodeHash, "state.checkpoint.turnNodeHash");
+      assertHashString(turnNodeHash, "state.checkpoint.turnNodeHash");
       hashes.push(turnNodeHash);
     }
 
@@ -709,29 +711,6 @@ export function createFrameworkAdapterProviderScenarios(
         "runtime.tool-execute.toolCall"
       ),
     ];
-  }
-
-  function assertDriverExecutionResultShape(
-    value: unknown,
-    label: string
-  ): void {
-    if (!isRecord(value)) {
-      throw new Error(`${label} must be an object`);
-    }
-
-    if (!isRecord(value.resolution)) {
-      throw new Error(`${label} must include a resolution`);
-    }
-
-    if (typeof value.resolution.type !== "string") {
-      throw new Error(`${label}.resolution.type must be a string`);
-    }
-  }
-
-  function assertHashStringShape(value: unknown, label: string): void {
-    if (typeof value !== "string" || !HASH_STRING_PATTERN.test(value)) {
-      throw new Error(`${label} must be a hex hash string`);
-    }
   }
 }
 

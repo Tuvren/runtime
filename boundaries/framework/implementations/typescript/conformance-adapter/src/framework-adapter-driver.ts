@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+import { assertHashString } from "@tuvren/core-types";
+import { assertDriverExecutionResult } from "@tuvren/driver-api";
 import type { ProviderStreamChunk, TuvrenProvider } from "@tuvren/provider-api";
 import type {
   ApprovalDecision,
@@ -43,8 +45,6 @@ import {
   type ScenarioToolCall,
   textSignal,
 } from "./framework-adapter-runtime.ts";
-
-const HASH_STRING_PATTERN = /^[0-9a-f]{64}$/i;
 
 export interface FrameworkAdapterDriverDependencies {
   errorToEnvelope(error: unknown): Record<string, unknown>;
@@ -280,7 +280,7 @@ export function createFrameworkAdapterDriver(
       })
     );
 
-    assertDriverExecutionResultShape(result, "driver aroundModel replacement");
+    assertDriverExecutionResult(result, "driver aroundModel replacement");
 
     const projection = {
       aroundModel: {
@@ -338,7 +338,7 @@ export function createFrameworkAdapterDriver(
       })
     );
 
-    assertDriverExecutionResultShape(result, "driver aroundModel retry");
+    assertDriverExecutionResult(result, "driver aroundModel retry");
 
     const projection = {
       aroundModel: {
@@ -377,7 +377,7 @@ export function createFrameworkAdapterDriver(
       })
     );
 
-    assertDriverExecutionResultShape(result, "driver execute result");
+    assertDriverExecutionResult(result, "driver execute result");
 
     const error =
       result.resolution.type === "fail"
@@ -425,7 +425,7 @@ export function createFrameworkAdapterDriver(
     }
 
     const resumedFrom = "0".repeat(64);
-    assertHashStringShape(resumedFrom, "driver.resume.resumedFrom");
+    assertHashString(resumedFrom, "driver.resume.resumedFrom");
 
     const result = await driver.resume({
       ...createDriverExecutionContext(),
@@ -446,7 +446,7 @@ export function createFrameworkAdapterDriver(
       resumedFrom,
     });
 
-    assertDriverExecutionResultShape(result, "driver resume result");
+    assertDriverExecutionResult(result, "driver resume result");
 
     return {
       evidence: {
@@ -664,34 +664,6 @@ function readAssistantText(messages: readonly unknown[]): string | undefined {
   }
 
   return undefined;
-}
-
-function assertDriverExecutionResultShape(value: unknown, label: string): void {
-  if (!isRecord(value)) {
-    throw new Error(`${label} must be an object`);
-  }
-
-  if (!isRecord(value.resolution)) {
-    throw new Error(`${label} must include a resolution`);
-  }
-
-  if (typeof value.resolution.type !== "string") {
-    throw new Error(`${label}.resolution.type must be a string`);
-  }
-
-  if (
-    value.resolution.type === "fail" &&
-    (!isRecord(value.resolution.error) ||
-      typeof value.resolution.error.message !== "string")
-  ) {
-    throw new Error(`${label}.resolution.error must be an error object`);
-  }
-}
-
-function assertHashStringShape(value: unknown, label: string): void {
-  if (typeof value !== "string" || !HASH_STRING_PATTERN.test(value)) {
-    throw new Error(`${label} must be a hex hash string`);
-  }
 }
 
 function createMeasuredExtension(hooks: HookCounters): TuvrenExtension {

@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+import { assertHashString } from "@tuvren/core-types";
 import type { RuntimeDriver } from "@tuvren/driver-api";
 import type {
   ApprovalDecision,
@@ -40,8 +41,6 @@ import {
   DRIVER_ID,
   textSignal,
 } from "./framework-adapter-runtime.ts";
-
-const HASH_STRING_PATTERN = /^[0-9a-f]{64}$/i;
 
 export interface FrameworkAdapterRuntimeScenarioDependencies {
   isRecord(value: unknown): value is Record<string, unknown>;
@@ -295,8 +294,7 @@ export function createFrameworkAdapterRuntimeScenarios(
       thread.branchId
     );
 
-    const runtimePhase =
-      cancelInvocations > 0 ? "failed" : handle.status().phase;
+    const finalStatus = handle.status();
 
     return {
       evidence: {
@@ -318,8 +316,8 @@ export function createFrameworkAdapterRuntimeScenarios(
           deadlineMs: controls.deadlineMs,
         },
         runtime: {
-          iterationCount: handle.status().iterationCount,
-          phase: runtimePhase,
+          iterationCount: finalStatus.iterationCount,
+          phase: finalStatus.phase,
         },
       },
       result: {
@@ -337,8 +335,8 @@ export function createFrameworkAdapterRuntimeScenarios(
             runtimeStatus.partial === true,
         },
         runtime: {
-          iterationCount: handle.status().iterationCount,
-          phase: runtimePhase,
+          iterationCount: finalStatus.iterationCount,
+          phase: finalStatus.phase,
         },
         error: readFirstErrorEnvelope(events),
       },
@@ -812,7 +810,7 @@ export function createFrameworkAdapterRuntimeScenarios(
       const turnNodeHash = dependencies.readRecordString(event, "turnNodeHash");
 
       if (turnNodeHash !== undefined) {
-        assertHashStringShape(turnNodeHash, "state.checkpoint.turnNodeHash");
+        assertHashString(turnNodeHash, "state.checkpoint.turnNodeHash");
         checkpointHash = turnNodeHash;
       }
     }
@@ -985,11 +983,5 @@ export function createFrameworkAdapterRuntimeScenarios(
       secondTurnIds.length === 1 &&
       firstTurnIds[0] === secondTurnIds[0]
     );
-  }
-
-  function assertHashStringShape(value: unknown, label: string): void {
-    if (typeof value !== "string" || !HASH_STRING_PATTERN.test(value)) {
-      throw new Error(`${label} must be a hex hash string`);
-    }
   }
 }

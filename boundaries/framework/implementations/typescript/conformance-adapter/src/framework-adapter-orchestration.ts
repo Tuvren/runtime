@@ -149,7 +149,7 @@ export function createFrameworkAdapterOrchestration(
 
     await sleep(0);
 
-    const childHandle = handle.spawn({
+    const childHandle = await spawnWhenRunning(handle, {
       agent: "worker",
       signal: textSignal("child"),
     });
@@ -556,7 +556,7 @@ export function createFrameworkAdapterOrchestration(
 
     await Promise.resolve();
 
-    const grandchildHandle = childHandle.spawn({
+    const grandchildHandle = await spawnWhenRunning(childHandle, {
       agent: "worker-2",
       signal: textSignal("grandchild"),
     });
