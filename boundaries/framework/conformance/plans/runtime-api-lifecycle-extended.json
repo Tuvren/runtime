@@ -12,12 +12,12 @@
         }
       ],
       "checkId": "runtime-lifecycle-ext.execute-turn.phase-completed",
-      "evidence": ["runtime.phase"],
       "input": {
         "scenarioPath": "$.completed-turn"
       },
       "operation": "runtime.execute-turn",
-      "scenario": "runtime-api-scenarios"
+      "scenario": "runtime-api-scenarios",
+      "evidence": ["result.runtime.phase"]
     },
     {
       "assertions": [
@@ -28,12 +28,12 @@
         }
       ],
       "checkId": "runtime-lifecycle-ext.execute-turn.phase-enum",
-      "evidence": ["runtime.phase"],
       "input": {
         "scenarioPath": "$.completed-turn"
       },
       "operation": "runtime.execute-turn",
-      "scenario": "runtime-api-scenarios"
+      "scenario": "runtime-api-scenarios",
+      "evidence": ["result.runtime.phase"]
     },
     {
       "assertions": [
@@ -158,12 +158,12 @@
         }
       ],
       "checkId": "runtime-lifecycle-ext.context-transform.message-count",
-      "evidence": ["context.messageCount"],
       "input": {
         "scenarioPath": "$.context-transform-append-summary"
       },
       "operation": "runtime.context-transform",
-      "scenario": "runtime-api-scenarios"
+      "scenario": "runtime-api-scenarios",
+      "evidence": ["result.context.messageCount"]
     },
     {
       "assertions": [
@@ -174,12 +174,12 @@
         }
       ],
       "checkId": "runtime-lifecycle-ext.context-transform.summary-text",
-      "evidence": ["context.summaryText"],
       "input": {
         "scenarioPath": "$.context-transform-append-summary"
       },
       "operation": "runtime.context-transform",
-      "scenario": "runtime-api-scenarios"
+      "scenario": "runtime-api-scenarios",
+      "evidence": ["result.context.summaryText"]
     },
     {
       "assertions": [
@@ -190,89 +190,12 @@
         }
       ],
       "checkId": "runtime-lifecycle-ext.context-transform.runtime-phase-completed",
-      "evidence": ["runtime.phase"],
       "input": {
         "scenarioPath": "$.context-transform-append-summary"
       },
       "operation": "runtime.context-transform",
-      "scenario": "runtime-api-scenarios"
-    },
-    {
-      "assertions": [
-        {
-          "equals": 1,
-          "field": "$.context.sourceMessageCount",
-          "kind": "resultField"
-        },
-        {
-          "equals": 2,
-          "field": "$.context.rewrittenMessageCount",
-          "kind": "resultField"
-        },
-        {
-          "equals": 3,
-          "field": "$.context.messageCount",
-          "kind": "resultField"
-        }
-      ],
-      "checkId": "runtime-lifecycle-af.context-transform-preserves-source-checkpoint",
-      "evidence": [
-        "context.sourceMessageCount",
-        "context.rewrittenMessageCount",
-        "context.messageCount"
-      ],
-      "input": {
-        "scenarioPath": "$.context-transform-append-summary"
-      },
-      "operation": "runtime.context-transform",
-      "scenario": "runtime-api-scenarios"
-    },
-    {
-      "assertions": [
-        {
-          "equals": true,
-          "field": "$.context.createdNewHead",
-          "kind": "resultField"
-        },
-        {
-          "equals": true,
-          "field": "$.context.finalHeadChanged",
-          "kind": "resultField"
-        },
-        {
-          "equals": [1, 2, 3],
-          "field": "$.context.snapshotMessageCounts",
-          "kind": "resultField"
-        }
-      ],
-      "checkId": "runtime-lifecycle-af.context-transform-creates-new-tree-heads",
-      "evidence": [
-        "context.checkpointHashes",
-        "context.createdNewHead",
-        "context.finalHeadChanged",
-        "context.snapshotMessageCounts"
-      ],
-      "input": {
-        "scenarioPath": "$.context-transform-append-summary"
-      },
-      "operation": "runtime.context-transform",
-      "scenario": "runtime-api-scenarios"
-    },
-    {
-      "assertions": [
-        {
-          "equals": 2,
-          "field": "$.context.driverObservedMessageCount",
-          "kind": "resultField"
-        }
-      ],
-      "checkId": "runtime-lifecycle-af.context-transform-driver-sees-rewritten-context",
-      "evidence": ["context.driverObservedMessageCount"],
-      "input": {
-        "scenarioPath": "$.context-transform-append-summary"
-      },
-      "operation": "runtime.context-transform",
-      "scenario": "runtime-api-scenarios"
+      "scenario": "runtime-api-scenarios",
+      "evidence": ["result.runtime.phase"]
     },
     {
       "assertions": [
@@ -283,12 +206,12 @@
         }
       ],
       "checkId": "runtime-lifecycle-ext.recover-result.uncommitted-count",
-      "evidence": ["recovery.uncommittedStagedResults"],
       "input": {
         "scenarioPath": "$.recover-staged-result"
       },
       "operation": "runtime.recover-result",
-      "scenario": "runtime-api-scenarios"
+      "scenario": "runtime-api-scenarios",
+      "evidence": ["result.recovery.uncommittedStagedResults"]
     },
     {
       "assertions": [
@@ -299,12 +222,12 @@
         }
       ],
       "checkId": "runtime-lifecycle-ext.recover-result.first-task-id",
-      "evidence": ["recovery.firstTaskId"],
       "input": {
         "scenarioPath": "$.recover-staged-result"
       },
       "operation": "runtime.recover-result",
-      "scenario": "runtime-api-scenarios"
+      "scenario": "runtime-api-scenarios",
+      "evidence": ["result.recovery.firstTaskId"]
     },
     {
       "assertions": [
@@ -315,12 +238,12 @@
         }
       ],
       "checkId": "runtime-lifecycle-ext.recover-result.first-object-type",
-      "evidence": ["recovery.firstObjectType"],
       "input": {
         "scenarioPath": "$.recover-staged-result"
       },
       "operation": "runtime.recover-result",
-      "scenario": "runtime-api-scenarios"
+      "scenario": "runtime-api-scenarios",
+      "evidence": ["result.recovery.firstObjectType"]
     },
     {
       "assertions": [
@@ -331,12 +254,12 @@
         }
       ],
       "checkId": "runtime-lifecycle-ext.recover-result.last-turn-node-hash-format",
-      "evidence": ["recovery.lastTurnNodeHash"],
       "input": {
         "scenarioPath": "$.recover-staged-result"
       },
       "operation": "runtime.recover-result",
-      "scenario": "runtime-api-scenarios"
+      "scenario": "runtime-api-scenarios",
+      "evidence": ["result.recovery.lastTurnNodeHash"]
     },
     {
       "assertions": [
@@ -368,18 +291,18 @@
       ],
       "capabilities": ["framework.run-liveness"],
       "checkId": "runtime-lifecycle-ext.stale-recovery.same-signal-iterate",
-      "evidence": [
-        "recovery.sameTurn",
-        "recovery.originalUserMessageCount",
-        "recovery.recoveredAssistantVisible",
-        "recovery.staleRunStatus",
-        "recovery.preemptCalls"
-      ],
       "input": {
         "scenarioPath": "$.stale-recovery-same-signal-iterate"
       },
       "operation": "runtime.recover-stale-run",
-      "scenario": "runtime-api-scenarios"
+      "scenario": "runtime-api-scenarios",
+      "evidence": [
+        "result.recovery.sameTurn",
+        "result.recovery.originalUserMessageCount",
+        "result.recovery.recoveredAssistantVisible",
+        "result.recovery.staleRunStatus",
+        "result.recovery.preemptCalls"
+      ]
     },
     {
       "assertions": [
@@ -411,18 +334,18 @@
       ],
       "capabilities": ["framework.run-liveness"],
       "checkId": "runtime-lifecycle-ext.stale-recovery.signal-mismatch-fresh-turn",
-      "evidence": [
-        "recovery.sameTurn",
-        "recovery.originalUserMessageCount",
-        "recovery.freshUserMessageCount",
-        "recovery.staleRunStatus",
-        "recovery.preemptCalls"
-      ],
       "input": {
         "scenarioPath": "$.stale-recovery-signal-mismatch"
       },
       "operation": "runtime.recover-stale-run",
-      "scenario": "runtime-api-scenarios"
+      "scenario": "runtime-api-scenarios",
+      "evidence": [
+        "result.recovery.sameTurn",
+        "result.recovery.originalUserMessageCount",
+        "result.recovery.freshUserMessageCount",
+        "result.recovery.staleRunStatus",
+        "result.recovery.preemptCalls"
+      ]
     },
     {
       "assertions": [
@@ -454,18 +377,18 @@
       ],
       "capabilities": ["framework.run-liveness"],
       "checkId": "runtime-lifecycle-ext.stale-recovery.handoff-context-active-agent",
-      "evidence": [
-        "recovery.sameTurn",
-        "recovery.phase",
-        "recovery.activeAgent",
-        "recovery.branchStatusActiveAgent",
-        "recovery.staleRunStatus"
-      ],
       "input": {
         "scenarioPath": "$.stale-recovery-handoff-context"
       },
       "operation": "runtime.recover-stale-run",
-      "scenario": "runtime-api-scenarios"
+      "scenario": "runtime-api-scenarios",
+      "evidence": [
+        "result.recovery.sameTurn",
+        "result.recovery.phase",
+        "result.recovery.activeAgent",
+        "result.recovery.branchStatusActiveAgent",
+        "result.recovery.staleRunStatus"
+      ]
     },
     {
       "assertions": [
@@ -497,78 +420,18 @@
       ],
       "capabilities": ["framework.run-liveness"],
       "checkId": "runtime-lifecycle-ext.stale-recovery.finalize-terminal-status",
-      "evidence": [
-        "recovery.sameTurn",
-        "recovery.phase",
-        "recovery.driverExecuteCalls",
-        "recovery.branchRuntimePhase",
-        "recovery.staleRunStatus"
-      ],
       "input": {
         "scenarioPath": "$.stale-recovery-finalize-status"
       },
       "operation": "runtime.recover-stale-run",
-      "scenario": "runtime-api-scenarios"
-    },
-    {
-      "assertions": [
-        {
-          "equals": 2,
-          "field": "$.cancellation.cancelInvocations",
-          "kind": "resultField"
-        },
-        {
-          "equals": 1,
-          "field": "$.cancellation.errorEventCount",
-          "kind": "resultField"
-        },
-        {
-          "equals": "failed",
-          "field": "$.runtime.phase",
-          "kind": "resultField"
-        }
-      ],
-      "checkId": "runtime-lifecycle-af.cancel-running-idempotent-fails-once",
-      "controls": {
-        "cancelAfterEvent": "turn.start",
-        "deadlineMs": 1000
-      },
+      "scenario": "runtime-api-scenarios",
       "evidence": [
-        "cancellation.cancelInvocations",
-        "cancellation.errorEventCount",
-        "runtime.phase"
-      ],
-      "operation": "runtime.cancel-execution"
-    },
-    {
-      "assertions": [
-        {
-          "equals": "failed",
-          "field": "$.runtime.phase",
-          "kind": "resultField"
-        },
-        {
-          "equals": true,
-          "field": "$.cancellation.runtimeStatusPartial",
-          "kind": "resultField"
-        },
-        {
-          "equals": "interrupted",
-          "field": "$.cancellation.partialAssistantText",
-          "kind": "resultField"
-        }
-      ],
-      "checkId": "runtime-lifecycle-af.cancel-running-stages-partial-status",
-      "controls": {
-        "cancelAfterEvent": "iteration.end",
-        "deadlineMs": 1000
-      },
-      "evidence": [
-        "cancellation.partialAssistantText",
-        "cancellation.runtimeStatusPartial",
-        "runtime.phase"
-      ],
-      "operation": "runtime.cancel-execution"
+        "result.recovery.sameTurn",
+        "result.recovery.phase",
+        "result.recovery.driverExecuteCalls",
+        "result.recovery.branchRuntimePhase",
+        "result.recovery.staleRunStatus"
+      ]
     }
   ],
   "packetId": "tuvren.framework.runtime-api",

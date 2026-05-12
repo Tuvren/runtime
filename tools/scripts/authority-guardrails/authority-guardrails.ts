@@ -41,7 +41,7 @@ interface AuthorityPacketManifest {
   packetId: string;
 }
 
-interface GuardrailFailure {
+export interface GuardrailFailure {
   check: string;
   message: string;
 }
@@ -107,7 +107,9 @@ const GENERIC_RUNNER_LITERAL_ALLOWLIST = new Set([
   "paused",
 ]);
 
-await main();
+if (import.meta.main) {
+  await main();
+}
 
 async function main(): Promise<void> {
   const manifests = await loadAuthorityPackets();
@@ -546,7 +548,7 @@ function collectOperationNamesFromPlanValue(
   }
 }
 
-function collectPlanEvidenceOracleShapeFailures(
+export function collectPlanEvidenceOracleShapeFailures(
   planValue: unknown,
   planLabel: string
 ): GuardrailFailure[] {

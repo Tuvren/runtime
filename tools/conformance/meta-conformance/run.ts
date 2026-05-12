@@ -17,6 +17,7 @@
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { collectPlanEvidenceOracleShapeFailures } from "../../scripts/authority-guardrails/authority-guardrails.ts";
 import {
   assertConformanceEvidence,
   createCheckResult,
@@ -352,44 +353,45 @@ async function runPlanCompilerCases(failures: string[]): Promise<void> {
       }
     }
 
-    await writeFile(
-      evidenceOnlyPlanPath,
-      `${JSON.stringify(
+    const evidenceOnlyPlan = {
+      applicability: { capabilities: ["meta"] },
+      checks: [
         {
-          applicability: { capabilities: ["meta"] },
-          checks: [
+          assertions: [
             {
-              assertions: [
-                {
-                  field: "$.answer",
-                  kind: "evidenceField",
-                  equals: "ready",
-                },
-              ],
-              checkId: "meta.evidence-only",
-              evidence: ["answer"],
-              operation: "meta.operation",
+              field: "$.answer",
+              kind: "evidenceField",
+              equals: "ready",
             },
           ],
-          packetId: "tuvren.meta",
-          planId: "tuvren.meta.evidence-only",
-          planVersion: "0.1.0",
+          checkId: "meta.evidence-only",
+          evidence: ["answer"],
+          operation: "meta.operation",
         },
-        null,
-        2
-      )}\n`
+      ],
+      packetId: "tuvren.meta",
+      planId: "tuvren.meta.evidence-only",
+      planVersion: "0.1.0",
+    };
+    await writeFile(
+      evidenceOnlyPlanPath,
+      `${JSON.stringify(evidenceOnlyPlan, null, 2)}\n`
+    );
+    const compiledEvidenceOnlyPlan =
+      await loadConformancePlan(evidenceOnlyPlanPath);
+    const evidenceOnlyFailures = collectPlanEvidenceOracleShapeFailures(
+      compiledEvidenceOnlyPlan.plan,
+      evidenceOnlyPlanPath
     );
 
     if (
-      hasDecisiveAssertion({
-        assertions: [
-          { field: "$.answer", kind: "evidenceField", equals: "ready" },
-        ],
-        checkId: "meta.evidence-only",
-        operation: "meta.operation",
-      })
+      !evidenceOnlyFailures.some((failure) =>
+        failure.message.includes("meta.evidence-only")
+      )
     ) {
-      failures.push("evidence-only plan unexpectedly deemed decisive");
+      failures.push(
+        "evidence-only plan unexpectedly passed the decisive-assertion guardrail"
+      );
     }
 
     await writeFile(
@@ -431,6 +433,10 @@ async function runPlanCompilerCases(failures: string[]): Promise<void> {
 
     const stepPlan = await loadConformancePlan(stepEvidencePlanPath);
     const requiredEvidence = stepPlan.checks[0]?.requiredEvidence ?? [];
+    const stepPlanFailures = collectPlanEvidenceOracleShapeFailures(
+      stepPlan.plan,
+      stepEvidencePlanPath
+    );
 
     for (const expectedPath of [
       "trace.observe.evidence.value",
@@ -443,58 +449,19 @@ async function runPlanCompilerCases(failures: string[]): Promise<void> {
         );
       }
     }
+
+    if (
+      !stepPlanFailures.some((failure) =>
+        failure.message.includes("meta.step-evidence")
+      )
+    ) {
+      failures.push(
+        "step evidence-only plan unexpectedly passed the decisive-assertion guardrail"
+      );
+    }
   } finally {
     await rm(directory, { force: true, recursive: true });
   }
-}
-
-function hasDecisiveAssertion(check: ConformancePlanCheck): boolean {
-  if (assertionsAreDecisive(check.assertions)) {
-    return true;
-  }
-
-  return (check.steps ?? []).some((step) =>
-    assertionsAreDecisive(step.assertions ?? [])
-  );
-}
-
-function assertionsAreDecisive(
-  assertions: ConformancePlanCheck["assertions"]
-): boolean {
-  return assertions.some((assertion) => assertionIsDecisive(assertion));
-}
-
-function assertionIsDecisive(
-  assertion: ConformancePlanCheck["assertions"][number]
-): boolean {
-  if (assertion.kind === "resultField") {
-    return true;
-  }
-
-  if (
-    assertion.kind === "stateField" ||
-    assertion.kind === "eventSequence" ||
-    assertion.kind === "terminalEvent" ||
-    assertion.kind === "ordering" ||
-    assertion.kind === "noEvent" ||
-    assertion.kind === "errorEnvelope"
-  ) {
-    return true;
-  }
-
-  if (assertion.kind !== "schemaValid") {
-    return false;
-  }
-
-  const path = assertion.path ?? "$.result";
-  return (
-    path === "$.result" ||
-    path.startsWith("$.result.") ||
-    path === "$.events" ||
-    path.startsWith("$.events.") ||
-    path === "$.state" ||
-    path.startsWith("$.state.")
-  );
 }
 
 function runEvidenceContractCases(failures: string[]): void {

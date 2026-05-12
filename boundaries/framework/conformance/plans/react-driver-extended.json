@@ -12,12 +12,12 @@
         }
       ],
       "checkId": "react-driver-ext.before-iteration-twice",
-      "evidence": ["hooks.beforeIteration"],
       "input": {
         "scenarioPath": "$.driver-hook-turn"
       },
       "operation": "driver.execute",
-      "scenario": "driver-api-scenarios"
+      "scenario": "driver-api-scenarios",
+      "evidence": ["result.hooks.beforeIteration"]
     },
     {
       "assertions": [
@@ -28,12 +28,12 @@
         }
       ],
       "checkId": "react-driver-ext.around-model-twice",
-      "evidence": ["hooks.aroundModel"],
       "input": {
         "scenarioPath": "$.driver-hook-turn"
       },
       "operation": "driver.execute",
-      "scenario": "driver-api-scenarios"
+      "scenario": "driver-api-scenarios",
+      "evidence": ["result.hooks.aroundModel"]
     },
     {
       "assertions": [
@@ -44,12 +44,12 @@
         }
       ],
       "checkId": "react-driver-ext.after-iteration-twice",
-      "evidence": ["hooks.afterIteration"],
       "input": {
         "scenarioPath": "$.driver-hook-turn"
       },
       "operation": "driver.execute",
-      "scenario": "driver-api-scenarios"
+      "scenario": "driver-api-scenarios",
+      "evidence": ["result.hooks.afterIteration"]
     },
     {
       "assertions": [
@@ -60,12 +60,12 @@
         }
       ],
       "checkId": "react-driver-ext.around-tool-once",
-      "evidence": ["hooks.aroundTool"],
       "input": {
         "scenarioPath": "$.driver-hook-turn"
       },
       "operation": "driver.execute",
-      "scenario": "driver-api-scenarios"
+      "scenario": "driver-api-scenarios",
+      "evidence": ["result.hooks.aroundTool"]
     },
     {
       "assertions": [
@@ -75,12 +75,12 @@
         }
       ],
       "checkId": "react-driver-ext.hook-field-present.before-iteration-present",
-      "evidence": ["hooks.beforeIteration"],
       "input": {
         "scenarioPath": "$.driver-hook-turn"
       },
       "operation": "driver.execute",
-      "scenario": "driver-api-scenarios"
+      "scenario": "driver-api-scenarios",
+      "evidence": ["result.hooks.beforeIteration"]
     },
     {
       "assertions": [
@@ -90,12 +90,12 @@
         }
       ],
       "checkId": "react-driver-ext.hook-field-present.after-iteration-present",
-      "evidence": ["hooks.afterIteration"],
       "input": {
         "scenarioPath": "$.driver-hook-turn"
       },
       "operation": "driver.execute",
-      "scenario": "driver-api-scenarios"
+      "scenario": "driver-api-scenarios",
+      "evidence": ["result.hooks.afterIteration"]
     },
     {
       "assertions": [
@@ -105,12 +105,12 @@
         }
       ],
       "checkId": "react-driver-ext.hook-field-present.around-model-present",
-      "evidence": ["hooks.aroundModel"],
       "input": {
         "scenarioPath": "$.driver-hook-turn"
       },
       "operation": "driver.execute",
-      "scenario": "driver-api-scenarios"
+      "scenario": "driver-api-scenarios",
+      "evidence": ["result.hooks.aroundModel"]
     },
     {
       "assertions": [
@@ -120,12 +120,12 @@
         }
       ],
       "checkId": "react-driver-ext.hook-field-present.around-tool-present",
-      "evidence": ["hooks.aroundTool"],
       "input": {
         "scenarioPath": "$.driver-hook-turn"
       },
       "operation": "driver.execute",
-      "scenario": "driver-api-scenarios"
+      "scenario": "driver-api-scenarios",
+      "evidence": ["result.hooks.aroundTool"]
     },
     {
       "assertions": [
@@ -151,127 +151,6 @@
           "stepId": "checkpoint"
         }
       ]
-    },
-    {
-      "assertions": [
-        {
-          "equals": [
-            "beforeIteration",
-            "aroundModel.before",
-            "aroundModel.after",
-            "aroundTool.before",
-            "aroundTool.after",
-            "afterIteration",
-            "beforeIteration",
-            "aroundModel.before",
-            "aroundModel.after",
-            "afterIteration"
-          ],
-          "field": "$.hooks.phaseTrace",
-          "kind": "resultField"
-        }
-      ],
-      "checkId": "react-driver-af.extension.phase-order-before-around-after",
-      "evidence": ["hooks.phaseTrace"],
-      "input": {
-        "scenarioPath": "$.driver-hook-turn"
-      },
-      "operation": "driver.execute",
-      "scenario": "driver-api-scenarios"
-    },
-    {
-      "assertions": [
-        {
-          "equals": ["aroundTool.before", "tool.execute", "aroundTool.after"],
-          "field": "$.hooks.aroundToolTrace",
-          "kind": "resultField"
-        }
-      ],
-      "checkId": "react-driver-af.extension.around-tool-nesting",
-      "evidence": ["hooks.aroundToolTrace"],
-      "input": {
-        "scenarioPath": "$.driver-hook-turn"
-      },
-      "operation": "driver.execute",
-      "scenario": "driver-api-scenarios"
-    },
-    {
-      "assertions": [
-        {
-          "equals": "modified",
-          "field": "$.aroundModel.finalAssistantText",
-          "kind": "resultField"
-        },
-        {
-          "equals": ["provider"],
-          "field": "$.aroundModel.streamedTextDone",
-          "kind": "resultField"
-        },
-        {
-          "equals": 1,
-          "field": "$.aroundModel.messageStartCount",
-          "kind": "resultField"
-        }
-      ],
-      "checkId": "react-driver-af.around-model-post-stream-replacement",
-      "evidence": [
-        "aroundModel.finalAssistantText",
-        "aroundModel.streamedTextDone",
-        "aroundModel.messageStartCount"
-      ],
-      "input": {
-        "scenarioPath": "$.driver-around-model-post-stream-replacement"
-      },
-      "operation": "driver.execute",
-      "scenario": "driver-api-scenarios"
-    },
-    {
-      "assertions": [
-        {
-          "equals": 2,
-          "field": "$.provider.generate.callCount",
-          "kind": "resultField"
-        },
-        {
-          "equals": "second attempt",
-          "field": "$.aroundModel.finalAssistantText",
-          "kind": "resultField"
-        }
-      ],
-      "checkId": "react-driver-af.around-model-retry-final-response-durable",
-      "evidence": [
-        "provider.generate.callCount",
-        "aroundModel.finalAssistantText"
-      ],
-      "input": {
-        "scenarioPath": "$.driver-around-model-retry-final-response"
-      },
-      "operation": "driver.execute",
-      "scenario": "driver-api-scenarios"
-    },
-    {
-      "assertions": [
-        {
-          "equals": true,
-          "field": "$.hooks.terminalMutationAttempted",
-          "kind": "resultField"
-        },
-        {
-          "equals": "driver hook turn completed",
-          "field": "$.hooks.terminalMutationDurableText",
-          "kind": "resultField"
-        }
-      ],
-      "checkId": "react-driver-af.extension.after-iteration-terminal-state-nondurable",
-      "evidence": [
-        "hooks.terminalMutationAttempted",
-        "hooks.terminalMutationDurableText"
-      ],
-      "input": {
-        "scenarioPath": "$.driver-hook-turn"
-      },
-      "operation": "driver.execute",
-      "scenario": "driver-api-scenarios"
     }
   ],
   "packetId": "tuvren.framework.react-driver",

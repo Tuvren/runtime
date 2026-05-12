@@ -35,7 +35,7 @@ import type {
 import { createAdapterErrorEnvelope } from "../../../../../../tools/conformance/adapter-protocol/index.js";
 import { serveStdioAdapter } from "../../../../../../tools/conformance/adapter-protocol/stdio-host.js";
 import { createAiSdkProviderBridge } from "../../bridge-ai-sdk/src/index.ts";
-import { providerTestkitFixtures } from "../../testkit/src/lib/provider-conformance-fixtures.ts";
+import { providerConformanceFixtures } from "./provider-conformance-fixtures.ts";
 
 class TypeScriptProviderAdapter {
   initialize(
@@ -124,7 +124,7 @@ async function generateMapping(): Promise<Record<string, unknown>> {
     }),
   });
   const response = await bridge.generate(
-    providerTestkitFixtures.structuredPrompt
+    providerConformanceFixtures.structuredPrompt
   );
   assertTuvrenModelResponse(
     response,
@@ -182,7 +182,7 @@ async function streamMetadataContinuity(): Promise<Record<string, unknown>> {
     }),
   });
   const chunks = await collectProviderStreamChunks(
-    bridge.stream(providerTestkitFixtures.toolPrompt)
+    bridge.stream(providerConformanceFixtures.toolPrompt)
   );
   const finishChunk = findFinishChunk(chunks, "tool_call");
 
@@ -220,7 +220,7 @@ async function structuredOutputStream(): Promise<Record<string, unknown>> {
     }),
   });
   const chunks = await collectProviderStreamChunks(
-    bridge.stream(providerTestkitFixtures.structuredPrompt)
+    bridge.stream(providerConformanceFixtures.structuredPrompt)
   );
   const structuredDoneChunk = findStructuredDoneChunk(chunks, "answer");
 
@@ -243,7 +243,7 @@ async function providerFailureNormalization(): Promise<
     }),
   });
   const error = await collectProviderOperationError(() =>
-    bridge.generate(providerTestkitFixtures.prompt)
+    bridge.generate(providerConformanceFixtures.prompt)
   );
 
   return createProjection({
@@ -273,7 +273,7 @@ async function strictStructuredOutputRejection(): Promise<
   });
   const generateError = await collectProviderOperationError(async () => {
     await generateBridge.generate({
-      ...providerTestkitFixtures.structuredPrompt,
+      ...providerConformanceFixtures.structuredPrompt,
       responseFormat: {
         ...responseFormat,
         strict: true,
@@ -293,7 +293,7 @@ async function strictStructuredOutputRejection(): Promise<
   const streamError = await collectProviderOperationError(async () => {
     await collectProviderStreamChunks(
       streamBridge.stream({
-        ...providerTestkitFixtures.structuredPrompt,
+        ...providerConformanceFixtures.structuredPrompt,
         responseFormat: {
           ...responseFormat,
           strict: true,
@@ -343,7 +343,7 @@ async function providerOwnedToolExecutionRejection(): Promise<
     }),
   });
   const generateError = await collectProviderOperationError(async () => {
-    await generateBridge.generate(providerTestkitFixtures.toolPrompt);
+    await generateBridge.generate(providerConformanceFixtures.toolPrompt);
   });
   const streamBridge = createAiSdkProviderBridge({
     model: createMockModel({
@@ -363,7 +363,7 @@ async function providerOwnedToolExecutionRejection(): Promise<
   });
   const streamError = await collectProviderOperationError(async () => {
     await collectProviderStreamChunks(
-      streamBridge.stream(providerTestkitFixtures.toolPrompt)
+      streamBridge.stream(providerConformanceFixtures.toolPrompt)
     );
   });
 
@@ -409,7 +409,7 @@ async function providerOwnedToolResultRejection(): Promise<
     }),
   });
   const generateError = await collectProviderOperationError(async () => {
-    await generateBridge.generate(providerTestkitFixtures.toolPrompt);
+    await generateBridge.generate(providerConformanceFixtures.toolPrompt);
     generateResolved = true;
   });
   const streamBridge = createAiSdkProviderBridge({
@@ -432,7 +432,7 @@ async function providerOwnedToolResultRejection(): Promise<
   });
   const streamError = await collectProviderOperationError(async () => {
     for await (const _chunk of streamBridge.stream(
-      providerTestkitFixtures.toolPrompt
+      providerConformanceFixtures.toolPrompt
     )) {
       streamChunkCount += 1;
     }
@@ -476,7 +476,7 @@ async function providerApprovalRequestRejection(): Promise<
   });
   const error = await collectProviderOperationError(async () => {
     await collectProviderStreamChunks(
-      bridge.stream(providerTestkitFixtures.toolPrompt)
+      bridge.stream(providerConformanceFixtures.toolPrompt)
     );
   });
 
@@ -668,7 +668,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function readStructuredResponseFormat(): StructuredOutputRequest {
-  const { responseFormat } = providerTestkitFixtures.structuredPrompt;
+  const { responseFormat } = providerConformanceFixtures.structuredPrompt;
 
   if (responseFormat === undefined) {
     throw new Error(

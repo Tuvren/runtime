@@ -3,7 +3,9 @@
   "planVersion": "0.1.0",
   "packetId": "tuvren.framework.event-stream",
   "applicability": {
-    "capabilities": ["framework.event-stream"]
+    "capabilities": [
+      "framework.event-stream"
+    ]
   },
   "scenarios": {
     "event-stream-scenarios": "../scenarios/event-stream-scenarios.json"
@@ -13,11 +15,12 @@
       "checkId": "event-stream.sse.projection",
       "operation": "event-stream.runtime-sse-projection",
       "scenario": "event-stream-scenarios",
-      "input": { "scenarioPath": "$.completed-tool-turn" },
+      "input": {
+        "scenarioPath": "$.completed-tool-turn"
+      },
       "assertions": [
         {
-          "kind": "resultField",
-          "field": "$.frameEvents",
+          "kind": "eventSequence",
           "equals": [
             "turn.start",
             "state.checkpoint",
@@ -43,49 +46,54 @@
             "iteration.end",
             "state.checkpoint",
             "turn.end"
-          ]
+          ],
+          "path": "$.event"
         },
         {
           "kind": "resultField",
-          "field": "$.sourceEventTypes.0",
+          "field": "$.events.0.payload.type",
           "equals": "turn.start"
         },
         {
           "kind": "resultField",
-          "field": "$.framePayloads.10.output.source",
+          "field": "$.events.10.payload.output.source",
           "equals": "shared event stream scenario"
         }
       ],
-      "evidence": ["sourceEventTypes", "frameEvents", "framePayloads"]
+      "evidence": [
+        "events"
+      ]
     },
     {
       "checkId": "event-stream.sse.eager-subscription",
       "operation": "event-stream.runtime-sse-eager-subscription",
       "scenario": "event-stream-scenarios",
-      "input": { "scenarioPath": "$.completed-tool-turn" },
+      "input": {
+        "scenarioPath": "$.completed-tool-turn"
+      },
       "assertions": [
         {
           "kind": "resultField",
-          "field": "$.firstDirectEventType",
+          "field": "$.firstDirectEvent.type",
           "equals": "turn.start"
         },
         {
           "kind": "resultField",
-          "field": "$.firstFrameEvent",
+          "field": "$.events.0.event",
           "equals": "turn.start"
         }
-      ],
-      "evidence": ["firstDirectEventType", "firstFrameEvent"]
+      ]
     },
     {
       "checkId": "event-stream.agui.projection",
       "operation": "event-stream.runtime-agui-projection",
       "scenario": "event-stream-scenarios",
-      "input": { "scenarioPath": "$.completed-tool-turn" },
+      "input": {
+        "scenarioPath": "$.completed-tool-turn"
+      },
       "assertions": [
         {
-          "kind": "resultField",
-          "field": "$.eventTypes",
+          "kind": "eventSequence",
           "equals": [
             "RUN_STARTED",
             "CUSTOM",
@@ -110,34 +118,44 @@
             "STEP_FINISHED",
             "CUSTOM",
             "RUN_FINISHED"
-          ]
+          ],
+          "path": "$.type"
         },
         {
           "kind": "resultField",
-          "field": "$.sourceEventTypes.0",
+          "field": "$.events.0.rawEvent.type",
           "equals": "turn.start"
         },
         {
           "kind": "resultField",
-          "field": "$.warningCodes",
+          "field": "$.warnings",
           "equals": [
-            "agui_state_checkpoint_custom_fallback",
-            "agui_message_done_custom_fallback",
-            "agui_tool_execution_custom_fallback"
+            {
+              "code": "agui_state_checkpoint_custom_fallback"
+            },
+            {
+              "code": "agui_message_done_custom_fallback"
+            },
+            {
+              "code": "agui_tool_execution_custom_fallback"
+            }
           ]
         }
       ],
-      "evidence": ["sourceEventTypes", "eventTypes", "events", "warningCodes"]
+      "evidence": [
+        "events"
+      ]
     },
     {
       "checkId": "event-stream.agui.failed-turn-error-projection",
       "operation": "event-stream.runtime-agui-projection",
       "scenario": "event-stream-scenarios",
-      "input": { "scenarioPath": "$.failed-provider-turn" },
+      "input": {
+        "scenarioPath": "$.failed-provider-turn"
+      },
       "assertions": [
         {
-          "kind": "resultField",
-          "field": "$.eventTypes",
+          "kind": "eventSequence",
           "equals": [
             "RUN_STARTED",
             "CUSTOM",
@@ -148,7 +166,8 @@
             "STEP_FINISHED",
             "CUSTOM",
             "RUN_ERROR"
-          ]
+          ],
+          "path": "$.type"
         },
         {
           "kind": "resultField",
@@ -161,17 +180,20 @@
           "matches": "^[a-z0-9]+(?:_[a-z0-9]+)*$"
         }
       ],
-      "evidence": ["sourceEventTypes", "eventTypes", "events"]
+      "evidence": [
+        "events"
+      ]
     },
     {
       "checkId": "event-stream.agui.paused-turn-fallback",
       "operation": "event-stream.runtime-agui-projection",
       "scenario": "event-stream-scenarios",
-      "input": { "scenarioPath": "$.paused-approval-turn" },
+      "input": {
+        "scenarioPath": "$.paused-approval-turn"
+      },
       "assertions": [
         {
-          "kind": "resultField",
-          "field": "$.eventTypes",
+          "kind": "eventSequence",
           "equals": [
             "RUN_STARTED",
             "CUSTOM",
@@ -187,7 +209,8 @@
             "CUSTOM",
             "CUSTOM",
             "RUN_FINISHED"
-          ]
+          ],
+          "path": "$.type"
         },
         {
           "kind": "resultField",
@@ -196,16 +219,26 @@
         },
         {
           "kind": "resultField",
-          "field": "$.warningCodes",
+          "field": "$.warnings",
           "equals": [
-            "agui_state_checkpoint_custom_fallback",
-            "agui_message_done_custom_fallback",
-            "agui_approval_custom_fallback",
-            "agui_paused_turn_coerced_to_run_finished"
+            {
+              "code": "agui_state_checkpoint_custom_fallback"
+            },
+            {
+              "code": "agui_message_done_custom_fallback"
+            },
+            {
+              "code": "agui_approval_custom_fallback"
+            },
+            {
+              "code": "agui_paused_turn_coerced_to_run_finished"
+            }
           ]
         }
       ],
-      "evidence": ["sourceEventTypes", "eventTypes", "events", "warningCodes"]
+      "evidence": [
+        "events"
+      ]
     }
   ]
 }

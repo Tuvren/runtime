@@ -531,7 +531,7 @@ function buildRuntimeApiOrchestration(): Plan {
         operation: "runtime.orchestration.nested-attribution",
         scenario: "runtime-api-scenarios",
       },
-    ],
+    ].map(normalizeGeneratedResultSurfaceCheck),
     packetId: "tuvren.framework.runtime-api",
     planId: "tuvren.framework.runtime-api.orchestration",
     planVersion: "0.1.0",
@@ -958,7 +958,7 @@ function buildRuntimeApiCallablesExtended(): Plan {
 
   return {
     applicability: { capabilities: ["framework.runtime-api"] },
-    checks,
+    checks: checks.map(normalizeGeneratedResultSurfaceCheck),
     packetId: "tuvren.framework.runtime-api",
     planId: "tuvren.framework.runtime-api.callables-extended",
     planVersion: "0.1.0",
@@ -1394,7 +1394,7 @@ function buildRuntimeApiLifecycleExtended(): Plan {
 
   return {
     applicability: { capabilities: ["framework.runtime-api"] },
-    checks,
+    checks: checks.map(normalizeGeneratedResultSurfaceCheck),
     packetId: "tuvren.framework.runtime-api",
     planId: "tuvren.framework.runtime-api.lifecycle-extended",
     planVersion: "0.1.0",
@@ -1949,7 +1949,7 @@ function buildEventStreamExtended(): Plan {
 
   return {
     applicability: { capabilities: ["framework.event-stream"] },
-    checks,
+    checks: checks.map(normalizeGeneratedEventStreamCheck),
     packetId: "tuvren.framework.event-stream",
     planId: "tuvren.framework.event-stream.extended",
     planVersion: "0.1.0",
@@ -1957,6 +1957,323 @@ function buildEventStreamExtended(): Plan {
       "event-stream-scenarios": "../scenarios/event-stream-scenarios.json",
     },
   };
+}
+
+function normalizeGeneratedEventStreamCheck(check: PlanCheck): PlanCheck {
+  const assertions = check.assertions.map((assertion) =>
+    normalizeGeneratedEventStreamAssertion(check.operation, assertion)
+  );
+  const { evidence: _evidence, ...rest } = check;
+
+  return {
+    ...rest,
+    assertions,
+    ...(assertions.some(
+      (assertion) =>
+        assertion.kind === "eventSequence" ||
+        assertion.kind === "noEvent" ||
+        assertion.kind === "ordering"
+    )
+      ? { evidence: ["events"] }
+      : {}),
+  };
+}
+
+function normalizeGeneratedEventStreamAssertion(
+  operation: string,
+  assertion: Record<string, unknown>
+): Record<string, unknown> {
+  if (
+    assertion.kind === "noEvent" &&
+    operation === "event-stream.runtime-sse-projection"
+  ) {
+    return {
+      ...assertion,
+      path: "$.event",
+    };
+  }
+
+  const field =
+    typeof assertion.field === "string" ? assertion.field : undefined;
+
+  if (field === undefined) {
+    return assertion;
+  }
+
+  return (
+    normalizeEventStreamEagerAssertion(operation, assertion, field) ??
+    normalizeEventStreamSseAssertion(operation, assertion, field) ??
+    normalizeEventStreamAguiAssertion(operation, assertion, field) ??
+    normalizeEventStreamResultNamespaceAssertion(operation, assertion, field) ??
+    assertion
+  );
+}
+
+function omitField(
+  assertion: Record<string, unknown>
+): Record<string, unknown> {
+  const { field: _field, ...rest } = assertion;
+  return rest;
+}
+
+function normalizeEventStreamEagerAssertion(
+  operation: string,
+  assertion: Record<string, unknown>,
+  field: string
+): Record<string, unknown> | undefined {
+  if (operation !== "event-stream.runtime-sse-eager-subscription") {
+    return undefined;
+  }
+
+  if (field === "$.firstDirectEventType") {
+    return toResultFieldAssertion(assertion, "$.firstDirectEvent.type");
+  }
+
+  if (field === "$.firstFrameEvent") {
+    return toResultFieldAssertion(assertion, "$.events.0.event");
+  }
+
+  return normalizeEventStreamResultNamespaceAssertion(
+    operation,
+    assertion,
+    field
+  );
+}
+
+function normalizeEventStreamSseAssertion(
+  operation: string,
+  assertion: Record<string, unknown>,
+  field: string
+): Record<string, unknown> | undefined {
+  if (operation !== "event-stream.runtime-sse-projection") {
+    return undefined;
+  }
+
+  if (field === "$.frameEvents") {
+    return {
+      ...omitField(assertion),
+      kind: "eventSequence",
+      path: "$.event",
+    };
+  }
+
+  if (field.startsWith("$.frameEvents.")) {
+    return toResultFieldAssertion(
+      assertion,
+      `${field.replace("$.frameEvents.", "$.events.")}.event`
+    );
+  }
+
+  if (field === "$.framePayloads.10.output.source") {
+    return toResultFieldAssertion(
+      assertion,
+      "$.events.10.payload.output.source"
+    );
+  }
+
+  if (field === "$.sourceEventTypes.0") {
+    return toResultFieldAssertion(assertion, "$.events.0.payload.type");
+  }
+
+  if (field === "$.sourceEventTypes") {
+    return {
+      ...omitField(assertion),
+      kind: "eventSequence",
+      path: "$.payload.type",
+    };
+  }
+
+  if (field === "$.threadIds.0") {
+    return toResultFieldAssertion(assertion, "$.events.0.payload.threadId");
+  }
+
+  if (field === "$.sourceThreadIds.0") {
+    return toResultFieldAssertion(
+      assertion,
+      "$.events.0.payload.source.threadId"
+    );
+  }
+
+  if (field === "$.checkpointHashes.0") {
+    return toResultFieldAssertion(assertion, "$.events.1.payload.turnNodeHash");
+  }
+
+  if (field === "$.resumedFromHashes.0") {
+    return toResultFieldAssertion(assertion, "$.events.14.payload.resumedFrom");
+  }
+
+  return normalizeEventStreamResultNamespaceAssertion(
+    operation,
+    assertion,
+    field
+  );
+}
+
+function normalizeEventStreamAguiAssertion(
+  operation: string,
+  assertion: Record<string, unknown>,
+  field: string
+): Record<string, unknown> | undefined {
+  if (operation !== "event-stream.runtime-agui-projection") {
+    return undefined;
+  }
+
+  if (field === "$.eventTypes") {
+    return {
+      ...omitField(assertion),
+      kind: "eventSequence",
+      path: "$.type",
+    };
+  }
+
+  if (field.startsWith("$.eventTypes.")) {
+    return toResultFieldAssertion(
+      assertion,
+      `${field.replace("$.eventTypes.", "$.events.")}.type`
+    );
+  }
+
+  if (field === "$.sourceEventTypes.0") {
+    return toResultFieldAssertion(assertion, "$.events.0.rawEvent.type");
+  }
+
+  if (field === "$.sourceEventTypes") {
+    return {
+      ...omitField(assertion),
+      kind: "eventSequence",
+      path: "$.rawEvent.type",
+    };
+  }
+
+  if (field === "$.warningCodes") {
+    return {
+      ...toResultFieldAssertion(assertion, "$.warnings"),
+      ...(assertion.equals === undefined
+        ? {}
+        : { equals: mapWarningExpectation(assertion.equals) }),
+      ...(assertion.contains === undefined
+        ? {}
+        : { contains: mapWarningExpectation(assertion.contains) }),
+    };
+  }
+
+  return normalizeEventStreamResultNamespaceAssertion(
+    operation,
+    assertion,
+    field
+  );
+}
+
+function normalizeEventStreamResultNamespaceAssertion(
+  operation: string,
+  assertion: Record<string, unknown>,
+  field: string
+): Record<string, unknown> | undefined {
+  if (
+    operation !== "event-stream.runtime-sse-projection" &&
+    operation !== "event-stream.runtime-sse-eager-subscription" &&
+    operation !== "event-stream.runtime-agui-projection"
+  ) {
+    return undefined;
+  }
+
+  if (
+    field === "$.warnings" ||
+    field.startsWith("$.warnings.") ||
+    field === "$.firstDirectEvent" ||
+    field.startsWith("$.firstDirectEvent.") ||
+    field === "$.events" ||
+    field.startsWith("$.events.")
+  ) {
+    return toResultFieldAssertion(assertion, field);
+  }
+
+  return undefined;
+}
+
+function toResultFieldAssertion(
+  assertion: Record<string, unknown>,
+  field: string
+): Record<string, unknown> {
+  return {
+    ...assertion,
+    field,
+    kind: "resultField",
+  };
+}
+
+function mapWarningExpectation(value: unknown): unknown {
+  if (typeof value === "string") {
+    return { code: value };
+  }
+
+  if (Array.isArray(value)) {
+    return value.map((entry) => mapWarningExpectation(entry));
+  }
+
+  return value;
+}
+
+function normalizeGeneratedResultSurfaceCheck(check: PlanCheck): PlanCheck {
+  const assertions = check.assertions.map((assertion) =>
+    normalizeGeneratedResultSurfaceAssertion(assertion)
+  );
+  const transformed = assertions.some(
+    (assertion, index) => assertion !== check.assertions[index]
+  );
+
+  if (!transformed) {
+    return check;
+  }
+
+  const { evidence, ...rest } = check;
+
+  return {
+    ...rest,
+    assertions,
+    ...(evidence === undefined
+      ? {}
+      : {
+          evidence: evidence.map(normalizeGeneratedResultRequiredEvidencePath),
+        }),
+  };
+}
+
+function normalizeGeneratedResultSurfaceAssertion(
+  assertion: Record<string, unknown>
+): Record<string, unknown> {
+  if (assertion.kind === "evidenceField") {
+    return toResultFieldAssertion(assertion, String(assertion.field));
+  }
+
+  if (
+    assertion.kind === "schemaValid" &&
+    typeof assertion.path === "string" &&
+    (assertion.path === "$.evidence" ||
+      assertion.path.startsWith("$.evidence."))
+  ) {
+    return {
+      ...assertion,
+      path: assertion.path.replace("$.evidence", "$.result"),
+    };
+  }
+
+  return assertion;
+}
+
+function normalizeGeneratedResultRequiredEvidencePath(path: string): string {
+  if (
+    path === "result" ||
+    path.startsWith("result.") ||
+    path === "state" ||
+    path.startsWith("state.") ||
+    path === "trace" ||
+    path.startsWith("trace.")
+  ) {
+    return path;
+  }
+
+  return `result.${path}`;
 }
 
 // Driver API extended — broader assertions on driver.execute and driver.resume
@@ -2074,7 +2391,7 @@ function buildDriverApiExtended(): Plan {
 
   return {
     applicability: { capabilities: ["framework.driver-api"] },
-    checks,
+    checks: checks.map(normalizeGeneratedResultSurfaceCheck),
     packetId: "tuvren.framework.driver-api",
     planId: "tuvren.framework.driver-api.extended",
     planVersion: "0.1.0",
@@ -2154,7 +2471,7 @@ function buildReactDriverExtended(): Plan {
 
   return {
     applicability: { capabilities: ["framework.react-driver"] },
-    checks,
+    checks: checks.map(normalizeGeneratedResultSurfaceCheck),
     packetId: "tuvren.framework.react-driver",
     planId: "tuvren.framework.react-driver.extended",
     planVersion: "0.1.0",
