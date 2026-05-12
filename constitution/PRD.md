@@ -2,9 +2,9 @@
 
 ## 0. Version History & Changelog
 
+- v0.6.0 - Tightened the portability promise to in-scope runtime features defined by the semantic docs so explanatory material and ecosystem-only adapters do not blur the portability gate.
 - v0.5.0 - Clarified that the first product-depth implementation line must prove the SDK through a serious REPL-style reference host, narrowed tolerated deferral of documented core runtime surfaces, and tightened the portability boundary to external-SDK-dependent integrations only.
 - v0.4.0 - Added the machine-enforced neutral authority capabilities, the authority-packet and conformance-plan domain terms, the no-implementation-oracle and no-prose-oracle prohibited patterns, and the runtime-maintainer success criterion that a new implementation must be buildable without reading another language's source as truth.
-- v0.3.0 - Added the multi-implementation portability posture, the runtime implementation maintainer actor, and explicit language-neutral semantic parity capabilities for the post-TypeScript transition line.
 - ... [Older history truncated, refer to git logs]
 
 ## 1. Executive Summary & Target Archetype
@@ -25,7 +25,7 @@
 - Tuvren Runtime must enforce that cross-implementation meaning lives in boundary-owned machine-readable authority and executable evidence rather than in any single implementation language, runner codebase, or human-prose document.
 - The first product-depth implementation line must prove the SDK through a serious REPL-style reference host that exercises the runtime end to end without relying on private-only shortcuts that other hosts cannot use.
 - Documented core runtime surfaces are expected to become real product scope for the first product-depth implementation line; long-lived deferral is reserved for ecosystem expansion or integrations that inherently depend on external SDK ecosystems.
-- Every feature defined by the project’s semantic docs is intended to be portable across implementation lines unless it exists only as an adapter to an external SDK or ecosystem-specific protocol.
+- Every in-scope runtime feature defined by the project’s semantic docs is intended to be portable across implementation lines unless it exists only as an adapter to an external SDK or ecosystem-specific protocol.
 
 ### 1.2 Success Criteria
 

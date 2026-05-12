@@ -2,9 +2,9 @@
 
 ## 0. Version History & Changelog
 
+- v0.22.0 - Clarified that the proving-host and portability-gate evidence must become part of the repo's canonical verification path, and kept the portability scope focused on in-scope runtime semantics rather than explanatory or ecosystem-only material.
 - v0.21.0 - Replaced the AG-closed maintenance posture with an active TypeScript productization plan centered on constitutional archive cleanup, host-facing package normalization, a serious REPL proving host, PostgreSQL, and portability-gate conformance closure before Rust resumes.
 - v0.20.0 - Closed Epic AG in current repo reality through non-self-attesting promoted-plan hardening, real-kernel framework proof, refreshed compatibility evidence, and passing AG-gated `bun run codegen`, `bun run conformance`, `bun run compatibility:evidence`, `bun run interop-smoke`, `bun run release-check`, and `bun run verify`; TypeScript freeze-readiness is reaffirmed for the currently promoted supported applicable surfaces.
-- v0.19.0 - Activated Epic AG for non-self-attesting conformance hardening, superseding the Epic AF freeze-readiness conclusion without reopening AD, AE, or AF.
 - ... [Older history truncated, refer to git logs]
 
 ## 1. Executive Summary & Active Critical Path
@@ -187,6 +187,7 @@ And those scenario runs explicitly cover both `memory` and SQLite-backed host ex
 And TypeScript AI SDK bridge-backed provider scenarios remain covered as a first-class TypeScript product obligation even though the bridge implementation is not itself a required portable surface
 And interactive REPL flows and scripted scenario mode share the same host-facing implementation path
 And product-proof claims cite proving-host evidence rather than private playground-only evidence
+And the repo's canonical verification path consumes proving-host validation as the decisive `product proof gate` so stale or failing host-proof evidence breaks readiness claims
 ```
 
 ### Epic AK — PostgreSQL Product Backend (KRT)
@@ -252,6 +253,7 @@ Then every documented portable surface in the active product scope is classified
 And canonical stream plus SSE are treated as required portable surfaces
 And AG-UI plus the TypeScript AI SDK bridge implementation are the only standing implementation-specific exceptions unless a new explicit decision changes that rule
 And the inventory separately records `memory` proving obligations and TypeScript AI SDK bridge-backed product obligations so they remain tested even where they are not portable targets
+And explanatory documentation and ecosystem-only adapter notes are not allowed to inflate the portable runtime scope beyond the intended product semantics
 ```
 
 **KRT-AL002 Portable Semantics Promotion Closure**
@@ -267,6 +269,7 @@ When the remaining portable TypeScript semantics are promoted
 Then the intended portable surface is carried by authority packets, conformance plans, fixtures, generated artifacts, and runner-observed checks rather than implementation-local tests
 And provider-agnostic semantics remain Tuvren-owned instead of AI-SDK-shaped
 And orchestration, extensions, host-proof semantics, canonical stream, and SSE assertions no longer depend on implementation-local summary logic where runner-observed proof is possible
+And the repo's canonical verification path treats the promoted portability evidence as decisive rather than leaving historical AF-era freshness checks as a substitute for portability status
 ```
 
 **KRT-AL003 Rust Re-entry Gate Reassessment**
@@ -294,4 +297,5 @@ And the constitutional docs name the exact evidence and remaining blockers inste
 - Canonical stream semantics and SSE translation are portable runner-owned surfaces; AG-UI remains an explicitly implementation-specific projection.
 - Provider-agnostic semantics remain Tuvren-owned and do not depend on AI SDK bridge shapes to define cross-language truth.
 - TypeScript AI SDK bridge-backed provider scenarios remain a required TypeScript product-proof lane even though the bridge implementation itself is not a cross-language portability target.
+- The canonical verification path enforces both the proving-host `product proof gate` and the promoted portability evidence once those lanes land.
 - The `product proof gate`, `platform gate`, and `portability gate` are evidenced from fresh checks before Rust framework/product work can resume.
