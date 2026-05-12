@@ -1,6 +1,6 @@
 # AI Agent Instruction Manual: System Execution Guide
 
-> **System Context:** This repository is managed via a strict 4-document planning pipeline plus historical support material that may remain available during archive migration. As an AI coding agent executing tasks within this project, your role is to implement the specifications exactly as defined. Rely on `PRD.md`, `Architecture.md`, `TechSpec.md`, `Tasks.md`, any support artifact those live documents explicitly keep active, and the authoritative behavioral specifications in `../docs/` to determine architecture, business logic, contracts, and dependencies. Treat `constitution/AGENTS.md` as a routing helper for that chain, not as a fifth authority document.
+> **System Context:** This repository is managed via a strict 4-document planning pipeline plus generated live support artifacts and archived historical context. As an AI coding agent executing tasks within this project, your role is to implement the specifications exactly as defined. Rely on `PRD.md`, `Architecture.md`, `TechSpec.md`, `Tasks.md`, any support artifact those live documents explicitly keep active, and the authoritative behavioral specifications in `../docs/` to determine architecture, business logic, contracts, and dependencies. Treat `constitution/AGENTS.md` as a routing helper for that chain, not as a fifth authority document.
 
 ## The 4-Document Architecture
 
@@ -15,8 +15,8 @@ This project separates concerns into four distinct layers. Understand where your
 
 - `Tasks.md` is the only source of truth for active scope, deferred scope, closed epics, and the current critical path.
 - When no ticket is active, do not invent one from the archived ticket list. Treat user-requested chores, documentation alignment, verification, and review work as maintenance unless the user explicitly asks to open or revise scope.
-- During archive migration, the explicitly retained live support artifacts are the Epic AD docs-to-authority coverage matrix and the Epic AF gap-plan outputs under `constitution/spikes/`. Treat them as transitional support inputs only until `KRT-AH001` / `KRT-AH002` relocate or replace them.
-- For closed areas or archive-cleanup chores, use the relevant archived or explicitly retained support artifact only as historical context before changing behavior, validation claims, or follow-up language. Do not treat `spikes/` closure inventories as live authority unless the four live constitutional documents explicitly keep a specific artifact active.
+- The live constitutional authority chain is only `PRD.md`, `Architecture.md`, `TechSpec.md`, and `Tasks.md`. Generated support artifacts under `constitution/support/live/` may inform docs portability classification or canonical verification freshness, but they do not extend that authority chain.
+- For closed areas or archive-cleanup chores, use `constitution/archived/` as historical context only. Do not treat archived inventories, reports, plans, or closure writeups as live authority unless one of the four live constitutional documents explicitly re-promotes a specific artifact.
 
 ---
 
@@ -35,7 +35,7 @@ To conserve your context window and improve accuracy, use this lookup table to f
 | **What a specific business/runtime term means?**              | `PRD.md`                                                                             | `Ubiquitous Language (Glossary)`                                                                        |
 | **Whether a feature belongs in scope at all?**                | `PRD.md`                                                                             | `Functional Capabilities`, `Success Criteria`, and `Scope Distinctions That Must Remain Stable`         |
 | **What the kernel and framework behavior mean semantically?** | `../docs/KrakenKernelSpecification.md` and `../docs/KrakenFrameworkSpecification.md` | Read the relevant normative sections directly                                                           |
-| **What closed epic work actually delivered?**                 | `constitution/spikes/` during archive migration; later `constitution/archived/`      | Read the affected historical inventory only as context, or consult the explicitly retained live support artifacts named in `Planning Posture` |
+| **What closed epic work actually delivered?**                 | `constitution/archived/` or an explicitly named file under `constitution/support/live/` | Read archived artifacts only as historical context, and read `support/live` artifacts only when one of the four live constitutional documents explicitly keeps that generated support input active |
 | **What implementation parity is currently evidenced?**        | `../reports/compatibility/`                                                          | Treat generated matrix and evidence files as measured evidence, not semantic authority                   |
 | **What carries the cross-implementation truth for a surface?** | `boundaries/<area>/contracts/<surface>/spec/authority-packet.json` and the conformance plans it references | Read the manifest first; treat implementation source, runner source, and Markdown as forbidden authority for any cross-implementation semantic |
 
