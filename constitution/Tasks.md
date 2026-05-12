@@ -10,7 +10,7 @@
 ## 1. Executive Summary & Active Critical Path
 
 - **Total Active Story Points:** 59
-- **Critical Path:** `KRT-AH001 -> KRT-AH002 -> KRT-AI001 -> KRT-AI002 -> KRT-AJ001 -> KRT-AJ002 -> KRT-AJ003 -> KRT-AK001 -> KRT-AK002 -> KRT-AK003 -> KRT-AL001 -> KRT-AL002 -> KRT-AL003`
+- **Critical Path:** `KRT-AH001 -> KRT-AH002 -> KRT-AI001 -> KRT-AJ001 -> KRT-AI002 -> KRT-AJ002 -> KRT-AJ003 -> KRT-AK001 -> KRT-AK002 -> KRT-AK003 -> KRT-AL001 -> KRT-AL002 -> KRT-AL003`
 - **Planning Assumptions:** `docs/` remains the timeless semantic authority; `constitution/` remains the live planning framework; stale constitutional support material moves under `constitution/archived/`; the SDK is the main product; the serious REPL CLI is the proving host; canonical stream plus SSE are portable surfaces; AG-UI and the TypeScript AI SDK bridge implementation are the standing implementation-specific exceptions; PostgreSQL lands before Rust; and Rust remains blocked until `product proof gate`, `platform gate`, and `portability gate` all pass.
 
 ### Brownfield Continuity Note
@@ -61,9 +61,9 @@
 flowchart LR
   KRTAH001[KRT-AH001 Archive Sweep] --> KRTAH002[KRT-AH002 Live Authority Cleanup]
   KRTAH002 --> KRTAI001[KRT-AI001 SDK Naming Audit]
-  KRTAI001 --> KRTAI002[KRT-AI002 Package Normalization]
-  KRTAI002 --> KRTAJ001[KRT-AJ001 REPL Host Contract]
-  KRTAJ001 --> KRTAJ002[KRT-AJ002 REPL Host Implementation]
+  KRTAI001 --> KRTAJ001[KRT-AJ001 REPL Host Contract]
+  KRTAJ001 --> KRTAI002[KRT-AI002 Package Normalization]
+  KRTAI002 --> KRTAJ002[KRT-AJ002 REPL Host Implementation]
   KRTAJ002 --> KRTAJ003[KRT-AJ003 Proving-Host Validation]
   KRTAJ003 --> KRTAK001[KRT-AK001 PostgreSQL Design Spike]
   KRTAK001 --> KRTAK002[KRT-AK002 PostgreSQL Implementation]
@@ -87,9 +87,10 @@ flowchart LR
 ```gherkin
 Given `constitution/` contains live planning artifacts and stale historical support material
 When the constitutional archive sweep is completed
-Then every retained non-live constitutional planning or closure artifact is targeted for relocation under `constitution/archived/`
+Then every retained non-live constitutional planning, report, or closure artifact is targeted for relocation under `constitution/archived/`
 And no archived artifact remains referenced as current authority from the four live constitutional documents
 And every retained historical artifact outside the live path is labeled as historical context only
+And any script that writes fresh constitutional support artifacts outside the four live documents is retargeted to the archived lane, moved to a newly explicit live support lane, or removed from active verification paths before the sweep closes
 ```
 
 **KRT-AH002 Live Authority Path Cleanup**
@@ -103,7 +104,8 @@ And every retained historical artifact outside the live path is labeled as histo
 Given archived historical material has been separated from the live constitutional path
 When the live authority path cleanup is completed
 Then `docs/` remains the timeless semantic authority
-And only `constitution/PRD.md`, `constitution/Architecture.md`, `constitution/TechSpec.md`, and `constitution/Tasks.md` remain on the live constitutional execution path
+And only `constitution/PRD.md`, `constitution/Architecture.md`, `constitution/TechSpec.md`, and `constitution/Tasks.md` remain on the live constitutional authority chain
+And `constitution/AGENTS.md` remains only as a routing helper aligned to that chain rather than as a fifth authority document
 And stale closure or freeze language no longer implies current product readiness without fresh evidence
 ```
 
@@ -127,12 +129,12 @@ And the audit does not prematurely freeze public package publication beyond the 
 **KRT-AI002 Host-Facing Package Normalization**
 - **Type:** Feature
 - **Effort:** 5
-- **Dependencies:** `KRT-AI001`
+- **Dependencies:** `KRT-AJ001`
 - **Capability / Contract Mapping:** PRD `CAP-P0-019`, `CAP-P0-020`, `CAP-P1-032`; TechSpec `§5.4`
-- **Description:** Apply the host-facing rename and topology normalization so the proving host can depend only on the intended high-level SDK surface.
+- **Description:** Apply the host-facing rename and topology normalization so the proving host can depend only on the intended high-level SDK surface defined by the reference REPL host contract.
 - **Acceptance Criteria (Gherkin):**
 ```gherkin
-Given the host-facing package audit has identified the required normalization
+Given the host-facing package audit and the reference REPL host contract have identified the required normalization
 When the host-facing packages are renamed or restructured
 Then the serious REPL host can depend only on the intended high-level SDK surface
 And internal-only packages are no longer required in the proving-host path
@@ -144,12 +146,12 @@ And existing behavior remains covered by automated build, typecheck, and validat
 **KRT-AJ001 Reference REPL Host Contract**
 - **Type:** Feature
 - **Effort:** 3
-- **Dependencies:** `KRT-AI002`
+- **Dependencies:** `KRT-AI001`
 - **Capability / Contract Mapping:** PRD `CAP-P0-019`, `CAP-P0-020`, `CAP-P0-023`, `CAP-P0-026`, `CAP-P0-027`; TechSpec ADR-032
-- **Description:** Define the serious REPL host command tree, scenario mode, and operator contract strictly around the host-facing SDK without inventing private proving-only seams.
+- **Description:** Define the serious REPL host command tree, scenario mode, and operator contract strictly around the host-facing SDK without inventing private proving-only seams, so the subsequent package normalization is driven by real host needs.
 - **Acceptance Criteria (Gherkin):**
 ```gherkin
-Given the normalized high-level SDK surface exists
+Given the host-facing package audit exists
 When the reference REPL host contract is defined
 Then the host exposes thread and branch controls, execution controls, approval resolution, steering, orchestration actions, persistence selection, and event inspection through the host-facing SDK
 And the contract includes both interactive REPL use and scripted end-to-end scenario execution
@@ -187,7 +189,8 @@ And those scenario runs explicitly cover both `memory` and SQLite-backed host ex
 And TypeScript AI SDK bridge-backed provider scenarios remain covered as a first-class TypeScript product obligation even though the bridge implementation is not itself a required portable surface
 And interactive REPL flows and scripted scenario mode share the same host-facing implementation path
 And product-proof claims cite proving-host evidence rather than private playground-only evidence
-And the repo's canonical verification path consumes proving-host validation as the decisive `product proof gate` so stale or failing host-proof evidence breaks readiness claims
+And named proving-host validation targets are introduced for the serious REPL host rather than reusing playground-only target names as the lasting gate
+And the repo's canonical verification path consumes those proving-host validation targets through `package.json` entry points and `tools/scripts/verify.ts` as the decisive `product proof gate` so stale or failing host-proof evidence breaks readiness claims
 ```
 
 ### Epic AK — PostgreSQL Product Backend (KRT)
@@ -269,7 +272,7 @@ When the remaining portable TypeScript semantics are promoted
 Then the intended portable surface is carried by authority packets, conformance plans, fixtures, generated artifacts, and runner-observed checks rather than implementation-local tests
 And provider-agnostic semantics remain Tuvren-owned instead of AI-SDK-shaped
 And orchestration, extensions, host-proof semantics, canonical stream, and SSE assertions no longer depend on implementation-local summary logic where runner-observed proof is possible
-And the repo's canonical verification path treats the promoted portability evidence as decisive rather than leaving historical AF-era freshness checks as a substitute for portability status
+And `package.json` entry points and `tools/scripts/verify.ts` treat the promoted portability evidence as decisive rather than leaving `docs:af-gap-plan:check` as the portability proxy once the new gate lands
 ```
 
 **KRT-AL003 Rust Re-entry Gate Reassessment**
