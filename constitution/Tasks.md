@@ -91,6 +91,7 @@ Then every retained non-live constitutional planning, report, or closure artifac
 And no archived artifact remains referenced as current authority from the four live constitutional documents
 And every retained historical artifact outside the live path is labeled as historical context only
 And any script that writes fresh constitutional support artifacts outside the four live documents is retargeted to the archived lane, moved to a newly explicit live support lane, or removed from active verification paths before the sweep closes
+And any support artifact still referenced by `docs/` or by the canonical verification path is either relocated out of stale paths or explicitly classified as a temporary retained live support artifact during archive migration
 ```
 
 **KRT-AH002 Live Authority Path Cleanup**
@@ -161,7 +162,7 @@ And no required host action depends on private runtime-only APIs
 **KRT-AJ002 Serious REPL Host Implementation**
 - **Type:** Feature
 - **Effort:** 8
-- **Dependencies:** `KRT-AJ001`
+- **Dependencies:** `KRT-AJ001`, `KRT-AI002`
 - **Capability / Contract Mapping:** PRD `CAP-P0-005`, `CAP-P0-010`, `CAP-P0-013`, `CAP-P0-016`, `CAP-P0-019`, `CAP-P0-020`, `CAP-P0-023`, `CAP-P0-026`, `CAP-P0-027`, `CAP-P1-022`, `CAP-P1-024`
 - **Description:** Build the serious REPL host using only the intended high-level SDK surface, proving the documented runtime behaviors as one coherent operator-facing product.
 - **Acceptance Criteria (Gherkin):**

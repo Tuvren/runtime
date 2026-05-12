@@ -2227,7 +2227,8 @@ conformance-plan JSON Schemas live under `tools/schemas/`.
 ### 5.3 Documentation Drift Prevention
 
 - `docs/KrakenKernelSpecification.md` and `docs/KrakenFrameworkSpecification.md` remain the authoritative behavioral sources that this TechSpec realizes physically.
-- `constitution/PRD.md`, `constitution/Architecture.md`, and `constitution/TechSpec.md` remain the governing artifacts for product, logical architecture, and technical implementation posture.
+- `constitution/PRD.md`, `constitution/Architecture.md`, `constitution/TechSpec.md`, and `constitution/Tasks.md` remain the governing artifacts for product, logical architecture, technical implementation posture, and execution posture.
+- During archive migration, the Epic AD docs-to-authority coverage matrix and the Epic AF gap-plan outputs remain explicitly retained live support artifacts under `constitution/spikes/` until the archive-reset tasks relocate or replace them.
 - Historical constitutional support material that no longer drives forward execution belongs under `constitution/archived/` and must be removed from any live-authority path once archived.
 - Changes to provider posture, backend posture, record encoding, hash algorithm, or public framework contracts require a TechSpec update in the same change.
 - Changes that alter the driver model, driver-neutral framework surface, or the ReAct Driver’s role as the initial baseline require a TechSpec update in the same change.
