@@ -58,6 +58,16 @@ const SCENARIO_NAMES = new Set<PlaygroundScenarioName>([
   "structured",
   "tools",
 ]);
+const TURN_SCENARIO_NAMES = new Set<PlaygroundScenarioName>([
+  "approval",
+  "cancel",
+  "extension",
+  "metadata",
+  "steering",
+  "streaming",
+  "structured",
+  "tools",
+]);
 
 const CONTINUE_ONCE_POLICY: LoopPolicy = {
   evaluate(_response, _manifest, iterationCount) {
@@ -143,6 +153,7 @@ export async function runReplCommand(
     case ".help":
       return { output: REPL_HELP_TEXT.join("\n") };
     case ".exit":
+      cancelActiveShellWork(shell);
       return { exit: true };
     case ".status":
       return { output: formatJson(readShellStatus(shell)) };
@@ -372,6 +383,14 @@ async function startTurn(
     return {
       output:
         'Expected ".turn start <scenario|text>". Example: ".turn start approval".',
+    };
+  }
+
+  const unsupportedScenarioMessage = readUnsupportedTurnScenarioMessage(input);
+
+  if (unsupportedScenarioMessage !== undefined) {
+    return {
+      output: unsupportedScenarioMessage,
     };
   }
 
@@ -630,7 +649,7 @@ function createTurnExecutionRequest(
   config?: Parameters<PlaygroundHost["executeTurn"]>[0]["config"];
   signal: InputSignal;
 } {
-  if (!isScenarioName(input)) {
+  if (!isTurnScenarioName(input)) {
     return {
       signal: textSignal(input),
     };
@@ -724,6 +743,20 @@ function createApprovalResponse(
 
 function isScenarioName(value: string): value is PlaygroundScenarioName {
   return SCENARIO_NAMES.has(value as PlaygroundScenarioName);
+}
+
+function isTurnScenarioName(value: string): value is PlaygroundScenarioName {
+  return TURN_SCENARIO_NAMES.has(value as PlaygroundScenarioName);
+}
+
+function readUnsupportedTurnScenarioMessage(value: string): string | undefined {
+  if (!isScenarioName(value) || isTurnScenarioName(value)) {
+    return undefined;
+  }
+
+  return value === "orchestration"
+    ? 'Scenario "orchestration" is not supported through .turn start. Use .orch commands or the scripted scenario runner instead.'
+    : `Scenario "${value}" is not supported through .turn start. Use the scripted scenario runner instead.`;
 }
 
 async function collect<T>(events: AsyncIterable<T>): Promise<T[]> {

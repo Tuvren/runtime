@@ -55,30 +55,28 @@ export function loadPlaygroundConfig(
   argv: readonly string[]
 ): PlaygroundConfig {
   const options = parseArgs(argv);
-  const backend = parseBackend(
-    options.backend ?? env.TUVREN_PLAYGROUND_BACKEND
-  );
+  const backend = parseBackend(options.backend ?? readReplEnv(env, "BACKEND"));
   const kernelMode = parseKernelMode(
-    options.kernelMode ?? env.TUVREN_PLAYGROUND_KERNEL_MODE
+    options.kernelMode ?? readReplEnv(env, "KERNEL_MODE")
   );
   const scenario = parseScenario(
-    options.scenario ?? env.TUVREN_PLAYGROUND_SCENARIO
+    options.scenario ?? readReplEnv(env, "SCENARIO")
   );
   const providerMode = parseProviderMode(
-    options.provider ?? env.TUVREN_PLAYGROUND_PROVIDER_MODE
+    options.provider ?? readReplEnv(env, "PROVIDER_MODE")
   );
   const modelId = normalizeModelId(
-    options.modelId ?? env.TUVREN_PLAYGROUND_MODEL_ID
+    options.modelId ?? readReplEnv(env, "MODEL_ID")
   );
   const googleApiKey = resolveGoogleApiKey(env);
   const aimockBaseUrl = normalizeAimockBaseUrl(
-    options.aimockBaseUrl ?? env.TUVREN_PLAYGROUND_AIMOCK_BASE_URL
+    options.aimockBaseUrl ?? readReplEnv(env, "AIMOCK_BASE_URL")
   );
   const kernelGrpcBaseUrl = normalizeKernelGrpcBaseUrl(
-    options.kernelGrpcBaseUrl ?? env.TUVREN_PLAYGROUND_KERNEL_GRPC_BASE_URL
+    options.kernelGrpcBaseUrl ?? readReplEnv(env, "KERNEL_GRPC_BASE_URL")
   );
   const sqlitePath = normalizeSqlitePath(
-    options.sqlitePath ?? env.TUVREN_PLAYGROUND_SQLITE_PATH
+    options.sqlitePath ?? readReplEnv(env, "SQLITE_PATH")
   );
 
   if (backend === "sqlite" && sqlitePath === undefined) {
@@ -204,6 +202,21 @@ export function isAimockProviderMode(
   return (AIMOCK_PLAYGROUND_PROVIDER_MODES as readonly string[]).includes(
     value
   );
+}
+
+export function readReplEnv(
+  env: Record<string, string | undefined>,
+  suffix:
+    | "AIMOCK_BASE_URL"
+    | "BACKEND"
+    | "KERNEL_GRPC_BASE_URL"
+    | "KERNEL_MODE"
+    | "MODEL_ID"
+    | "PROVIDER_MODE"
+    | "SCENARIO"
+    | "SQLITE_PATH"
+): string | undefined {
+  return env[`TUVREN_REPL_${suffix}`] ?? env[`TUVREN_PLAYGROUND_${suffix}`];
 }
 
 function parseArgs(argv: readonly string[]): Record<string, string> {

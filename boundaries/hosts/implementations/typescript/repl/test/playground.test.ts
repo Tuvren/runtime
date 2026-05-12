@@ -170,6 +170,25 @@ describe("repl host scenarios", () => {
     );
   });
 
+  test("loads REPL-prefixed env aliases", () => {
+    const config = loadPlaygroundConfig(
+      {
+        TUVREN_REPL_AIMOCK_BASE_URL: "http://127.0.0.1:4012/v1",
+        TUVREN_REPL_KERNEL_GRPC_BASE_URL: "http://127.0.0.1:50053",
+        TUVREN_REPL_KERNEL_MODE: "rust-grpc",
+        TUVREN_REPL_PROVIDER_MODE: "aimock-openai",
+        TUVREN_REPL_SCENARIO: "metadata",
+      },
+      []
+    );
+
+    expect(config.aimockBaseUrl).toBe("http://127.0.0.1:4012/v1");
+    expect(config.kernelGrpcBaseUrl).toBe("http://127.0.0.1:50053");
+    expect(config.kernelMode).toBe("rust-grpc");
+    expect(config.providerMode).toBe("aimock-openai");
+    expect(config.scenario).toBe("metadata");
+  });
+
   test("rejects aimock provider configuration without a usable base URL", () => {
     for (const providerMode of AIMOCK_PLAYGROUND_PROVIDER_MODES) {
       expectPlaygroundConfigError(
@@ -705,6 +724,25 @@ describe("repl host scenarios", () => {
     await waitForCondition(() => activeHandle.status().phase !== "running");
   });
 
+  test("cancels active work when exiting the shell", async () => {
+    const shell = createReplShell({
+      backend: "memory",
+      providerMode: "fixture",
+      scenario: "streaming",
+    });
+
+    await runReplCommand(shell, ".thread new");
+    await runReplCommand(shell, ".turn start steering");
+    const activeHandle = shell.activeTurn?.handle;
+
+    if (activeHandle === undefined) {
+      throw new Error("expected active turn handle after .turn start");
+    }
+
+    expect((await runReplCommand(shell, ".exit")).exit).toBe(true);
+    await waitForCondition(() => activeHandle.status().phase !== "running");
+  });
+
   test("resets shell state when the backend command is used", async () => {
     const shell = createReplShell({
       backend: "memory",
@@ -734,6 +772,24 @@ describe("repl host scenarios", () => {
       "No active thread exists."
     );
     expect(shell.thread).toBe(undefined);
+  });
+
+  test("rejects multi-turn proof scenarios through .turn start", async () => {
+    const shell = createReplShell({
+      backend: "memory",
+      providerMode: "fixture",
+      scenario: "streaming",
+    });
+
+    expect(
+      (await runReplCommand(shell, ".turn start orchestration")).output
+    ).toBe(
+      'Scenario "orchestration" is not supported through .turn start. Use .orch commands or the scripted scenario runner instead.'
+    );
+    expect((await runReplCommand(shell, ".turn start branching")).output).toBe(
+      'Scenario "branching" is not supported through .turn start. Use the scripted scenario runner instead.'
+    );
+    expect(shell.activeTurn).toBe(undefined);
   });
 
   test("aggregates matrix success for deterministic scenarios", async () => {
@@ -834,6 +890,16 @@ describe("repl host scenarios", () => {
       expect(result.stderr.includes("ERR_USE_AFTER_CLOSE")).toBe(false);
     }
   });
+
+  test("interactive CLI honors TUVREN_REPL_SCENARIO aliases", async () => {
+    const result = await runCliSession("", {
+      TUVREN_REPL_SCENARIO: "streaming",
+    });
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout.includes('"scenario": "streaming"')).toBe(true);
+    expect(result.stdout.includes("Tuvren REPL Host")).toBe(false);
+  });
 });
 
 function readCommandArray(
@@ -870,7 +936,8 @@ async function waitForCondition(
 }
 
 async function runCliSession(
-  stdin: string
+  stdin: string,
+  envOverrides?: Record<string, string>
 ): Promise<{ exitCode: number | null; stderr: string; stdout: string }> {
   const cli = spawn(
     "node",
@@ -883,6 +950,10 @@ async function runCliSession(
     ],
     {
       cwd: process.cwd(),
+      env: {
+        ...process.env,
+        ...envOverrides,
+      },
       stdio: "pipe",
     }
   );

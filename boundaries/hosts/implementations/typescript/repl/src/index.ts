@@ -22,6 +22,7 @@ export {
   DEFAULT_PLAYGROUND_SCENARIOS as DEFAULT_REPL_SCENARIOS,
   isAimockProviderMode,
   loadPlaygroundConfig as loadReplConfig,
+  readReplEnv,
   resolveGoogleApiKey,
 } from "./lib/playground-config.js";
 export { createPlaygroundHost as createReplHost } from "./lib/playground-host.js";

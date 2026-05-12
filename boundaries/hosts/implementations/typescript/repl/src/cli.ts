@@ -20,6 +20,7 @@ import {
   createReplShell,
   haveAllChecksPassed,
   loadReplConfig,
+  readReplEnv,
   runReplCommand,
   runReplScenario,
 } from "./index.js";
@@ -97,7 +98,7 @@ function hasExplicitScenarioSelection(
   env: Record<string, string | undefined>,
   argv: readonly string[]
 ): boolean {
-  if (env.TUVREN_PLAYGROUND_SCENARIO?.trim().length) {
+  if (readReplEnv(env, "SCENARIO")?.trim().length) {
     return true;
   }
 
