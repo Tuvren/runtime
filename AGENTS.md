@@ -15,7 +15,7 @@ Treat machine-readable authority as the source of cross-language truth.
 
 - Read `docs/KrakenKernelSpecification.md` before changing kernel behavior.
 - Read `docs/KrakenFrameworkSpecification.md` before changing framework behavior.
-- Keep `constitution/TechSpec.md`, `constitution/Tasks.md`, and `constitution/spikes/` aligned with implementation scope.
+- Keep `constitution/TechSpec.md`, `constitution/Tasks.md`, and any explicit `constitution/support/live/` support artifacts aligned with implementation scope. Treat `constitution/archived/` as historical context only.
 - Keep `contracts/`, `conformance/`, `interop/`, generated artifacts, and compatibility evidence aligned when semantics change.
 - Do not make Markdown, implementation source, or runner code the oracle for cross-implementation behavior.
 - Cite or derive semantic claims from authority packets, generated artifacts, conformance plans, interop assets, or measured evidence.
