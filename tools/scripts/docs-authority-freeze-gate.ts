@@ -30,7 +30,7 @@ const DOC_SOURCES = [
   },
 ] as const;
 
-const OUTPUT_DIR = "constitution/spikes";
+const OUTPUT_DIR = "constitution/support/live";
 const INVENTORY_PATH = `${OUTPUT_DIR}/epic-ad-normative-docs-claim-inventory.json`;
 const MATRIX_PATH = `${OUTPUT_DIR}/epic-ad-docs-to-authority-coverage-matrix.json`;
 const SUMMARY_PATH = `${OUTPUT_DIR}/epic-ad-docs-to-authority-freeze-gate-summary.md`;

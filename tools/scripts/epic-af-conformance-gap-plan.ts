@@ -19,9 +19,11 @@ import { dirname, join } from "node:path";
 import process from "node:process";
 
 const MATRIX_PATH =
-  "constitution/spikes/epic-ad-docs-to-authority-coverage-matrix.json";
-const PLAN_JSON_PATH = "constitution/spikes/epic-af-conformance-gap-plan.json";
-const PLAN_MD_PATH = "constitution/spikes/epic-af-conformance-gap-plan.md";
+  "constitution/support/live/epic-ad-docs-to-authority-coverage-matrix.json";
+const PLAN_JSON_PATH =
+  "constitution/support/live/epic-af-conformance-gap-plan.json";
+const PLAN_MD_PATH =
+  "constitution/support/live/epic-af-conformance-gap-plan.md";
 const BOUNDARIES_ROOT = "boundaries";
 
 type MatrixClassification =

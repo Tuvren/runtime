@@ -2,6 +2,7 @@
 
 ## 0. Version History & Changelog
 
+- v0.23.0 - Closed Epic AH by archiving historical constitutional support material under `constitution/archived/`, moving active generated support artifacts to `constitution/support/live/`, and advancing the active critical path to the SDK audit and proving-host work.
 - v0.22.0 - Clarified that the proving-host and portability-gate evidence must become part of the repo's canonical verification path, and kept the portability scope focused on in-scope runtime semantics rather than explanatory or ecosystem-only material.
 - v0.21.0 - Replaced the AG-closed maintenance posture with an active TypeScript productization plan centered on constitutional archive cleanup, host-facing package normalization, a serious REPL proving host, PostgreSQL, and portability-gate conformance closure before Rust resumes.
 - v0.20.0 - Closed Epic AG in current repo reality through non-self-attesting promoted-plan hardening, real-kernel framework proof, refreshed compatibility evidence, and passing AG-gated `bun run codegen`, `bun run conformance`, `bun run compatibility:evidence`, `bun run interop-smoke`, `bun run release-check`, and `bun run verify`; TypeScript freeze-readiness is reaffirmed for the currently promoted supported applicable surfaces.
@@ -9,15 +10,15 @@
 
 ## 1. Executive Summary & Active Critical Path
 
-- **Total Active Story Points:** 59
-- **Critical Path:** `KRT-AH001 -> KRT-AH002 -> KRT-AI001 -> KRT-AJ001 -> KRT-AI002 -> KRT-AJ002 -> KRT-AJ003 -> KRT-AK001 -> KRT-AK002 -> KRT-AK003 -> KRT-AL001 -> KRT-AL002 -> KRT-AL003`
-- **Planning Assumptions:** `docs/` remains the timeless semantic authority; `constitution/` remains the live planning framework; stale constitutional support material moves under `constitution/archived/`; the SDK is the main product; the serious REPL CLI is the proving host; canonical stream plus SSE are portable surfaces; AG-UI and the TypeScript AI SDK bridge implementation are the standing implementation-specific exceptions; PostgreSQL lands before Rust; and Rust remains blocked until `product proof gate`, `platform gate`, and `portability gate` all pass.
+- **Total Active Story Points:** 53
+- **Critical Path:** `KRT-AI001 -> KRT-AJ001 -> KRT-AI002 -> KRT-AJ002 -> KRT-AJ003 -> KRT-AK001 -> KRT-AK002 -> KRT-AK003 -> KRT-AL001 -> KRT-AL002 -> KRT-AL003`
+- **Planning Assumptions:** `docs/` remains the timeless semantic authority; the live constitutional authority chain is `constitution/PRD.md`, `constitution/Architecture.md`, `constitution/TechSpec.md`, and `constitution/Tasks.md`; `constitution/support/live/` holds generated support artifacts consumed by docs portability classification or canonical verification without extending that authority chain; historical constitutional support material lives under `constitution/archived/`; the SDK is the main product; the serious REPL CLI is the proving host; canonical stream plus SSE are portable surfaces; AG-UI and the TypeScript AI SDK bridge implementation are the standing implementation-specific exceptions; PostgreSQL lands before Rust; and Rust remains blocked until `product proof gate`, `platform gate`, and `portability gate` all pass.
 
 ### Brownfield Continuity Note
 
 - Epics A-AG remain historical context, not the active forward-execution path.
 - The current repo already proves a promoted semantic subset and a private playground host path, but the active plan now targets full TypeScript product proof rather than maintenance of the AG subset alone.
-- Historical closure inventories may remain available for audit until archive migration lands, but they do not define current execution scope.
+- Historical closure inventories now live under `constitution/archived/` for audit only, and they do not define current execution scope.
 
 ### Sequential Scope Rule
 
@@ -35,7 +36,6 @@
 
 ### Current Active Scope
 
-- Narrow the live constitutional authority path and archive stale support material under `constitution/archived/`.
 - Normalize host-facing TypeScript package naming and topology immediately before the proving-host build.
 - Build a serious REPL host entirely on the intended high-level SDK surface.
 - Add PostgreSQL as the next official backend and prove it under strict backend semantics.
@@ -51,6 +51,7 @@
 
 ### Archived or Already Completed Scope
 
+- Epic AH completed the constitutional authority reset: historical support material moved under `constitution/archived/`, active generated support artifacts now live under `constitution/support/live/`, and the live authority chain is narrowed to the four constitutional documents plus explicit support inputs.
 - Epics A-Q established the baseline TypeScript runtime, ReAct path, provider bridge, stream adapters, playground host, and release-hardening work.
 - Epics R-AG established the multi-language transition foundation, shared conformance architecture, kernel interop, and the AG hardening subset that remains historical evidence for promoted surfaces.
 - That work remains valuable audit context, but the active path is now TypeScript product proof, TypeScript platform completion, and then portability-gate closure.
@@ -59,9 +60,7 @@
 
 ```mermaid
 flowchart LR
-  KRTAH001[KRT-AH001 Archive Sweep] --> KRTAH002[KRT-AH002 Live Authority Cleanup]
-  KRTAH002 --> KRTAI001[KRT-AI001 SDK Naming Audit]
-  KRTAI001 --> KRTAJ001[KRT-AJ001 REPL Host Contract]
+  KRTAI001[KRT-AI001 SDK Naming Audit] --> KRTAJ001[KRT-AJ001 REPL Host Contract]
   KRTAJ001 --> KRTAI002[KRT-AI002 Package Normalization]
   KRTAI002 --> KRTAJ002[KRT-AJ002 REPL Host Implementation]
   KRTAJ002 --> KRTAJ003[KRT-AJ003 Proving-Host Validation]
@@ -77,7 +76,10 @@ flowchart LR
 
 ### Epic AH — Constitutional Authority Reset (KRT)
 
+**Status:** Completed in v0.23.0
+
 **KRT-AH001 Constitutional Archive Sweep**
+- **Status:** Completed in v0.23.0
 - **Type:** Chore
 - **Effort:** 3
 - **Dependencies:** None
@@ -95,6 +97,7 @@ And any support artifact still referenced by `docs/` or by the canonical verific
 ```
 
 **KRT-AH002 Live Authority Path Cleanup**
+- **Status:** Completed in v0.23.0
 - **Type:** Chore
 - **Effort:** 3
 - **Dependencies:** `KRT-AH001`
