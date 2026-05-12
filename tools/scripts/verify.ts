@@ -63,6 +63,7 @@ export const WORKSPACE_TEST_PROJECTS: readonly string[] = [
   "framework-runtime",
   "framework-driver-react",
   "host-playground",
+  "host-repl",
 ];
 
 export const WORKSPACE_BUILD_PROJECTS: readonly string[] = [
@@ -86,6 +87,7 @@ export const WORKSPACE_BUILD_PROJECTS: readonly string[] = [
   "framework-stream-sse",
   "framework-stream-agui",
   "host-playground",
+  "host-repl",
 ];
 
 export const WORKSPACE_EXPORT_SMOKE_PROJECTS: readonly string[] = [
@@ -104,6 +106,7 @@ export const WORKSPACE_EXPORT_SMOKE_PROJECTS: readonly string[] = [
   "framework-stream-sse",
   "framework-stream-agui",
   "host-playground",
+  "host-repl",
 ];
 
 export const DEFAULT_VERIFICATION_STEPS: readonly VerificationStep[] = [
@@ -289,18 +292,8 @@ export const DEFAULT_VERIFICATION_STEPS: readonly VerificationStep[] = [
     id: "boundary-owned conformance suites",
   },
   {
-    command: [
-      "bun",
-      "run",
-      "nx",
-      "run",
-      "host-playground:interop-smoke",
-      "--skipNxCache",
-      // The interop lane must execute against a freshly spawned Rust kernel
-      // service so the compatibility evidence remains measured, not cached.
-      "--excludeTaskDependencies",
-    ],
-    id: "cross-language playground interop smoke",
+    command: ["bun", "run", "proving-host:interop-smoke"],
+    id: "cross-language proving-host interop smoke",
   },
   {
     command: [
@@ -323,19 +316,8 @@ export const DEFAULT_VERIFICATION_STEPS: readonly VerificationStep[] = [
     id: "Bun and Node portability import checks",
   },
   {
-    command: [
-      "bun",
-      "run",
-      "nx",
-      "run",
-      "host-playground:scenario-sqlite",
-      // The Nx target itself pins `--provider fixture` so this reload proof
-      // stays deterministic even when a session has Gemini-oriented env vars.
-      // The SQLite scenario intentionally consumes the host build produced
-      // earlier in verify so repeated release checks avoid a third rebuild.
-      "--excludeTaskDependencies",
-    ],
-    id: "Node-backed playground SQLite reload scenario",
+    command: ["bun", "run", "proving-host:scenario-sqlite"],
+    id: "Node-backed proving-host SQLite reload scenario",
   },
 ];
 

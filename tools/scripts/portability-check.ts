@@ -149,6 +149,12 @@ const DOCUMENTED_PACKAGE_SURFACES: readonly DocumentedPackageSurface[] = [
       "Bun unit tests cover non-reload scenarios; Node CLI covers SQLite reload",
   },
   {
+    classification: "mixed-runtime validated",
+    packageName: "@tuvren/repl-host",
+    reason:
+      "Bun tests cover the interactive shell plus memory scenarios; Node CLI covers SQLite reload",
+  },
+  {
     classification: "deferred",
     packageName: "Deno package surface",
     reason: "Deno checks remain deferred until package surfaces stabilize",

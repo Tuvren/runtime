@@ -18,6 +18,7 @@ import { describe, expect, test } from "bun:test";
 import {
   createDriverRegistry,
   createGrpcRuntimeKernel,
+  createOrchestrationRuntime,
   createReActDriver,
   createRuntimeKernel,
   REACT_DRIVER_ID,
@@ -30,6 +31,7 @@ describe("runtime package exports", () => {
   test("expose the curated host-facing runtime helpers", () => {
     expect(typeof createDriverRegistry).toBe("function");
     expect(typeof createGrpcRuntimeKernel).toBe("function");
+    expect(typeof createOrchestrationRuntime).toBe("function");
     expect(typeof createReActDriver).toBe("function");
     expect(typeof createRuntimeKernel).toBe("function");
     expect(REACT_DRIVER_ID.length > 0).toBe(true);
