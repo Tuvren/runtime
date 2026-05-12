@@ -35,6 +35,7 @@ import {
   TUVREN_RUNTIME_TELEMETRY_SCHEMA_URL,
 } from "@tuvren/runtime";
 import { createPlaygroundKernelInspector } from "../src/lib/playground-kernel.js";
+import { withHead } from "../src/lib/playground-scenarios-support.js";
 import {
   expectPlaygroundConfigError,
   expectScenarioChecksPassed,
@@ -570,6 +571,65 @@ describe("repl host scenarios", () => {
     expect(forkMessages.length).toBe(activeMessages.length);
   });
 
+  test("rejects overwriting an active turn and cancels it before backend reset", async () => {
+    const shell = createReplShell({
+      backend: "memory",
+      providerMode: "fixture",
+      scenario: "streaming",
+    });
+
+    await runReplCommand(shell, ".thread new");
+    await runReplCommand(shell, ".turn start steering");
+    const activeHandle = shell.activeTurn?.handle;
+
+    if (activeHandle === undefined) {
+      throw new Error("expected active turn handle after .turn start");
+    }
+
+    expect((await runReplCommand(shell, ".turn start approval")).output).toBe(
+      "An active turn already exists. Await, approve, steer, or cancel it before starting another turn."
+    );
+    expect(shell.activeTurn?.handle).toBe(activeHandle);
+
+    await runReplCommand(shell, ".backend memory");
+
+    expect(shell.activeTurn).toBe(undefined);
+    await waitForCondition(() => activeHandle.status().phase !== "running");
+  });
+
+  test("rejects conflicting orchestration commands and cancels tracked work before thread reset", async () => {
+    const shell = createReplShell({
+      backend: "memory",
+      providerMode: "fixture",
+      scenario: "streaming",
+    });
+
+    await runReplCommand(shell, ".thread new");
+    await runReplCommand(shell, ".orch start");
+    const activeHandle = shell.activeOrchestration?.handle;
+
+    if (activeHandle === undefined) {
+      throw new Error("expected active orchestration handle after .orch start");
+    }
+
+    expect((await runReplCommand(shell, ".orch start")).output).toBe(
+      "An orchestration already exists. Await or cancel it before starting another root orchestration."
+    );
+
+    await runReplCommand(shell, ".orch spawn worker first");
+
+    expect(
+      (await runReplCommand(shell, ".orch spawn worker second")).output
+    ).toBe(
+      "A child orchestration handle is already active. Await the current orchestration before spawning another child."
+    );
+
+    await runReplCommand(shell, ".thread new");
+
+    expect(shell.activeOrchestration).toBe(undefined);
+    await waitForCondition(() => activeHandle.status().phase !== "running");
+  });
+
   test("resets shell state when the backend command is used", async () => {
     const shell = createReplShell({
       backend: "memory",
@@ -645,6 +705,35 @@ describe("repl host scenarios", () => {
     expect(await inspector.readBranchMessages(thread.branchId)).toEqual([]);
     expect(await inspector.readBranchStatus(thread.branchId)).toEqual(null);
   });
+
+  test("preserves the previous head when only descendant checkpoints are present", () => {
+    const thread = {
+      branchId: "branch-1",
+      headTurnNodeHash: "head-1",
+      rootTurnNodeHash: "root-1",
+      rootTurnTreeHash: "tree-1",
+      threadId: "thread-1",
+    };
+    const projection = {
+      agui: [],
+      canonical: [
+        {
+          iterationCount: 1,
+          source: {
+            agent: "worker",
+            threadId: "thread-2",
+            workerId: "worker-1",
+          },
+          timestamp: 0,
+          turnNodeHash: "child-head-1",
+          type: "state.checkpoint",
+        },
+      ],
+      sse: [],
+    } satisfies Parameters<typeof withHead>[1];
+
+    expect(withHead(thread, projection).headTurnNodeHash).toBe("head-1");
+  });
 });
 
 function readCommandArray(
@@ -661,4 +750,21 @@ function readCommandArray(
   }
 
   return parsed;
+}
+
+async function waitForCondition(
+  predicate: () => boolean,
+  timeoutMs = 1000
+): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+
+  while (!predicate()) {
+    if (Date.now() >= deadline) {
+      throw new Error("timed out waiting for shell condition");
+    }
+
+    await new Promise<void>((resolve) => {
+      setTimeout(resolve, 20);
+    });
+  }
 }

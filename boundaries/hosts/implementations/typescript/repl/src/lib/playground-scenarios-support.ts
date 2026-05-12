@@ -517,7 +517,10 @@ export function withHead(
 
   return {
     ...thread,
-    headTurnNodeHash: checkpoint?.turnNodeHash ?? thread.rootTurnNodeHash,
+    headTurnNodeHash:
+      checkpoint?.turnNodeHash ??
+      thread.headTurnNodeHash ??
+      thread.rootTurnNodeHash,
   };
 }
 

@@ -85,8 +85,8 @@ export const REPL_HELP_TEXT = [
   ".turn steer <text>            Inject steering into the active turn",
   ".turn cancel                  Cancel the active turn",
   ".orch start                   Start a root orchestration turn",
-  ".orch spawn <agent> <text>    Spawn a child orchestration handle",
-  ".orch await                   Await current orchestration handles",
+  ".orch spawn <agent> <text>    Spawn the tracked child orchestration handle",
+  ".orch await                   Await the current orchestration root/child",
   ".orch events                  Show the last orchestration event types",
 ] as const;
 
@@ -213,6 +213,7 @@ function selectBackend(
     };
   }
 
+  cancelActiveShellWork(shell);
   shell.config = nextConfig;
   shell.host = createPlaygroundHost(nextConfig);
   shell.activeOrchestration = undefined;
@@ -237,6 +238,7 @@ async function handleThreadCommand(
 
   switch (subcommand) {
     case "new":
+      cancelActiveShellWork(shell);
       shell.thread = await shell.host.createThread();
       shell.activeOrchestration = undefined;
       shell.activeTurn = undefined;
@@ -361,6 +363,13 @@ async function startTurn(
     };
   }
 
+  if (shell.activeTurn !== undefined) {
+    return {
+      output:
+        "An active turn already exists. Await, approve, steer, or cancel it before starting another turn.",
+    };
+  }
+
   const thread = await ensureThread(shell);
   const execution = createTurnExecutionRequest(shell.config, input);
   const handle = shell.host.executeTurn({
@@ -478,6 +487,13 @@ function cancelTurn(shell: ReplShell): ReplCommandResult {
 async function startOrchestration(
   shell: ReplShell
 ): Promise<ReplCommandResult> {
+  if (shell.activeOrchestration !== undefined) {
+    return {
+      output:
+        "An orchestration already exists. Await or cancel it before starting another root orchestration.",
+    };
+  }
+
   const thread = await ensureThread(shell);
   const orchestration = createOrchestrationRuntime({
     agents: {
@@ -527,6 +543,14 @@ function spawnOrchestrationChild(
   const agent = args[0] ?? "worker";
   const signalText =
     args.slice(1).join(" ").trim() || "Run orchestration child";
+
+  if (active.childHandle !== undefined) {
+    return {
+      output:
+        "A child orchestration handle is already active. Await the current orchestration before spawning another child.",
+    };
+  }
+
   const childHandle = active.handle.spawn({
     agent,
     signal: textSignal(signalText),
@@ -704,8 +728,39 @@ function formatJson(value: unknown): string {
   return JSON.stringify(value, null, 2);
 }
 
+function cancelActiveShellWork(shell: ReplShell): void {
+  if (
+    shell.activeTurn !== undefined &&
+    !isTerminalPhase(shell.activeTurn.handle.status().phase)
+  ) {
+    shell.host.cancel(shell.activeTurn.handle);
+    observeCancellation(shell.activeTurn.projectionPromise);
+  }
+
+  if (
+    shell.activeOrchestration?.childHandle !== undefined &&
+    !isTerminalPhase(shell.activeOrchestration.childHandle.status().phase)
+  ) {
+    shell.activeOrchestration.childHandle.cancel();
+    observeCancellation(shell.activeOrchestration.childHandle.awaitResult());
+  }
+
+  if (
+    shell.activeOrchestration !== undefined &&
+    !isTerminalPhase(shell.activeOrchestration.handle.status().phase)
+  ) {
+    shell.activeOrchestration.handle.cancel();
+    observeCancellation(shell.activeOrchestration.handle.awaitResult());
+    observeCancellation(shell.activeOrchestration.eventsPromise);
+  }
+}
+
 function isTerminalPhase(
   phase: ReturnType<ExecutionHandle["status"]>["phase"]
 ): boolean {
   return phase === "completed" || phase === "failed";
+}
+
+function observeCancellation(promise: Promise<unknown>): void {
+  promise.catch(() => undefined);
 }
