@@ -16,7 +16,7 @@
 
 import { TuvrenRuntimeError } from "@tuvren/core-types";
 import type { RuntimeDriver } from "@tuvren/driver-api";
-import type { AgentConfig } from "@tuvren/runtime-api";
+import type { AgentConfig, OrchestrationHandle } from "@tuvren/runtime-api";
 import {
   createDriverRegistry,
   createOrchestrationRuntime,
@@ -463,6 +463,7 @@ export function createFrameworkAdapterOrchestration(
       childThreadId,
       driverIdInherited: childEvents.some(
         (event) =>
+          dependencies.isRecord(event) &&
           dependencies.readRecordString(event, "type") === "tool.result" &&
           dependencies.isRecord(event.source) &&
           event.source.driver === "special"
@@ -1099,21 +1100,13 @@ export function createFrameworkAdapterOrchestration(
   }
 
   async function spawnWhenRunning(
-    handle: {
-      spawn(input: { agent: string; signal: ReturnType<typeof textSignal> }): {
-        awaitResult(): Promise<unknown>;
-        events(): AsyncIterable<unknown>;
-      };
-    },
+    handle: Pick<OrchestrationHandle, "spawn" | "status">,
     input: {
       agent: string;
       signal: ReturnType<typeof textSignal>;
     },
     timeoutMs = 1000
-  ): Promise<{
-    awaitResult(): Promise<unknown>;
-    events(): AsyncIterable<unknown>;
-  }> {
+  ): Promise<OrchestrationHandle> {
     const start = Date.now();
 
     while (true) {

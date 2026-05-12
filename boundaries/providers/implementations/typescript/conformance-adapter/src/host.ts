@@ -23,10 +23,15 @@ import type {
   LanguageModelV3StreamPart,
 } from "@ai-sdk/provider";
 import { TuvrenProviderError } from "@tuvren/core-types";
-import type {
-  ProviderStreamChunk,
-  TuvrenModelResponse,
+import {
+  assertProviderStreamChunk,
+  assertTuvrenModelResponse,
+  type ProviderStreamChunk,
+  type StructuredOutputRequest,
+  type TuvrenModelResponse,
+  type TuvrenPrompt,
 } from "@tuvren/provider-api";
+import { assertTuvrenMessage } from "@tuvren/runtime-api";
 import type {
   AdapterCapabilities,
   AdapterControls,
@@ -37,19 +42,10 @@ import { serveStdioAdapter } from "../../../../../../tools/conformance/adapter-p
 import { createAiSdkProviderBridge } from "../../bridge-ai-sdk/src/index.ts";
 
 interface ProviderConformanceFixtureSet {
-  prompt: {
-    messages: unknown[];
-  };
+  prompt: TuvrenPrompt;
   response: TuvrenModelResponse;
-  structuredPrompt: {
-    messages: unknown[];
-    responseFormat?: Record<string, unknown>;
-  };
-  toolPrompt: {
-    messages: unknown[];
-    tools?: unknown[];
-    responseFormat?: Record<string, unknown>;
-  };
+  structuredPrompt: TuvrenPrompt;
+  toolPrompt: TuvrenPrompt;
 }
 
 const PROVIDER_FIXTURE_PATH = fileURLToPath(
@@ -144,37 +140,13 @@ function assertProviderConformanceFixtureSet(
     throw new Error("provider fixture file must be a valid object");
   }
 
-  if (
-    !(
-      isFixturePrompt(value.prompt) &&
-      isFixturePrompt(value.structuredPrompt) &&
-      isFixturePrompt(value.toolPrompt)
-    )
-  ) {
-    throw new Error("provider fixture prompts must include messages");
-  }
-
-  assertTuvrenModelResponseShape(value.response, "provider fixture response");
-
-  const responseFormat = value.structuredPrompt.responseFormat;
-
-  if (responseFormat !== undefined && !isRecord(responseFormat)) {
-    throw new Error(
-      "provider fixture structuredPrompt.responseFormat must be an object"
-    );
-  }
-}
-
-function isFixturePrompt(value: unknown): value is {
-  messages: unknown[];
-  responseFormat?: Record<string, unknown>;
-  tools?: unknown[];
-} {
-  return (
-    isRecord(value) &&
-    Array.isArray(value.messages) &&
-    value.messages.length > 0
+  assertFixturePrompt(value.prompt, "provider fixture prompt");
+  assertFixturePrompt(
+    value.structuredPrompt,
+    "provider fixture structuredPrompt"
   );
+  assertFixturePrompt(value.toolPrompt, "provider fixture toolPrompt");
+  assertTuvrenModelResponse(value.response, "provider fixture response");
 }
 
 async function generateMapping(): Promise<Record<string, unknown>> {
@@ -204,7 +176,7 @@ async function generateMapping(): Promise<Record<string, unknown>> {
   const response = await bridge.generate(
     providerTestkitFixtures.structuredPrompt
   );
-  assertTuvrenModelResponseShape(
+  assertTuvrenModelResponse(
     response,
     "providers.bridge.generate-mapping generate response"
   );
@@ -661,7 +633,7 @@ async function collectProviderStreamChunks(
   let index = 0;
 
   for await (const chunk of stream) {
-    assertProviderStreamChunkShape(chunk, `provider stream chunk ${index}`);
+    assertProviderStreamChunk(chunk, `provider stream chunk ${index}`);
     chunks.push(structuredClone(chunk));
     index += 1;
   }
@@ -671,7 +643,7 @@ async function collectProviderStreamChunks(
 
 async function collectProviderOperationError(
   run: () => Promise<unknown> | unknown
-): Promise<unknown> {
+): Promise<Error> {
   try {
     await run();
   } catch (error: unknown) {
@@ -745,36 +717,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function assertTuvrenModelResponseShape(
-  value: unknown,
-  label: string
-): asserts value is TuvrenModelResponse {
-  if (!isRecord(value)) {
-    throw new Error(`${label} must be a provider response`);
-  }
-
-  if (!Array.isArray(value.parts)) {
-    throw new Error(`${label} must include response parts`);
-  }
-}
-
-function assertProviderStreamChunkShape(
-  value: unknown,
-  label: string
-): asserts value is ProviderStreamChunk {
-  if (!isRecord(value)) {
-    throw new Error(`${label} must be a provider stream chunk`);
-  }
-
-  if (typeof value.type !== "string") {
-    throw new Error(`${label} chunk type must be a string`);
-  }
-}
-
-function readStructuredResponseFormat(): {
-  [key: string]: unknown;
-  name?: string;
-} {
+function readStructuredResponseFormat(): StructuredOutputRequest {
   const { responseFormat } = providerTestkitFixtures.structuredPrompt;
 
   if (responseFormat === undefined) {
@@ -784,4 +727,77 @@ function readStructuredResponseFormat(): {
   }
 
   return responseFormat;
+}
+
+function assertFixturePrompt(
+  value: unknown,
+  label: string
+): asserts value is TuvrenPrompt {
+  if (!isRecord(value)) {
+    throw new Error(`${label} must be an object`);
+  }
+
+  if (!Array.isArray(value.messages) || value.messages.length === 0) {
+    throw new Error(`${label}.messages must be a non-empty array`);
+  }
+
+  for (const [index, message] of value.messages.entries()) {
+    assertTuvrenMessage(message, `${label}.messages[${index}]`);
+  }
+
+  if (value.responseFormat !== undefined) {
+    assertStructuredOutputRequest(
+      value.responseFormat,
+      `${label}.responseFormat`
+    );
+  }
+
+  if (value.tools !== undefined) {
+    if (!Array.isArray(value.tools)) {
+      throw new Error(`${label}.tools must be an array`);
+    }
+
+    for (const [index, tool] of value.tools.entries()) {
+      assertRenderedToolDefinition(tool, `${label}.tools[${index}]`);
+    }
+  }
+}
+
+function assertStructuredOutputRequest(
+  value: unknown,
+  label: string
+): asserts value is StructuredOutputRequest {
+  if (!isRecord(value)) {
+    throw new Error(`${label} must be an object`);
+  }
+
+  if (!isRecord(value.schema)) {
+    throw new Error(`${label}.schema must be an object`);
+  }
+
+  if (value.name !== undefined && typeof value.name !== "string") {
+    throw new Error(`${label}.name must be a string`);
+  }
+
+  if (value.strict !== undefined && typeof value.strict !== "boolean") {
+    throw new Error(`${label}.strict must be a boolean`);
+  }
+}
+
+function assertRenderedToolDefinition(value: unknown, label: string): void {
+  if (!isRecord(value)) {
+    throw new Error(`${label} must be an object`);
+  }
+
+  if (typeof value.name !== "string" || value.name.length === 0) {
+    throw new Error(`${label}.name must be a non-empty string`);
+  }
+
+  if (typeof value.description !== "string") {
+    throw new Error(`${label}.description must be a string`);
+  }
+
+  if (!isRecord(value.inputSchema)) {
+    throw new Error(`${label}.inputSchema must be an object`);
+  }
 }
