@@ -30,11 +30,11 @@ import {
 import { toAgUiEvents } from "@tuvren/stream-agui";
 import { teeTuvrenStreamEvents } from "@tuvren/stream-core";
 import { toSseFrames } from "@tuvren/stream-sse";
+import { INVALID_REPL_CONFIG_CODE } from "./playground-config.js";
 import {
   createPlaygroundKernelInspector,
   type PlaygroundKernelHarness,
 } from "./playground-kernel.js";
-import { INVALID_REPL_CONFIG_CODE } from "./playground-config.js";
 import { createPlaygroundProvider } from "./playground-provider.js";
 import type {
   PlaygroundConfig,

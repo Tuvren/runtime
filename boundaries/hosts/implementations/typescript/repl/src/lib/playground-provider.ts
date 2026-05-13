@@ -136,9 +136,12 @@ function createAimockProvider(
       });
     }
     default:
-      throw new TuvrenRuntimeError(`unsupported aimock repl provider "${mode}"`, {
-        code: INVALID_REPL_CONFIG_CODE,
-      });
+      throw new TuvrenRuntimeError(
+        `unsupported aimock repl provider "${mode}"`,
+        {
+          code: INVALID_REPL_CONFIG_CODE,
+        }
+      );
   }
 }
 

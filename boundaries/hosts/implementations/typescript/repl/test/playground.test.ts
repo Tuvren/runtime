@@ -37,8 +37,8 @@ import {
   TUVREN_RUNTIME_TELEMETRY_SCHEMA_URL,
 } from "@tuvren/runtime";
 import { createPlaygroundKernelInspector } from "../src/lib/playground-kernel.js";
-import { readShellTextArgument } from "../src/lib/repl-shell.js";
 import { withHead } from "../src/lib/playground-scenarios-support.js";
+import { readShellTextArgument } from "../src/lib/repl-shell.js";
 import {
   expectPlaygroundConfigError,
   expectScenarioChecksPassed,
@@ -853,12 +853,7 @@ describe("repl host scenarios", () => {
 
   test("preserves quoted sqlite paths when rejoining shell arguments", () => {
     expect(
-      readShellTextArgument([
-        '"/tmp/tuvren',
-        "repl",
-        "spaced",
-        'path.sqlite"',
-      ])
+      readShellTextArgument(['"/tmp/tuvren', "repl", "spaced", 'path.sqlite"'])
     ).toBe("/tmp/tuvren repl spaced path.sqlite");
   });
 

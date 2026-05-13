@@ -16,11 +16,11 @@
 
 import { expect } from "bun:test";
 import type { ChatCompletionRequest, LLMock } from "@copilotkit/aimock";
-import { TuvrenRuntimeError } from "@tuvren/runtime";
 import type {
   ReplProviderMode as PlaygroundProviderMode,
   ReplScenarioReport as PlaygroundScenarioReport,
 } from "@tuvren/repl-host";
+import { TuvrenRuntimeError } from "@tuvren/runtime";
 
 export const AIMOCK_PROVIDER_CASES: readonly AimockProviderCase[] = [
   {
