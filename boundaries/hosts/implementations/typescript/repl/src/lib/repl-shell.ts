@@ -35,7 +35,7 @@ import {
   startProjectionCapture,
   withHead,
 } from "./playground-scenarios-support.js";
-import { textSignal } from "./playground-tools.js";
+import { createPlaygroundTools, textSignal } from "./playground-tools.js";
 import type {
   PlaygroundConfig,
   PlaygroundHost,
@@ -402,7 +402,7 @@ async function handleTurnCommand(
 
   switch (subcommand) {
     case "start":
-      return await startTurn(shell, args.slice(1), onCanonicalEvent);
+      return await startTurn(shell, args.slice(1));
     case "await":
       return await awaitTurn(shell, onCanonicalEvent);
     case "approve":
@@ -453,8 +453,7 @@ async function handleOrchestrationCommand(
 
 async function startTurn(
   shell: ReplShell,
-  args: readonly string[],
-  onCanonicalEvent?: (event: TuvrenStreamEvent) => void
+  args: readonly string[]
 ): Promise<ReplCommandResult> {
   const input = args.join(" ").trim();
 
@@ -491,7 +490,7 @@ async function startTurn(
 
   shell.activeTurn = {
     handle,
-    projectionPromise: startProjectionCapture(handle, onCanonicalEvent),
+    projectionPromise: startProjectionCapture(handle),
     thread,
   };
 
@@ -515,6 +514,13 @@ async function awaitTurn(
   }
 
   const projection = await activeTurn.projectionPromise;
+
+  if (onCanonicalEvent !== undefined) {
+    for (const event of projection.canonical) {
+      onCanonicalEvent(event);
+    }
+  }
+
   const phase = finalizeTurnProjection(shell, activeTurn, projection);
 
   if (onCanonicalEvent !== undefined) {
@@ -802,6 +808,10 @@ async function runFreeformTurn(
   const thread = await ensureThread(shell);
   const handle = shell.host.executeTurn({
     branchId: thread.branchId,
+    config: {
+      name: "primary",
+      tools: createPlaygroundTools(),
+    },
     signal: textSignal(input),
     threadId: thread.threadId,
   });

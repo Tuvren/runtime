@@ -108,6 +108,10 @@ export function createLiveTurnWriter(
           );
           return;
         case "error":
+          if (isCancellationErrorEvent(event)) {
+            return;
+          }
+
           writeStandaloneLine("error", renderErrorLine(event), "red");
           return;
         case "steering.incorporated":
@@ -232,6 +236,15 @@ export function createLiveTurnWriter(
     const fatality = event.fatal ? "fatal " : "";
 
     return `${fatality}${errorCode}${event.error.message}`.trim();
+  }
+
+  function isCancellationErrorEvent(
+    event: Extract<TuvrenStreamEvent, { type: "error" }>
+  ): boolean {
+    return (
+      event.error.code === "runtime_execution_cancelled" ||
+      event.error.code === "react_driver_execution_cancelled"
+    );
   }
 
   function styleText(text: string, color: LiveColor): string {

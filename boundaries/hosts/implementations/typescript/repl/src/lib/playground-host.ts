@@ -36,7 +36,6 @@ import {
   type PlaygroundKernelHarness,
 } from "./playground-kernel.js";
 import { createPlaygroundProvider } from "./playground-provider.js";
-import { createPlaygroundTools } from "./playground-tools.js";
 import type {
   PlaygroundConfig,
   PlaygroundHost,
@@ -46,7 +45,6 @@ import type {
 
 export function createPlaygroundHost(config: PlaygroundConfig): PlaygroundHost {
   const harness = createKernelHarness(config);
-  const defaultTools = createPlaygroundTools();
   const provider = createPlaygroundProvider({
     aimockBaseUrl: config.aimockBaseUrl,
     googleApiKey: config.googleApiKey,
@@ -98,7 +96,6 @@ export function createPlaygroundHost(config: PlaygroundConfig): PlaygroundHost {
           model: requestedConfig?.model ?? provider,
           name: requestedConfig?.name ?? "primary",
           systemPrompt: requestedConfig?.systemPrompt ?? config.systemPrompt,
-          tools: requestedConfig?.tools ?? defaultTools,
         },
         signal: input.signal,
         threadId: input.threadId,

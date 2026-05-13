@@ -925,6 +925,7 @@ describe("repl host scenarios", () => {
 
     expect(startResult.output).toContain('"threadId"');
     expect(shell.activeTurn).not.toBe(undefined);
+    expect(eventTypes).toEqual([]);
 
     const awaitResult = await runReplCommand(shell, ".turn await", {
       onCanonicalEvent(event) {
@@ -971,6 +972,32 @@ describe("repl host scenarios", () => {
   });
 
   test("registers built-in repl tools on freeform turns by default", async () => {
+    const shell = createReplShell({
+      backend: "memory",
+      providerMode: "fixture",
+      scenario: "streaming",
+    });
+    const originalExecuteTurn = shell.host.executeTurn;
+    let observedTools: TuvrenToolDefinition[] | undefined;
+    shell.host = {
+      ...shell.host,
+      executeTurn(input) {
+        observedTools = input.config?.tools;
+        return originalExecuteTurn(input);
+      },
+    };
+
+    await runReplInput(shell, "what can you do?");
+
+    expect(observedTools?.map((tool) => tool.name)).toEqual([
+      "search",
+      "email",
+      "calculator",
+      "weather",
+    ]);
+  });
+
+  test("does not inject repl tools into programmatic host turns by default", async () => {
     const host = createPlaygroundHost({
       backend: "memory",
       providerMode: "fixture",
@@ -996,12 +1023,7 @@ describe("repl host scenarios", () => {
 
     await host.project(handle);
 
-    expect(observedPrompt?.tools?.map((tool) => tool.name)).toEqual([
-      "search",
-      "email",
-      "calculator",
-      "weather",
-    ]);
+    expect(observedPrompt?.tools ?? null).toBe(null);
   });
 
   test("allows callers to opt out of repl tools explicitly", async () => {
@@ -1697,6 +1719,7 @@ describe("repl host scenarios", () => {
 
       expect(result.exitCode).toBe(0);
       expect(result.stderr.includes("ERR_USE_AFTER_CLOSE")).toBe(false);
+      expect(result.stdout.includes("runtime_execution_cancelled")).toBe(false);
     }
   });
 
