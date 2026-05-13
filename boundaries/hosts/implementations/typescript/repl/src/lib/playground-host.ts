@@ -87,12 +87,15 @@ export function createPlaygroundHost(config: PlaygroundConfig): PlaygroundHost {
       };
     },
     executeTurn(input) {
+      const requestedConfig = input.config;
+
       return runtime.executeTurn({
         branchId: input.branchId,
         config: {
-          ...input.config,
-          model: input.config?.model ?? provider,
-          name: input.config?.name ?? "primary",
+          ...requestedConfig,
+          model: requestedConfig?.model ?? provider,
+          name: requestedConfig?.name ?? "primary",
+          systemPrompt: requestedConfig?.systemPrompt ?? config.systemPrompt,
         },
         signal: input.signal,
         threadId: input.threadId,

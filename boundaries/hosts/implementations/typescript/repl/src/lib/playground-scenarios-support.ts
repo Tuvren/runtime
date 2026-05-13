@@ -43,6 +43,8 @@ import type {
   PlaygroundThreadSummary,
 } from "./playground-types.js";
 
+const NO_TOOLS: [] = [];
+
 export function readMetadataObserved(
   config: PlaygroundConfig,
   messages: unknown[]
@@ -308,6 +310,7 @@ export function createScenarioExecutionPlan(
         signal: textSignal(
           'Return a playground_summary object. Set scenario to "structured" and status to "ready".'
         ),
+        tools: NO_TOOLS,
       };
     case "metadata":
       return {
@@ -315,6 +318,7 @@ export function createScenarioExecutionPlan(
         signal: textSignal(
           "Reply with a short sentence confirming provider metadata is preserved."
         ),
+        tools: NO_TOOLS,
       };
     case "streaming":
       return {
@@ -322,11 +326,13 @@ export function createScenarioExecutionPlan(
         signal: textSignal(
           "Reply with a short single-sentence streaming confirmation."
         ),
+        tools: NO_TOOLS,
       };
     default:
       return {
         model: defaultModel,
         signal: textSignal(`Run ${config.scenario}`),
+        tools: NO_TOOLS,
       };
   }
 }
@@ -455,7 +461,8 @@ export function readProjectionError(
 }
 
 export function startProjectionCapture(
-  handle: ExecutionHandle
+  handle: ExecutionHandle,
+  onCanonicalEvent?: (event: TuvrenStreamEvent) => void
 ): Promise<PlaygroundStreamProjection> {
   const [canonicalBranch, sseBranch, aguiBranch] = teeTuvrenStreamEvents(
     handle.events(),
@@ -463,7 +470,7 @@ export function startProjectionCapture(
   );
 
   return Promise.all([
-    collect(canonicalBranch),
+    collect(canonicalBranch, onCanonicalEvent),
     collect(toSseFrames(sseBranch)),
     collect(toAgUiEvents(aguiBranch)),
   ]).then(([canonical, sse, agui]) => ({
@@ -474,18 +481,20 @@ export function startProjectionCapture(
 }
 
 export function projectContinuationCapture(
-  handle: ExecutionHandle
+  handle: ExecutionHandle,
+  onCanonicalEvent?: (event: TuvrenStreamEvent) => void
 ): Promise<PlaygroundStreamProjection> {
-  const [canonicalBranch, sseBranch] = teeTuvrenStreamEvents(
+  const [canonicalBranch, sseBranch, aguiBranch] = teeTuvrenStreamEvents(
     handle.events(),
-    2
+    3
   );
 
   return Promise.all([
-    collect(canonicalBranch),
+    collect(canonicalBranch, onCanonicalEvent),
     collect(toSseFrames(sseBranch)),
-  ]).then(([canonical, sse]) => ({
-    agui: [],
+    collect(toAgUiEvents(aguiBranch)),
+  ]).then(([canonical, sse, agui]) => ({
+    agui,
     canonical,
     sse,
   }));
@@ -809,10 +818,14 @@ function isPlainRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-async function collect<T>(events: AsyncIterable<T>): Promise<T[]> {
+async function collect<T>(
+  events: AsyncIterable<T>,
+  onItem?: (item: T) => void
+): Promise<T[]> {
   const output: T[] = [];
 
   for await (const event of events) {
+    onItem?.(event);
     output.push(event);
   }
 
@@ -850,11 +863,8 @@ export async function steerWhenRunning(
       return;
     } catch (error: unknown) {
       if (
-        !(
-          error instanceof TuvrenRuntimeError &&
-          error.code === "invalid_steering_state" &&
-          handle.status().phase === "running"
-        )
+        !isInvalidSteeringStateError(error) ||
+        handle.status().phase !== "running"
       ) {
         throw error;
       }
@@ -868,6 +878,15 @@ export async function steerWhenRunning(
       setTimeout(resolve, 5);
     });
   }
+}
+
+function isInvalidSteeringStateError(
+  error: unknown
+): error is TuvrenRuntimeError {
+  return (
+    error instanceof TuvrenRuntimeError &&
+    error.code === "invalid_steering_state"
+  );
 }
 
 export function readSteeringMessageDurable(messages: unknown[]): boolean {
