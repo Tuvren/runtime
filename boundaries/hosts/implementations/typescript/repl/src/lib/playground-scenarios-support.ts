@@ -43,6 +43,8 @@ import type {
   PlaygroundThreadSummary,
 } from "./playground-types.js";
 
+const NO_TOOLS: [] = [];
+
 export function readMetadataObserved(
   config: PlaygroundConfig,
   messages: unknown[]
@@ -308,6 +310,7 @@ export function createScenarioExecutionPlan(
         signal: textSignal(
           'Return a playground_summary object. Set scenario to "structured" and status to "ready".'
         ),
+        tools: NO_TOOLS,
       };
     case "metadata":
       return {
@@ -315,6 +318,7 @@ export function createScenarioExecutionPlan(
         signal: textSignal(
           "Reply with a short sentence confirming provider metadata is preserved."
         ),
+        tools: NO_TOOLS,
       };
     case "streaming":
       return {
@@ -322,11 +326,13 @@ export function createScenarioExecutionPlan(
         signal: textSignal(
           "Reply with a short single-sentence streaming confirmation."
         ),
+        tools: NO_TOOLS,
       };
     default:
       return {
         model: defaultModel,
         signal: textSignal(`Run ${config.scenario}`),
+        tools: NO_TOOLS,
       };
   }
 }

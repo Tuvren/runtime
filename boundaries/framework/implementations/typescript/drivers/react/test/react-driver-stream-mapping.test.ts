@@ -467,6 +467,78 @@ describe("driver-react streamed mapping", () => {
     ]);
   });
 
+  test("creates a new reasoning part after reasoning has already completed", async () => {
+    const emittedEvents: TuvrenStreamEvent[] = [];
+    const provider = {
+      async generate() {
+        throw new Error("generate should not be called");
+      },
+      id: "provider",
+      async *stream() {
+        yield {
+          text: "first",
+          type: "reasoning_delta",
+        } as const;
+        yield {
+          type: "reasoning_done",
+        } as const;
+        yield {
+          text: "second",
+          type: "reasoning_delta",
+        } as const;
+        yield {
+          type: "reasoning_done",
+        } as const;
+        yield {
+          finishReason: "stop",
+          type: "finish",
+        } as const;
+      },
+    } satisfies TuvrenProvider;
+    const driver = createReActDriver({
+      providerCallMode: "stream",
+      toolExecutionMode: "parallel",
+    }).create();
+
+    const result = await driver.execute(
+      createDriverExecutionContext({
+        config: {
+          model: provider,
+          name: "primary",
+        },
+        emittedEvents,
+      })
+    );
+
+    expect(result.messages).toEqual([
+      {
+        parts: [
+          {
+            providerMetadata: undefined,
+            redacted: false,
+            text: "first",
+            type: "reasoning",
+          },
+          {
+            providerMetadata: undefined,
+            redacted: false,
+            text: "second",
+            type: "reasoning",
+          },
+        ],
+        role: "assistant",
+      },
+    ]);
+    expect(emittedEvents.map((event) => event.type)).toEqual([
+      "message.start",
+      "reasoning.delta",
+      "reasoning.done",
+      "reasoning.delta",
+      "reasoning.done",
+      "message.done",
+    ]);
+  });
+
   test("synthesizes structured deltas when provider streams final structured data only", async () => {
     const emittedEvents: TuvrenStreamEvent[] = [];
     const provider = {

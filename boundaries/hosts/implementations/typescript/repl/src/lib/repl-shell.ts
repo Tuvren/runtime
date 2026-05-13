@@ -86,6 +86,7 @@ export const REPL_HELP_TEXT = [
   ".status                       Show current shell state",
   "<text>                        Send a plain chat turn and stream the reply",
   "Freeform turns auto-await; use .turn start/.turn await for steer/cancel",
+  "Unknown leading-dot input is treated as chat text; use .help to verify commands",
   "Paused approvals: 1 approve, 2 reject, 3 edit",
   "Built-in tools: calculator, weather (mock), search, email",
   ".backend <memory|sqlite> [path|auto]",
@@ -173,6 +174,8 @@ export async function runReplInput(
 
   const [command] = trimmed.split(COMMAND_SPLIT_PATTERN);
 
+  // Known dot-commands stay operator controls; any other leading-dot input is
+  // treated as chat text so prompts like ".env file" remain expressible.
   if (command !== undefined && KNOWN_TOP_LEVEL_REPL_COMMANDS.has(command)) {
     return await runReplCommand(shell, trimmed, options);
   }

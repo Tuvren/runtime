@@ -258,7 +258,7 @@ export class StreamAccumulator {
   private appendReasoning(delta: string, signature?: string): void {
     const lastPart = this.parts.at(-1);
 
-    if (lastPart?.kind === "reasoning") {
+    if (lastPart?.kind === "reasoning" && !lastPart.done) {
       lastPart.text += delta;
       lastPart.signature = signature ?? lastPart.signature;
       return;

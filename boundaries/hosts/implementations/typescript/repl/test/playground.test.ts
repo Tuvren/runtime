@@ -41,7 +41,10 @@ import {
   type TuvrenToolDefinition,
 } from "@tuvren/runtime";
 import { createPlaygroundKernelInspector } from "../src/lib/playground-kernel.js";
-import { withHead } from "../src/lib/playground-scenarios-support.js";
+import {
+  createScenarioExecutionPlan,
+  withHead,
+} from "../src/lib/playground-scenarios-support.js";
 import {
   createPlaygroundTools,
   textSignal,
@@ -972,6 +975,36 @@ describe("repl host scenarios", () => {
     ]);
   });
 
+  test("allows callers to opt out of repl tools explicitly", async () => {
+    const host = createPlaygroundHost({
+      backend: "memory",
+      providerMode: "fixture",
+      scenario: "streaming",
+    });
+    const thread = await host.createThread();
+    let observedPrompt: TuvrenPrompt | undefined;
+    const provider = createPromptObservingProvider(
+      "test:no-tools-provider",
+      (prompt) => {
+        observedPrompt = prompt;
+      }
+    );
+    const handle = host.executeTurn({
+      branchId: thread.branchId,
+      config: {
+        model: provider,
+        name: "primary",
+        tools: [],
+      },
+      signal: textSignal("hello"),
+      threadId: thread.threadId,
+    });
+
+    await host.project(handle);
+
+    expect(observedPrompt?.tools ?? null).toBe(null);
+  });
+
   test("respects explicit tool overrides for scenario-style turns", async () => {
     const host = createPlaygroundHost({
       backend: "memory",
@@ -1003,6 +1036,33 @@ describe("repl host scenarios", () => {
     expect(observedPrompt?.tools?.map((tool) => tool.name)).toEqual([
       "weather",
     ]);
+  });
+
+  test("uses explicit empty tool lists for tool-free ai-sdk-google scenarios", () => {
+    const baseConfig = {
+      backend: "memory",
+      googleApiKey: "test-key",
+      providerMode: "ai-sdk-google",
+    } as const;
+
+    expect(
+      createScenarioExecutionPlan({
+        ...baseConfig,
+        scenario: "streaming",
+      }).tools
+    ).toEqual([]);
+    expect(
+      createScenarioExecutionPlan({
+        ...baseConfig,
+        scenario: "metadata",
+      }).tools
+    ).toEqual([]);
+    expect(
+      createScenarioExecutionPlan({
+        ...baseConfig,
+        scenario: "structured",
+      }).tools
+    ).toEqual([]);
   });
 
   test("implements calculator and mock weather repl tools", async () => {
