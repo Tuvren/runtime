@@ -64,7 +64,7 @@ export function createPlaygroundProvider(input: {
 
     if (apiKey === undefined) {
       throw new TuvrenRuntimeError(
-        "ai-sdk-google playground provider requires GOOGLE_GENERATIVE_AI_API_KEY or GEMINI_API_KEY",
+        "ai-sdk-google repl provider requires GOOGLE_GENERATIVE_AI_API_KEY or GEMINI_API_KEY",
         {
           code: "invalid_playground_config",
         }
@@ -93,7 +93,7 @@ function createAimockProvider(
 
   if (aimockBaseUrl === undefined || aimockBaseUrl.length === 0) {
     throw new TuvrenRuntimeError(
-      `${mode} playground provider requires --aimock-base-url or TUVREN_PLAYGROUND_AIMOCK_BASE_URL`,
+      `${mode} repl provider requires --aimock-base-url, TUVREN_REPL_AIMOCK_BASE_URL, or TUVREN_PLAYGROUND_AIMOCK_BASE_URL`,
       {
         code: "invalid_playground_config",
       }

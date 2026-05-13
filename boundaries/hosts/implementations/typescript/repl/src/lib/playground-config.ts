@@ -55,88 +55,36 @@ export function loadPlaygroundConfig(
   argv: readonly string[]
 ): PlaygroundConfig {
   const options = parseArgs(argv);
-  const backend = parseBackend(options.backend ?? readReplEnv(env, "BACKEND"));
-  const kernelMode = parseKernelMode(
-    options.kernelMode ?? readReplEnv(env, "KERNEL_MODE")
-  );
-  const scenario = parseScenario(
-    options.scenario ?? readReplEnv(env, "SCENARIO")
-  );
-  const providerMode = parseProviderMode(
-    options.provider ?? readReplEnv(env, "PROVIDER_MODE")
-  );
-  const modelId = normalizeModelId(
-    options.modelId ?? readReplEnv(env, "MODEL_ID")
-  );
-  const googleApiKey = resolveGoogleApiKey(env);
-  const aimockBaseUrl = normalizeAimockBaseUrl(
-    options.aimockBaseUrl ?? readReplEnv(env, "AIMOCK_BASE_URL")
-  );
-  const kernelGrpcBaseUrl = normalizeKernelGrpcBaseUrl(
-    options.kernelGrpcBaseUrl ?? readReplEnv(env, "KERNEL_GRPC_BASE_URL")
-  );
-  const sqlitePath = normalizeSqlitePath(
-    options.sqlitePath ?? readReplEnv(env, "SQLITE_PATH")
-  );
+  const config = {
+    aimockBaseUrl: normalizeAimockBaseUrl(
+      options.aimockBaseUrl ?? readReplEnv(env, "AIMOCK_BASE_URL")
+    ),
+    backend: parseBackend(options.backend ?? readReplEnv(env, "BACKEND")),
+    googleApiKey: resolveGoogleApiKey(env),
+    kernelGrpcBaseUrl: normalizeKernelGrpcBaseUrl(
+      options.kernelGrpcBaseUrl ?? readReplEnv(env, "KERNEL_GRPC_BASE_URL")
+    ),
+    kernelMode: parseKernelMode(
+      options.kernelMode ?? readReplEnv(env, "KERNEL_MODE")
+    ),
+    modelId: normalizeModelId(options.modelId ?? readReplEnv(env, "MODEL_ID")),
+    providerMode: parseProviderMode(
+      options.provider ?? readReplEnv(env, "PROVIDER_MODE")
+    ),
+    scenario: parseScenario(options.scenario ?? readReplEnv(env, "SCENARIO")),
+    sqlitePath: normalizeSqlitePath(
+      options.sqlitePath ?? readReplEnv(env, "SQLITE_PATH")
+    ),
+  } satisfies PlaygroundConfig;
 
-  if (backend === "sqlite" && sqlitePath === undefined) {
-    throw new TuvrenRuntimeError(
-      "sqlite playground scenarios require --sqlite-path or TUVREN_PLAYGROUND_SQLITE_PATH",
-      {
-        code: "invalid_playground_config",
-      }
-    );
-  }
-
-  if (isAimockProviderMode(providerMode) && aimockBaseUrl === undefined) {
-    throw new TuvrenRuntimeError(
-      `${providerMode} playground provider requires --aimock-base-url or TUVREN_PLAYGROUND_AIMOCK_BASE_URL`,
-      {
-        code: "invalid_playground_config",
-      }
-    );
-  }
-
-  if (providerMode === "ai-sdk-google" && googleApiKey === undefined) {
-    throw new TuvrenRuntimeError(
-      "ai-sdk-google playground provider requires GOOGLE_GENERATIVE_AI_API_KEY or GEMINI_API_KEY",
-      {
-        code: "invalid_playground_config",
-      }
-    );
-  }
-
-  if (kernelMode === "rust-grpc" && kernelGrpcBaseUrl === undefined) {
-    throw new TuvrenRuntimeError(
-      "rust-grpc playground kernel requires --kernel-grpc-base-url or TUVREN_PLAYGROUND_KERNEL_GRPC_BASE_URL",
-      {
-        code: "invalid_playground_config",
-      }
-    );
-  }
-
-  if (kernelMode === "rust-grpc" && backend !== "memory") {
-    throw new TuvrenRuntimeError(
-      "rust-grpc playground kernel currently supports only the memory backend baseline",
-      {
-        code: "invalid_playground_config",
-      }
-    );
-  }
+  assertValidPlaygroundConfig(config);
 
   return {
-    aimockBaseUrl,
-    backend,
-    googleApiKey,
-    kernelGrpcBaseUrl,
-    kernelMode,
+    ...config,
     modelId:
-      providerMode === "ai-sdk-google"
-        ? (modelId ?? DEFAULT_GEMINI_PLAYGROUND_MODEL_ID)
-        : modelId,
-    providerMode,
-    scenario,
-    sqlitePath,
+      config.providerMode === "ai-sdk-google"
+        ? (config.modelId ?? DEFAULT_GEMINI_PLAYGROUND_MODEL_ID)
+        : config.modelId,
   };
 }
 
@@ -217,6 +165,62 @@ export function readReplEnv(
     | "SQLITE_PATH"
 ): string | undefined {
   return env[`TUVREN_REPL_${suffix}`] ?? env[`TUVREN_PLAYGROUND_${suffix}`];
+}
+
+export function assertValidPlaygroundConfig(config: PlaygroundConfig): void {
+  if (config.backend === "sqlite" && config.sqlitePath === undefined) {
+    throw new TuvrenRuntimeError(
+      "sqlite repl scenarios require --sqlite-path, TUVREN_REPL_SQLITE_PATH, or TUVREN_PLAYGROUND_SQLITE_PATH",
+      {
+        code: "invalid_playground_config",
+      }
+    );
+  }
+
+  if (
+    isAimockProviderMode(config.providerMode) &&
+    config.aimockBaseUrl === undefined
+  ) {
+    throw new TuvrenRuntimeError(
+      `${config.providerMode} repl provider requires --aimock-base-url, TUVREN_REPL_AIMOCK_BASE_URL, or TUVREN_PLAYGROUND_AIMOCK_BASE_URL`,
+      {
+        code: "invalid_playground_config",
+      }
+    );
+  }
+
+  if (
+    config.providerMode === "ai-sdk-google" &&
+    config.googleApiKey === undefined
+  ) {
+    throw new TuvrenRuntimeError(
+      "ai-sdk-google repl provider requires GOOGLE_GENERATIVE_AI_API_KEY or GEMINI_API_KEY",
+      {
+        code: "invalid_playground_config",
+      }
+    );
+  }
+
+  if (
+    config.kernelMode === "rust-grpc" &&
+    config.kernelGrpcBaseUrl === undefined
+  ) {
+    throw new TuvrenRuntimeError(
+      "rust-grpc repl kernel requires --kernel-grpc-base-url, TUVREN_REPL_KERNEL_GRPC_BASE_URL, or TUVREN_PLAYGROUND_KERNEL_GRPC_BASE_URL",
+      {
+        code: "invalid_playground_config",
+      }
+    );
+  }
+
+  if (config.kernelMode === "rust-grpc" && config.backend !== "memory") {
+    throw new TuvrenRuntimeError(
+      "rust-grpc repl kernel currently supports only the memory backend baseline",
+      {
+        code: "invalid_playground_config",
+      }
+    );
+  }
 }
 
 function parseArgs(argv: readonly string[]): Record<string, string> {

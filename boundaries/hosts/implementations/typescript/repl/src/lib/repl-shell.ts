@@ -25,6 +25,7 @@ import {
   type OrchestrationHandle,
   type TuvrenStreamEvent,
 } from "@tuvren/runtime";
+import { assertValidPlaygroundConfig } from "./playground-config.js";
 import { createPlaygroundHost } from "./playground-host.js";
 import {
   createScenarioExecutionPlan,
@@ -97,6 +98,7 @@ export const REPL_HELP_TEXT = [
   ".orch start                   Start a root orchestration turn",
   ".orch spawn <agent> <text>    Spawn the tracked child orchestration handle",
   ".orch await                   Await the current orchestration root/child",
+  ".orch cancel                  Cancel the active orchestration",
   ".orch events                  Show the last orchestration event types",
 ] as const;
 
@@ -224,6 +226,7 @@ function selectBackend(
     };
   }
 
+  assertValidPlaygroundConfig(nextConfig);
   cancelActiveShellWork(shell);
   shell.config = nextConfig;
   shell.host = createPlaygroundHost(nextConfig);
@@ -360,6 +363,8 @@ async function handleOrchestrationCommand(
       return await spawnOrchestrationChild(shell, args.slice(1));
     case "await":
       return await awaitOrchestration(shell);
+    case "cancel":
+      return cancelOrchestration(shell);
     case "events":
       return {
         output: formatJson(
@@ -368,7 +373,7 @@ async function handleOrchestrationCommand(
       };
     default:
       return {
-        output: 'Expected ".orch <start|spawn|await|events>".',
+        output: 'Expected ".orch <start|spawn|await|cancel|events>".',
       };
   }
 }
@@ -512,6 +517,8 @@ function cancelTurn(shell: ReplShell): ReplCommandResult {
   }
 
   shell.host.cancel(activeTurn.handle);
+  observeCancellation(activeTurn.projectionPromise);
+  shell.activeTurn = undefined;
   return { output: "Cancellation requested for the active turn." };
 }
 
@@ -606,30 +613,60 @@ async function awaitOrchestration(
     return { output: "No active orchestration root exists." };
   }
 
-  if (active.childHandle !== undefined) {
-    active.childResult = await active.childHandle.awaitResult();
+  try {
+    if (active.childHandle !== undefined) {
+      active.childResult = await active.childHandle.awaitResult();
+    }
+
+    active.rootResult = await active.handle.awaitResult();
+    shell.lastOrchestrationEvents = await active.eventsPromise;
+    const projection = {
+      agui: [],
+      canonical: shell.lastOrchestrationEvents,
+      sse: [],
+    } satisfies PlaygroundStreamProjection;
+    shell.thread = withHead(active.thread, projection);
+    active.thread = shell.thread;
+    if (isTerminalPhase(active.handle.status().phase)) {
+      shell.activeOrchestration = undefined;
+    }
+
+    return {
+      output: formatJson({
+        childResult: active.childResult ?? null,
+        eventTypes: shell.lastOrchestrationEvents.map((event) => event.type),
+        rootResult: active.rootResult,
+      }),
+    };
+  } catch (error: unknown) {
+    cancelOrchestration(shell);
+    throw error;
+  }
+}
+
+function cancelOrchestration(shell: ReplShell): ReplCommandResult {
+  const active = shell.activeOrchestration;
+
+  if (active === undefined) {
+    return { output: "No active orchestration root exists." };
   }
 
-  active.rootResult = await active.handle.awaitResult();
-  shell.lastOrchestrationEvents = await active.eventsPromise;
-  const projection = {
-    agui: [],
-    canonical: shell.lastOrchestrationEvents,
-    sse: [],
-  } satisfies PlaygroundStreamProjection;
-  shell.thread = withHead(active.thread, projection);
-  active.thread = shell.thread;
-  if (isTerminalPhase(active.handle.status().phase)) {
-    shell.activeOrchestration = undefined;
+  if (
+    active.childHandle !== undefined &&
+    !isTerminalPhase(active.childHandle.status().phase)
+  ) {
+    active.childHandle.cancel();
+    observeCancellation(active.childHandle.awaitResult());
   }
 
-  return {
-    output: formatJson({
-      childResult: active.childResult ?? null,
-      eventTypes: shell.lastOrchestrationEvents.map((event) => event.type),
-      rootResult: active.rootResult,
-    }),
-  };
+  if (!isTerminalPhase(active.handle.status().phase)) {
+    active.handle.cancel();
+    observeCancellation(active.handle.awaitResult());
+  }
+
+  observeCancellation(active.eventsPromise);
+  shell.activeOrchestration = undefined;
+  return { output: "Cancellation requested for the active orchestration." };
 }
 
 async function ensureThread(

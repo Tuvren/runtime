@@ -146,7 +146,7 @@ function createKernelHarness(
   if ((config.kernelMode ?? "typescript-local") === "rust-grpc") {
     if (config.kernelGrpcBaseUrl === undefined) {
       throw new TuvrenRuntimeError(
-        "rust-grpc playground kernel requires a gRPC base URL",
+        "rust-grpc repl kernel requires a gRPC base URL",
         {
           code: "invalid_playground_config",
         }
@@ -178,7 +178,7 @@ function createBackend(config: PlaygroundConfig): RuntimeBackend {
 
   if (config.sqlitePath === undefined) {
     throw new TuvrenRuntimeError(
-      "sqlite playground backend requires a database path",
+      "sqlite repl backend requires a database path",
       {
         code: "invalid_playground_config",
       }

@@ -193,7 +193,7 @@ describe("repl host scenarios", () => {
     for (const providerMode of AIMOCK_PLAYGROUND_PROVIDER_MODES) {
       expectPlaygroundConfigError(
         () => loadPlaygroundConfig({}, ["--provider", providerMode]),
-        `${providerMode} playground provider requires --aimock-base-url or TUVREN_PLAYGROUND_AIMOCK_BASE_URL`
+        `${providerMode} repl provider requires --aimock-base-url, TUVREN_REPL_AIMOCK_BASE_URL, or TUVREN_PLAYGROUND_AIMOCK_BASE_URL`
       );
 
       expectPlaygroundConfigError(
@@ -205,7 +205,7 @@ describe("repl host scenarios", () => {
             },
             []
           ),
-        `${providerMode} playground provider requires --aimock-base-url or TUVREN_PLAYGROUND_AIMOCK_BASE_URL`
+        `${providerMode} repl provider requires --aimock-base-url, TUVREN_REPL_AIMOCK_BASE_URL, or TUVREN_PLAYGROUND_AIMOCK_BASE_URL`
       );
     }
   });
@@ -213,7 +213,7 @@ describe("repl host scenarios", () => {
   test("rejects ai-sdk-google configuration without a usable API key", () => {
     expectPlaygroundConfigError(
       () => loadPlaygroundConfig({}, ["--provider", "ai-sdk-google"]),
-      "ai-sdk-google playground provider requires GOOGLE_GENERATIVE_AI_API_KEY or GEMINI_API_KEY"
+      "ai-sdk-google repl provider requires GOOGLE_GENERATIVE_AI_API_KEY or GEMINI_API_KEY"
     );
 
     expectPlaygroundConfigError(
@@ -226,14 +226,14 @@ describe("repl host scenarios", () => {
           },
           []
         ),
-      "ai-sdk-google playground provider requires GOOGLE_GENERATIVE_AI_API_KEY or GEMINI_API_KEY"
+      "ai-sdk-google repl provider requires GOOGLE_GENERATIVE_AI_API_KEY or GEMINI_API_KEY"
     );
   });
 
   test("rejects rust-grpc kernel configuration without a usable base URL", () => {
     expectPlaygroundConfigError(
       () => loadPlaygroundConfig({}, ["--kernel-mode", "rust-grpc"]),
-      "rust-grpc playground kernel requires --kernel-grpc-base-url or TUVREN_PLAYGROUND_KERNEL_GRPC_BASE_URL"
+      "rust-grpc repl kernel requires --kernel-grpc-base-url, TUVREN_REPL_KERNEL_GRPC_BASE_URL, or TUVREN_PLAYGROUND_KERNEL_GRPC_BASE_URL"
     );
 
     expectPlaygroundConfigError(
@@ -245,7 +245,7 @@ describe("repl host scenarios", () => {
           },
           []
         ),
-      "rust-grpc playground kernel requires --kernel-grpc-base-url or TUVREN_PLAYGROUND_KERNEL_GRPC_BASE_URL"
+      "rust-grpc repl kernel requires --kernel-grpc-base-url, TUVREN_REPL_KERNEL_GRPC_BASE_URL, or TUVREN_PLAYGROUND_KERNEL_GRPC_BASE_URL"
     );
   });
 
@@ -259,7 +259,7 @@ describe("repl host scenarios", () => {
           },
           ["--backend", "sqlite", "--sqlite-path", "auto"]
         ),
-      "rust-grpc playground kernel currently supports only the memory backend baseline"
+      "rust-grpc repl kernel currently supports only the memory backend baseline"
     );
   });
 
@@ -456,7 +456,7 @@ describe("repl host scenarios", () => {
         }
 
         expect(actualMessage).toBe(
-          "ai-sdk-google playground provider requires GOOGLE_GENERATIVE_AI_API_KEY or GEMINI_API_KEY"
+          "ai-sdk-google repl provider requires GOOGLE_GENERATIVE_AI_API_KEY or GEMINI_API_KEY"
         );
       }
     );
@@ -743,6 +743,31 @@ describe("repl host scenarios", () => {
     await waitForCondition(() => activeHandle.status().phase !== "running");
   });
 
+  test("allows new work immediately after turn cancellation", async () => {
+    const shell = createReplShell({
+      backend: "memory",
+      providerMode: "fixture",
+      scenario: "streaming",
+    });
+
+    await runReplCommand(shell, ".thread new");
+    await runReplCommand(shell, ".turn start steering");
+    const cancelledHandle = shell.activeTurn?.handle;
+
+    if (cancelledHandle === undefined) {
+      throw new Error("expected active turn handle after .turn start");
+    }
+
+    expect((await runReplCommand(shell, ".turn cancel")).output).toBe(
+      "Cancellation requested for the active turn."
+    );
+    expect(shell.activeTurn).toBe(undefined);
+    await waitForCondition(() => cancelledHandle.status().phase !== "running");
+
+    await runReplCommand(shell, ".turn start streaming");
+    expect(shell.activeTurn).not.toBe(undefined);
+  });
+
   test("resets shell state when the backend command is used", async () => {
     const shell = createReplShell({
       backend: "memory",
@@ -772,6 +797,85 @@ describe("repl host scenarios", () => {
       "No active thread exists."
     );
     expect(shell.thread).toBe(undefined);
+  });
+
+  test("rejects rust-grpc backend switching to sqlite through the shell", async () => {
+    const shell = createReplShell({
+      backend: "memory",
+      kernelGrpcBaseUrl: "http://127.0.0.1:50051",
+      kernelMode: "rust-grpc",
+      providerMode: "fixture",
+      scenario: "streaming",
+    });
+
+    let actualMessage = "";
+
+    try {
+      await runReplCommand(shell, ".backend sqlite auto");
+    } catch (error: unknown) {
+      actualMessage = error instanceof Error ? error.message : String(error);
+    }
+
+    expect(actualMessage).toBe(
+      "rust-grpc repl kernel currently supports only the memory backend baseline"
+    );
+  });
+
+  test("cancels active orchestration without resetting the shell", async () => {
+    const shell = createReplShell({
+      backend: "memory",
+      providerMode: "fixture",
+      scenario: "streaming",
+    });
+
+    await runReplCommand(shell, ".thread new");
+    await runReplCommand(shell, ".orch start");
+    const activeHandle = shell.activeOrchestration?.handle;
+
+    if (activeHandle === undefined) {
+      throw new Error("expected active orchestration handle after .orch start");
+    }
+
+    expect((await runReplCommand(shell, ".orch cancel")).output).toBe(
+      "Cancellation requested for the active orchestration."
+    );
+    expect(shell.activeOrchestration).toBe(undefined);
+    await waitForCondition(() => activeHandle.status().phase !== "running");
+  });
+
+  test("clears failed child orchestration state after await errors", async () => {
+    const shell = createReplShell({
+      backend: "memory",
+      providerMode: "fixture",
+      scenario: "streaming",
+    });
+
+    await runReplCommand(shell, ".thread new");
+    await runReplCommand(shell, ".orch start");
+    await runReplCommand(shell, ".orch spawn nope hi");
+
+    let actualMessage = "";
+
+    try {
+      await runReplCommand(shell, ".orch await");
+    } catch (error: unknown) {
+      actualMessage = error instanceof Error ? error.message : String(error);
+    }
+
+    expect(actualMessage.length > 0).toBe(true);
+    expect(shell.activeOrchestration).toBe(undefined);
+
+    await runReplCommand(shell, ".orch start");
+    const recoveryHandle = shell.activeOrchestration?.handle;
+    expect(recoveryHandle).not.toBe(undefined);
+
+    expect((await runReplCommand(shell, ".orch cancel")).output).toBe(
+      "Cancellation requested for the active orchestration."
+    );
+
+    if (recoveryHandle !== undefined) {
+      await waitForCondition(() => recoveryHandle.status().phase !== "running");
+    }
   });
 
   test("rejects multi-turn proof scenarios through .turn start", async () => {
