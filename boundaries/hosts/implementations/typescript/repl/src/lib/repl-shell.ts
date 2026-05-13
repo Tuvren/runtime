@@ -154,6 +154,10 @@ export interface ReplInputOptions {
   onCanonicalEvent?: (event: TuvrenStreamEvent) => void;
 }
 
+interface ApproveTurnOptions {
+  awaitCompletion?: boolean;
+}
+
 export function createReplShell(config: PlaygroundConfig): ReplShell {
   return {
     config,
@@ -186,7 +190,8 @@ export async function runReplInput(
     return await approveTurn(
       shell,
       approvalShortcutMode,
-      options?.onCanonicalEvent
+      options?.onCanonicalEvent,
+      { awaitCompletion: true }
     );
   }
 
@@ -543,7 +548,8 @@ async function awaitTurn(
 async function approveTurn(
   shell: ReplShell,
   mode: string,
-  onCanonicalEvent?: (event: TuvrenStreamEvent) => void
+  onCanonicalEvent?: (event: TuvrenStreamEvent) => void,
+  options?: ApproveTurnOptions
 ): Promise<ReplCommandResult> {
   const activeTurn = shell.activeTurn;
 
@@ -571,7 +577,7 @@ async function approveTurn(
 
   shell.activeTurn = resumedActiveTurn;
 
-  if (onCanonicalEvent !== undefined) {
+  if (options?.awaitCompletion === true || onCanonicalEvent !== undefined) {
     const projection = await resumedActiveTurn.projectionPromise;
     return finalizeInteractiveTurn(shell, resumedActiveTurn, projection);
   }

@@ -484,16 +484,17 @@ export function projectContinuationCapture(
   handle: ExecutionHandle,
   onCanonicalEvent?: (event: TuvrenStreamEvent) => void
 ): Promise<PlaygroundStreamProjection> {
-  const [canonicalBranch, sseBranch] = teeTuvrenStreamEvents(
+  const [canonicalBranch, sseBranch, aguiBranch] = teeTuvrenStreamEvents(
     handle.events(),
-    2
+    3
   );
 
   return Promise.all([
     collect(canonicalBranch, onCanonicalEvent),
     collect(toSseFrames(sseBranch)),
-  ]).then(([canonical, sse]) => ({
-    agui: [],
+    collect(toAgUiEvents(aguiBranch)),
+  ]).then(([canonical, sse, agui]) => ({
+    agui,
     canonical,
     sse,
   }));

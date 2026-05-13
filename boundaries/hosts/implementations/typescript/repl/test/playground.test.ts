@@ -1176,6 +1176,40 @@ describe("repl host scenarios", () => {
     expect(eventTypes).toContain("tool.result");
   });
 
+  test("approval shortcuts await resumed turns and preserve agui projections without callbacks", async () => {
+    const shell = createReplShell({
+      backend: "memory",
+      providerMode: "fixture",
+      scenario: "streaming",
+    });
+
+    await runReplInput(shell, ".turn start approval");
+    await runReplInput(shell, ".turn await");
+
+    const projectionBeforeApproval = shell.lastProjection;
+
+    if (projectionBeforeApproval === undefined) {
+      throw new Error("expected a projection before approval");
+    }
+
+    const approveResult = await runReplInput(shell, "1");
+    const projectionAfterApproval = shell.lastProjection;
+
+    expect(approveResult.output).toBe(undefined);
+    expect(shell.activeTurn).toBe(undefined);
+
+    if (projectionAfterApproval === undefined) {
+      throw new Error("expected a projection after approval");
+    }
+
+    expect(projectionAfterApproval.canonical.length).toBeGreaterThan(
+      projectionBeforeApproval.canonical.length
+    );
+    expect(projectionAfterApproval.agui.length).toBeGreaterThan(
+      projectionBeforeApproval.agui.length
+    );
+  });
+
   test("renders streamed thinking and assistant output distinctly", () => {
     const chunks: string[] = [];
     const writer = createLiveTurnWriter((chunk) => {
