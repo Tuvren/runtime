@@ -583,7 +583,7 @@ async function approveTurn(
 
   shell.activeTurn = resumedActiveTurn;
 
-  if (options?.awaitCompletion === true || onCanonicalEvent !== undefined) {
+  if (options?.awaitCompletion === true) {
     const projection = await resumedActiveTurn.projectionPromise;
     return finalizeInteractiveTurn(shell, resumedActiveTurn, projection);
   }

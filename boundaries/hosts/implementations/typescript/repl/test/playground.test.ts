@@ -1232,6 +1232,43 @@ describe("repl host scenarios", () => {
     );
   });
 
+  test("keeps .turn approve awaitable while canonical events are observed", async () => {
+    const shell = createReplShell({
+      backend: "memory",
+      providerMode: "fixture",
+      scenario: "streaming",
+    });
+    const eventTypes: string[] = [];
+
+    await runReplCommand(shell, ".thread new");
+    await runReplCommand(shell, ".turn start approval");
+    await runReplCommand(shell, ".turn await", {
+      onCanonicalEvent(event) {
+        eventTypes.push(event.type);
+      },
+    });
+
+    const approveResult = await runReplCommand(shell, ".turn approve edit", {
+      onCanonicalEvent(event) {
+        eventTypes.push(event.type);
+      },
+    });
+
+    expect(approveResult.output).toContain('"phase"');
+    expect(shell.activeTurn).not.toBe(undefined);
+
+    const awaitResult = await runReplCommand(shell, ".turn await", {
+      onCanonicalEvent(event) {
+        eventTypes.push(event.type);
+      },
+    });
+
+    expect(awaitResult.output).toBe(undefined);
+    expect(shell.activeTurn).toBe(undefined);
+    expect(eventTypes).toContain("approval.resolved");
+    expect(eventTypes).toContain("tool.result");
+  });
+
   test("renders streamed thinking and assistant output distinctly", () => {
     const chunks: string[] = [];
     const writer = createLiveTurnWriter((chunk) => {
@@ -1853,12 +1890,7 @@ async function runCliProcess(input: {
     ],
     {
       cwd: process.cwd(),
-      env: {
-        ...process.env,
-        FORCE_COLOR: undefined,
-        NO_COLOR: undefined,
-        ...input.envOverrides,
-      },
+      env: readCliProcessEnv(input.envOverrides),
       stdio: "pipe",
     }
   );
@@ -1883,4 +1915,26 @@ async function runCliProcess(input: {
       resolve({ exitCode, stderr, stdout });
     });
   });
+}
+
+function readCliProcessEnv(
+  envOverrides?: Record<string, string | undefined>
+): Record<string, string | undefined> {
+  return {
+    CI: process.env.CI,
+    FORCE_COLOR: undefined,
+    HOME: process.env.HOME,
+    LANG: process.env.LANG,
+    LC_ALL: process.env.LC_ALL,
+    NODE_OPTIONS: process.env.NODE_OPTIONS,
+    NO_COLOR: undefined,
+    PATH: process.env.PATH,
+    TEMP: process.env.TEMP,
+    TERM: process.env.TERM,
+    TMP: process.env.TMP,
+    TMPDIR: process.env.TMPDIR,
+    TZ: process.env.TZ,
+    USER: process.env.USER,
+    ...envOverrides,
+  };
 }
