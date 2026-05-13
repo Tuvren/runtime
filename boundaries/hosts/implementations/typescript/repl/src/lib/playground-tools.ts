@@ -214,13 +214,16 @@ function readNumberArray(
   input: unknown,
   propertyName: string
 ): number[] | undefined {
-  if (!isRecord(input) || !(propertyName in input)) {
+  if (!(isRecord(input) && propertyName in input)) {
     return undefined;
   }
 
   const value = input[propertyName];
 
-  if (!Array.isArray(value) || value.some((entry) => typeof entry !== "number")) {
+  if (
+    !Array.isArray(value) ||
+    value.some((entry) => typeof entry !== "number")
+  ) {
     return undefined;
   }
 
@@ -231,7 +234,7 @@ function readTrimmedString(
   input: unknown,
   propertyName: string
 ): string | undefined {
-  if (!isRecord(input) || !(propertyName in input)) {
+  if (!(isRecord(input) && propertyName in input)) {
     return undefined;
   }
 
@@ -280,7 +283,9 @@ function evaluateCalculator(
       return createCalculatorSuccess(
         operation,
         operands,
-        operands.slice(1).reduce((result, operand) => result - operand, operands[0])
+        operands
+          .slice(1)
+          .reduce((result, operand) => result - operand, operands[0])
       );
     case "multiply":
       return createCalculatorSuccess(
@@ -334,9 +339,17 @@ function evaluateCalculator(
         operands.reduce((sum, operand) => sum + operand, 0) / operands.length
       );
     case "min":
-      return createCalculatorSuccess(operation, operands, Math.min(...operands));
+      return createCalculatorSuccess(
+        operation,
+        operands,
+        Math.min(...operands)
+      );
     case "max":
-      return createCalculatorSuccess(operation, operands, Math.max(...operands));
+      return createCalculatorSuccess(
+        operation,
+        operands,
+        Math.max(...operands)
+      );
     default:
       return createCalculatorError(
         operation,

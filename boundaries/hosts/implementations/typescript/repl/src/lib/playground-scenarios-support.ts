@@ -856,11 +856,8 @@ export async function steerWhenRunning(
       return;
     } catch (error: unknown) {
       if (
-        !(
-          error instanceof TuvrenRuntimeError &&
-          error.code === "invalid_steering_state" &&
-          handle.status().phase === "running"
-        )
+        !isInvalidSteeringStateError(error) ||
+        handle.status().phase !== "running"
       ) {
         throw error;
       }
@@ -874,6 +871,15 @@ export async function steerWhenRunning(
       setTimeout(resolve, 5);
     });
   }
+}
+
+function isInvalidSteeringStateError(
+  error: unknown
+): error is TuvrenRuntimeError {
+  return (
+    error instanceof TuvrenRuntimeError &&
+    error.code === "invalid_steering_state"
+  );
 }
 
 export function readSteeringMessageDurable(messages: unknown[]): boolean {

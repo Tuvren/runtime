@@ -102,5 +102,6 @@
       ]
     }
   },
-  "defaultBase": "master"
+  "defaultBase": "master",
+  "analytics": false
 }

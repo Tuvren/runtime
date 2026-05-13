@@ -81,11 +81,14 @@ async function runInteractiveShell(
   try {
     for await (const line of rl) {
       let shouldPrompt = !process.stdin.readableEnded;
-      const liveOutput = createLiveTurnWriter((chunk) => {
-        process.stdout.write(chunk);
-      }, {
-        useAnsiColors: shouldUseAnsiColors(process.stdout, process.env),
-      });
+      const liveOutput = createLiveTurnWriter(
+        (chunk) => {
+          process.stdout.write(chunk);
+        },
+        {
+          useAnsiColors: shouldUseAnsiColors(process.stdout, process.env),
+        }
+      );
 
       try {
         const result = await runReplInput(shell, line, {

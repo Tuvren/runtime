@@ -37,8 +37,8 @@ import {
   TUVREN_RUNTIME_TELEMETRY_ATTRIBUTE_KEYS,
   TUVREN_RUNTIME_TELEMETRY_SCHEMA_URL,
   type TuvrenPrompt,
-  type TuvrenToolDefinition,
   type TuvrenProvider,
+  type TuvrenToolDefinition,
 } from "@tuvren/runtime";
 import { createPlaygroundKernelInspector } from "../src/lib/playground-kernel.js";
 import { withHead } from "../src/lib/playground-scenarios-support.js";
@@ -46,6 +46,7 @@ import {
   createPlaygroundTools,
   textSignal,
 } from "../src/lib/playground-tools.js";
+import { createLiveTurnWriter } from "../src/lib/repl-live-output.js";
 import { readShellTextArgument } from "../src/lib/repl-shell.js";
 import {
   expectPlaygroundConfigError,
@@ -53,7 +54,41 @@ import {
   withTemporaryEnv,
   withTemporaryEnvAsync,
 } from "./playground-test-helpers.ts";
-import { createLiveTurnWriter } from "../src/lib/repl-live-output.js";
+
+function createPromptObservingProvider(
+  id: string,
+  observePrompt: (prompt: TuvrenPrompt) => void
+): TuvrenProvider {
+  return {
+    generate(prompt) {
+      observePrompt(prompt);
+      return Promise.resolve({
+        finishReason: "stop",
+        parts: [{ text: "ok", type: "text" }],
+      });
+    },
+    id,
+    stream(prompt) {
+      observePrompt(prompt);
+      return streamPromptObservationResponse();
+    },
+  };
+}
+
+async function* streamPromptObservationResponse() {
+  await Promise.resolve();
+  yield { type: "text_delta", text: "ok" } as const;
+  yield { finishReason: "stop", type: "finish" } as const;
+}
+
+function createToolExecutionContext(
+  name: string
+): Parameters<TuvrenToolDefinition["execute"]>[1] {
+  return {
+    callId: `test:${name}`,
+    name,
+  };
+}
 
 describe("repl host scenarios", () => {
   test("loads deterministic default configuration", () => {
@@ -859,21 +894,12 @@ describe("repl host scenarios", () => {
     });
     const thread = await host.createThread();
     let observedPrompt: TuvrenPrompt | undefined;
-    const provider: TuvrenProvider = {
-      async generate(prompt) {
+    const provider = createPromptObservingProvider(
+      "test:system-prompt-provider",
+      (prompt) => {
         observedPrompt = prompt;
-        return {
-          finishReason: "stop",
-          parts: [{ text: "ok", type: "text" }],
-        };
-      },
-      id: "test:system-prompt-provider",
-      async *stream(prompt) {
-        observedPrompt = prompt;
-        yield { type: "text_delta", text: "ok" };
-        yield { finishReason: "stop", type: "finish" };
-      },
-    };
+      }
+    );
     const handle = host.executeTurn({
       branchId: thread.branchId,
       config: {
@@ -900,21 +926,12 @@ describe("repl host scenarios", () => {
     });
     const thread = await host.createThread();
     let observedPrompt: TuvrenPrompt | undefined;
-    const provider: TuvrenProvider = {
-      async generate(prompt) {
+    const provider = createPromptObservingProvider(
+      "test:default-tools-provider",
+      (prompt) => {
         observedPrompt = prompt;
-        return {
-          finishReason: "stop",
-          parts: [{ text: "ok", type: "text" }],
-        };
-      },
-      id: "test:default-tools-provider",
-      async *stream(prompt) {
-        observedPrompt = prompt;
-        yield { type: "text_delta", text: "ok" };
-        yield { finishReason: "stop", type: "finish" };
-      },
-    };
+      }
+    );
     const handle = host.executeTurn({
       branchId: thread.branchId,
       config: {
@@ -944,21 +961,12 @@ describe("repl host scenarios", () => {
     const thread = await host.createThread();
     const weatherTool = findToolDefinition("weather");
     let observedPrompt: TuvrenPrompt | undefined;
-    const provider: TuvrenProvider = {
-      async generate(prompt) {
+    const provider = createPromptObservingProvider(
+      "test:explicit-tools-provider",
+      (prompt) => {
         observedPrompt = prompt;
-        return {
-          finishReason: "stop",
-          parts: [{ text: "ok", type: "text" }],
-        };
-      },
-      id: "test:explicit-tools-provider",
-      async *stream(prompt) {
-        observedPrompt = prompt;
-        yield { type: "text_delta", text: "ok" };
-        yield { finishReason: "stop", type: "finish" };
-      },
-    };
+      }
+    );
     const handle = host.executeTurn({
       branchId: thread.branchId,
       config: {
@@ -983,10 +991,13 @@ describe("repl host scenarios", () => {
 
     expect(
       await Promise.resolve(
-        calculator.execute({
-          operands: [84, 2, 3],
-          operation: "divide",
-        })
+        calculator.execute(
+          {
+            operands: [84, 2, 3],
+            operation: "divide",
+          },
+          createToolExecutionContext("calculator")
+        )
       )
     ).toEqual({
       operands: [84, 2, 3],
@@ -997,10 +1008,13 @@ describe("repl host scenarios", () => {
 
     expect(
       await Promise.resolve(
-        weather.execute({
-          location: "Santiago",
-          unit: "celsius",
-        })
+        weather.execute(
+          {
+            location: "Santiago",
+            unit: "celsius",
+          },
+          createToolExecutionContext("weather")
+        )
       )
     ).toEqual({
       condition: "windy",
@@ -1133,7 +1147,8 @@ describe("repl host scenarios", () => {
     writer.observe({
       error: {
         code: "invalid_stream_event",
-        message: "driver-emitted assistant event sequences must be complete and match the durable assistant message",
+        message:
+          "driver-emitted assistant event sequences must be complete and match the durable assistant message",
       },
       fatal: true,
       timestamp: 0,
@@ -1498,9 +1513,9 @@ describe("repl host scenarios", () => {
 
     expect(result.exitCode).toBe(0);
     expect(result.stdout.includes("Playground streaming complete.")).toBe(true);
-    expect(result.stdout.includes('Unknown command "Hello from the REPL"')).toBe(
-      false
-    );
+    expect(
+      result.stdout.includes('Unknown command "Hello from the REPL"')
+    ).toBe(false);
   });
 
   test("interactive CLI honors TUVREN_REPL_SCENARIO aliases", async () => {

@@ -484,70 +484,100 @@ export class StreamAccumulator {
     const events: TuvrenStreamEvent[] = [];
 
     for (const part of this.parts) {
-      switch (part.kind) {
-        case "text":
-          if (!part.done) {
-            events.push({
-              messageId: this.messageId,
-              text: part.text,
-              timestamp: this.now(),
-              type: "text.done",
-            });
-            part.done = true;
-          }
-          break;
-        case "reasoning":
-          if (!part.done) {
-            events.push({
-              messageId: this.messageId,
-              timestamp: this.now(),
-              type: "reasoning.done",
-            });
-            part.done = true;
-          }
-          break;
-        case "structured":
-          if (!part.done) {
-            const data = parsePartialStructuredPart(part, true);
+      const event = this.createPartialCompletionEvent(part);
 
-            if (data !== undefined) {
-              events.push({
-                data: cloneValue(data),
-                messageId: this.messageId,
-                name: part.name,
-                timestamp: this.now(),
-                type: "structured.done",
-              });
-              part.done = true;
-            }
-          }
-          break;
-        case "tool_call":
-          if (!part.state.done) {
-            const input = parsePartialToolCallInput(part.state, true);
-
-            if (input !== undefined) {
-              events.push({
-                callId: part.state.callId,
-                input: cloneValue(input),
-                name: part.state.name,
-                providerMetadata: buildToolCallProviderMetadata(
-                  part.state.providerCallId,
-                  part.state.providerMetadata
-                ),
-                timestamp: this.now(),
-                type: "tool_call.done",
-              });
-              part.state.done = true;
-            }
-          }
-          break;
-        default:
-          break;
+      if (event !== undefined) {
+        events.push(event);
       }
     }
 
     return events;
+  }
+
+  private createPartialCompletionEvent(
+    part: AccumulatedPart
+  ): TuvrenStreamEvent | undefined {
+    switch (part.kind) {
+      case "text":
+        if (part.done) {
+          return undefined;
+        }
+
+        part.done = true;
+        return {
+          messageId: this.messageId,
+          text: part.text,
+          timestamp: this.now(),
+          type: "text.done",
+        };
+      case "reasoning":
+        if (part.done) {
+          return undefined;
+        }
+
+        part.done = true;
+        return {
+          messageId: this.messageId,
+          timestamp: this.now(),
+          type: "reasoning.done",
+        };
+      case "structured":
+        return this.createPartialStructuredDoneEvent(part);
+      case "tool_call":
+        return this.createPartialToolCallDoneEvent(part.state);
+      default:
+        return undefined;
+    }
+  }
+
+  private createPartialStructuredDoneEvent(
+    part: Extract<AccumulatedPart, { kind: "structured" }>
+  ): Extract<TuvrenStreamEvent, { type: "structured.done" }> | undefined {
+    if (part.done) {
+      return undefined;
+    }
+
+    const data = parsePartialStructuredPart(part, true);
+
+    if (data === undefined) {
+      return undefined;
+    }
+
+    part.done = true;
+    return {
+      data: cloneValue(data),
+      messageId: this.messageId,
+      name: part.name,
+      timestamp: this.now(),
+      type: "structured.done",
+    };
+  }
+
+  private createPartialToolCallDoneEvent(
+    state: PendingToolCall
+  ): Extract<TuvrenStreamEvent, { type: "tool_call.done" }> | undefined {
+    if (state.done) {
+      return undefined;
+    }
+
+    const input = parsePartialToolCallInput(state, true);
+
+    if (input === undefined) {
+      return undefined;
+    }
+
+    state.done = true;
+    return {
+      callId: state.callId,
+      input: cloneValue(input),
+      name: state.name,
+      providerMetadata: buildToolCallProviderMetadata(
+        state.providerCallId,
+        state.providerMetadata
+      ),
+      timestamp: this.now(),
+      type: "tool_call.done",
+    };
   }
 
   private hasOpenPartialContent(): boolean {
@@ -1012,10 +1042,7 @@ function createExecutionCancelledError(
 }
 
 export function isExecutionCancelledError(error: unknown): boolean {
-  return (
-    error instanceof TuvrenRuntimeError &&
-    error.code === "react_driver_execution_cancelled"
-  );
+  return isRuntimeErrorWithCode(error, "react_driver_execution_cancelled");
 }
 
 function toProviderError(error: unknown): TuvrenProviderError {
@@ -1028,6 +1055,13 @@ function toProviderError(error: unknown): TuvrenProviderError {
     code: "react_driver_provider_failure",
     details: normalizeUnknownError(error),
   });
+}
+
+function isRuntimeErrorWithCode(
+  error: unknown,
+  code: string
+): error is TuvrenRuntimeError {
+  return error instanceof TuvrenRuntimeError && error.code === code;
 }
 
 function normalizeUnknownError(error: unknown): {

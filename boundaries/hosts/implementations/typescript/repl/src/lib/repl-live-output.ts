@@ -102,18 +102,10 @@ export function createLiveTurnWriter(
           );
           return;
         case "error":
-          writeStandaloneLine(
-            "error",
-            renderErrorLine(event),
-            "red"
-          );
+          writeStandaloneLine("error", renderErrorLine(event), "red");
           return;
         case "steering.incorporated":
-          writeStandaloneLine(
-            "steering",
-            "incorporated",
-            "blue"
-          );
+          writeStandaloneLine("steering", "incorporated", "blue");
           return;
         case "tool_call.done":
           writeStandaloneLine(
@@ -162,9 +154,7 @@ export function createLiveTurnWriter(
       activeLine = undefined;
     }
 
-    write(
-      `${styleText(`${label}> `, color)}${styleText(message, color)}\n`
-    );
+    write(`${styleText(`${label}> `, color)}${styleText(message, color)}\n`);
   }
 
   function renderInlineValue(value: unknown): string {
@@ -197,7 +187,9 @@ export function createLiveTurnWriter(
 
   function renderApprovalRequest(request: ApprovalRequest): string {
     const pendingTools = request.toolCalls
-      .map((toolCall) => `${toolCall.name} ${renderInlineValue(toolCall.input)}`)
+      .map(
+        (toolCall) => `${toolCall.name} ${renderInlineValue(toolCall.input)}`
+      )
       .join("; ");
     const completedCount = request.completedResults.length;
     const completedSuffix =
@@ -207,7 +199,10 @@ export function createLiveTurnWriter(
   }
 
   function renderApprovalResolved(
-    response: Extract<TuvrenStreamEvent, { type: "approval.resolved" }>["response"]
+    response: Extract<
+      TuvrenStreamEvent,
+      { type: "approval.resolved" }
+    >["response"]
   ): string {
     const decisionTypes = response.decisions.map((decision) => decision.type);
 
