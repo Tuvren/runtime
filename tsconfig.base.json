@@ -75,6 +75,9 @@
       ],
       "@tuvren/playground-host": [
         "./boundaries/hosts/implementations/typescript/playground/src/index.ts"
+      ],
+      "@tuvren/repl-host": [
+        "./boundaries/hosts/implementations/typescript/repl/src/index.ts"
       ]
     },
     "strict": true,

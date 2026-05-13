@@ -1,0 +1,45 @@
+{
+  "extends": "./tsconfig.lib.json",
+  "compilerOptions": {
+    "composite": false,
+    "rootDir": "../../../../../",
+    "allowImportingTsExtensions": true,
+    "paths": {
+      "@tuvren/backend-memory": [
+        "../../../../kernel/implementations/typescript/backend-memory/src/index.ts"
+      ],
+      "@tuvren/backend-sqlite": [
+        "../../../../kernel/implementations/typescript/backend-sqlite/src/index.ts"
+      ],
+      "@tuvren/provider-bridge-ai-sdk": [
+        "../../../../providers/implementations/typescript/bridge-ai-sdk/src/index.ts"
+      ],
+      "@tuvren/runtime": [
+        "../../../../framework/implementations/typescript/runtime/src/index.ts"
+      ],
+      "@tuvren/stream-agui": [
+        "../../../../framework/implementations/typescript/stream-agui/src/index.ts"
+      ],
+      "@tuvren/stream-core": [
+        "../../../../framework/implementations/typescript/stream-core/src/index.ts"
+      ],
+      "@tuvren/stream-sse": [
+        "../../../../framework/implementations/typescript/stream-sse/src/index.ts"
+      ],
+      "@tuvren/repl-host": ["./src/index.ts"]
+    },
+    "types": ["bun", "node"]
+  },
+  "include": [
+    "src/**/*.ts",
+    "test/**/*.ts",
+    "smoke/**/*.ts",
+    "../../../../kernel/implementations/typescript/backend-memory/src/**/*.ts",
+    "../../../../kernel/implementations/typescript/backend-sqlite/src/**/*.ts",
+    "../../../../framework/implementations/typescript/runtime/src/**/*.ts",
+    "../../../../framework/implementations/typescript/stream-core/src/**/*.ts",
+    "../../../../framework/implementations/typescript/stream-sse/src/**/*.ts",
+    "../../../../framework/implementations/typescript/stream-agui/src/**/*.ts",
+    "../../../../providers/implementations/typescript/bridge-ai-sdk/src/**/*.ts"
+  ]
+}

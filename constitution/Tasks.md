@@ -2,6 +2,7 @@
 
 ## 0. Version History & Changelog
 
+- v0.25.0 - Closed Epic AJ in current repo reality by landing the serious `@tuvren/repl-host` proving host, wiring named proving-host validation targets into the canonical verification path, and refreshing measured host-proof evidence away from the playground-only product gate.
 - v0.24.0 - Closed Epic AI in current repo reality through a checked-in SDK-surface audit, a curated `@tuvren/runtime` host-facing facade, playground rewiring away from lower-level runtime packages, and fresh host/runtime validation evidence.
 - v0.23.0 - Closed Epic AH by archiving historical constitutional support material under `constitution/archived/`, moving active generated support artifacts to `constitution/support/live/`, and advancing the active critical path to the SDK audit and proving-host work.
 - v0.22.0 - Clarified that the proving-host and portability-gate evidence must become part of the repo's canonical verification path, and kept the portability scope focused on in-scope runtime semantics rather than explanatory or ecosystem-only material.
@@ -11,14 +12,14 @@
 
 ## 1. Executive Summary & Active Critical Path
 
-- **Total Active Story Points:** 46
-- **Critical Path:** `KRT-AJ001 -> KRT-AJ002 -> KRT-AJ003 -> KRT-AK001 -> KRT-AK002 -> KRT-AK003 -> KRT-AL001 -> KRT-AL002 -> KRT-AL003`
+- **Total Active Story Points:** 30
+- **Critical Path:** `KRT-AK001 -> KRT-AK002 -> KRT-AK003 -> KRT-AL001 -> KRT-AL002 -> KRT-AL003`
 - **Planning Assumptions:** `docs/` remains the timeless semantic authority; the live constitutional authority chain is `constitution/PRD.md`, `constitution/Architecture.md`, `constitution/TechSpec.md`, and `constitution/Tasks.md`; `constitution/support/live/` holds generated support artifacts consumed by docs portability classification or canonical verification without extending that authority chain; historical constitutional support material lives under `constitution/archived/`; the SDK is the main product; the serious REPL CLI is the proving host; canonical stream plus SSE are portable surfaces; AG-UI and the TypeScript AI SDK bridge implementation are the standing implementation-specific exceptions; PostgreSQL lands before Rust; and Rust remains blocked until `product proof gate`, `platform gate`, and `portability gate` all pass.
 
 ### Brownfield Continuity Note
 
 - Epics A-AG remain historical context, not the active forward-execution path.
-- The current repo already proves a promoted semantic subset and a private playground host path, but the active plan now targets full TypeScript product proof rather than maintenance of the AG subset alone.
+- The current repo now proves the host-facing SDK through the serious REPL host and its named proving-host validation lanes, while the remaining active plan targets platform-gate and portability-gate closure rather than maintenance of the AG subset alone.
 - Historical closure inventories now live under `constitution/archived/` for audit only, and they do not define current execution scope.
 
 ### Sequential Scope Rule
@@ -37,9 +38,9 @@
 
 ### Current Active Scope
 
-- Build a serious REPL host entirely on the curated `@tuvren/runtime` high-level SDK surface.
 - Add PostgreSQL as the next official backend and prove it under strict backend semantics.
 - Close the portability gate across the intended portable runtime surface before Rust resumes.
+- Keep the proving-host `product proof gate` green while platform and portability work proceed.
 
 ### Future / Deferred Scope
 
@@ -54,17 +55,15 @@
 - Epic AH completed the constitutional authority reset: historical support material moved under `constitution/archived/`, active generated support artifacts now live under `constitution/support/live/`, and the live authority chain is narrowed to the four constitutional documents plus explicit support inputs.
 - Epics A-Q established the baseline TypeScript runtime, ReAct path, provider bridge, stream adapters, playground host, and release-hardening work.
 - Epic AI completed the current host-facing TypeScript package audit/normalization path through [epic-ai-high-level-sdk-surface-audit.md](./archived/spikes/epic-ai-high-level-sdk-surface-audit.md).
+- Epic AJ completed the serious REPL proving-host path, including shared interactive/scenario host wiring, named `proving-host:*` validation targets, Node-backed SQLite reload proof, Rust-kernel interop proof, and refreshed compatibility evidence.
 - Epics R-AG established the multi-language transition foundation, shared conformance architecture, kernel interop, and the AG hardening subset that remains historical evidence for promoted surfaces.
-- That work remains valuable audit context, but the active path is now TypeScript product proof, TypeScript platform completion, and then portability-gate closure.
+- That work remains valuable audit context, but the active path is now TypeScript platform completion and then portability-gate closure.
 
 ## 3. Build Order (Mermaid)
 
 ```mermaid
 flowchart LR
-  KRTAJ001[KRT-AJ001 REPL Host Contract] --> KRTAJ002[KRT-AJ002 REPL Host Implementation]
-  KRTAJ002 --> KRTAJ003[KRT-AJ003 Proving-Host Validation]
-  KRTAJ003 --> KRTAK001[KRT-AK001 PostgreSQL Design Spike]
-  KRTAK001 --> KRTAK002[KRT-AK002 PostgreSQL Implementation]
+  KRTAK001[KRT-AK001 PostgreSQL Design Spike] --> KRTAK002[KRT-AK002 PostgreSQL Implementation]
   KRTAK002 --> KRTAK003[KRT-AK003 PostgreSQL Proof]
   KRTAK003 --> KRTAL001[KRT-AL001 Portability Gap Inventory]
   KRTAL001 --> KRTAL002[KRT-AL002 Portable Semantics Closure]
@@ -150,7 +149,10 @@ And existing behavior remains covered by automated build, typecheck, and validat
 
 ### Epic AJ — Serious REPL Host Proof (KRT)
 
+**Status:** Completed in v0.25.0
+
 **KRT-AJ001 Reference REPL Host Contract**
+- **Status:** Completed in v0.25.0
 - **Type:** Feature
 - **Effort:** 3
 - **Dependencies:** `KRT-AI001`
@@ -166,6 +168,7 @@ And no required host action depends on private runtime-only APIs
 ```
 
 **KRT-AJ002 Serious REPL Host Implementation**
+- **Status:** Completed in v0.25.0
 - **Type:** Feature
 - **Effort:** 8
 - **Dependencies:** `KRT-AJ001`, `KRT-AI002`
@@ -182,6 +185,7 @@ And the host does not depend on playground-only shortcuts or implementation-loca
 ```
 
 **KRT-AJ003 Proving-Host End-to-End Validation**
+- **Status:** Completed in v0.25.0
 - **Type:** Feature
 - **Effort:** 5
 - **Dependencies:** `KRT-AJ002`
