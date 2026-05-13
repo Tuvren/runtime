@@ -27,12 +27,23 @@ import type {
 } from "./playground-types.js";
 
 const AUTO_SQLITE_PATH_VALUE = "auto";
+export const INVALID_REPL_CONFIG_CODE = "invalid_repl_config";
 export const DEFAULT_GEMINI_PLAYGROUND_MODEL_ID = "gemini-2.5-flash";
 export const AIMOCK_PLAYGROUND_PROVIDER_MODES = [
   "aimock-openai",
   "aimock-anthropic",
   "aimock-google",
 ] as const;
+const OPTION_KEY_MAP = {
+  "aimock-base-url": "aimockBaseUrl",
+  backend: "backend",
+  "kernel-grpc-base-url": "kernelGrpcBaseUrl",
+  "kernel-mode": "kernelMode",
+  "model-id": "modelId",
+  provider: "provider",
+  scenario: "scenario",
+  "sqlite-path": "sqlitePath",
+} as const;
 
 export const DEFAULT_PLAYGROUND_SCENARIOS: readonly PlaygroundScenarioName[] = [
   "streaming",
@@ -172,7 +183,7 @@ export function assertValidPlaygroundConfig(config: PlaygroundConfig): void {
     throw new TuvrenRuntimeError(
       "sqlite repl scenarios require --sqlite-path, TUVREN_REPL_SQLITE_PATH, or TUVREN_PLAYGROUND_SQLITE_PATH",
       {
-        code: "invalid_playground_config",
+        code: INVALID_REPL_CONFIG_CODE,
       }
     );
   }
@@ -184,7 +195,7 @@ export function assertValidPlaygroundConfig(config: PlaygroundConfig): void {
     throw new TuvrenRuntimeError(
       `${config.providerMode} repl provider requires --aimock-base-url, TUVREN_REPL_AIMOCK_BASE_URL, or TUVREN_PLAYGROUND_AIMOCK_BASE_URL`,
       {
-        code: "invalid_playground_config",
+        code: INVALID_REPL_CONFIG_CODE,
       }
     );
   }
@@ -196,7 +207,7 @@ export function assertValidPlaygroundConfig(config: PlaygroundConfig): void {
     throw new TuvrenRuntimeError(
       "ai-sdk-google repl provider requires GOOGLE_GENERATIVE_AI_API_KEY or GEMINI_API_KEY",
       {
-        code: "invalid_playground_config",
+        code: INVALID_REPL_CONFIG_CODE,
       }
     );
   }
@@ -208,7 +219,7 @@ export function assertValidPlaygroundConfig(config: PlaygroundConfig): void {
     throw new TuvrenRuntimeError(
       "rust-grpc repl kernel requires --kernel-grpc-base-url, TUVREN_REPL_KERNEL_GRPC_BASE_URL, or TUVREN_PLAYGROUND_KERNEL_GRPC_BASE_URL",
       {
-        code: "invalid_playground_config",
+        code: INVALID_REPL_CONFIG_CODE,
       }
     );
   }
@@ -217,7 +228,7 @@ export function assertValidPlaygroundConfig(config: PlaygroundConfig): void {
     throw new TuvrenRuntimeError(
       "rust-grpc repl kernel currently supports only the memory backend baseline",
       {
-        code: "invalid_playground_config",
+        code: INVALID_REPL_CONFIG_CODE,
       }
     );
   }
@@ -234,15 +245,23 @@ function parseArgs(argv: readonly string[]): Record<string, string> {
     }
 
     const key = arg.slice(2);
+    const optionKey = OPTION_KEY_MAP[key as keyof typeof OPTION_KEY_MAP];
+
+    if (optionKey === undefined) {
+      throw new TuvrenRuntimeError(`unsupported repl option --${key}`, {
+        code: INVALID_REPL_CONFIG_CODE,
+      });
+    }
+
     const next = argv[index + 1];
 
     if (next === undefined || next.startsWith("--")) {
       throw new TuvrenRuntimeError(`missing value for --${key}`, {
-        code: "invalid_playground_config",
+        code: INVALID_REPL_CONFIG_CODE,
       });
     }
 
-    options[toCamelKey(key)] = next;
+    options[optionKey] = next;
     index += 1;
   }
 
@@ -257,12 +276,9 @@ function parseBackend(value: string | undefined): PlaygroundBackendMode {
     case "sqlite":
       return normalized;
     default:
-      throw new TuvrenRuntimeError(
-        `unsupported playground backend "${normalized}"`,
-        {
-          code: "invalid_playground_config",
-        }
-      );
+      throw new TuvrenRuntimeError(`unsupported repl backend "${normalized}"`, {
+        code: INVALID_REPL_CONFIG_CODE,
+      });
   }
 }
 
@@ -275,9 +291,9 @@ function parseKernelMode(value: string | undefined): PlaygroundKernelMode {
       return normalized;
     default:
       throw new TuvrenRuntimeError(
-        `unsupported playground kernel mode "${normalized}"`,
+        `unsupported repl kernel mode "${normalized}"`,
         {
-          code: "invalid_playground_config",
+          code: INVALID_REPL_CONFIG_CODE,
         }
       );
   }
@@ -296,9 +312,9 @@ function parseProviderMode(value: string | undefined): PlaygroundProviderMode {
       return normalized;
     default:
       throw new TuvrenRuntimeError(
-        `unsupported playground provider mode "${normalized}"`,
+        `unsupported repl provider mode "${normalized}"`,
         {
-          code: "invalid_playground_config",
+          code: INVALID_REPL_CONFIG_CODE,
         }
       );
   }
@@ -322,16 +338,10 @@ function parseScenario(value: string | undefined): PlaygroundScenarioName {
       return normalized;
     default:
       throw new TuvrenRuntimeError(
-        `unsupported playground scenario "${normalized}"`,
+        `unsupported repl scenario "${normalized}"`,
         {
-          code: "invalid_playground_config",
+          code: INVALID_REPL_CONFIG_CODE,
         }
       );
   }
-}
-
-function toCamelKey(key: string): string {
-  return key.replaceAll(/-([a-z])/gu, (_match, letter: string) =>
-    letter.toUpperCase()
-  );
 }

@@ -27,7 +27,10 @@ import {
 import { toAgUiEvents } from "@tuvren/stream-agui";
 import { teeTuvrenStreamEvents } from "@tuvren/stream-core";
 import { toSseFrames } from "@tuvren/stream-sse";
-import { isAimockProviderMode } from "./playground-config.js";
+import {
+  INVALID_REPL_CONFIG_CODE,
+  isAimockProviderMode,
+} from "./playground-config.js";
 import { createPlaygroundProvider } from "./playground-provider.js";
 import { createPlaygroundTools, textSignal } from "./playground-tools.js";
 import type {
@@ -410,8 +413,8 @@ function findToolDefinition(name: "email" | "search") {
   const tool = createPlaygroundTools().find((entry) => entry.name === name);
 
   if (tool === undefined) {
-    throw new TuvrenRuntimeError(`missing playground tool "${name}"`, {
-      code: "invalid_playground_config",
+    throw new TuvrenRuntimeError(`missing repl tool "${name}"`, {
+      code: INVALID_REPL_CONFIG_CODE,
     });
   }
 

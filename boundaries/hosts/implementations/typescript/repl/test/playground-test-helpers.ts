@@ -16,6 +16,7 @@
 
 import { expect } from "bun:test";
 import type { ChatCompletionRequest, LLMock } from "@copilotkit/aimock";
+import { TuvrenRuntimeError } from "@tuvren/runtime";
 import type {
   ReplProviderMode as PlaygroundProviderMode,
   ReplScenarioReport as PlaygroundScenarioReport,
@@ -288,14 +289,20 @@ export function expectPlaygroundConfigError(
   loadConfig: () => unknown,
   expectedMessage: string
 ): void {
+  let actualCode: string | undefined;
   let actualMessage: string | undefined;
 
   try {
     loadConfig();
   } catch (error: unknown) {
     actualMessage = error instanceof Error ? error.message : String(error);
+
+    if (error instanceof TuvrenRuntimeError) {
+      actualCode = error.code;
+    }
   }
 
+  expect(actualCode).toBe("invalid_repl_config");
   expect(actualMessage).toBe(expectedMessage);
 }
 

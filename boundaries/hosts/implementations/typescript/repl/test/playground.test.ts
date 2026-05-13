@@ -37,6 +37,7 @@ import {
   TUVREN_RUNTIME_TELEMETRY_SCHEMA_URL,
 } from "@tuvren/runtime";
 import { createPlaygroundKernelInspector } from "../src/lib/playground-kernel.js";
+import { readShellTextArgument } from "../src/lib/repl-shell.js";
 import { withHead } from "../src/lib/playground-scenarios-support.js";
 import {
   expectPlaygroundConfigError,
@@ -187,6 +188,13 @@ describe("repl host scenarios", () => {
     expect(config.kernelMode).toBe("rust-grpc");
     expect(config.providerMode).toBe("aimock-openai");
     expect(config.scenario).toBe("metadata");
+  });
+
+  test("rejects unsupported REPL options before configuration is loaded", () => {
+    expectPlaygroundConfigError(
+      () => loadPlaygroundConfig({}, ["--bogus", "value"]),
+      "unsupported repl option --bogus"
+    );
   });
 
   test("rejects aimock provider configuration without a usable base URL", () => {
@@ -592,6 +600,28 @@ describe("repl host scenarios", () => {
     expect(forkMessages.length).toBe(activeMessages.length);
   });
 
+  test("shows the last canonical orchestration events through .events show", async () => {
+    const shell = createReplShell({
+      backend: "memory",
+      providerMode: "fixture",
+      scenario: "streaming",
+    });
+
+    await runReplCommand(shell, ".thread new");
+    await runReplCommand(shell, ".orch start");
+    await runReplCommand(shell, ".orch spawn worker Run proof child");
+    await runReplCommand(shell, ".orch await");
+
+    const events = readCommandArray(
+      await runReplCommand(shell, ".events show")
+    ) as Array<{ source?: { workerId?: string } }>;
+
+    expect(events.length).toBeGreaterThan(0);
+    expect(events.some((event) => event.source?.workerId !== undefined)).toBe(
+      true
+    );
+  });
+
   test("rejects overwriting an active turn and cancels it before backend reset", async () => {
     const shell = createReplShell({
       backend: "memory",
@@ -821,6 +851,17 @@ describe("repl host scenarios", () => {
     );
   });
 
+  test("preserves quoted sqlite paths when rejoining shell arguments", () => {
+    expect(
+      readShellTextArgument([
+        '"/tmp/tuvren',
+        "repl",
+        "spaced",
+        'path.sqlite"',
+      ])
+    ).toBe("/tmp/tuvren repl spaced path.sqlite");
+  });
+
   test("cancels active orchestration without resetting the shell", async () => {
     const shell = createReplShell({
       backend: "memory",
@@ -1004,6 +1045,41 @@ describe("repl host scenarios", () => {
     expect(result.stdout.includes('"scenario": "streaming"')).toBe(true);
     expect(result.stdout.includes("Tuvren REPL Host")).toBe(false);
   });
+
+  test("CLI startup failures render a concise single-line error", async () => {
+    const result = await runCliProcess({
+      argv: ["--bogus", "value"],
+    });
+
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr.trim()).toBe("unsupported repl option --bogus");
+    expect(result.stderr.trim().split("\n")).toHaveLength(1);
+    expect(result.stdout).toBe("");
+  });
+
+  test("CLI scenario failures render a concise single-line error", async () => {
+    const result = await runCliProcess({
+      argv: [
+        "--backend",
+        "memory",
+        "--provider",
+        "ai-sdk-google",
+        "--scenario",
+        "streaming",
+      ],
+      envOverrides: {
+        GEMINI_API_KEY: undefined,
+        GOOGLE_GENERATIVE_AI_API_KEY: undefined,
+      },
+    });
+
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr.trim()).toBe(
+      "ai-sdk-google repl provider requires GOOGLE_GENERATIVE_AI_API_KEY or GEMINI_API_KEY"
+    );
+    expect(result.stderr.trim().split("\n")).toHaveLength(1);
+    expect(result.stdout).toBe("");
+  });
 });
 
 function readCommandArray(
@@ -1043,20 +1119,30 @@ async function runCliSession(
   stdin: string,
   envOverrides?: Record<string, string>
 ): Promise<{ exitCode: number | null; stderr: string; stdout: string }> {
+  return await runCliProcess({
+    envOverrides,
+    stdin,
+  });
+}
+
+async function runCliProcess(input: {
+  argv?: readonly string[];
+  envOverrides?: Record<string, string | undefined>;
+  stdin?: string;
+}): Promise<{ exitCode: number | null; stderr: string; stdout: string }> {
   const cli = spawn(
     "node",
     [
       join(process.cwd(), "dist/cli.js"),
-      "--backend",
-      "memory",
-      "--provider",
-      "fixture",
+      ...(input.argv ?? ["--backend", "memory", "--provider", "fixture"]),
     ],
     {
       cwd: process.cwd(),
       env: {
         ...process.env,
-        ...envOverrides,
+        FORCE_COLOR: undefined,
+        NO_COLOR: undefined,
+        ...input.envOverrides,
       },
       stdio: "pipe",
     }
@@ -1070,7 +1156,7 @@ async function runCliSession(
   cli.stderr.on("data", (chunk: Buffer | string) => {
     stderr += String(chunk);
   });
-  cli.stdin.end(stdin);
+  cli.stdin.end(input.stdin ?? "");
 
   return await new Promise<{
     exitCode: number | null;

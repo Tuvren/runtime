@@ -34,6 +34,7 @@ import {
   createPlaygroundKernelInspector,
   type PlaygroundKernelHarness,
 } from "./playground-kernel.js";
+import { INVALID_REPL_CONFIG_CODE } from "./playground-config.js";
 import { createPlaygroundProvider } from "./playground-provider.js";
 import type {
   PlaygroundConfig,
@@ -148,7 +149,7 @@ function createKernelHarness(
       throw new TuvrenRuntimeError(
         "rust-grpc repl kernel requires a gRPC base URL",
         {
-          code: "invalid_playground_config",
+          code: INVALID_REPL_CONFIG_CODE,
         }
       );
     }
@@ -180,7 +181,7 @@ function createBackend(config: PlaygroundConfig): RuntimeBackend {
     throw new TuvrenRuntimeError(
       "sqlite repl backend requires a database path",
       {
-        code: "invalid_playground_config",
+        code: INVALID_REPL_CONFIG_CODE,
       }
     );
   }

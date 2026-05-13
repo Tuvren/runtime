@@ -122,6 +122,7 @@ export interface ReplShell {
   activeTurn?: ActiveTurnState;
   config: PlaygroundConfig;
   host: PlaygroundHost;
+  lastCanonicalEvents?: TuvrenStreamEvent[];
   lastOrchestrationEvents?: TuvrenStreamEvent[];
   lastProjection?: PlaygroundStreamProjection;
   thread?: PlaygroundThreadSummary;
@@ -215,9 +216,9 @@ function selectBackend(
           ...shell.config,
           backend,
           sqlitePath:
-            args[1] === "auto"
+            readShellTextArgument(args.slice(1)) === "auto"
               ? join(tmpdir(), `tuvren-repl-${randomUUID()}.sqlite`)
-              : args[1],
+              : readShellTextArgument(args.slice(1)),
         };
 
   if (backend === "sqlite" && nextConfig.sqlitePath === undefined) {
@@ -232,6 +233,7 @@ function selectBackend(
   shell.host = createPlaygroundHost(nextConfig);
   shell.activeOrchestration = undefined;
   shell.activeTurn = undefined;
+  shell.lastCanonicalEvents = undefined;
   shell.lastOrchestrationEvents = undefined;
   shell.lastProjection = undefined;
   shell.thread = undefined;
@@ -256,6 +258,7 @@ async function handleThreadCommand(
       shell.thread = await shell.host.createThread();
       shell.activeOrchestration = undefined;
       shell.activeTurn = undefined;
+      shell.lastCanonicalEvents = undefined;
       shell.lastProjection = undefined;
       shell.lastOrchestrationEvents = undefined;
       return { output: formatJson(shell.thread) };
@@ -323,7 +326,8 @@ function showEvents(
     return { output: 'Expected ".events show".' };
   }
 
-  return { output: formatJson(shell.lastProjection?.canonical ?? []) };
+  // Keep `.events show` aligned across turn and orchestration awaits.
+  return { output: formatJson(shell.lastCanonicalEvents ?? []) };
 }
 
 async function handleTurnCommand(
@@ -440,6 +444,7 @@ async function awaitTurn(shell: ReplShell): Promise<ReplCommandResult> {
   const projection = await activeTurn.projectionPromise;
   const phase = activeTurn.handle.status().phase;
   shell.lastProjection = projection;
+  shell.lastCanonicalEvents = projection.canonical;
   shell.thread = withHead(activeTurn.thread, projection);
   if (isTerminalPhase(phase)) {
     shell.activeTurn = undefined;
@@ -620,9 +625,10 @@ async function awaitOrchestration(
 
     active.rootResult = await active.handle.awaitResult();
     shell.lastOrchestrationEvents = await active.eventsPromise;
+    shell.lastCanonicalEvents = shell.lastOrchestrationEvents;
     const projection = {
       agui: [],
-      canonical: shell.lastOrchestrationEvents,
+      canonical: shell.lastCanonicalEvents,
       sse: [],
     } satisfies PlaygroundStreamProjection;
     shell.thread = withHead(active.thread, projection);
@@ -851,4 +857,24 @@ function isTerminalPhase(
 
 function observeCancellation(promise: Promise<unknown>): void {
   promise.catch(() => undefined);
+}
+
+export function readShellTextArgument(
+  args: readonly string[]
+): string | undefined {
+  const value = args.join(" ").trim();
+
+  if (value.length === 0) {
+    return undefined;
+  }
+
+  // Rejoin split tokens so quoted SQLite paths survive the shell parser.
+  if (
+    (value.startsWith('"') && value.endsWith('"')) ||
+    (value.startsWith("'") && value.endsWith("'"))
+  ) {
+    return value.slice(1, -1);
+  }
+
+  return value;
 }

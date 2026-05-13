@@ -33,6 +33,7 @@ import {
 } from "@tuvren/runtime";
 import {
   DEFAULT_GEMINI_PLAYGROUND_MODEL_ID,
+  INVALID_REPL_CONFIG_CODE,
   isAimockProviderMode,
   resolveGoogleApiKey,
 } from "./playground-config.js";
@@ -66,7 +67,7 @@ export function createPlaygroundProvider(input: {
       throw new TuvrenRuntimeError(
         "ai-sdk-google repl provider requires GOOGLE_GENERATIVE_AI_API_KEY or GEMINI_API_KEY",
         {
-          code: "invalid_playground_config",
+          code: INVALID_REPL_CONFIG_CODE,
         }
       );
     }
@@ -95,7 +96,7 @@ function createAimockProvider(
     throw new TuvrenRuntimeError(
       `${mode} repl provider requires --aimock-base-url, TUVREN_REPL_AIMOCK_BASE_URL, or TUVREN_PLAYGROUND_AIMOCK_BASE_URL`,
       {
-        code: "invalid_playground_config",
+        code: INVALID_REPL_CONFIG_CODE,
       }
     );
   }
@@ -135,12 +136,9 @@ function createAimockProvider(
       });
     }
     default:
-      throw new TuvrenRuntimeError(
-        `unsupported aimock playground provider "${mode}"`,
-        {
-          code: "invalid_playground_config",
-        }
-      );
+      throw new TuvrenRuntimeError(`unsupported aimock repl provider "${mode}"`, {
+        code: INVALID_REPL_CONFIG_CODE,
+      });
   }
 }
 

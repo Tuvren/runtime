@@ -26,18 +26,29 @@ import {
 } from "./index.js";
 
 const argv = process.argv.slice(2);
-const config = loadReplConfig(process.env, argv);
+await main(argv);
 
-if (hasExplicitScenarioSelection(process.env, argv)) {
-  const report = await runReplScenario(config);
+async function main(argv: readonly string[]): Promise<void> {
+  try {
+    const config = loadReplConfig(process.env, argv);
 
-  process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
+    if (hasExplicitScenarioSelection(process.env, argv)) {
+      const report = await runReplScenario(config);
 
-  if (!haveAllChecksPassed(report.checks)) {
+      process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
+
+      if (!haveAllChecksPassed(report.checks)) {
+        process.exitCode = 1;
+      }
+
+      return;
+    }
+
+    await runInteractiveShell(config);
+  } catch (error: unknown) {
+    process.stderr.write(`${renderError(error)}\n`);
     process.exitCode = 1;
   }
-} else {
-  await runInteractiveShell(config);
 }
 
 async function runInteractiveShell(
