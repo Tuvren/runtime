@@ -1631,7 +1631,25 @@ describe("repl host scenarios", () => {
     expect(shell.config.postgresSchemaName?.startsWith("tuvren-repl-")).toBe(
       true
     );
-    expect(result.output).toContain("\"backend\": \"postgres\"");
+    expect(result.output).toContain('"backend": "postgres"');
+  });
+
+  test("clears postgres-specific shell state when switching back to memory", async () => {
+    const shell = createReplShell({
+      backend: "memory",
+      providerMode: "fixture",
+      scenario: "streaming",
+    });
+
+    await runReplCommand(shell, ".backend postgres tuvren_runtime auto");
+    const result = await runReplCommand(shell, ".backend memory");
+
+    expect(shell.config.backend).toBe("memory");
+    expect(shell.config.postgresDatabase).toBe(undefined);
+    expect(shell.config.postgresSchemaName).toBe(undefined);
+    expect(result.output).toContain('"backend": "memory"');
+    expect(result.output).toContain('"postgresDatabase": null');
+    expect(result.output).toContain('"postgresSchemaName": null');
   });
 
   test("rejects rust-grpc backend switching to postgres through the shell", async () => {

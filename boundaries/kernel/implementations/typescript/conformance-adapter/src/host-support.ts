@@ -58,6 +58,10 @@ interface ConfiguredBackendHandle {
   cleanup(): Promise<void>;
 }
 
+interface DisposablePostgresBackend {
+  destroy(options?: { dropSchema?: boolean }): Promise<void>;
+}
+
 let canonicalSchemaPromise: Promise<TurnTreeSchema> | undefined;
 
 export async function withConformanceKernel<T>(
@@ -305,17 +309,19 @@ async function createConfiguredBackend(config: {
       "../../backend-postgres/dist/index.js",
       import.meta.url
     );
-    const { createPostgresBackend } = await import(postgresBackendModuleUrl.href);
+    const { createPostgresBackend } = await import(
+      postgresBackendModuleUrl.href
+    );
     const schemaName = `${config.adapterId.replaceAll("-", "_")}_${randomUUID().replaceAll("-", "_")}`;
+    const backend = createPostgresBackend({
+      database: process.env.PGDATABASE ?? "tuvren_runtime",
+      schemaName,
+    }) as ReturnType<typeof createPostgresBackend> & DisposablePostgresBackend;
+
     return {
-      backend: createPostgresBackend({
-        database: process.env.PGDATABASE ?? "tuvren_runtime",
-        schemaName,
-      }),
+      backend,
       cleanup: async () => {
-        // The managed devenv Postgres service owns process lifecycle. The
-        // backend itself is intentionally connection-only and the schema is
-        // disposable, so adapter cleanup stays side-effect free here.
+        await backend.destroy({ dropSchema: true });
       },
     };
   }

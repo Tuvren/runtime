@@ -15,12 +15,14 @@
  */
 
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { createStoredObjectRecord } from "@tuvren/kernel-testkit";
+import type { RuntimeBackend } from "@tuvren/kernel-protocol";
 import {
+  createStoredObjectRecord,
   registerBackendConformanceSuite,
   registerBackendInvariantSuite,
   registerBackendRecoverySuite,
 } from "@tuvren/kernel-testkit";
+import type { Sql } from "postgres";
 import { createPostgresBackend } from "../src/index.js";
 import {
   assertDevenvPostgresReady,
@@ -75,5 +77,38 @@ describe("@tuvren/backend-postgres", () => {
     await reopenedBackend.transact(async (tx) => {
       expect(await tx.objects.get(objectRecord.hash)).toEqual(objectRecord);
     });
+  });
+
+  test("retries initialization after a transient bootstrap failure", async () => {
+    interface TestablePostgresBackend extends RuntimeBackend {
+      destroy(options?: { dropSchema?: boolean }): Promise<void>;
+      readonly sql: Sql;
+    }
+
+    const backend = createPostgresBackend(
+      createPostgresTestBackendOptions()
+    ) as TestablePostgresBackend;
+    const originalBegin = backend.sql.begin.bind(backend.sql);
+    let attempts = 0;
+
+    backend.sql.begin = (async (...args: Parameters<Sql["begin"]>) => {
+      attempts += 1;
+
+      if (attempts === 1) {
+        throw new Error("transient bootstrap failure");
+      }
+
+      return await originalBegin(...args);
+    }) as Sql["begin"];
+
+    try {
+      expect(await backend.health()).toEqual({
+        ok: false,
+        reason: "transient bootstrap failure",
+      });
+      expect(await backend.health()).toEqual({ ok: true });
+    } finally {
+      await backend.destroy({ dropSchema: true });
+    }
   });
 });

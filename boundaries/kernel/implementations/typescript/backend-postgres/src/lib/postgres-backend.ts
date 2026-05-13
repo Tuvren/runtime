@@ -15,8 +15,6 @@
  */
 
 import { AsyncLocalStorage } from "node:async_hooks";
-import type { EpochMs } from "@tuvren/core-types";
-import type { Sql, TransactionSql } from "postgres";
 import {
   assertStoredBranch,
   assertStoredObject,
@@ -41,6 +39,7 @@ import {
   type StoredStagedResult,
   type StoredTurnTreePath,
 } from "@tuvren/kernel-protocol";
+import type { Sql } from "postgres";
 import {
   assertBranchHeadMoveIsLinear,
   assertRunStartTurnNodeWithinTurnSpan,
@@ -92,9 +91,7 @@ import {
   assertMonotonicUpdatedAtMs,
   assertRunUpdateIsLegal,
 } from "./memory-backend-run-logic.js";
-import {
-  validateCommittedState,
-} from "./memory-backend-state.js";
+import { validateCommittedState } from "./memory-backend-state.js";
 import {
   cloneState,
   getSchemaForSchemaId,
@@ -108,18 +105,24 @@ import {
   ensurePostgresSchemaInitialized,
   loadPersistedStateForUpdate,
   normalizeSchemaName,
-  persistStateSnapshot,
   type PostgresBackendPersistenceOptions,
+  persistStateSnapshot,
 } from "./postgres-backend-persistence.js";
 
 interface MutableRepositories extends KrakenBackendTx {
   readonly now: () => number;
 }
 
+interface PostgresBackendDestroyOptions {
+  dropSchema?: boolean;
+}
+
 export interface PostgresBackendOptions
   extends PostgresBackendPersistenceOptions {}
 
 class PostgresBackend implements KrakenBackend {
+  private readonly connectionOptions: PostgresBackendPersistenceOptions;
+  private destroyed = false;
   private initializationPromise: Promise<void> | undefined;
   private readonly schemaName: string;
   private readonly sql: Sql;
@@ -128,9 +131,12 @@ class PostgresBackend implements KrakenBackend {
   private readonly now: () => number;
 
   constructor(options?: PostgresBackendOptions) {
-    this.schemaName = normalizeSchemaName(options?.schemaName);
-    this.sql = createPostgresClient(options ?? {});
-    this.now = options?.now ?? Date.now;
+    const resolvedOptions = options ?? {};
+
+    this.connectionOptions = { ...resolvedOptions };
+    this.schemaName = normalizeSchemaName(resolvedOptions.schemaName);
+    this.sql = createPostgresClient(resolvedOptions);
+    this.now = resolvedOptions.now ?? Date.now;
   }
 
   async health(): Promise<{ ok: true } | { ok: false; reason: string }> {
@@ -146,6 +152,27 @@ class PostgresBackend implements KrakenBackend {
         ok: false,
         reason: readErrorMessage(error),
       };
+    }
+  }
+
+  async close(): Promise<void> {
+    if (this.destroyed) {
+      return;
+    }
+
+    try {
+      await this.sql.end({ timeout: 0 });
+    } finally {
+      this.destroyed = true;
+      this.initializationPromise = undefined;
+    }
+  }
+
+  async destroy(options?: PostgresBackendDestroyOptions): Promise<void> {
+    await this.close();
+
+    if (options?.dropSchema === true) {
+      await this.dropSchema();
     }
   }
 
@@ -173,7 +200,10 @@ class PostgresBackend implements KrakenBackend {
       let result: T | undefined;
 
       await this.sql.begin(async (tx): Promise<void> => {
-        const baseState = await loadPersistedStateForUpdate(tx, this.schemaName);
+        const baseState = await loadPersistedStateForUpdate(
+          tx,
+          this.schemaName
+        );
         const draftState = cloneState(baseState);
         let active = true;
         const repositories = createRepositories(
@@ -196,7 +226,9 @@ class PostgresBackend implements KrakenBackend {
       });
 
       if (!hasResult) {
-        throw new Error("postgres backend transaction completed without a result");
+        throw new Error(
+          "postgres backend transaction completed without a result"
+        );
       }
 
       return result as T;
@@ -206,13 +238,36 @@ class PostgresBackend implements KrakenBackend {
   }
 
   private async ensureInitialized(): Promise<void> {
-    this.initializationPromise ??= ensurePostgresSchemaInitialized(
-      this.sql,
-      this.schemaName,
-      this.now
-    );
+    if (this.initializationPromise === undefined) {
+      const initialization = ensurePostgresSchemaInitialized(
+        this.sql,
+        this.schemaName,
+        this.now
+      );
+      const retryableInitialization = initialization.catch((error: unknown) => {
+        if (this.initializationPromise === retryableInitialization) {
+          this.initializationPromise = undefined;
+        }
+
+        throw error;
+      });
+
+      this.initializationPromise = retryableInitialization;
+    }
 
     await this.initializationPromise;
+  }
+
+  private async dropSchema(): Promise<void> {
+    const cleanupClient = createPostgresClient(this.connectionOptions);
+
+    try {
+      await cleanupClient.unsafe(
+        `DROP SCHEMA IF EXISTS ${quoteIdentifier(this.schemaName)} CASCADE`
+      );
+    } finally {
+      await cleanupClient.end({ timeout: 0 });
+    }
   }
 }
 
@@ -920,4 +975,8 @@ function readErrorMessage(error: unknown): string {
   }
 
   return String(error);
+}
+
+function quoteIdentifier(value: string): string {
+  return `"${value.replaceAll('"', '""')}"`;
 }

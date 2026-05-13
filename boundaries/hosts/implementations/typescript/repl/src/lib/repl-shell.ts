@@ -278,6 +278,7 @@ function selectBackend(
     nextConfig = {
       ...shell.config,
       backend,
+      postgresDatabase: undefined,
       postgresSchemaName: undefined,
       sqlitePath: undefined,
     };
@@ -306,6 +307,7 @@ function selectBackend(
     nextConfig = {
       ...shell.config,
       backend,
+      postgresDatabase: undefined,
       postgresSchemaName: undefined,
       sqlitePath:
         readShellTextArgument(args.slice(1)) === "auto"

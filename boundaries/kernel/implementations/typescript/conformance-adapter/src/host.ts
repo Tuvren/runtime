@@ -56,6 +56,12 @@ interface KernelAdapterConfig {
   capabilities: string[];
 }
 
+interface DisposablePostgresBackend {
+  close(): Promise<void>;
+  destroy(options?: { dropSchema?: boolean }): Promise<void>;
+  dropSchema(): Promise<void>;
+}
+
 const ADAPTER_CONFIG = readAdapterConfig(process.argv.slice(2));
 
 class TypeScriptKernelAdapter {
@@ -953,139 +959,7 @@ async function runRestartRecovery(): Promise<Record<string, unknown>> {
 
   try {
     if (ADAPTER_CONFIG.backend === "postgres") {
-      const { createPostgresBackend } = await import(
-        new URL("../../backend-postgres/dist/index.js", import.meta.url).href
-      );
-      const restartSchema: TurnTreeSchema = {
-        incorporationRules: [{ objectType: "message", targetPath: "messages" }],
-        paths: [
-          { collection: "ordered", path: "messages" },
-          { collection: "single", path: "context.manifest" },
-        ],
-        schemaId: "schema_restart_recovery",
-      };
-      const schemaName = `restart_${randomUUID().replaceAll("-", "_")}`;
-      const backend = createPostgresBackend({
-        database: process.env.PGDATABASE ?? "tuvren_runtime",
-        schemaName,
-      });
-      const firstKernel = createRuntimeKernel({ backend });
-      const schemaId = await firstKernel.schema.register(restartSchema);
-      const thread = await firstKernel.thread.create(
-        "thread_restart",
-        schemaId,
-        "branch_restart"
-      );
-      const turn = await firstKernel.turn.create(
-        "turn_restart",
-        thread.threadId,
-        thread.branchId,
-        null,
-        thread.rootTurnNodeHash
-      );
-      await firstKernel.run.create(
-        "run_restart",
-        turn.turnId,
-        thread.branchId,
-        schemaId,
-        thread.rootTurnNodeHash,
-        [
-          { deterministic: false, id: "model_call", sideEffects: false },
-          { deterministic: false, id: "tool_execution", sideEffects: true },
-        ]
-      );
-      await firstKernel.run.beginStep("run_restart", "model_call");
-      const committed = await firstKernel.staging.stage(
-        "run_restart",
-        new TextEncoder().encode("committed assistant output"),
-        "message_committed",
-        "message",
-        "completed"
-      );
-      const checkpoint = await firstKernel.run.completeStep(
-        "run_restart",
-        "model_call"
-      );
-
-      if (checkpoint.turnNodeHash === undefined) {
-        throw new Error(
-          "expected checkpoint hash for postgres restart recovery"
-        );
-      }
-
-      await firstKernel.run.beginStep("run_restart", "tool_execution");
-      const uncommitted = await firstKernel.staging.stage(
-        "run_restart",
-        new TextEncoder().encode("uncommitted tool output"),
-        "message_uncommitted",
-        "message",
-        "completed"
-      );
-
-      const reopenedKernel = createRuntimeKernel({
-        backend: createPostgresBackend({
-          database: process.env.PGDATABASE ?? "tuvren_runtime",
-          schemaName,
-        }),
-      });
-      const branch = await reopenedKernel.branch.get(thread.branchId);
-
-      if (branch === null) {
-        throw new Error(`expected branch "${thread.branchId}" after reopen`);
-      }
-
-      const committedNode = await reopenedKernel.node.get(
-        checkpoint.turnNodeHash
-      );
-
-      if (committedNode === null) {
-        throw new Error(
-          `expected committed turn node "${checkpoint.turnNodeHash}" after reopen`
-        );
-      }
-
-      const manifest = await reopenedKernel.tree.manifest(
-        committedNode.turnTreeHash
-      );
-      const committedMessages = Array.isArray(manifest.messages)
-        ? manifest.messages
-        : [];
-      const recovery = await reopenedKernel.run.recover("run_restart");
-      const walkBackHashes: string[] = [];
-
-      for await (const turnNode of reopenedKernel.node.walkBack(
-        branch.headTurnNodeHash
-      )) {
-        walkBackHashes.push(turnNode.hash);
-
-        if (walkBackHashes.length === 2) {
-          break;
-        }
-      }
-
-      return createProjection({
-        restartRecovery: {
-          checkpointLineageSurvivesRestart:
-            committedNode.previousTurnNodeHash === thread.rootTurnNodeHash &&
-            walkBackHashes[0] === checkpoint.turnNodeHash &&
-            walkBackHashes[1] === thread.rootTurnNodeHash,
-          committedMessageCount: committedMessages.length,
-          committedStateVisible:
-            branch.headTurnNodeHash === checkpoint.turnNodeHash &&
-            committedMessages.length === 1 &&
-            committedMessages[0] === committed.objectHash,
-          recoveredLastCompletedStepId: recovery.lastCompletedStepId,
-          recoveredUncommittedCount: recovery.uncommittedStagedResults.length,
-          recoveryHeadMatchesCommittedCheckpoint:
-            recovery.lastTurnNodeHash === checkpoint.turnNodeHash,
-          uncommittedNotPromoted:
-            !committedMessages.includes(uncommitted.objectHash) &&
-            recovery.uncommittedStagedResults.some(
-              (stagedResult) =>
-                stagedResult.objectHash === uncommitted.objectHash
-            ),
-        },
-      });
+      return await runPostgresRestartRecovery();
     }
 
     await runRestartRecoveryPhase("write", databasePath, metadataPath);
@@ -1100,6 +974,157 @@ async function runRestartRecovery(): Promise<Record<string, unknown>> {
     });
   } finally {
     await rm(tempDirectory, { force: true, recursive: true });
+  }
+}
+
+async function runPostgresRestartRecovery(): Promise<Record<string, unknown>> {
+  const { createPostgresBackend } = await import(
+    new URL("../../backend-postgres/dist/index.js", import.meta.url).href
+  );
+  const restartSchema: TurnTreeSchema = {
+    incorporationRules: [{ objectType: "message", targetPath: "messages" }],
+    paths: [
+      { collection: "ordered", path: "messages" },
+      { collection: "single", path: "context.manifest" },
+    ],
+    schemaId: "schema_restart_recovery",
+  };
+  const schemaName = `restart_${randomUUID().replaceAll("-", "_")}`;
+  const firstBackend = createPostgresBackend({
+    database: process.env.PGDATABASE ?? "tuvren_runtime",
+    schemaName,
+  }) as ReturnType<typeof createPostgresBackend> & DisposablePostgresBackend;
+  let reopenedBackend:
+    | (ReturnType<typeof createPostgresBackend> & DisposablePostgresBackend)
+    | undefined;
+
+  try {
+    const firstKernel = createRuntimeKernel({ backend: firstBackend });
+    const schemaId = await firstKernel.schema.register(restartSchema);
+    const thread = await firstKernel.thread.create(
+      "thread_restart",
+      schemaId,
+      "branch_restart"
+    );
+    const turn = await firstKernel.turn.create(
+      "turn_restart",
+      thread.threadId,
+      thread.branchId,
+      null,
+      thread.rootTurnNodeHash
+    );
+    await firstKernel.run.create(
+      "run_restart",
+      turn.turnId,
+      thread.branchId,
+      schemaId,
+      thread.rootTurnNodeHash,
+      [
+        { deterministic: false, id: "model_call", sideEffects: false },
+        { deterministic: false, id: "tool_execution", sideEffects: true },
+      ]
+    );
+    await firstKernel.run.beginStep("run_restart", "model_call");
+    const committed = await firstKernel.staging.stage(
+      "run_restart",
+      new TextEncoder().encode("committed assistant output"),
+      "message_committed",
+      "message",
+      "completed"
+    );
+    const checkpoint = await firstKernel.run.completeStep(
+      "run_restart",
+      "model_call"
+    );
+
+    if (checkpoint.turnNodeHash === undefined) {
+      throw new Error("expected checkpoint hash for postgres restart recovery");
+    }
+
+    await firstKernel.run.beginStep("run_restart", "tool_execution");
+    const uncommitted = await firstKernel.staging.stage(
+      "run_restart",
+      new TextEncoder().encode("uncommitted tool output"),
+      "message_uncommitted",
+      "message",
+      "completed"
+    );
+
+    // Close the first backend client before reopening the same disposable
+    // schema so repeated conformance runs do not accumulate idle pools.
+    await firstBackend.close();
+    reopenedBackend = createPostgresBackend({
+      database: process.env.PGDATABASE ?? "tuvren_runtime",
+      schemaName,
+    }) as ReturnType<typeof createPostgresBackend> & DisposablePostgresBackend;
+    const reopenedKernel = createRuntimeKernel({
+      backend: reopenedBackend,
+    });
+    const branch = await reopenedKernel.branch.get(thread.branchId);
+
+    if (branch === null) {
+      throw new Error(`expected branch "${thread.branchId}" after reopen`);
+    }
+
+    const committedNode = await reopenedKernel.node.get(
+      checkpoint.turnNodeHash
+    );
+
+    if (committedNode === null) {
+      throw new Error(
+        `expected committed turn node "${checkpoint.turnNodeHash}" after reopen`
+      );
+    }
+
+    const manifest = await reopenedKernel.tree.manifest(
+      committedNode.turnTreeHash
+    );
+    const committedMessages = Array.isArray(manifest.messages)
+      ? manifest.messages
+      : [];
+    const recovery = await reopenedKernel.run.recover("run_restart");
+    const walkBackHashes: string[] = [];
+
+    for await (const turnNode of reopenedKernel.node.walkBack(
+      branch.headTurnNodeHash
+    )) {
+      walkBackHashes.push(turnNode.hash);
+
+      if (walkBackHashes.length === 2) {
+        break;
+      }
+    }
+
+    return createProjection({
+      restartRecovery: {
+        checkpointLineageSurvivesRestart:
+          committedNode.previousTurnNodeHash === thread.rootTurnNodeHash &&
+          walkBackHashes[0] === checkpoint.turnNodeHash &&
+          walkBackHashes[1] === thread.rootTurnNodeHash,
+        committedMessageCount: committedMessages.length,
+        committedStateVisible:
+          branch.headTurnNodeHash === checkpoint.turnNodeHash &&
+          committedMessages.length === 1 &&
+          committedMessages[0] === committed.objectHash,
+        recoveredLastCompletedStepId: recovery.lastCompletedStepId,
+        recoveredUncommittedCount: recovery.uncommittedStagedResults.length,
+        recoveryHeadMatchesCommittedCheckpoint:
+          recovery.lastTurnNodeHash === checkpoint.turnNodeHash,
+        uncommittedNotPromoted:
+          !committedMessages.includes(uncommitted.objectHash) &&
+          recovery.uncommittedStagedResults.some(
+            (stagedResult) => stagedResult.objectHash === uncommitted.objectHash
+          ),
+      },
+    });
+  } finally {
+    await firstBackend.close();
+
+    if (reopenedBackend === undefined) {
+      await firstBackend.dropSchema();
+    } else {
+      await reopenedBackend.destroy({ dropSchema: true });
+    }
   }
 }
 
