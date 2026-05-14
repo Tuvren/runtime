@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tuvren.dev/schemas/framework/event-stream-sse/DecodedSseStream.json",
+  "type": "object",
+  "properties": {
+    "events": {
+      "type": "array",
+      "items": {
+        "$ref": "https://tuvren.dev/schemas/framework/event-stream-sse/DecodedSseEvent.json"
+      }
+    },
+    "lastEventId": {
+      "type": "string",
+      "description": "Last event identifier observed across the full stream. Equal to the most\nrecent decoded `id:` value (or absent when no valid `id:` field was seen).\nDecoders MUST send this value back via the `Last-Event-ID` HTTP header on\nautomatic reconnection."
+    },
+    "reconnectDelayMs": {
+      "$ref": "https://tuvren.dev/schemas/framework/event-stream-sse/NonNegativeSafeInt.json",
+      "description": "Most recent reconnect delay set by a valid `retry:` field. Absent when no\nvalid `retry:` field was seen."
+    }
+  },
+  "required": ["events"],
+  "unevaluatedProperties": {
+    "not": {}
+  },
+  "description": "Sequence of zero or more decoded SSE frames produced by a conformant decoder\nover an entire byte trace. Implementations MUST emit frames in the order\nthey appear in the byte trace."
+}

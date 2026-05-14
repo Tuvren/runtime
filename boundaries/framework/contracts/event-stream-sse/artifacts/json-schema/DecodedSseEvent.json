@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tuvren.dev/schemas/framework/event-stream-sse/DecodedSseEvent.json",
+  "type": "object",
+  "properties": {
+    "type": {
+      "$ref": "https://tuvren.dev/schemas/framework/event-stream-sse/NonEmptyString.json",
+      "description": "Event type set by the most recent `event:` field. Decoders MUST default to\n`message` when no `event:` field is present, matching the WHATWG default\ndispatch type."
+    },
+    "data": {
+      "type": "string",
+      "description": "Concatenated value of every `data:` field in the frame, joined by\nU+000A LINE FEED characters per WHATWG. A trailing LF appended by the\nalgorithm MUST be removed before dispatch."
+    },
+    "id": {
+      "type": "string",
+      "description": "Last `id:` value the decoder saw before dispatch. Implementations MUST\nignore an `id:` field whose value contains U+0000 NULL per WHATWG."
+    },
+    "retryMs": {
+      "$ref": "https://tuvren.dev/schemas/framework/event-stream-sse/NonNegativeSafeInt.json",
+      "description": "Reconnect delay in milliseconds set by the most recent `retry:` field\nwhose value is a sequence of ASCII digits. Non-digit `retry:` values are\nignored."
+    }
+  },
+  "required": ["type", "data"],
+  "unevaluatedProperties": {
+    "not": {}
+  },
+  "description": "Decoded representation of a single Server-Sent Events frame as produced by a\nconformant decoder against a `text/event-stream` byte trace per the WHATWG\nHTML server-sent events normative section.\n\nThe decoded shape is intentionally minimal and provider-neutral: every field\nthat an SSE encoder may control on the wire appears here, every field that\nan SSE encoder may not control is omitted, and the decoder discards\ncomment-only lines per WHATWG so they never reach this shape."
+}
