@@ -1,0 +1,42 @@
+{
+  "packetId": "tuvren.framework.interop-rust-kernel",
+  "version": "0.1.0",
+  "boundary": "framework",
+  "surface": "interop-rust-kernel",
+  "humanAuthorityRefs": [
+    "docs/KrakenFrameworkSpecification.md",
+    "constitution/TechSpec.md#2.1-compatibility-record"
+  ],
+  "authoritativeSources": [
+    {
+      "path": "boundaries/framework/interop/rust-kernel/schemas/suite-manifest.schema.json",
+      "format": "json-schema"
+    },
+    {
+      "path": "boundaries/framework/interop/rust-kernel/scenarios/suite-manifest.json",
+      "format": "fixture-set"
+    }
+  ],
+  "bindingProjections": {
+    "typescript-host": "boundaries/hosts/implementations/typescript/repl",
+    "typescript-runtime-core": "boundaries/framework/implementations/typescript/runtime-core"
+  },
+  "forbiddenAuthoritySources": [
+    "boundaries/hosts/implementations/typescript/repl",
+    "boundaries/framework/implementations/typescript/runtime-core",
+    "boundaries/kernel/implementations/rust/grpc-service",
+    "boundaries/kernel/implementations/rust/kernel",
+    "docs",
+    "constitution"
+  ],
+  "verificationPaths": [
+    {
+      "kind": "interop-smoke",
+      "target": "boundaries/framework/interop/rust-kernel/scenarios/suite-manifest.json"
+    },
+    {
+      "kind": "schema-validation",
+      "target": "boundaries/framework/interop/rust-kernel/scenarios/suite-manifest.json"
+    }
+  ]
+}

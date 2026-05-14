@@ -1,10 +1,14 @@
 {
   "packetId": "tuvren.kernel.protocol",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "boundary": "kernel",
   "surface": "protocol",
   "humanAuthorityRefs": ["docs/KrakenKernelSpecification.md"],
   "authoritativeSources": [
+    {
+      "path": "boundaries/kernel/contracts/protocol/spec/cddl/kernel-records.cddl",
+      "format": "cddl"
+    },
     {
       "path": "boundaries/kernel/conformance/plans/kernel-protocol-core.json",
       "format": "conformance-plan"

@@ -1796,6 +1796,7 @@ The manifest lives at `boundaries/<area>/contracts/<surface>/spec/authority-pack
             "type": "string",
             "enum": [
               "schema-validation",
+              "openapi-validation",
               "conformance-plan",
               "interop-smoke",
               "freshness-check",
@@ -1826,7 +1827,7 @@ The manifest lives at `boundaries/<area>/contracts/<surface>/spec/authority-pack
 - `humanAuthorityRefs` lists rationale documents (such as `docs/KrakenKernelSpecification.md` sections) that the packet projects but does not depend on for executable verification.
 - `forbiddenAuthoritySources` always includes at minimum every implementation-language root that contributes binding projections for the surface, plus `README.md`, `docs`, and `constitution` paths that historically described it. Per ADR-023 and ADR-024, those are explicit forbidden authority sources for cross-language semantics carried by this packet, not forbidden source files.
 - Every binding-language projection root listed under `bindingProjections` must also appear in `forbiddenAuthoritySources` (the projection is a downstream of the packet, not authority for it).
-- `verificationPaths` must include at least one `schema-validation` or `conformance-plan` kind. A packet with only `freshness-check` entries is not yet executable authority and must be marked with `version` `0.0.x` until at least one verification path lands.
+- `verificationPaths` must include at least one `schema-validation`, `openapi-validation`, `conformance-plan`, or `interop-smoke` kind. A packet with only `freshness-check` or `vocabulary-check` entries is not yet executable authority and must be marked with `version` `0.0.x` until at least one executable verification path lands. `openapi-validation` validates an emitted OpenAPI artifact against the OpenAPI specification; `interop-smoke` exercises a cross-implementation transport path through an interop-smoke target named by the surface's Nx project. Both kinds count as executable verification for packets that own an emitted OpenAPI artifact or an interop seam, respectively.
 
 ### 4.12 Conformance Plan Contract
 
