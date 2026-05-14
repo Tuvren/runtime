@@ -1,0 +1,87 @@
+{
+  "packetId": "tuvren.framework.tool-contracts",
+  "version": "0.1.0",
+  "boundary": "framework",
+  "surface": "tool-contracts",
+  "humanAuthorityRefs": [
+    "docs/KrakenFrameworkSpecification.md",
+    "constitution/TechSpec.md#4.4-provider-bridge-contract",
+    "constitution/TechSpec.md#4.6-runtime-driver-contract"
+  ],
+  "authoritativeSources": [
+    {
+      "path": "boundaries/framework/contracts/tool-contracts/spec/typespec/main.tsp",
+      "format": "typespec"
+    },
+    {
+      "path": "boundaries/framework/conformance/plans/tool-contracts-extended.json",
+      "format": "conformance-plan"
+    }
+  ],
+  "generatedArtifacts": [
+    {
+      "path": "boundaries/framework/contracts/tool-contracts/artifacts/json-schema",
+      "generatedFrom": "boundaries/framework/contracts/tool-contracts/spec/typespec",
+      "generator": "@typespec/json-schema"
+    },
+    {
+      "path": "boundaries/framework/contracts/tool-contracts/artifacts/openapi/tool-contracts.openapi.json",
+      "generatedFrom": "boundaries/framework/contracts/tool-contracts/spec/typespec",
+      "generator": "@typespec/openapi3"
+    }
+  ],
+  "conformancePlans": [
+    {
+      "planId": "tuvren.framework.tool-contracts.extended",
+      "planVersion": "0.1.0",
+      "path": "boundaries/framework/conformance/plans/tool-contracts-extended.json"
+    }
+  ],
+  "bindingProjections": {
+    "typescript": "boundaries/framework/contracts/tool-contracts/implementations/typescript"
+  },
+  "forbiddenAuthoritySources": [
+    "boundaries/framework/contracts/tool-contracts/implementations/typescript",
+    "boundaries/framework/implementations/typescript/conformance-runner",
+    "boundaries/framework/implementations/typescript/conformance-adapter",
+    "boundaries/framework/implementations/rust/conformance-runner",
+    "boundaries/framework/implementations/rust/conformance-adapter",
+    "boundaries/framework/contracts/tool-contracts/README.md",
+    "boundaries/framework/contracts/tool-contracts/spec/README.md",
+    "boundaries/framework/contracts/tool-contracts/artifacts/README.md",
+    "docs",
+    "constitution"
+  ],
+  "verificationPaths": [
+    {
+      "kind": "schema-validation",
+      "target": "boundaries/framework/contracts/tool-contracts/artifacts/json-schema"
+    },
+    {
+      "kind": "openapi-validation",
+      "target": "boundaries/framework/contracts/tool-contracts/artifacts/openapi/tool-contracts.openapi.json"
+    },
+    {
+      "kind": "conformance-plan",
+      "target": "boundaries/framework/conformance/plans/tool-contracts-extended.json"
+    },
+    {
+      "kind": "freshness-check",
+      "target": "boundaries/framework/contracts/tool-contracts/artifacts/json-schema"
+    },
+    {
+      "kind": "freshness-check",
+      "target": "boundaries/framework/contracts/tool-contracts/artifacts/openapi/tool-contracts.openapi.json"
+    }
+  ],
+  "freshnessChecks": [
+    {
+      "artifact": "boundaries/framework/contracts/tool-contracts/artifacts/json-schema",
+      "regenerateCommand": "bun run nx run framework-tool-contracts:codegen"
+    },
+    {
+      "artifact": "boundaries/framework/contracts/tool-contracts/artifacts/openapi/tool-contracts.openapi.json",
+      "regenerateCommand": "bun run nx run framework-tool-contracts:codegen"
+    }
+  ]
+}

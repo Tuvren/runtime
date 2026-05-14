@@ -366,13 +366,17 @@ const SURFACE_PLANS: Readonly<Record<string, SurfacePlan>> = {
   },
   "tool and approval contracts": {
     adapterOperation: "runtime.tool-execute; runtime.approval-resolve",
+    authorityPacket:
+      "boundaries/framework/contracts/tool-contracts/spec/authority-packet.json",
     capabilityRequirement:
       "framework.runtime-api; providers.framework-owned-tool-execution",
     checkIds: [
-      "runtime-callable-af.tool-call-id-owned-by-framework",
-      "runtime-callable-af.tool-failure-produces-error-result-not-run-fail",
-      "runtime-callable-af.approval-message-attaches-to-tool-result",
+      "tool-contracts-af.tool-call-id-owned-by-framework",
+      "tool-contracts-af.tool-failure-produces-error-result-not-run-fail",
+      "tool-contracts-af.approval-message-attaches-to-tool-result",
     ],
+    conformancePlan:
+      "boundaries/framework/conformance/plans/tool-contracts-extended.json",
     deliveryTicket: "KRT-AF004",
     disposition: "promote",
     evidenceUpdate:
@@ -390,11 +394,15 @@ const SURFACE_PLANS: Readonly<Record<string, SurfacePlan>> = {
   },
   "tool parallelism and event ordering": {
     adapterOperation: "runtime.tool-execute",
+    authorityPacket:
+      "boundaries/framework/contracts/tool-contracts/spec/authority-packet.json",
     capabilityRequirement: "framework.runtime-api",
     checkIds: [
-      "runtime-callable-af.tool-parallel-wave-starts-before-results",
-      "runtime-callable-af.mixed-approval-gated-tool-start-after-resume",
+      "tool-contracts-af.tool-parallel-wave-starts-before-results",
+      "tool-contracts-af.mixed-approval-gated-tool-start-after-resume",
     ],
+    conformancePlan:
+      "boundaries/framework/conformance/plans/tool-contracts-extended.json",
     deliveryTicket: "KRT-AF004",
     disposition: "promote",
     evidenceUpdate:

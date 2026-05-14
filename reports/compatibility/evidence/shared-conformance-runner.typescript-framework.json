@@ -3153,28 +3153,6 @@
     {
       "assertionResults": [
         {
-          "assertionId": "runtime-callable-af.approval-message-attaches-to-tool-result.1.resultField",
-          "status": "pass"
-        },
-        {
-          "assertionId": "runtime-callable-af.approval-message-attaches-to-tool-result.requiredEvidence.approval.messageAttachment",
-          "status": "pass"
-        },
-        {
-          "assertionId": "runtime-callable-af.approval-message-attaches-to-tool-result.requiredEvidence.result.approval.messageAttachment",
-          "status": "pass"
-        }
-      ],
-      "checkId": "runtime-callable-af.approval-message-attaches-to-tool-result",
-      "details": {
-        "adapterId": "typescript-framework",
-        "planId": "tuvren.framework.runtime-api.callables-extended"
-      },
-      "status": "pass"
-    },
-    {
-      "assertionResults": [
-        {
           "assertionId": "runtime-callable-af.approval-reject-stages-tool-result.1.resultField",
           "status": "pass"
         },
@@ -3347,32 +3325,6 @@
     {
       "assertionResults": [
         {
-          "assertionId": "runtime-callable-af.mixed-approval-gated-tool-start-after-resume.1.resultField",
-          "status": "pass"
-        },
-        {
-          "assertionId": "runtime-callable-af.mixed-approval-gated-tool-start-after-resume.requiredEvidence.approval.gatedToolStartAfterResume",
-          "status": "pass"
-        },
-        {
-          "assertionId": "runtime-callable-af.mixed-approval-gated-tool-start-after-resume.requiredEvidence.approval.resumedEventTypes",
-          "status": "pass"
-        },
-        {
-          "assertionId": "runtime-callable-af.mixed-approval-gated-tool-start-after-resume.requiredEvidence.result.approval.gatedToolStartAfterResume",
-          "status": "pass"
-        }
-      ],
-      "checkId": "runtime-callable-af.mixed-approval-gated-tool-start-after-resume",
-      "details": {
-        "adapterId": "typescript-framework",
-        "planId": "tuvren.framework.runtime-api.callables-extended"
-      },
-      "status": "pass"
-    },
-    {
-      "assertionResults": [
-        {
           "assertionId": "runtime-callable-af.paused-cancel-rejection-and-stop.1.resultField",
           "status": "pass"
         },
@@ -3534,108 +3486,6 @@
         }
       ],
       "checkId": "runtime-callable-af.structured-validation-hard-fail-code",
-      "details": {
-        "adapterId": "typescript-framework",
-        "planId": "tuvren.framework.runtime-api.callables-extended"
-      },
-      "status": "pass"
-    },
-    {
-      "assertionResults": [
-        {
-          "assertionId": "runtime-callable-af.tool-call-id-owned-by-framework.1.resultField",
-          "status": "pass"
-        },
-        {
-          "assertionId": "runtime-callable-af.tool-call-id-owned-by-framework.2.resultField",
-          "status": "pass"
-        },
-        {
-          "assertionId": "runtime-callable-af.tool-call-id-owned-by-framework.requiredEvidence.provider.stream.response.parts.0.providerMetadata.providerCallId",
-          "status": "pass"
-        },
-        {
-          "assertionId": "runtime-callable-af.tool-call-id-owned-by-framework.requiredEvidence.provider.stream.toolCallIdOwnedByFramework",
-          "status": "pass"
-        },
-        {
-          "assertionId": "runtime-callable-af.tool-call-id-owned-by-framework.requiredEvidence.result.provider.stream.response.parts.0.providerMetadata.providerCallId",
-          "status": "pass"
-        },
-        {
-          "assertionId": "runtime-callable-af.tool-call-id-owned-by-framework.requiredEvidence.result.provider.stream.toolCallIdOwnedByFramework",
-          "status": "pass"
-        }
-      ],
-      "checkId": "runtime-callable-af.tool-call-id-owned-by-framework",
-      "details": {
-        "adapterId": "typescript-framework",
-        "planId": "tuvren.framework.runtime-api.callables-extended"
-      },
-      "status": "pass"
-    },
-    {
-      "assertionResults": [
-        {
-          "assertionId": "runtime-callable-af.tool-failure-produces-error-result-not-run-fail.1.resultField",
-          "status": "pass"
-        },
-        {
-          "assertionId": "runtime-callable-af.tool-failure-produces-error-result-not-run-fail.2.resultField",
-          "status": "pass"
-        },
-        {
-          "assertionId": "runtime-callable-af.tool-failure-produces-error-result-not-run-fail.3.stateField",
-          "status": "pass"
-        },
-        {
-          "assertionId": "runtime-callable-af.tool-failure-produces-error-result-not-run-fail.requiredEvidence.result.tool.execution.toolResults.0.isError",
-          "status": "pass"
-        },
-        {
-          "assertionId": "runtime-callable-af.tool-failure-produces-error-result-not-run-fail.requiredEvidence.result.tool.execution.toolResults.0.output.error",
-          "status": "pass"
-        },
-        {
-          "assertionId": "runtime-callable-af.tool-failure-produces-error-result-not-run-fail.requiredEvidence.tool.execution.toolResults.0.isError",
-          "status": "pass"
-        },
-        {
-          "assertionId": "runtime-callable-af.tool-failure-produces-error-result-not-run-fail.requiredEvidence.tool.execution.toolResults.0.output.error",
-          "status": "pass"
-        },
-        {
-          "assertionId": "runtime-callable-af.tool-failure-produces-error-result-not-run-fail.requiredEvidence.toolExecution.status.phase",
-          "status": "pass"
-        }
-      ],
-      "checkId": "runtime-callable-af.tool-failure-produces-error-result-not-run-fail",
-      "details": {
-        "adapterId": "typescript-framework",
-        "planId": "tuvren.framework.runtime-api.callables-extended"
-      },
-      "status": "pass"
-    },
-    {
-      "assertionResults": [
-        {
-          "assertionId": "runtime-callable-af.tool-parallel-wave-starts-before-results.1.resultField",
-          "status": "pass"
-        },
-        {
-          "assertionId": "runtime-callable-af.tool-parallel-wave-starts-before-results.requiredEvidence.result.tool.execution.parallelWaveStartedBeforeResults",
-          "status": "pass"
-        },
-        {
-          "assertionId": "runtime-callable-af.tool-parallel-wave-starts-before-results.requiredEvidence.tool.execution.eventTypes",
-          "status": "pass"
-        },
-        {
-          "assertionId": "runtime-callable-af.tool-parallel-wave-starts-before-results.requiredEvidence.tool.execution.parallelWaveStartedBeforeResults",
-          "status": "pass"
-        }
-      ],
-      "checkId": "runtime-callable-af.tool-parallel-wave-starts-before-results",
       "details": {
         "adapterId": "typescript-framework",
         "planId": "tuvren.framework.runtime-api.callables-extended"
@@ -5810,6 +5660,156 @@
       "details": {
         "adapterId": "typescript-framework",
         "planId": "tuvren.framework.runtime-api.orchestration"
+      },
+      "status": "pass"
+    },
+    {
+      "assertionResults": [
+        {
+          "assertionId": "tool-contracts-af.approval-message-attaches-to-tool-result.1.resultField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "tool-contracts-af.approval-message-attaches-to-tool-result.requiredEvidence.approval.messageAttachment",
+          "status": "pass"
+        },
+        {
+          "assertionId": "tool-contracts-af.approval-message-attaches-to-tool-result.requiredEvidence.result.approval.messageAttachment",
+          "status": "pass"
+        }
+      ],
+      "checkId": "tool-contracts-af.approval-message-attaches-to-tool-result",
+      "details": {
+        "adapterId": "typescript-framework",
+        "planId": "tuvren.framework.tool-contracts.extended"
+      },
+      "status": "pass"
+    },
+    {
+      "assertionResults": [
+        {
+          "assertionId": "tool-contracts-af.mixed-approval-gated-tool-start-after-resume.1.resultField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "tool-contracts-af.mixed-approval-gated-tool-start-after-resume.requiredEvidence.approval.gatedToolStartAfterResume",
+          "status": "pass"
+        },
+        {
+          "assertionId": "tool-contracts-af.mixed-approval-gated-tool-start-after-resume.requiredEvidence.approval.resumedEventTypes",
+          "status": "pass"
+        },
+        {
+          "assertionId": "tool-contracts-af.mixed-approval-gated-tool-start-after-resume.requiredEvidence.result.approval.gatedToolStartAfterResume",
+          "status": "pass"
+        }
+      ],
+      "checkId": "tool-contracts-af.mixed-approval-gated-tool-start-after-resume",
+      "details": {
+        "adapterId": "typescript-framework",
+        "planId": "tuvren.framework.tool-contracts.extended"
+      },
+      "status": "pass"
+    },
+    {
+      "assertionResults": [
+        {
+          "assertionId": "tool-contracts-af.tool-call-id-owned-by-framework.1.resultField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "tool-contracts-af.tool-call-id-owned-by-framework.2.resultField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "tool-contracts-af.tool-call-id-owned-by-framework.requiredEvidence.provider.stream.response.parts.0.providerMetadata.providerCallId",
+          "status": "pass"
+        },
+        {
+          "assertionId": "tool-contracts-af.tool-call-id-owned-by-framework.requiredEvidence.provider.stream.toolCallIdOwnedByFramework",
+          "status": "pass"
+        },
+        {
+          "assertionId": "tool-contracts-af.tool-call-id-owned-by-framework.requiredEvidence.result.provider.stream.response.parts.0.providerMetadata.providerCallId",
+          "status": "pass"
+        },
+        {
+          "assertionId": "tool-contracts-af.tool-call-id-owned-by-framework.requiredEvidence.result.provider.stream.toolCallIdOwnedByFramework",
+          "status": "pass"
+        }
+      ],
+      "checkId": "tool-contracts-af.tool-call-id-owned-by-framework",
+      "details": {
+        "adapterId": "typescript-framework",
+        "planId": "tuvren.framework.tool-contracts.extended"
+      },
+      "status": "pass"
+    },
+    {
+      "assertionResults": [
+        {
+          "assertionId": "tool-contracts-af.tool-failure-produces-error-result-not-run-fail.1.resultField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "tool-contracts-af.tool-failure-produces-error-result-not-run-fail.2.resultField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "tool-contracts-af.tool-failure-produces-error-result-not-run-fail.3.stateField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "tool-contracts-af.tool-failure-produces-error-result-not-run-fail.requiredEvidence.result.tool.execution.toolResults.0.isError",
+          "status": "pass"
+        },
+        {
+          "assertionId": "tool-contracts-af.tool-failure-produces-error-result-not-run-fail.requiredEvidence.result.tool.execution.toolResults.0.output.error",
+          "status": "pass"
+        },
+        {
+          "assertionId": "tool-contracts-af.tool-failure-produces-error-result-not-run-fail.requiredEvidence.tool.execution.toolResults.0.isError",
+          "status": "pass"
+        },
+        {
+          "assertionId": "tool-contracts-af.tool-failure-produces-error-result-not-run-fail.requiredEvidence.tool.execution.toolResults.0.output.error",
+          "status": "pass"
+        },
+        {
+          "assertionId": "tool-contracts-af.tool-failure-produces-error-result-not-run-fail.requiredEvidence.toolExecution.status.phase",
+          "status": "pass"
+        }
+      ],
+      "checkId": "tool-contracts-af.tool-failure-produces-error-result-not-run-fail",
+      "details": {
+        "adapterId": "typescript-framework",
+        "planId": "tuvren.framework.tool-contracts.extended"
+      },
+      "status": "pass"
+    },
+    {
+      "assertionResults": [
+        {
+          "assertionId": "tool-contracts-af.tool-parallel-wave-starts-before-results.1.resultField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "tool-contracts-af.tool-parallel-wave-starts-before-results.requiredEvidence.result.tool.execution.parallelWaveStartedBeforeResults",
+          "status": "pass"
+        },
+        {
+          "assertionId": "tool-contracts-af.tool-parallel-wave-starts-before-results.requiredEvidence.tool.execution.eventTypes",
+          "status": "pass"
+        },
+        {
+          "assertionId": "tool-contracts-af.tool-parallel-wave-starts-before-results.requiredEvidence.tool.execution.parallelWaveStartedBeforeResults",
+          "status": "pass"
+        }
+      ],
+      "checkId": "tool-contracts-af.tool-parallel-wave-starts-before-results",
+      "details": {
+        "adapterId": "typescript-framework",
+        "planId": "tuvren.framework.tool-contracts.extended"
       },
       "status": "pass"
     }

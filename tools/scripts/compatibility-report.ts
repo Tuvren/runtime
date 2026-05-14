@@ -945,6 +945,38 @@ function extractTrailingJsonObject(stdout: string): string {
     }
   }
 
+  // Locate the last top-level JSON object in the stdout by scanning lines for
+  // a column-zero `{` followed by a column-zero `}` after a balanced run of
+  // nested braces. This avoids treating an inner brace as the top-level start
+  // and avoids returning trailing Nx framing (e.g. " NX  Successfully ran...")
+  // that would otherwise break JSON.parse on otherwise-clean runner output.
+  const lines = stdout.split("\n");
+  let openIndex = -1;
+
+  for (let index = lines.length - 1; index >= 0; index -= 1) {
+    const line = lines[index];
+
+    if (line !== undefined && line.startsWith("}")) {
+      // Walk backward looking for the matching column-zero `{` that opened
+      // this trailing object. Use indentation as a proxy for nesting depth
+      // since the runners emit pretty-printed JSON.
+      for (let inner = index - 1; inner >= 0; inner -= 1) {
+        const innerLine = lines[inner];
+
+        if (innerLine?.startsWith("{")) {
+          openIndex = inner;
+          break;
+        }
+      }
+
+      if (openIndex !== -1) {
+        return lines.slice(openIndex, index + 1).join("\n").trim();
+      }
+
+      break;
+    }
+  }
+
   const trimmed = stdout.trim();
   const objectStart = trimmed.lastIndexOf("\n{");
 
@@ -1256,7 +1288,7 @@ function assertCompatibilityCheckSummary(
     applicableChecks + nonApplicableChecks !== value.totalChecks
   ) {
     throw new Error(
-      "compatibility matrix check summaries must be internally consistent"
+      `compatibility matrix check summaries must be internally consistent: ${JSON.stringify(value)}`
     );
   }
 }

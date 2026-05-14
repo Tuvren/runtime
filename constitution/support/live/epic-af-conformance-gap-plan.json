@@ -444,12 +444,14 @@
     },
     {
       "adapterOperation": "runtime.tool-execute; runtime.approval-resolve",
+      "authorityPacket": "boundaries/framework/contracts/tool-contracts/spec/authority-packet.json",
       "capabilityRequirement": "framework.runtime-api; providers.framework-owned-tool-execution",
       "checkIds": [
-        "runtime-callable-af.tool-call-id-owned-by-framework",
-        "runtime-callable-af.tool-failure-produces-error-result-not-run-fail",
-        "runtime-callable-af.approval-message-attaches-to-tool-result"
+        "tool-contracts-af.tool-call-id-owned-by-framework",
+        "tool-contracts-af.tool-failure-produces-error-result-not-run-fail",
+        "tool-contracts-af.approval-message-attaches-to-tool-result"
       ],
+      "conformancePlan": "boundaries/framework/conformance/plans/tool-contracts-extended.json",
       "deliveryTicket": "KRT-AF004",
       "disposition": "promote",
       "evidenceUpdate": "Refresh framework and provider compatibility evidence for tool execution and approval-boundary traces.",
@@ -463,7 +465,6 @@
         "approval.messageAttachment"
       ],
       "adapterCapability": "framework.runtime-api",
-      "authorityPacket": "boundaries/framework/contracts/runtime-api/spec/authority-packet.json",
       "claimIds": [
         "FWK-097D5A1C6AA2",
         "FWK-86DBC9E570C8",
@@ -475,7 +476,6 @@
       ],
       "classifications": ["authority-backed-conformance-covered"],
       "compatibilityEvidence": "reports/compatibility/evidence/shared-conformance-runner.typescript-framework.json",
-      "conformancePlan": "boundaries/framework/conformance/plans/runtime-api-lifecycle.json; boundaries/framework/conformance/plans/runtime-api-lifecycle-extended.json; boundaries/framework/conformance/plans/runtime-api-callables.json; boundaries/framework/conformance/plans/runtime-api-callables-extended.json",
       "fixture": "boundaries/framework/conformance/scenarios/runtime-api-scenarios.json",
       "generatedArtifact": "boundaries/framework/contracts/runtime-api/artifacts/json-schema",
       "matrixFollowUpTickets": ["KRT-AF004"],
@@ -483,11 +483,13 @@
     },
     {
       "adapterOperation": "runtime.tool-execute",
+      "authorityPacket": "boundaries/framework/contracts/tool-contracts/spec/authority-packet.json",
       "capabilityRequirement": "framework.runtime-api",
       "checkIds": [
-        "runtime-callable-af.tool-parallel-wave-starts-before-results",
-        "runtime-callable-af.mixed-approval-gated-tool-start-after-resume"
+        "tool-contracts-af.tool-parallel-wave-starts-before-results",
+        "tool-contracts-af.mixed-approval-gated-tool-start-after-resume"
       ],
+      "conformancePlan": "boundaries/framework/conformance/plans/tool-contracts-extended.json",
       "deliveryTicket": "KRT-AF004",
       "disposition": "promote",
       "evidenceUpdate": "Refresh framework compatibility evidence with event-order traces and durable result ordering.",
@@ -499,11 +501,9 @@
         "approval.gatedToolStartAfterResume"
       ],
       "adapterCapability": "framework.runtime-api",
-      "authorityPacket": "boundaries/framework/contracts/runtime-api/spec/authority-packet.json",
       "claimIds": ["FWK-4193D2A613E0", "FWK-BC7142393BAA"],
       "classifications": ["authority-backed-conformance-covered"],
       "compatibilityEvidence": "reports/compatibility/evidence/shared-conformance-runner.typescript-framework.json",
-      "conformancePlan": "boundaries/framework/conformance/plans/runtime-api-lifecycle.json; boundaries/framework/conformance/plans/runtime-api-lifecycle-extended.json; boundaries/framework/conformance/plans/runtime-api-callables.json; boundaries/framework/conformance/plans/runtime-api-callables-extended.json",
       "fixture": "boundaries/framework/conformance/scenarios/runtime-api-scenarios.json",
       "generatedArtifact": "boundaries/framework/contracts/runtime-api/artifacts/json-schema",
       "matrixFollowUpTickets": ["KRT-AF004"],

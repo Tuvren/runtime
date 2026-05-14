@@ -206,13 +206,13 @@ This plan is generated from the Epic AD docs-to-authority coverage matrix. It is
 - Delivery ticket: `KRT-AF004`
 - Matrix follow-up tickets: `KRT-AF004`
 - Claim IDs: `FWK-097D5A1C6AA2`, `FWK-86DBC9E570C8`, `FWK-8EB24EEFC45C`, `FWK-9F20F73A9745`, `FWK-AEFDB52BDBF9`, `FWK-B9434E23AB69`, `FWK-C9356EE09017`
-- Authority packet: `boundaries/framework/contracts/runtime-api/spec/authority-packet.json`
-- Conformance plan: `boundaries/framework/conformance/plans/runtime-api-lifecycle.json; boundaries/framework/conformance/plans/runtime-api-lifecycle-extended.json; boundaries/framework/conformance/plans/runtime-api-callables.json; boundaries/framework/conformance/plans/runtime-api-callables-extended.json`
+- Authority packet: `boundaries/framework/contracts/tool-contracts/spec/authority-packet.json`
+- Conformance plan: `boundaries/framework/conformance/plans/tool-contracts-extended.json`
 - Fixture or scenario: `boundaries/framework/conformance/scenarios/runtime-api-scenarios.json`
 - Adapter operation: `runtime.tool-execute; runtime.approval-resolve`
 - Capability requirement: `framework.runtime-api; providers.framework-owned-tool-execution`
 - Required evidence: `provider.stream.response.parts.0.providerMetadata.providerCallId`, `provider.stream.toolCallIdOwnedByFramework`, `tool.execution.toolResults.0.isError`, `tool.execution.toolResults.0.output.error`, `toolExecution.status.phase`, `approval.messageAttachment`
-- Planned check IDs: `runtime-callable-af.tool-call-id-owned-by-framework`, `runtime-callable-af.tool-failure-produces-error-result-not-run-fail`, `runtime-callable-af.approval-message-attaches-to-tool-result`
+- Planned check IDs: `tool-contracts-af.tool-call-id-owned-by-framework`, `tool-contracts-af.tool-failure-produces-error-result-not-run-fail`, `tool-contracts-af.approval-message-attaches-to-tool-result`
 - Evidence update: Refresh framework and provider compatibility evidence for tool execution and approval-boundary traces.
 - Rationale: The portable surface is framework-owned call/result/error shape, not provider-family-specific metadata.
 
@@ -222,13 +222,13 @@ This plan is generated from the Epic AD docs-to-authority coverage matrix. It is
 - Delivery ticket: `KRT-AF004`
 - Matrix follow-up tickets: `KRT-AF004`
 - Claim IDs: `FWK-4193D2A613E0`, `FWK-BC7142393BAA`
-- Authority packet: `boundaries/framework/contracts/runtime-api/spec/authority-packet.json`
-- Conformance plan: `boundaries/framework/conformance/plans/runtime-api-lifecycle.json; boundaries/framework/conformance/plans/runtime-api-lifecycle-extended.json; boundaries/framework/conformance/plans/runtime-api-callables.json; boundaries/framework/conformance/plans/runtime-api-callables-extended.json`
+- Authority packet: `boundaries/framework/contracts/tool-contracts/spec/authority-packet.json`
+- Conformance plan: `boundaries/framework/conformance/plans/tool-contracts-extended.json`
 - Fixture or scenario: `boundaries/framework/conformance/scenarios/runtime-api-scenarios.json`
 - Adapter operation: `runtime.tool-execute`
 - Capability requirement: `framework.runtime-api`
 - Required evidence: `tool.execution.eventTypes`, `tool.execution.parallelWaveStartedBeforeResults`, `approval.resumedEventTypes`, `approval.gatedToolStartAfterResume`
-- Planned check IDs: `runtime-callable-af.tool-parallel-wave-starts-before-results`, `runtime-callable-af.mixed-approval-gated-tool-start-after-resume`
+- Planned check IDs: `tool-contracts-af.tool-parallel-wave-starts-before-results`, `tool-contracts-af.mixed-approval-gated-tool-start-after-resume`
 - Evidence update: Refresh framework compatibility evidence with event-order traces and durable result ordering.
 - Rationale: Parallel wave and mixed approval ordering are high-risk interleavings selected for portable conformance.
 
