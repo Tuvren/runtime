@@ -331,14 +331,15 @@ function validateVerificationPaths(
       verificationPath.kind === "schema-validation" ||
       verificationPath.kind === "openapi-validation" ||
       verificationPath.kind === "conformance-plan" ||
-      verificationPath.kind === "interop-smoke"
+      verificationPath.kind === "interop-smoke" ||
+      verificationPath.kind === "vocabulary-check"
   );
 
   if (!(hasExecutableVerification || manifest.version.startsWith("0.0."))) {
     failures.push({
       manifestPath,
       message:
-        "packets without schema-validation, openapi-validation, conformance-plan, or interop-smoke verification must use a 0.0.x version",
+        "packets without schema-validation, openapi-validation, conformance-plan, interop-smoke, or vocabulary-check verification must use a 0.0.x version",
     });
   }
 

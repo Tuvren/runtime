@@ -16,7 +16,7 @@
 
 import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
-import { readdir, readFile } from "node:fs/promises";
+import { readdir, readFile, stat } from "node:fs/promises";
 import { dirname, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -193,6 +193,16 @@ async function checkFreshnessDrift(
   const failures: GuardrailFailure[] = [];
 
   for (const manifest of manifests) {
+    // One regenerate command may produce multiple artifacts. Group freshness
+    // checks by command so we snapshot every relevant artifact before running
+    // the command once, then compare each artifact's after-state. Running the
+    // command separately per artifact would mask drift on every artifact past
+    // the first because the command itself updates them all in lockstep.
+    const checksByCommand = new Map<
+      string,
+      Array<{ artifact: string; artifactPath: string }>
+    >();
+
     for (const check of manifest.freshnessChecks ?? []) {
       const artifactPath = resolve(REPO_ROOT, check.artifact);
 
@@ -200,23 +210,48 @@ async function checkFreshnessDrift(
         continue;
       }
 
-      const before = await snapshotPath(artifactPath);
-      const result = await runRegenerateCommand(check.regenerateCommand);
-      const after = await snapshotPath(artifactPath);
+      const existing = checksByCommand.get(check.regenerateCommand);
+      const entry = { artifact: check.artifact, artifactPath };
+
+      if (existing === undefined) {
+        checksByCommand.set(check.regenerateCommand, [entry]);
+      } else {
+        existing.push(entry);
+      }
+    }
+
+    for (const [command, checks] of checksByCommand.entries()) {
+      const beforeSnapshots = new Map<string, FileSnapshot[]>();
+
+      for (const check of checks) {
+        beforeSnapshots.set(
+          check.artifact,
+          await snapshotPath(check.artifactPath)
+        );
+      }
+
+      const result = await runRegenerateCommand(command);
 
       if (!result.ok) {
-        failures.push({
-          check: "freshness-check",
-          message: `${manifest.packetId} regenerate command failed for ${check.artifact}: ${result.message}`,
-        });
+        for (const check of checks) {
+          failures.push({
+            check: "freshness-check",
+            message: `${manifest.packetId} regenerate command failed for ${check.artifact}: ${result.message}`,
+          });
+        }
         continue;
       }
 
-      if (!snapshotsAreEqual(before, after)) {
-        failures.push({
-          check: "freshness-check",
-          message: `${manifest.packetId} generated artifact drifted after ${check.regenerateCommand}: ${check.artifact}`,
-        });
+      for (const check of checks) {
+        const after = await snapshotPath(check.artifactPath);
+        const before = beforeSnapshots.get(check.artifact) ?? [];
+
+        if (!snapshotsAreEqual(before, after)) {
+          failures.push({
+            check: "freshness-check",
+            message: `${manifest.packetId} generated artifact drifted after ${command}: ${check.artifact}`,
+          });
+        }
       }
     }
   }
@@ -1489,6 +1524,17 @@ async function collectConformanceSourceRoots(
 }
 
 async function snapshotPath(path: string): Promise<FileSnapshot[]> {
+  const stats = await stat(path);
+
+  if (stats.isFile()) {
+    return [
+      {
+        content: await readFile(path, "utf8"),
+        relativePath: relative(path, path),
+      },
+    ];
+  }
+
   const entries = await collectSnapshotEntries(path, path);
   return entries.sort((left, right) =>
     left.relativePath.localeCompare(right.relativePath)
