@@ -18,6 +18,7 @@ import { existsSync } from "node:fs";
 import { readdir, readFile } from "node:fs/promises";
 import { dirname, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import yaml from "yaml";
 
 interface AuthorityPacketManifest {
   authoritativeSources: Array<{
@@ -46,10 +47,14 @@ interface ValidationFailure {
   message: string;
 }
 
+interface ExtractedSemconvVocabulary {
+  attributeIds: Set<string>;
+  groupIds: Set<string>;
+}
+
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
 const BOUNDARIES_ROOT = resolve(REPO_ROOT, "boundaries");
 const MANIFEST_FILE_NAME = "authority-packet.json";
-const ATTRIBUTE_ID_PATTERN = /^\s*-\s*id:\s*([A-Za-z][A-Za-z0-9._-]*)\s*$/gmu;
 const SEMCONV_YAML_FORMAT = "semconv-yaml";
 
 await main();
@@ -144,12 +149,20 @@ async function validateVocabularyTarget(
   }
 
   const vocabularyContent = await readFile(absoluteTargetPath, "utf8");
-  const declaredIdentifiers = extractIdentifiers(vocabularyContent);
+  const extraction = extractSemconvVocabulary(vocabularyContent);
 
-  if (declaredIdentifiers.size === 0) {
+  if (extraction === undefined) {
     failures.push({
       manifestPath,
-      message: `vocabulary-check target ${vocabularyTargetPath} declares no identifiers`,
+      message: `vocabulary-check target ${vocabularyTargetPath} must be a Weaver semconv document with a top-level "groups" sequence`,
+    });
+    return;
+  }
+
+  if (extraction.attributeIds.size === 0) {
+    failures.push({
+      manifestPath,
+      message: `vocabulary-check target ${vocabularyTargetPath} declares no attribute identifiers`,
     });
     return;
   }
@@ -190,8 +203,11 @@ async function validateVocabularyTarget(
     rawArtifact.attributes.map((attribute) => attribute.key)
   );
 
+  // Resolved keys that are not even mentioned as attribute or group ids in the
+  // source YAML signal Weaver drift: the artifact has emitted an attribute
+  // the source vocabulary no longer covers.
   const orphanedKeys = [...resolvedKeys].filter(
-    (key) => !declaredIdentifiers.has(key)
+    (key) => !(extraction.attributeIds.has(key) || extraction.groupIds.has(key))
   );
 
   if (orphanedKeys.length > 0) {
@@ -201,9 +217,9 @@ async function validateVocabularyTarget(
     });
   }
 
-  const undeclaredYamlAttributeIds = filterYamlAttributeIdentifiers(
-    declaredIdentifiers
-  ).filter((id) => !resolvedKeys.has(id));
+  const undeclaredYamlAttributeIds = [...extraction.attributeIds].filter(
+    (id) => !resolvedKeys.has(id)
+  );
 
   if (undeclaredYamlAttributeIds.length > 0) {
     failures.push({
@@ -213,31 +229,54 @@ async function validateVocabularyTarget(
   }
 }
 
-function extractIdentifiers(yamlContent: string): Set<string> {
-  const identifiers = new Set<string>();
+function extractSemconvVocabulary(
+  yamlContent: string
+): ExtractedSemconvVocabulary | undefined {
+  // Parse the YAML structurally rather than line-scanning for `- id:` so that
+  // deeply namespaced group ids (e.g. Weaver's `attributes.http.client.authority`
+  // style) are still recognized as groups, not misclassified as attributes
+  // because of their dot depth. The Weaver semconv schema places attribute ids
+  // strictly under `groups[*].attributes[*].id`; group ids live at
+  // `groups[*].id`. Nested `member_attributes` (used by some Weaver groups)
+  // are walked as attribute lists too.
+  const parsed: unknown = yaml.parse(yamlContent);
 
-  for (const match of yamlContent.matchAll(ATTRIBUTE_ID_PATTERN)) {
-    const identifier = match[1];
-
-    if (identifier !== undefined) {
-      identifiers.add(identifier);
-    }
+  if (!(isRecord(parsed) && Array.isArray(parsed.groups))) {
+    return undefined;
   }
 
-  return identifiers;
+  const attributeIds = new Set<string>();
+  const groupIds = new Set<string>();
+
+  for (const groupEntry of parsed.groups) {
+    if (!isRecord(groupEntry)) {
+      continue;
+    }
+
+    if (typeof groupEntry.id === "string") {
+      groupIds.add(groupEntry.id);
+    }
+
+    collectAttributeIds(groupEntry.attributes, attributeIds);
+    collectAttributeIds(groupEntry.member_attributes, attributeIds);
+  }
+
+  return { attributeIds, groupIds };
 }
 
-function filterYamlAttributeIdentifiers(identifiers: Set<string>): string[] {
-  // Attribute identifiers carry at least three dot-separated segments
-  // (e.g., tuvren.runtime.run.id). Group identifiers are shorter
-  // (e.g., tuvren.runtime.identity). The semconv conventions guarantee
-  // attribute keys exceed the group depth, so dot count is a reliable
-  // discriminator inside a single vocabulary.
-  return [...identifiers].filter((identifier) => {
-    const dotCount = identifier.split(".").length - 1;
+function collectAttributeIds(
+  attributesValue: unknown,
+  attributeIds: Set<string>
+): void {
+  if (!Array.isArray(attributesValue)) {
+    return;
+  }
 
-    return dotCount >= 3;
-  });
+  for (const attribute of attributesValue) {
+    if (isRecord(attribute) && typeof attribute.id === "string") {
+      attributeIds.add(attribute.id);
+    }
+  }
 }
 
 function findResolvedAttributesArtifact(

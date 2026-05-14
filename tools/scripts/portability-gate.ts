@@ -271,17 +271,57 @@ async function runPortabilityGate(): Promise<PortabilityGateFailure[]> {
   const expectedPacketIds = new Set(
     EXPECTED_PACKET_TOPOLOGY.map((entry) => entry.packetId)
   );
+  const expectedPaths = new Set(
+    EXPECTED_PACKET_TOPOLOGY.map((entry) => entry.packetPath)
+  );
 
   failures.push(...checkInventoryExists());
+  failures.push(...checkExpectedTopologyIsUnique());
   failures.push(
     ...checkExpectedPacketsPresent(expectedPacketIds, onDiskManifests)
   );
   failures.push(
-    ...checkNoUnexpectedPackets(expectedPacketIds, onDiskManifests)
+    ...checkNoUnexpectedPackets(
+      expectedPaths,
+      expectedPacketIds,
+      onDiskManifests
+    )
   );
+  failures.push(...checkPacketIdUniqueness(onDiskManifests));
   failures.push(...checkExecutableVerification(onDiskManifests));
   failures.push(...checkStandingExceptions(onDiskManifests));
   failures.push(...checkRequiredSources(onDiskManifests));
+
+  return failures;
+}
+
+function checkExpectedTopologyIsUnique(): PortabilityGateFailure[] {
+  // The expected-topology table is the gate's source of truth, so a typo or
+  // copy-paste mistake that duplicates a packetId or packetPath would silently
+  // narrow what we enforce. Catch that here rather than letting it propagate.
+  const failures: PortabilityGateFailure[] = [];
+  const seenPacketIds = new Set<string>();
+  const seenPaths = new Set<string>();
+
+  for (const entry of EXPECTED_PACKET_TOPOLOGY) {
+    if (seenPacketIds.has(entry.packetId)) {
+      failures.push({
+        rule: "expected-topology-unique",
+        message: `EXPECTED_PACKET_TOPOLOGY lists packetId ${entry.packetId} more than once`,
+      });
+    } else {
+      seenPacketIds.add(entry.packetId);
+    }
+
+    if (seenPaths.has(entry.packetPath)) {
+      failures.push({
+        rule: "expected-topology-unique",
+        message: `EXPECTED_PACKET_TOPOLOGY lists packetPath ${entry.packetPath} more than once`,
+      });
+    } else {
+      seenPaths.add(entry.packetPath);
+    }
+  }
 
   return failures;
 }
@@ -380,16 +420,64 @@ function checkExpectedPacketsPresent(
 }
 
 function checkNoUnexpectedPackets(
+  expectedPaths: ReadonlySet<string>,
   expectedPacketIds: ReadonlySet<string>,
   onDisk: ReadonlyMap<string, AuthorityPacketManifest>
 ): PortabilityGateFailure[] {
   const failures: PortabilityGateFailure[] = [];
 
   for (const [path, manifest] of onDisk.entries()) {
+    // The path check is the primary guard: it catches an extra
+    // authority-packet.json planted at any location that the inventory does
+    // not name, even when that file reuses an already-expected packetId.
+    // The packetId check then catches any new manifest that lands at an
+    // expected-looking path but declares a fresh portable surface the
+    // inventory has not promoted.
+    if (!expectedPaths.has(path)) {
+      failures.push({
+        rule: "no-unexpected-packets",
+        message: `authority-packet.json at ${path} is not listed in EXPECTED_PACKET_TOPOLOGY; revise the AL inventory and the expected-topology table together before adding new cross-implementation surfaces (declared packetId: ${manifest.packetId})`,
+      });
+      continue;
+    }
+
     if (!expectedPacketIds.has(manifest.packetId)) {
       failures.push({
         rule: "no-unexpected-packets",
         message: `packet ${manifest.packetId} at ${path} is not listed in the AL inventory's expected topology; revise the inventory and EXPECTED_PACKET_TOPOLOGY together before adding new cross-implementation surfaces`,
+      });
+    }
+  }
+
+  return failures;
+}
+
+function checkPacketIdUniqueness(
+  onDisk: ReadonlyMap<string, AuthorityPacketManifest>
+): PortabilityGateFailure[] {
+  // Two manifests at different paths must not share the same packetId, or
+  // tooling that resolves a packet by id would silently pick whichever file
+  // wins the directory walk. This guard catches that even when both paths
+  // happen to be in `expectedPaths` (e.g., a copy-paste at one expected
+  // location of another expected packet's id).
+  const failures: PortabilityGateFailure[] = [];
+  const pathsByPacketId = new Map<string, string[]>();
+
+  for (const [path, manifest] of onDisk.entries()) {
+    const existing = pathsByPacketId.get(manifest.packetId);
+
+    if (existing === undefined) {
+      pathsByPacketId.set(manifest.packetId, [path]);
+    } else {
+      existing.push(path);
+    }
+  }
+
+  for (const [packetId, paths] of pathsByPacketId.entries()) {
+    if (paths.length > 1) {
+      failures.push({
+        rule: "packet-id-uniqueness",
+        message: `packetId ${packetId} is declared at multiple paths: ${paths.sort().join(", ")}`,
       });
     }
   }
