@@ -442,6 +442,48 @@ These guardrails mirror the AF gap plan and apply to KRT-AL002.
   explicitly promotes them. AL002 may not unilaterally remove the AG-UI or
   AI-SDK-bridge exception.
 
+## 9b. KRT-AL002 closure status
+
+KRT-AL002 has landed the gap closures listed below. The portability gate
+target (`bun run portability:check` / `tools/scripts/portability-gate.ts`)
+now enforces the post-AL002 packet topology so a future change cannot
+silently drop a portable surface, add an unauthorized packet, or promote a
+standing exception without revising both this inventory and the gate's
+expected-topology table.
+
+| Gap | Status | Landing artifact |
+| --- | --- | --- |
+| G1 tool-contracts | closed | `tuvren.framework.tool-contracts` packet + `tool-contracts-extended.json` plan; AF tool checks relocated under `tool-contracts-af.*` prefix |
+| G2 kernel CDDL registration | closed | `boundaries/kernel/contracts/protocol/spec/cddl/kernel-records.cddl` registered as `cddl` authoritative source on the kernel-protocol packet (version 0.2.0) |
+| G3 SSE projection | closed | `tuvren.framework.event-stream-sse` packet, TypeSpec source, sixteen WHATWG-normative byte-trace fixtures, and `event-stream-sse.core` conformance plan with seventeen decisive checks |
+| G4 kernel gRPC interop packet | closed | `tuvren.kernel.interop-grpc` packet referencing the existing `.proto` files and interop-smoke target |
+| G5 framework rust-kernel interop packet | closed | `tuvren.framework.interop-rust-kernel` packet referencing the suite manifest and host-repl interop-smoke target |
+| G6 telemetry semconv packet | closed | `tuvren.telemetry.semconv` packet (TechSpec §4.11 boundary enum extended to include `telemetry`), Weaver-driven freshness checks, new `vocabulary-check` runner at `tools/conformance/vocabulary/validate-vocabulary.ts` |
+| G7 TechSpec verification-path enum drift | closed | TechSpec §4.11 documented JSON Schema now lists `openapi-validation`; the executable-verification rule recognizes `openapi-validation`, `interop-smoke`, and `vocabulary-check` alongside `schema-validation` and `conformance-plan` |
+| G8 portability gate replaces `docs:af-gap-plan:check` | closed | `tools/scripts/portability-gate.ts` + `package.json` `portability:check` script; wired into `tools/scripts/verify.ts` and the `codegen` script as the canonical portability proxy |
+| G9 `hosts` boundary intentionally unopened | closed | Recorded in §6.G9 above; the portability gate enforces no `hosts` packet exists |
+
+Follow-up items that are explicitly outside KRT-AL002's scope and remain
+candidates for future tickets:
+
+- §8.E5 SSE checks remain non-applicable on the TypeScript framework lane
+  until the framework conformance adapter declares
+  `framework.event-stream-sse` capability and dispatches
+  `event-stream-sse.decode-trace` / `event-stream-sse.report-wire-compliance`
+  against the existing `@tuvren/stream-sse` package. The TypeScript binding
+  appendix at
+  `boundaries/framework/contracts/event-stream-sse/spec/bindings/typescript.md`
+  documents the pending adapter work.
+- §8.E6 tool argument streaming completeness assertion was not added in
+  AL002; it requires either canonical `$.events` exposure or an adapter
+  capability that surfaces concatenated `ToolCallArgsDelta` payloads.
+- §8.E1, E2, E7, E9, E11 are non-blocking productization items recorded for
+  future epics.
+- The interop-smoke target's pre-existing E2BIG environmental sensitivity
+  (esbuild service argument-list limit when many tsup invocations chain) is
+  unrelated to AL002 and remains a maintenance follow-up in
+  `tools/scripts/repl-host-interop-smoke.ts`.
+
 ## 10. Hand-off to KRT-AL002
 
 The concrete punch list AL002 must execute. Each item is the implementation form of

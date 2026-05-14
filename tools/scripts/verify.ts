@@ -196,6 +196,10 @@ export const DEFAULT_VERIFICATION_STEPS: readonly VerificationStep[] = [
     id: "docs-to-authority freeze gate",
   },
   {
+    command: ["bun", "run", "portability:check"],
+    id: "Epic AL portability gate",
+  },
+  {
     command: ["bun", "run", "docs:af-gap-plan:check"],
     id: "Epic AF conformance gap plan freshness",
   },
@@ -222,6 +226,10 @@ export const DEFAULT_VERIFICATION_STEPS: readonly VerificationStep[] = [
     id: "shared conformance runner meta-conformance",
   },
   {
+    command: ["bun", "tools/conformance/vocabulary/validate-vocabulary.ts"],
+    id: "vocabulary-check verification",
+  },
+  {
     command: [
       "bun",
       "tools/scripts/authority-guardrails/authority-guardrails.ts",
@@ -237,7 +245,7 @@ export const DEFAULT_VERIFICATION_STEPS: readonly VerificationStep[] = [
       "-t",
       "codegen",
       "-p",
-      "shared-core-types,framework-runtime-api,framework-event-stream,framework-driver-api,framework-tool-contracts,provider-api,telemetry-semconv,compatibility-reporting,kernel-interop-grpc",
+      "shared-core-types,framework-runtime-api,framework-event-stream,framework-event-stream-sse,framework-driver-api,framework-tool-contracts,provider-api,telemetry-semconv,compatibility-reporting,kernel-interop-grpc",
       // Compatibility codegen shells out to the conformance runners to produce
       // measured evidence, so verify forces a fresh execution here instead of
       // accepting cached artifacts from another workspace state.
