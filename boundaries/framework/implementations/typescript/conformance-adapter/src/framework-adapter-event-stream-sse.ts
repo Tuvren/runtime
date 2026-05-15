@@ -14,7 +14,11 @@
  * limitations under the License.
  */
 
-import { decodeSseStream, reportSseWireCompliance } from "@tuvren/stream-sse";
+import {
+  decodeSseStream,
+  reportSseWireCompliance,
+  toSseResponse,
+} from "@tuvren/stream-sse";
 import type { AdapterProjection } from "./framework-adapter-runtime.ts";
 
 export function createFrameworkAdapterEventStreamSse(): {
@@ -46,22 +50,56 @@ export function createFrameworkAdapterEventStreamSse(): {
   async function runReportWireCompliance(
     _input: unknown
   ): Promise<AdapterProjection> {
-    // `event-stream-sse.report-wire-compliance` is a self-report check: the
-    // plan asserts each normative wire property as an independent boolean
-    // under `$.sse.wire.*` so a regression in any one property surfaces as
-    // its own failure rather than collapsing into a single composite signal.
-    await Promise.resolve();
+    // The wire-compliance booleans are derived from real observations: a
+    // one-shot probe of `toSseResponse` for the response-header surface,
+    // plus targeted decoder probes for each WHATWG line-terminator,
+    // BOM-stripping, leading-space, dispatch, and comment-handling rule.
+    // A regression in `@tuvren/stream-sse` (encoder headers, decoder
+    // behavior) flips the appropriate boolean to false and the plan's
+    // independent assertions surface it.
+    const wire = await reportSseWireCompliance(observeSseEncoder);
 
     return {
       result: {
         sse: {
-          wire: reportSseWireCompliance(),
+          wire,
         },
       },
     };
   }
 
   return { runDecodeTrace, runReportWireCompliance };
+}
+
+async function observeSseEncoder(): Promise<{
+  body: Uint8Array;
+  contentType: string;
+}> {
+  // Drive `toSseResponse` with a one-event probe stream and read both the
+  // surfaced `Content-Type` header and the encoded body bytes. This is the
+  // observation surface the wire-compliance report consumes — it confirms
+  // the encoder emits `text/event-stream` and that the body is valid UTF-8
+  // without coupling either claim to a hardcoded `true` literal.
+  // biome-ignore lint/suspicious/useAwait: encoder probe stream is a sync generator wrapped to satisfy AsyncIterable; toSseResponse consumes it asynchronously
+  const events = (async function* () {
+    yield {
+      data: { value: "wire-compliance-probe" },
+      messageId: "probe-1",
+      threadId: "thread-probe",
+      timestamp: 0,
+      turnId: "turn-probe",
+      type: "turn.start",
+    };
+  })();
+  const response = toSseResponse(
+    events as unknown as AsyncIterable<never> & AsyncIterator<never>
+  );
+  const body = new Uint8Array(await response.arrayBuffer());
+
+  return {
+    body,
+    contentType: response.headers.get("content-type") ?? "",
+  };
 }
 
 function readEncodedBytes(input: unknown): string {

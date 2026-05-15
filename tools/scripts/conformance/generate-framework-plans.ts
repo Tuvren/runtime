@@ -739,11 +739,19 @@ function buildToolContractsExtended(): Plan {
   ];
 
   return {
-    applicability: { capabilities: ["framework.runtime-api"] },
+    // The tool-contracts plan exercises a distinct portable surface — tool
+    // calls, approval boundaries, parallel-tool ordering — that is
+    // adjacent to but separate from the broader `framework.runtime-api`
+    // surface. Tagging the plan with its own `framework.tool-contracts`
+    // capability lets the compatibility matrix distinguish "runtime API
+    // supported" from "tool-contract surface supported", so an adapter
+    // that implements one but not the other surfaces as a partial-coverage
+    // signal instead of being silently folded into the runtime-api bucket.
+    applicability: { capabilities: ["framework.tool-contracts"] },
     checks: checks.map(normalizeGeneratedResultSurfaceCheck),
     packetId: "tuvren.framework.tool-contracts",
     planId: "tuvren.framework.tool-contracts.extended",
-    planVersion: "0.1.0",
+    planVersion: "0.2.0",
     scenarios: {
       "runtime-api-scenarios": "../scenarios/runtime-api-scenarios.json",
     },

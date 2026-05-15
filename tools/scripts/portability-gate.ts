@@ -89,6 +89,7 @@ interface InventoryRequiredSource {
   inventorySection?: string;
   packetId: string;
   rationale: string;
+  sourceFormat: string;
   sourcePath: string;
 }
 
@@ -214,6 +215,9 @@ async function runPortabilityGate(
       onDiskManifests,
       adapterManifests
     ))
+  );
+  failures.push(
+    ...(await checkAdapterCapabilityCoveredByPlan(adapterManifests))
   );
 
   return failures;
@@ -481,11 +485,12 @@ function validateRequiredSources(value: unknown): {
     if (
       typeof entry.packetId !== "string" ||
       typeof entry.sourcePath !== "string" ||
-      typeof entry.rationale !== "string"
+      typeof entry.rationale !== "string" ||
+      typeof entry.sourceFormat !== "string"
     ) {
       failures.push({
         rule: "inventory-manifest",
-        message: `requiredAuthoritativeSources[${index}] must declare string packetId, sourcePath, and rationale`,
+        message: `requiredAuthoritativeSources[${index}] must declare string packetId, sourcePath, rationale, and sourceFormat`,
       });
       continue;
     }
@@ -497,6 +502,7 @@ function validateRequiredSources(value: unknown): {
           : undefined,
       packetId: entry.packetId,
       rationale: entry.rationale,
+      sourceFormat: entry.sourceFormat,
       sourcePath: entry.sourcePath,
     });
   }
@@ -813,6 +819,14 @@ async function checkPlanApplicabilityHasAdapter(
 async function readPlanApplicabilityCapabilities(
   planPath: string
 ): Promise<readonly string[]> {
+  // Returns the union of plan-level applicability capabilities and every
+  // check-level `capabilities` array. The shared runner decides applicability
+  // from that exact union (`tools/conformance/runner/run.ts:663-665`), so an
+  // earlier gate version that only read `plan.applicability.capabilities`
+  // would miss check-scoped capability gaps — a check tagged with a
+  // capability no adapter advertises would run as `nonApplicable` forever
+  // and the portability claim would silently regress without the gate
+  // flagging it.
   const absolutePath = resolve(REPO_ROOT, planPath);
 
   if (!existsSync(absolutePath)) {
@@ -821,14 +835,88 @@ async function readPlanApplicabilityCapabilities(
 
   const plan = JSON.parse(await readFile(absolutePath, "utf8")) as {
     applicability?: { capabilities?: unknown };
+    checks?: Array<{ capabilities?: unknown }>;
   };
-  const value = plan.applicability?.capabilities;
+  const collected = new Set<string>();
 
+  for (const capability of toStringArray(plan.applicability?.capabilities)) {
+    collected.add(capability);
+  }
+
+  for (const check of plan.checks ?? []) {
+    for (const capability of toStringArray(check.capabilities)) {
+      collected.add(capability);
+    }
+  }
+
+  return [...collected];
+}
+
+function toStringArray(value: unknown): string[] {
   if (!Array.isArray(value)) {
     return [];
   }
 
   return value.filter((entry): entry is string => typeof entry === "string");
+}
+
+async function checkAdapterCapabilityCoveredByPlan(
+  adapterManifests: ReadonlyMap<string, AdapterManifest>
+): Promise<PortabilityGateFailure[]> {
+  // Every adapter-advertised capability must appear in at least one plan
+  // check (either plan-level applicability or check-level capabilities)
+  // anywhere in the workspace. Wave 5 briefly let
+  // `compatibility-report.ts` count adapter-only capabilities as part of
+  // "full coverage" so unmeasured surfaces (e.g. an aspirational
+  // `trace.lifecycle` claim) would still flip the lane to `full_pass`.
+  // That weakened the meaning of `full_pass`. Wave 6 reverts that and
+  // catches the gap structurally here: a capability advertised by an
+  // adapter but mentioned by zero plan checks forces an explicit decision —
+  // remove the capability from the adapter manifest or add a plan that
+  // exercises it. Cross-boundary roles (e.g. the framework adapter
+  // advertising `providers.framework-owned-approval-boundary` so the
+  // providers boundary's plans can dispatch on it) still pass because the
+  // capability is mentioned by SOME plan even when it lives in a
+  // different boundary.
+  const failures: PortabilityGateFailure[] = [];
+  const planCapabilities = await collectAllPlanCapabilities();
+
+  for (const adapter of adapterManifests.values()) {
+    const declared = adapter.capabilities ?? [];
+
+    for (const capability of declared) {
+      if (!planCapabilities.has(capability)) {
+        failures.push({
+          rule: "adapter-capability-covered-by-plan",
+          message: `adapter ${adapter.adapterId} advertises capability ${capability} but no conformance plan in the workspace exercises it; remove it from the adapter manifest or add a plan check that asserts on the capability`,
+        });
+      }
+    }
+  }
+
+  return failures;
+}
+
+async function collectAllPlanCapabilities(): Promise<Set<string>> {
+  // Walk every authority packet's `conformancePlans` rather than relying on
+  // a directory naming convention. That keeps the coverage inventory aligned
+  // with what `tools/conformance/plan-compiler/index.ts` actually compiles —
+  // a plan file outside a packet's reach wouldn't be measured by any lane,
+  // so its capabilities don't count as coverage either.
+  const capabilities = new Set<string>();
+  const packets = await loadAllManifests();
+
+  for (const manifest of packets.values()) {
+    for (const plan of manifest.conformancePlans ?? []) {
+      for (const capability of await readPlanApplicabilityCapabilities(
+        plan.path
+      )) {
+        capabilities.add(capability);
+      }
+    }
+  }
+
+  return capabilities;
 }
 
 function isAdapterCapability(
@@ -1018,14 +1106,31 @@ function checkRequiredSources(
       continue;
     }
 
-    const declared = manifest.authoritativeSources.some(
+    const declaredSource = manifest.authoritativeSources.find(
       (source) => source.path === required.sourcePath
     );
 
-    if (!declared) {
+    if (declaredSource === undefined) {
       failures.push({
         rule: "required-sources",
         message: `${required.rationale}: ${required.sourcePath} exists on disk but is not declared under ${required.packetId}.authoritativeSources`,
+      });
+      continue;
+    }
+
+    // Verifying the source-registration format catches the case where a
+    // packet author registers a required source under the wrong format
+    // (e.g. tagging the kernel CDDL grammar as `text` instead of `cddl`,
+    // or the SSE TypeSpec as `typespec` after a refactor that should have
+    // moved it to a new format). Tooling that walks
+    // `authoritativeSources[*].format` would silently skip the
+    // mis-registered source, so the portability claim could pass while
+    // the named authority no longer routes through its declared
+    // verification path.
+    if (declaredSource.format !== required.sourceFormat) {
+      failures.push({
+        rule: "required-sources",
+        message: `${required.rationale}: ${required.sourcePath} is registered under ${required.packetId}.authoritativeSources with format "${declaredSource.format}"; inventory requires format "${required.sourceFormat}"`,
       });
     }
   }

@@ -605,25 +605,24 @@ async function computeExpectedCapabilitiesFromTopology(
   const adapterManifestPath = resolve(REPO_ROOT, adapterManifestPathRelative);
   const adapterManifest = JSON.parse(
     await readFile(adapterManifestPath, "utf8")
-  ) as { authorityPackets?: unknown; capabilities?: unknown };
+  ) as { authorityPackets?: unknown };
 
   const packetPaths = readStringArray(adapterManifest.authorityPackets);
   const capabilities = new Set<string>();
 
-  // Adapter-advertised capabilities that no conformance plan happens to
-  // mention still count toward this lane's "full coverage" claim — they're
-  // surface the lane publishes whether or not the portability matrix has a
-  // plan asserting against them. `trace.lifecycle` on the TypeScript
-  // framework adapter is the canonical example: its evidence rides through
-  // the telemetry vocabulary-check verification path, not through a
-  // conformance plan, so a plan-only union would silently weaken what
-  // `full_pass` means on the lane. Wave 5 flagged that drop; this restores
-  // the pre-wave-4 semantics while keeping the topology-derived contract
-  // for the plan-side of the union.
-  for (const capability of readStringArray(adapterManifest.capabilities)) {
-    capabilities.add(capability);
-  }
-
+  // The expected set is derived exclusively from the discovered plan
+  // topology — any capability that is not exercised by at least one plan
+  // check is NOT part of the lane's "full coverage" surface. Wave 5
+  // experimented with also unioning adapter-advertised capabilities here so
+  // adapter-only surfaces (like an unmeasured `trace.lifecycle` claim)
+  // would still count toward `full_pass`; wave 6 reverted that because it
+  // weakened the meaning of `full_pass` — a lane could be reported as
+  // fully covered while a chunk of its claimed surface had zero asserting
+  // checks. Adapter-advertised capabilities without plan coverage are now
+  // caught structurally by `portability-gate.ts`'s
+  // `adapter-capability-covered-by-plan` rule, which forces either the
+  // capability to be removed from the adapter manifest or a plan check to
+  // exercise it.
   for (const packetPath of packetPaths) {
     const packetManifest = JSON.parse(
       await readFile(resolve(REPO_ROOT, packetPath), "utf8")

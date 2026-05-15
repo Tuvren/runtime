@@ -194,7 +194,6 @@ function defaultCapabilities(
     "kernel.edge-validation",
     "kernel.logical",
     "kernel.run-liveness",
-    "kernel.persistence.process-local",
   ];
 }
 

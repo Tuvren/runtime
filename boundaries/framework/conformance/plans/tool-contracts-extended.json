@@ -1,6 +1,6 @@
 {
   "applicability": {
-    "capabilities": ["framework.runtime-api"]
+    "capabilities": ["framework.tool-contracts"]
   },
   "checks": [
     {
@@ -114,7 +114,7 @@
   ],
   "packetId": "tuvren.framework.tool-contracts",
   "planId": "tuvren.framework.tool-contracts.extended",
-  "planVersion": "0.1.0",
+  "planVersion": "0.2.0",
   "scenarios": {
     "runtime-api-scenarios": "../scenarios/runtime-api-scenarios.json"
   }

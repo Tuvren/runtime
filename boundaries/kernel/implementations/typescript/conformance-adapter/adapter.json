@@ -22,16 +22,13 @@
     "--capability",
     "kernel.logical",
     "--capability",
-    "kernel.run-liveness",
-    "--capability",
-    "kernel.persistence.process-local"
+    "kernel.run-liveness"
   ],
   "capabilities": [
     "kernel.protocol",
     "kernel.edge-validation",
     "kernel.logical",
-    "kernel.run-liveness",
-    "kernel.persistence.process-local"
+    "kernel.run-liveness"
   ],
   "authorityPackets": [
     "boundaries/kernel/contracts/protocol/spec/authority-packet.json"

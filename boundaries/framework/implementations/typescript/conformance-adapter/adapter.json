@@ -20,10 +20,10 @@
     "framework.run-liveness",
     "framework.react-driver",
     "framework.runtime-api",
+    "framework.tool-contracts",
     "providers.framework-owned-approval-boundary",
     "providers.framework-owned-tool-execution",
-    "providers.rejects-native-strict-structured-output",
-    "trace.lifecycle"
+    "providers.rejects-native-strict-structured-output"
   ],
   "authorityPackets": [
     "boundaries/framework/contracts/event-stream/spec/authority-packet.json",

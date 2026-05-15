@@ -9,10 +9,10 @@
     "framework.react-driver",
     "framework.run-liveness",
     "framework.runtime-api",
+    "framework.tool-contracts",
     "providers.framework-owned-approval-boundary",
     "providers.framework-owned-tool-execution",
-    "providers.rejects-native-strict-structured-output",
-    "trace.lifecycle"
+    "providers.rejects-native-strict-structured-output"
   ],
   "checkResults": [
     {

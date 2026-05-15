@@ -16,7 +16,11 @@
 
 import { describe, expect, test } from "bun:test";
 import { readFile } from "node:fs/promises";
-import { decodeSseStream, reportSseWireCompliance } from "../src/index.ts";
+import {
+  decodeSseStream,
+  reportSseWireCompliance,
+  toSseResponse,
+} from "../src/index.ts";
 
 interface SseTraceFixture {
   traces: Record<
@@ -67,9 +71,34 @@ describe("sse-decoder", () => {
     });
   }
 
-  test("reports wire compliance booleans matching the fixture", () => {
-    expect(
-      reportSseWireCompliance() as unknown as Record<string, boolean>
-    ).toEqual(fixture.wireCompliance);
+  test("reports wire compliance booleans matching the fixture", async () => {
+    const report = await reportSseWireCompliance(observeEncoderForTest);
+    expect(report as unknown as Record<string, boolean>).toEqual(
+      fixture.wireCompliance
+    );
   });
 });
+
+async function observeEncoderForTest(): Promise<{
+  body: Uint8Array;
+  contentType: string;
+}> {
+  // biome-ignore lint/suspicious/useAwait: encoder probe stream is a sync generator wrapped to satisfy AsyncIterable; toSseResponse consumes it asynchronously
+  const events = (async function* () {
+    yield {
+      data: { value: "probe" },
+      messageId: "probe-msg",
+      threadId: "probe-thread",
+      timestamp: 0,
+      turnId: "probe-turn",
+      type: "turn.start",
+    };
+  })();
+  const response = toSseResponse(
+    events as unknown as AsyncIterable<never> & AsyncIterator<never>
+  );
+  return {
+    body: new Uint8Array(await response.arrayBuffer()),
+    contentType: response.headers.get("content-type") ?? "",
+  };
+}

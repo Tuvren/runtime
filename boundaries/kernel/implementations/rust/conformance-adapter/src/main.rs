@@ -108,11 +108,7 @@ fn dispatch_request(request: JsonRpcRequest) -> Result<Value, AdapterErrorEnvelo
     match request.method.as_str() {
         "initialize" => Ok(json!(AdapterCapabilities {
             adapter_id: "rust-kernel",
-            capabilities: vec![
-                "kernel.protocol",
-                "kernel.logical",
-                "kernel.persistence.process-local",
-            ],
+            capabilities: vec!["kernel.protocol", "kernel.logical"],
             packet_id: read_param_string(&request.params, "packetId")?,
             plan_version: read_param_string(&request.params, "planVersion")?,
         })),

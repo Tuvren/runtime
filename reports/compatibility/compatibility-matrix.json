@@ -307,10 +307,10 @@
             "framework.react-driver",
             "framework.run-liveness",
             "framework.runtime-api",
+            "framework.tool-contracts",
             "providers.framework-owned-approval-boundary",
             "providers.framework-owned-tool-execution",
-            "providers.rejects-native-strict-structured-output",
-            "trace.lifecycle"
+            "providers.rejects-native-strict-structured-output"
           ],
           "evidencePath": "reports/compatibility/evidence/shared-conformance-runner.typescript-framework.json",
           "reportLabel": "TypeScript framework runtime baseline",
@@ -392,7 +392,6 @@
           "declaredCapabilities": [
             "kernel.edge-validation",
             "kernel.logical",
-            "kernel.persistence.process-local",
             "kernel.protocol",
             "kernel.run-liveness"
           ],
@@ -694,11 +693,7 @@
             "applicableChecks": 41,
             "nonApplicableChecks": 14
           },
-          "declaredCapabilities": [
-            "kernel.logical",
-            "kernel.persistence.process-local",
-            "kernel.protocol"
-          ],
+          "declaredCapabilities": ["kernel.logical", "kernel.protocol"],
           "evidencePath": "reports/compatibility/evidence/shared-conformance-runner.rust-kernel.json",
           "reportLabel": "Rust process-local kernel baseline",
           "reportStatus": "capability_subset_pass",
