@@ -1,11 +1,7 @@
 {
   "adapterId": "rust-kernel",
   "boundary": "kernel",
-  "capabilities": [
-    "kernel.logical",
-    "kernel.persistence.process-local",
-    "kernel.protocol"
-  ],
+  "capabilities": ["kernel.logical", "kernel.protocol"],
   "checkResults": [
     {
       "assertionResults": [

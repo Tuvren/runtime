@@ -1,0 +1,266 @@
+/**
+ * Copyright 2026 Oscar Yáñez Cisterna (@SkrOYC)
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+export interface TuvrenDecodedSseEvent {
+  data: string;
+  id?: string;
+  retryMs?: number;
+  type: string;
+}
+
+export interface TuvrenDecodedSseStream {
+  events: TuvrenDecodedSseEvent[];
+  lastEventId?: string;
+  reconnectDelayMs?: number;
+}
+
+const UTF8_BOM = "\uFEFF";
+const NULL_CHARACTER = "\u0000";
+const RETRY_DIGITS_PATTERN = /^[0-9]+$/u;
+const UTF8_DECODER = new TextDecoder("utf-8");
+
+interface DecoderState {
+  dataBuffer: string;
+  events: TuvrenDecodedSseEvent[];
+  eventTypeBuffer: string;
+  lastEventId: string | undefined;
+  reconnectDelayMs: number | undefined;
+}
+
+export function decodeSseStream(
+  input: string | Uint8Array
+): TuvrenDecodedSseStream {
+  // Implements the WHATWG `text/event-stream` interpretation
+  // (https://html.spec.whatwg.org/multipage/server-sent-events.html
+  // #event-stream-interpretation). The decoder consumes a complete byte
+  // trace and returns the sequence of events the algorithm would dispatch,
+  // along with the final values of the `last event ID` and `reconnection
+  // time` buffers a client would carry across reconnects. Any incomplete
+  // line at end-of-stream is discarded per spec.
+  const text = typeof input === "string" ? input : UTF8_DECODER.decode(input);
+  const stripped = text.startsWith(UTF8_BOM) ? text.slice(1) : text;
+  const state: DecoderState = {
+    dataBuffer: "",
+    eventTypeBuffer: "",
+    events: [],
+    lastEventId: undefined,
+    reconnectDelayMs: undefined,
+  };
+
+  for (const line of iterateCompleteLines(stripped)) {
+    processSseLine(line, state);
+  }
+
+  const result: TuvrenDecodedSseStream = { events: state.events };
+
+  if (state.lastEventId !== undefined) {
+    result.lastEventId = state.lastEventId;
+  }
+
+  if (state.reconnectDelayMs !== undefined) {
+    result.reconnectDelayMs = state.reconnectDelayMs;
+  }
+
+  return result;
+}
+
+function processSseLine(line: string, state: DecoderState): void {
+  if (line === "") {
+    dispatchPendingEvent(state);
+    state.eventTypeBuffer = "";
+    state.dataBuffer = "";
+    return;
+  }
+
+  if (line.startsWith(":")) {
+    return;
+  }
+
+  const colonIndex = line.indexOf(":");
+  const fieldName = colonIndex === -1 ? line : line.slice(0, colonIndex);
+  const rawValue = colonIndex === -1 ? "" : line.slice(colonIndex + 1);
+  const fieldValue = rawValue.startsWith(" ") ? rawValue.slice(1) : rawValue;
+
+  applyFieldUpdate(fieldName, fieldValue, state);
+}
+
+function dispatchPendingEvent(state: DecoderState): void {
+  if (state.dataBuffer === "") {
+    return;
+  }
+
+  const trimmedData = state.dataBuffer.endsWith("\n")
+    ? state.dataBuffer.slice(0, -1)
+    : state.dataBuffer;
+  const event: TuvrenDecodedSseEvent = {
+    data: trimmedData,
+    type: state.eventTypeBuffer === "" ? "message" : state.eventTypeBuffer,
+  };
+
+  if (state.lastEventId !== undefined) {
+    event.id = state.lastEventId;
+  }
+
+  if (state.reconnectDelayMs !== undefined) {
+    event.retryMs = state.reconnectDelayMs;
+  }
+
+  state.events.push(event);
+}
+
+function applyFieldUpdate(
+  fieldName: string,
+  fieldValue: string,
+  state: DecoderState
+): void {
+  switch (fieldName) {
+    case "event":
+      state.eventTypeBuffer = fieldValue;
+      return;
+    case "data":
+      state.dataBuffer += `${fieldValue}\n`;
+      return;
+    case "id":
+      if (!fieldValue.includes(NULL_CHARACTER)) {
+        state.lastEventId = fieldValue;
+      }
+      return;
+    case "retry":
+      if (RETRY_DIGITS_PATTERN.test(fieldValue)) {
+        state.reconnectDelayMs = Number.parseInt(fieldValue, 10);
+      }
+      return;
+    default:
+      return;
+  }
+}
+
+export interface TuvrenSseWireCompliance {
+  acceptsLfCrlfAndCrLineTerminators: boolean;
+  contentTypeIsEventStream: boolean;
+  dispatchesOnEmptyLine: boolean;
+  encodingIsUtf8: boolean;
+  ignoresCommentLines: boolean;
+  stripsLeadingBom: boolean;
+  stripsSingleLeadingFieldSpace: boolean;
+}
+
+export async function reportSseWireCompliance(
+  observeEncoder: () => Promise<{ body: Uint8Array; contentType: string }>
+): Promise<TuvrenSseWireCompliance> {
+  // Each boolean is derived from an actual observation of this lane's
+  // encoder/decoder pair, so a regression in either implementation surfaces
+  // as a failed wire-compliance check rather than as a stale `true`. The
+  // caller supplies `observeEncoder` — a one-shot probe of `toSseResponse`
+  // (or equivalent) that returns the encoded bytes plus the surfaced
+  // Content-Type header — so this report stays usable from any lane that
+  // can produce one SSE response without coupling this module to a specific
+  // observation strategy.
+  const encoded = await observeEncoder();
+  const contentTypeIsEventStream =
+    encoded.contentType.toLowerCase().split(";")[0]?.trim() ===
+    "text/event-stream";
+  const encodingIsUtf8 = isValidUtf8(encoded.body);
+
+  // Decoder probes feed minimal byte traces through the same `decodeSseStream`
+  // the production lane uses, so any drift between this report and the
+  // decoder is impossible by construction.
+  const lfEvents = decodeSseStream("data: lf-line\n\n").events;
+  const crlfEvents = decodeSseStream("data: crlf-line\r\n\r\n").events;
+  const crEvents = decodeSseStream("data: cr-line\r\r").events;
+  const acceptsLfCrlfAndCrLineTerminators =
+    lfEvents.length === 1 &&
+    crlfEvents.length === 1 &&
+    crEvents.length === 1 &&
+    lfEvents[0]?.data === "lf-line" &&
+    crlfEvents[0]?.data === "crlf-line" &&
+    crEvents[0]?.data === "cr-line";
+
+  const bomProbe = decodeSseStream("\uFEFFdata: bom-stripped\n\n").events;
+  const stripsLeadingBom =
+    bomProbe.length === 1 && bomProbe[0]?.data === "bom-stripped";
+
+  const spaceProbe = decodeSseStream("data:  one-space-stripped\n\n").events;
+  const stripsSingleLeadingFieldSpace =
+    spaceProbe.length === 1 && spaceProbe[0]?.data === " one-space-stripped";
+
+  const pendingProbe = decodeSseStream("data: never-dispatches\n").events;
+  const dispatchedProbe = decodeSseStream("data: dispatches\n\n").events;
+  const dispatchesOnEmptyLine =
+    pendingProbe.length === 0 &&
+    dispatchedProbe.length === 1 &&
+    dispatchedProbe[0]?.data === "dispatches";
+
+  const commentProbe = decodeSseStream(": heartbeat\ndata: kept\n\n").events;
+  const ignoresCommentLines =
+    commentProbe.length === 1 && commentProbe[0]?.data === "kept";
+
+  return {
+    acceptsLfCrlfAndCrLineTerminators,
+    contentTypeIsEventStream,
+    dispatchesOnEmptyLine,
+    encodingIsUtf8,
+    ignoresCommentLines,
+    stripsLeadingBom,
+    stripsSingleLeadingFieldSpace,
+  };
+}
+
+function isValidUtf8(bytes: Uint8Array): boolean {
+  try {
+    new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function* iterateCompleteLines(text: string): Generator<string> {
+  // WHATWG line terminators are LF, CRLF, or bare CR. A trailing unterminated
+  // run of characters at end-of-stream is NOT a complete line and is
+  // therefore not yielded — it would correspond to a partial frame the
+  // algorithm must discard.
+  let current = "";
+  let index = 0;
+
+  while (index < text.length) {
+    const character = text[index] ?? "";
+
+    if (character === "\r") {
+      yield current;
+      current = "";
+      const next = text[index + 1];
+
+      if (next === "\n") {
+        index += 2;
+      } else {
+        index += 1;
+      }
+
+      continue;
+    }
+
+    if (character === "\n") {
+      yield current;
+      current = "";
+      index += 1;
+      continue;
+    }
+
+    current += character;
+    index += 1;
+  }
+}

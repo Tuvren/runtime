@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tuvren.dev/schemas/framework/event-stream-sse/SseWireCompliance.json",
+  "type": "object",
+  "properties": {
+    "contentTypeIsEventStream": {
+      "type": "boolean",
+      "description": "Encoder emits `Content-Type: text/event-stream` for the response."
+    },
+    "encodingIsUtf8": {
+      "type": "boolean",
+      "description": "Encoder output is valid UTF-8."
+    },
+    "acceptsLfCrlfAndCrLineTerminators": {
+      "type": "boolean",
+      "description": "Decoder accepts each of LF (`\\n`), CRLF (`\\r\\n`), and CR (`\\r`) as a line\nterminator per WHATWG."
+    },
+    "stripsLeadingBom": {
+      "type": "boolean",
+      "description": "Decoder strips at most one leading UTF-8 BOM per WHATWG."
+    },
+    "stripsSingleLeadingFieldSpace": {
+      "type": "boolean",
+      "description": "Decoder strips a single leading U+0020 SPACE from field values per WHATWG."
+    },
+    "dispatchesOnEmptyLine": {
+      "type": "boolean",
+      "description": "Decoder dispatches the buffered event only on an empty line per WHATWG."
+    },
+    "ignoresCommentLines": {
+      "type": "boolean",
+      "description": "Decoder treats every line that starts with U+003A COLON as a comment and\ndoes NOT surface those lines as decoded events."
+    }
+  },
+  "required": [
+    "contentTypeIsEventStream",
+    "encodingIsUtf8",
+    "acceptsLfCrlfAndCrLineTerminators",
+    "stripsLeadingBom",
+    "stripsSingleLeadingFieldSpace",
+    "dispatchesOnEmptyLine",
+    "ignoresCommentLines"
+  ],
+  "unevaluatedProperties": {
+    "not": {}
+  },
+  "description": "Normative wire characteristics that a conformant encoder MUST honor and a\nconformant decoder MUST tolerate. These are presented as observable booleans\nso the conformance plan can assert each one independently from a single\ndecoder observation."
+}

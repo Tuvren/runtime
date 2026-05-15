@@ -20,7 +20,14 @@
     "version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" },
     "boundary": {
       "type": "string",
-      "enum": ["framework", "kernel", "providers", "shared", "hosts"]
+      "enum": [
+        "framework",
+        "kernel",
+        "providers",
+        "shared",
+        "hosts",
+        "telemetry"
+      ]
     },
     "surface": { "type": "string", "minLength": 1 },
     "humanAuthorityRefs": {
@@ -125,7 +132,17 @@
               "vocabulary-check"
             ]
           },
-          "target": { "type": "string", "minLength": 1 }
+          "target": { "type": "string", "minLength": 1 },
+          "resolvedArtifact": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional. Used by `vocabulary-check` to name the resolved registry artifact (e.g. Weaver's `otel-attributes.json`) whose identifiers must equal the identifiers declared in `target`. Lifts the previously hardcoded artifact name into the manifest so packets that publish a different resolved registry filename remain usable through the same verification lane."
+          },
+          "resolvedKeyPath": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional. Used by `vocabulary-check` to declare where, inside the resolved artifact, the identifier list lives. Format: dot-separated property path with `*` for array iteration (e.g. `attributes.*.key` or `metrics.*.name`). Lifts the previously hardcoded `{attributes:[{key}]}` shape into the manifest so packets with a different registry shape are not rejected for tooling reasons."
+          }
         }
       }
     },

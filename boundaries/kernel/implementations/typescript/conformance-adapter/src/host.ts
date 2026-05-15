@@ -18,6 +18,7 @@ import { randomUUID } from "node:crypto";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import type { TurnTreeSchema } from "@tuvren/kernel-protocol";
 import {
   assertStagedResult,
   decodeDeterministicKernelRecord,
@@ -193,7 +194,6 @@ function defaultCapabilities(
     "kernel.edge-validation",
     "kernel.logical",
     "kernel.run-liveness",
-    "kernel.persistence.process-local",
   ];
 }
 

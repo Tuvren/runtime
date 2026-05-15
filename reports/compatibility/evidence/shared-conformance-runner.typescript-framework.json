@@ -4,14 +4,15 @@
   "capabilities": [
     "framework.driver-api",
     "framework.event-stream",
+    "framework.event-stream-sse",
     "framework.orchestration",
     "framework.react-driver",
     "framework.run-liveness",
     "framework.runtime-api",
+    "framework.tool-contracts",
     "providers.framework-owned-approval-boundary",
     "providers.framework-owned-tool-execution",
-    "providers.rejects-native-strict-structured-output",
-    "trace.lifecycle"
+    "providers.rejects-native-strict-structured-output"
   ],
   "checkResults": [
     {
@@ -329,6 +330,468 @@
       "details": {
         "adapterId": "typescript-framework",
         "planId": "tuvren.framework.driver-api.extended"
+      },
+      "status": "pass"
+    },
+    {
+      "assertionResults": [
+        {
+          "assertionId": "event-stream-sse.comment-line-ignored.1.resultField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "event-stream-sse.comment-line-ignored.requiredEvidence.result.sse.decoded.events",
+          "status": "pass"
+        }
+      ],
+      "checkId": "event-stream-sse.comment-line-ignored",
+      "details": {
+        "adapterId": "typescript-framework",
+        "planId": "tuvren.framework.event-stream-sse.core"
+      },
+      "status": "pass"
+    },
+    {
+      "assertionResults": [
+        {
+          "assertionId": "event-stream-sse.cr-line-terminator.1.resultField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "event-stream-sse.cr-line-terminator.requiredEvidence.result.sse.decoded.events",
+          "status": "pass"
+        }
+      ],
+      "checkId": "event-stream-sse.cr-line-terminator",
+      "details": {
+        "adapterId": "typescript-framework",
+        "planId": "tuvren.framework.event-stream-sse.core"
+      },
+      "status": "pass"
+    },
+    {
+      "assertionResults": [
+        {
+          "assertionId": "event-stream-sse.crlf-line-terminator.1.resultField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "event-stream-sse.crlf-line-terminator.requiredEvidence.result.sse.decoded.events",
+          "status": "pass"
+        }
+      ],
+      "checkId": "event-stream-sse.crlf-line-terminator",
+      "details": {
+        "adapterId": "typescript-framework",
+        "planId": "tuvren.framework.event-stream-sse.core"
+      },
+      "status": "pass"
+    },
+    {
+      "assertionResults": [
+        {
+          "assertionId": "event-stream-sse.empty-data-buffer-no-dispatch.1.resultField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "event-stream-sse.empty-data-buffer-no-dispatch.requiredEvidence.result.sse.decoded.events",
+          "status": "pass"
+        }
+      ],
+      "checkId": "event-stream-sse.empty-data-buffer-no-dispatch",
+      "details": {
+        "adapterId": "typescript-framework",
+        "planId": "tuvren.framework.event-stream-sse.core"
+      },
+      "status": "pass"
+    },
+    {
+      "assertionResults": [
+        {
+          "assertionId": "event-stream-sse.event-type-resets-between-frames.1.resultField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "event-stream-sse.event-type-resets-between-frames.requiredEvidence.result.sse.decoded.events",
+          "status": "pass"
+        }
+      ],
+      "checkId": "event-stream-sse.event-type-resets-between-frames",
+      "details": {
+        "adapterId": "typescript-framework",
+        "planId": "tuvren.framework.event-stream-sse.core"
+      },
+      "status": "pass"
+    },
+    {
+      "assertionResults": [
+        {
+          "assertionId": "event-stream-sse.field-without-value.1.resultField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "event-stream-sse.field-without-value.requiredEvidence.result.sse.decoded.events",
+          "status": "pass"
+        }
+      ],
+      "checkId": "event-stream-sse.field-without-value",
+      "details": {
+        "adapterId": "typescript-framework",
+        "planId": "tuvren.framework.event-stream-sse.core"
+      },
+      "status": "pass"
+    },
+    {
+      "assertionResults": [
+        {
+          "assertionId": "event-stream-sse.id-empty-resets-last-event-id.1.resultField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "event-stream-sse.id-empty-resets-last-event-id.2.resultField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "event-stream-sse.id-empty-resets-last-event-id.3.resultField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "event-stream-sse.id-empty-resets-last-event-id.requiredEvidence.result.sse.decoded.events.0.id",
+          "status": "pass"
+        },
+        {
+          "assertionId": "event-stream-sse.id-empty-resets-last-event-id.requiredEvidence.result.sse.decoded.events.1.id",
+          "status": "pass"
+        },
+        {
+          "assertionId": "event-stream-sse.id-empty-resets-last-event-id.requiredEvidence.result.sse.decoded.lastEventId",
+          "status": "pass"
+        }
+      ],
+      "checkId": "event-stream-sse.id-empty-resets-last-event-id",
+      "details": {
+        "adapterId": "typescript-framework",
+        "planId": "tuvren.framework.event-stream-sse.core"
+      },
+      "status": "pass"
+    },
+    {
+      "assertionResults": [
+        {
+          "assertionId": "event-stream-sse.id-persists-until-next-id.1.resultField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "event-stream-sse.id-persists-until-next-id.2.resultField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "event-stream-sse.id-persists-until-next-id.3.resultField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "event-stream-sse.id-persists-until-next-id.4.resultField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "event-stream-sse.id-persists-until-next-id.requiredEvidence.result.sse.decoded.events.0.id",
+          "status": "pass"
+        },
+        {
+          "assertionId": "event-stream-sse.id-persists-until-next-id.requiredEvidence.result.sse.decoded.events.1.id",
+          "status": "pass"
+        },
+        {
+          "assertionId": "event-stream-sse.id-persists-until-next-id.requiredEvidence.result.sse.decoded.events.2.id",
+          "status": "pass"
+        },
+        {
+          "assertionId": "event-stream-sse.id-persists-until-next-id.requiredEvidence.result.sse.decoded.lastEventId",
+          "status": "pass"
+        }
+      ],
+      "checkId": "event-stream-sse.id-persists-until-next-id",
+      "details": {
+        "adapterId": "typescript-framework",
+        "planId": "tuvren.framework.event-stream-sse.core"
+      },
+      "status": "pass"
+    },
+    {
+      "assertionResults": [
+        {
+          "assertionId": "event-stream-sse.id-sets-last-event-id.1.resultField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "event-stream-sse.id-sets-last-event-id.2.resultField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "event-stream-sse.id-sets-last-event-id.requiredEvidence.result.sse.decoded.events.0.id",
+          "status": "pass"
+        },
+        {
+          "assertionId": "event-stream-sse.id-sets-last-event-id.requiredEvidence.result.sse.decoded.lastEventId",
+          "status": "pass"
+        }
+      ],
+      "checkId": "event-stream-sse.id-sets-last-event-id",
+      "details": {
+        "adapterId": "typescript-framework",
+        "planId": "tuvren.framework.event-stream-sse.core"
+      },
+      "status": "pass"
+    },
+    {
+      "assertionResults": [
+        {
+          "assertionId": "event-stream-sse.id-with-null-byte-ignored.1.resultField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "event-stream-sse.id-with-null-byte-ignored.2.resultField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "event-stream-sse.id-with-null-byte-ignored.requiredEvidence.result.sse.decoded.events.1.id",
+          "status": "pass"
+        },
+        {
+          "assertionId": "event-stream-sse.id-with-null-byte-ignored.requiredEvidence.result.sse.decoded.lastEventId",
+          "status": "pass"
+        }
+      ],
+      "checkId": "event-stream-sse.id-with-null-byte-ignored",
+      "details": {
+        "adapterId": "typescript-framework",
+        "planId": "tuvren.framework.event-stream-sse.core"
+      },
+      "status": "pass"
+    },
+    {
+      "assertionResults": [
+        {
+          "assertionId": "event-stream-sse.leading-bom-stripped.1.resultField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "event-stream-sse.leading-bom-stripped.requiredEvidence.result.sse.decoded.events",
+          "status": "pass"
+        }
+      ],
+      "checkId": "event-stream-sse.leading-bom-stripped",
+      "details": {
+        "adapterId": "typescript-framework",
+        "planId": "tuvren.framework.event-stream-sse.core"
+      },
+      "status": "pass"
+    },
+    {
+      "assertionResults": [
+        {
+          "assertionId": "event-stream-sse.leading-space-stripped-once.1.resultField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "event-stream-sse.leading-space-stripped-once.requiredEvidence.result.sse.decoded.events",
+          "status": "pass"
+        }
+      ],
+      "checkId": "event-stream-sse.leading-space-stripped-once",
+      "details": {
+        "adapterId": "typescript-framework",
+        "planId": "tuvren.framework.event-stream-sse.core"
+      },
+      "status": "pass"
+    },
+    {
+      "assertionResults": [
+        {
+          "assertionId": "event-stream-sse.multi-data-lf-concat.1.resultField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "event-stream-sse.multi-data-lf-concat.requiredEvidence.result.sse.decoded.events",
+          "status": "pass"
+        }
+      ],
+      "checkId": "event-stream-sse.multi-data-lf-concat",
+      "details": {
+        "adapterId": "typescript-framework",
+        "planId": "tuvren.framework.event-stream-sse.core"
+      },
+      "status": "pass"
+    },
+    {
+      "assertionResults": [
+        {
+          "assertionId": "event-stream-sse.multiple-frames-ordered.1.resultField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "event-stream-sse.multiple-frames-ordered.requiredEvidence.result.sse.decoded.events",
+          "status": "pass"
+        }
+      ],
+      "checkId": "event-stream-sse.multiple-frames-ordered",
+      "details": {
+        "adapterId": "typescript-framework",
+        "planId": "tuvren.framework.event-stream-sse.core"
+      },
+      "status": "pass"
+    },
+    {
+      "assertionResults": [
+        {
+          "assertionId": "event-stream-sse.named-event-type.1.resultField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "event-stream-sse.named-event-type.requiredEvidence.result.sse.decoded.events",
+          "status": "pass"
+        }
+      ],
+      "checkId": "event-stream-sse.named-event-type",
+      "details": {
+        "adapterId": "typescript-framework",
+        "planId": "tuvren.framework.event-stream-sse.core"
+      },
+      "status": "pass"
+    },
+    {
+      "assertionResults": [
+        {
+          "assertionId": "event-stream-sse.retry-digits-only.1.resultField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "event-stream-sse.retry-digits-only.2.resultField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "event-stream-sse.retry-digits-only.3.resultField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "event-stream-sse.retry-digits-only.requiredEvidence.result.sse.decoded.events.0.retryMs",
+          "status": "pass"
+        },
+        {
+          "assertionId": "event-stream-sse.retry-digits-only.requiredEvidence.result.sse.decoded.events.1.retryMs",
+          "status": "pass"
+        },
+        {
+          "assertionId": "event-stream-sse.retry-digits-only.requiredEvidence.result.sse.decoded.reconnectDelayMs",
+          "status": "pass"
+        }
+      ],
+      "checkId": "event-stream-sse.retry-digits-only",
+      "details": {
+        "adapterId": "typescript-framework",
+        "planId": "tuvren.framework.event-stream-sse.core"
+      },
+      "status": "pass"
+    },
+    {
+      "assertionResults": [
+        {
+          "assertionId": "event-stream-sse.single-data-default-type.1.resultField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "event-stream-sse.single-data-default-type.requiredEvidence.result.sse.decoded.events",
+          "status": "pass"
+        }
+      ],
+      "checkId": "event-stream-sse.single-data-default-type",
+      "details": {
+        "adapterId": "typescript-framework",
+        "planId": "tuvren.framework.event-stream-sse.core"
+      },
+      "status": "pass"
+    },
+    {
+      "assertionResults": [
+        {
+          "assertionId": "event-stream-sse.unterminated-final-frame-no-dispatch.1.resultField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "event-stream-sse.unterminated-final-frame-no-dispatch.requiredEvidence.result.sse.decoded.events",
+          "status": "pass"
+        }
+      ],
+      "checkId": "event-stream-sse.unterminated-final-frame-no-dispatch",
+      "details": {
+        "adapterId": "typescript-framework",
+        "planId": "tuvren.framework.event-stream-sse.core"
+      },
+      "status": "pass"
+    },
+    {
+      "assertionResults": [
+        {
+          "assertionId": "event-stream-sse.wire-compliance-self-report.1.resultField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "event-stream-sse.wire-compliance-self-report.2.resultField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "event-stream-sse.wire-compliance-self-report.3.resultField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "event-stream-sse.wire-compliance-self-report.4.resultField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "event-stream-sse.wire-compliance-self-report.5.resultField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "event-stream-sse.wire-compliance-self-report.6.resultField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "event-stream-sse.wire-compliance-self-report.7.resultField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "event-stream-sse.wire-compliance-self-report.requiredEvidence.result.sse.wire.acceptsLfCrlfAndCrLineTerminators",
+          "status": "pass"
+        },
+        {
+          "assertionId": "event-stream-sse.wire-compliance-self-report.requiredEvidence.result.sse.wire.contentTypeIsEventStream",
+          "status": "pass"
+        },
+        {
+          "assertionId": "event-stream-sse.wire-compliance-self-report.requiredEvidence.result.sse.wire.dispatchesOnEmptyLine",
+          "status": "pass"
+        },
+        {
+          "assertionId": "event-stream-sse.wire-compliance-self-report.requiredEvidence.result.sse.wire.encodingIsUtf8",
+          "status": "pass"
+        },
+        {
+          "assertionId": "event-stream-sse.wire-compliance-self-report.requiredEvidence.result.sse.wire.ignoresCommentLines",
+          "status": "pass"
+        },
+        {
+          "assertionId": "event-stream-sse.wire-compliance-self-report.requiredEvidence.result.sse.wire.stripsLeadingBom",
+          "status": "pass"
+        },
+        {
+          "assertionId": "event-stream-sse.wire-compliance-self-report.requiredEvidence.result.sse.wire.stripsSingleLeadingFieldSpace",
+          "status": "pass"
+        }
+      ],
+      "checkId": "event-stream-sse.wire-compliance-self-report",
+      "details": {
+        "adapterId": "typescript-framework",
+        "planId": "tuvren.framework.event-stream-sse.core"
       },
       "status": "pass"
     },
@@ -3153,28 +3616,6 @@
     {
       "assertionResults": [
         {
-          "assertionId": "runtime-callable-af.approval-message-attaches-to-tool-result.1.resultField",
-          "status": "pass"
-        },
-        {
-          "assertionId": "runtime-callable-af.approval-message-attaches-to-tool-result.requiredEvidence.approval.messageAttachment",
-          "status": "pass"
-        },
-        {
-          "assertionId": "runtime-callable-af.approval-message-attaches-to-tool-result.requiredEvidence.result.approval.messageAttachment",
-          "status": "pass"
-        }
-      ],
-      "checkId": "runtime-callable-af.approval-message-attaches-to-tool-result",
-      "details": {
-        "adapterId": "typescript-framework",
-        "planId": "tuvren.framework.runtime-api.callables-extended"
-      },
-      "status": "pass"
-    },
-    {
-      "assertionResults": [
-        {
           "assertionId": "runtime-callable-af.approval-reject-stages-tool-result.1.resultField",
           "status": "pass"
         },
@@ -3347,32 +3788,6 @@
     {
       "assertionResults": [
         {
-          "assertionId": "runtime-callable-af.mixed-approval-gated-tool-start-after-resume.1.resultField",
-          "status": "pass"
-        },
-        {
-          "assertionId": "runtime-callable-af.mixed-approval-gated-tool-start-after-resume.requiredEvidence.approval.gatedToolStartAfterResume",
-          "status": "pass"
-        },
-        {
-          "assertionId": "runtime-callable-af.mixed-approval-gated-tool-start-after-resume.requiredEvidence.approval.resumedEventTypes",
-          "status": "pass"
-        },
-        {
-          "assertionId": "runtime-callable-af.mixed-approval-gated-tool-start-after-resume.requiredEvidence.result.approval.gatedToolStartAfterResume",
-          "status": "pass"
-        }
-      ],
-      "checkId": "runtime-callable-af.mixed-approval-gated-tool-start-after-resume",
-      "details": {
-        "adapterId": "typescript-framework",
-        "planId": "tuvren.framework.runtime-api.callables-extended"
-      },
-      "status": "pass"
-    },
-    {
-      "assertionResults": [
-        {
           "assertionId": "runtime-callable-af.paused-cancel-rejection-and-stop.1.resultField",
           "status": "pass"
         },
@@ -3534,108 +3949,6 @@
         }
       ],
       "checkId": "runtime-callable-af.structured-validation-hard-fail-code",
-      "details": {
-        "adapterId": "typescript-framework",
-        "planId": "tuvren.framework.runtime-api.callables-extended"
-      },
-      "status": "pass"
-    },
-    {
-      "assertionResults": [
-        {
-          "assertionId": "runtime-callable-af.tool-call-id-owned-by-framework.1.resultField",
-          "status": "pass"
-        },
-        {
-          "assertionId": "runtime-callable-af.tool-call-id-owned-by-framework.2.resultField",
-          "status": "pass"
-        },
-        {
-          "assertionId": "runtime-callable-af.tool-call-id-owned-by-framework.requiredEvidence.provider.stream.response.parts.0.providerMetadata.providerCallId",
-          "status": "pass"
-        },
-        {
-          "assertionId": "runtime-callable-af.tool-call-id-owned-by-framework.requiredEvidence.provider.stream.toolCallIdOwnedByFramework",
-          "status": "pass"
-        },
-        {
-          "assertionId": "runtime-callable-af.tool-call-id-owned-by-framework.requiredEvidence.result.provider.stream.response.parts.0.providerMetadata.providerCallId",
-          "status": "pass"
-        },
-        {
-          "assertionId": "runtime-callable-af.tool-call-id-owned-by-framework.requiredEvidence.result.provider.stream.toolCallIdOwnedByFramework",
-          "status": "pass"
-        }
-      ],
-      "checkId": "runtime-callable-af.tool-call-id-owned-by-framework",
-      "details": {
-        "adapterId": "typescript-framework",
-        "planId": "tuvren.framework.runtime-api.callables-extended"
-      },
-      "status": "pass"
-    },
-    {
-      "assertionResults": [
-        {
-          "assertionId": "runtime-callable-af.tool-failure-produces-error-result-not-run-fail.1.resultField",
-          "status": "pass"
-        },
-        {
-          "assertionId": "runtime-callable-af.tool-failure-produces-error-result-not-run-fail.2.resultField",
-          "status": "pass"
-        },
-        {
-          "assertionId": "runtime-callable-af.tool-failure-produces-error-result-not-run-fail.3.stateField",
-          "status": "pass"
-        },
-        {
-          "assertionId": "runtime-callable-af.tool-failure-produces-error-result-not-run-fail.requiredEvidence.result.tool.execution.toolResults.0.isError",
-          "status": "pass"
-        },
-        {
-          "assertionId": "runtime-callable-af.tool-failure-produces-error-result-not-run-fail.requiredEvidence.result.tool.execution.toolResults.0.output.error",
-          "status": "pass"
-        },
-        {
-          "assertionId": "runtime-callable-af.tool-failure-produces-error-result-not-run-fail.requiredEvidence.tool.execution.toolResults.0.isError",
-          "status": "pass"
-        },
-        {
-          "assertionId": "runtime-callable-af.tool-failure-produces-error-result-not-run-fail.requiredEvidence.tool.execution.toolResults.0.output.error",
-          "status": "pass"
-        },
-        {
-          "assertionId": "runtime-callable-af.tool-failure-produces-error-result-not-run-fail.requiredEvidence.toolExecution.status.phase",
-          "status": "pass"
-        }
-      ],
-      "checkId": "runtime-callable-af.tool-failure-produces-error-result-not-run-fail",
-      "details": {
-        "adapterId": "typescript-framework",
-        "planId": "tuvren.framework.runtime-api.callables-extended"
-      },
-      "status": "pass"
-    },
-    {
-      "assertionResults": [
-        {
-          "assertionId": "runtime-callable-af.tool-parallel-wave-starts-before-results.1.resultField",
-          "status": "pass"
-        },
-        {
-          "assertionId": "runtime-callable-af.tool-parallel-wave-starts-before-results.requiredEvidence.result.tool.execution.parallelWaveStartedBeforeResults",
-          "status": "pass"
-        },
-        {
-          "assertionId": "runtime-callable-af.tool-parallel-wave-starts-before-results.requiredEvidence.tool.execution.eventTypes",
-          "status": "pass"
-        },
-        {
-          "assertionId": "runtime-callable-af.tool-parallel-wave-starts-before-results.requiredEvidence.tool.execution.parallelWaveStartedBeforeResults",
-          "status": "pass"
-        }
-      ],
-      "checkId": "runtime-callable-af.tool-parallel-wave-starts-before-results",
       "details": {
         "adapterId": "typescript-framework",
         "planId": "tuvren.framework.runtime-api.callables-extended"
@@ -5812,6 +6125,156 @@
         "planId": "tuvren.framework.runtime-api.orchestration"
       },
       "status": "pass"
+    },
+    {
+      "assertionResults": [
+        {
+          "assertionId": "tool-contracts-af.approval-message-attaches-to-tool-result.1.resultField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "tool-contracts-af.approval-message-attaches-to-tool-result.requiredEvidence.approval.messageAttachment",
+          "status": "pass"
+        },
+        {
+          "assertionId": "tool-contracts-af.approval-message-attaches-to-tool-result.requiredEvidence.result.approval.messageAttachment",
+          "status": "pass"
+        }
+      ],
+      "checkId": "tool-contracts-af.approval-message-attaches-to-tool-result",
+      "details": {
+        "adapterId": "typescript-framework",
+        "planId": "tuvren.framework.tool-contracts.extended"
+      },
+      "status": "pass"
+    },
+    {
+      "assertionResults": [
+        {
+          "assertionId": "tool-contracts-af.mixed-approval-gated-tool-start-after-resume.1.resultField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "tool-contracts-af.mixed-approval-gated-tool-start-after-resume.requiredEvidence.approval.gatedToolStartAfterResume",
+          "status": "pass"
+        },
+        {
+          "assertionId": "tool-contracts-af.mixed-approval-gated-tool-start-after-resume.requiredEvidence.approval.resumedEventTypes",
+          "status": "pass"
+        },
+        {
+          "assertionId": "tool-contracts-af.mixed-approval-gated-tool-start-after-resume.requiredEvidence.result.approval.gatedToolStartAfterResume",
+          "status": "pass"
+        }
+      ],
+      "checkId": "tool-contracts-af.mixed-approval-gated-tool-start-after-resume",
+      "details": {
+        "adapterId": "typescript-framework",
+        "planId": "tuvren.framework.tool-contracts.extended"
+      },
+      "status": "pass"
+    },
+    {
+      "assertionResults": [
+        {
+          "assertionId": "tool-contracts-af.tool-call-id-owned-by-framework.1.resultField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "tool-contracts-af.tool-call-id-owned-by-framework.2.resultField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "tool-contracts-af.tool-call-id-owned-by-framework.requiredEvidence.provider.stream.response.parts.0.providerMetadata.providerCallId",
+          "status": "pass"
+        },
+        {
+          "assertionId": "tool-contracts-af.tool-call-id-owned-by-framework.requiredEvidence.provider.stream.toolCallIdOwnedByFramework",
+          "status": "pass"
+        },
+        {
+          "assertionId": "tool-contracts-af.tool-call-id-owned-by-framework.requiredEvidence.result.provider.stream.response.parts.0.providerMetadata.providerCallId",
+          "status": "pass"
+        },
+        {
+          "assertionId": "tool-contracts-af.tool-call-id-owned-by-framework.requiredEvidence.result.provider.stream.toolCallIdOwnedByFramework",
+          "status": "pass"
+        }
+      ],
+      "checkId": "tool-contracts-af.tool-call-id-owned-by-framework",
+      "details": {
+        "adapterId": "typescript-framework",
+        "planId": "tuvren.framework.tool-contracts.extended"
+      },
+      "status": "pass"
+    },
+    {
+      "assertionResults": [
+        {
+          "assertionId": "tool-contracts-af.tool-failure-produces-error-result-not-run-fail.1.resultField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "tool-contracts-af.tool-failure-produces-error-result-not-run-fail.2.resultField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "tool-contracts-af.tool-failure-produces-error-result-not-run-fail.3.stateField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "tool-contracts-af.tool-failure-produces-error-result-not-run-fail.requiredEvidence.result.tool.execution.toolResults.0.isError",
+          "status": "pass"
+        },
+        {
+          "assertionId": "tool-contracts-af.tool-failure-produces-error-result-not-run-fail.requiredEvidence.result.tool.execution.toolResults.0.output.error",
+          "status": "pass"
+        },
+        {
+          "assertionId": "tool-contracts-af.tool-failure-produces-error-result-not-run-fail.requiredEvidence.tool.execution.toolResults.0.isError",
+          "status": "pass"
+        },
+        {
+          "assertionId": "tool-contracts-af.tool-failure-produces-error-result-not-run-fail.requiredEvidence.tool.execution.toolResults.0.output.error",
+          "status": "pass"
+        },
+        {
+          "assertionId": "tool-contracts-af.tool-failure-produces-error-result-not-run-fail.requiredEvidence.toolExecution.status.phase",
+          "status": "pass"
+        }
+      ],
+      "checkId": "tool-contracts-af.tool-failure-produces-error-result-not-run-fail",
+      "details": {
+        "adapterId": "typescript-framework",
+        "planId": "tuvren.framework.tool-contracts.extended"
+      },
+      "status": "pass"
+    },
+    {
+      "assertionResults": [
+        {
+          "assertionId": "tool-contracts-af.tool-parallel-wave-starts-before-results.1.resultField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "tool-contracts-af.tool-parallel-wave-starts-before-results.requiredEvidence.result.tool.execution.parallelWaveStartedBeforeResults",
+          "status": "pass"
+        },
+        {
+          "assertionId": "tool-contracts-af.tool-parallel-wave-starts-before-results.requiredEvidence.tool.execution.eventTypes",
+          "status": "pass"
+        },
+        {
+          "assertionId": "tool-contracts-af.tool-parallel-wave-starts-before-results.requiredEvidence.tool.execution.parallelWaveStartedBeforeResults",
+          "status": "pass"
+        }
+      ],
+      "checkId": "tool-contracts-af.tool-parallel-wave-starts-before-results",
+      "details": {
+        "adapterId": "typescript-framework",
+        "planId": "tuvren.framework.tool-contracts.extended"
+      },
+      "status": "pass"
     }
   ],
   "command": [
@@ -5829,9 +6292,9 @@
   "status": "pass",
   "summary": {
     "failedChecks": 0,
-    "passedChecks": 265,
-    "totalChecks": 265,
-    "applicableChecks": 265,
+    "passedChecks": 284,
+    "totalChecks": 284,
+    "applicableChecks": 284,
     "nonApplicableChecks": 0
   },
   "suiteId": "tuvren.framework.promoted-authority",

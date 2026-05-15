@@ -1,6 +1,6 @@
 {
   "packetId": "tuvren.framework.runtime-api",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "boundary": "framework",
   "surface": "runtime-api",
   "humanAuthorityRefs": [
@@ -53,7 +53,7 @@
     },
     {
       "planId": "tuvren.framework.runtime-api.callables-extended",
-      "planVersion": "0.1.0",
+      "planVersion": "0.2.0",
       "path": "boundaries/framework/conformance/plans/runtime-api-callables-extended.json"
     },
     {

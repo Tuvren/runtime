@@ -1,0 +1,298 @@
+{
+  "fixtureSetId": "tuvren.framework.event-stream-sse.traces",
+  "fixtureVersion": "0.1.0",
+  "description": "WHATWG-normative `text/event-stream` byte traces paired with the decoded events a conformant decoder MUST produce. Each trace exercises one normative rule so the conformance plan can assert each rule independently.",
+  "sourceAuthority": "https://html.spec.whatwg.org/multipage/server-sent-events.html",
+  "traces": {
+    "single-data-default-type": {
+      "description": "A single `data:` field followed by an empty line dispatches one event whose `type` defaults to `message`.",
+      "encodedBytes": "data: hello\n\n",
+      "lineEnding": "LF",
+      "expectedDecodedStream": {
+        "events": [
+          {
+            "type": "message",
+            "data": "hello"
+          }
+        ]
+      }
+    },
+    "multi-data-lf-concat": {
+      "description": "Multiple `data:` fields in one frame are concatenated with a single LF between them; the trailing LF that the algorithm appends is stripped before dispatch.",
+      "encodedBytes": "data: first\ndata: second\n\n",
+      "lineEnding": "LF",
+      "expectedDecodedStream": {
+        "events": [
+          {
+            "type": "message",
+            "data": "first\nsecond"
+          }
+        ]
+      }
+    },
+    "crlf-line-terminator": {
+      "description": "CRLF line endings are valid frame separators alongside LF and CR.",
+      "encodedBytes": "data: crlf-ok\r\n\r\n",
+      "lineEnding": "CRLF",
+      "expectedDecodedStream": {
+        "events": [
+          {
+            "type": "message",
+            "data": "crlf-ok"
+          }
+        ]
+      }
+    },
+    "cr-line-terminator": {
+      "description": "Bare CR line endings are valid frame separators per WHATWG.",
+      "encodedBytes": "data: cr-ok\r\r",
+      "lineEnding": "CR",
+      "expectedDecodedStream": {
+        "events": [
+          {
+            "type": "message",
+            "data": "cr-ok"
+          }
+        ]
+      }
+    },
+    "named-event-type": {
+      "description": "An `event:` field sets the dispatched event's `type` to that value.",
+      "encodedBytes": "event: tuvren.turn.start\ndata: payload\n\n",
+      "lineEnding": "LF",
+      "expectedDecodedStream": {
+        "events": [
+          {
+            "type": "tuvren.turn.start",
+            "data": "payload"
+          }
+        ]
+      }
+    },
+    "id-sets-last-event-id": {
+      "description": "An `id:` field sets the last-event-id buffer which the decoder MUST surface on dispatch and which the client MUST send via `Last-Event-ID` on reconnection.",
+      "encodedBytes": "id: 42\ndata: with-id\n\n",
+      "lineEnding": "LF",
+      "expectedDecodedStream": {
+        "events": [
+          {
+            "type": "message",
+            "data": "with-id",
+            "id": "42"
+          }
+        ],
+        "lastEventId": "42"
+      }
+    },
+    "id-with-null-byte-ignored": {
+      "description": "An `id:` field whose value contains U+0000 NULL MUST be ignored: the last-event-id buffer remains unchanged.",
+      "encodedBytes": "id: legit\ndata: keep\n\nid: bad\u0000value\ndata: still-legit\n\n",
+      "lineEnding": "LF",
+      "expectedDecodedStream": {
+        "events": [
+          {
+            "type": "message",
+            "data": "keep",
+            "id": "legit"
+          },
+          {
+            "type": "message",
+            "data": "still-legit",
+            "id": "legit"
+          }
+        ],
+        "lastEventId": "legit"
+      }
+    },
+    "id-empty-resets-last-event-id": {
+      "description": "Per WHATWG `https://html.spec.whatwg.org/multipage/server-sent-events.html#event-stream-interpretation`, an `id:` field with an empty value sets the last-event-id buffer to the empty string, which suppresses the `Last-Event-ID` header on reconnect. The reset MUST be observable on subsequent dispatched events and on the surfaced `lastEventId`.",
+      "encodedBytes": "id: 42\ndata: first\n\nid:\ndata: second\n\n",
+      "lineEnding": "LF",
+      "expectedDecodedStream": {
+        "events": [
+          {
+            "type": "message",
+            "data": "first",
+            "id": "42"
+          },
+          {
+            "type": "message",
+            "data": "second",
+            "id": ""
+          }
+        ],
+        "lastEventId": ""
+      }
+    },
+    "retry-digits-only": {
+      "description": "A `retry:` field whose value is ASCII digits sets the reconnect delay; non-digit `retry:` values MUST be ignored.",
+      "encodedBytes": "retry: 5000\ndata: with-retry\n\nretry: not-a-number\ndata: ignored-retry\n\n",
+      "lineEnding": "LF",
+      "expectedDecodedStream": {
+        "events": [
+          {
+            "type": "message",
+            "data": "with-retry",
+            "retryMs": 5000
+          },
+          {
+            "type": "message",
+            "data": "ignored-retry",
+            "retryMs": 5000
+          }
+        ],
+        "reconnectDelayMs": 5000
+      }
+    },
+    "comment-line-ignored": {
+      "description": "A line that starts with U+003A COLON is a comment per WHATWG and MUST NOT surface as a decoded event; it MAY serve as a keep-alive.",
+      "encodedBytes": ": heartbeat\ndata: real-event\n\n",
+      "lineEnding": "LF",
+      "expectedDecodedStream": {
+        "events": [
+          {
+            "type": "message",
+            "data": "real-event"
+          }
+        ]
+      }
+    },
+    "leading-space-stripped-once": {
+      "description": "If a field value starts with U+0020 SPACE, the decoder strips ONE leading space. Subsequent spaces are preserved.",
+      "encodedBytes": "data:  two-leading-spaces\n\n",
+      "lineEnding": "LF",
+      "expectedDecodedStream": {
+        "events": [
+          {
+            "type": "message",
+            "data": " two-leading-spaces"
+          }
+        ]
+      }
+    },
+    "field-without-value": {
+      "description": "A line with no U+003A COLON is treated as a field with an empty value. `data` (no value, no colon) appends an empty string then a LF.",
+      "encodedBytes": "data\ndata\n\n",
+      "lineEnding": "LF",
+      "expectedDecodedStream": {
+        "events": [
+          {
+            "type": "message",
+            "data": "\n"
+          }
+        ]
+      }
+    },
+    "empty-data-buffer-no-dispatch": {
+      "description": "An empty line dispatches an event only when the data buffer is non-empty. A frame consisting solely of comment + empty line MUST NOT dispatch.",
+      "encodedBytes": ": only-comment\n\ndata: after-empty-frame\n\n",
+      "lineEnding": "LF",
+      "expectedDecodedStream": {
+        "events": [
+          {
+            "type": "message",
+            "data": "after-empty-frame"
+          }
+        ]
+      }
+    },
+    "leading-bom-stripped": {
+      "description": "The UTF-8 decode step strips at most one leading U+FEFF BYTE ORDER MARK from the stream.",
+      "encodedBytes": "﻿data: bom-was-stripped\n\n",
+      "lineEnding": "LF",
+      "expectedDecodedStream": {
+        "events": [
+          {
+            "type": "message",
+            "data": "bom-was-stripped"
+          }
+        ]
+      }
+    },
+    "event-type-resets-between-frames": {
+      "description": "The event-type buffer is reset between dispatched frames: an `event:` field on one frame does NOT carry over to the next frame.",
+      "encodedBytes": "event: typed\ndata: first\n\ndata: second\n\n",
+      "lineEnding": "LF",
+      "expectedDecodedStream": {
+        "events": [
+          {
+            "type": "typed",
+            "data": "first"
+          },
+          {
+            "type": "message",
+            "data": "second"
+          }
+        ]
+      }
+    },
+    "multiple-frames-ordered": {
+      "description": "Decoded frames MUST be emitted in the order they appear in the byte trace; ordering is observable evidence.",
+      "encodedBytes": "data: a\n\ndata: b\n\ndata: c\n\n",
+      "lineEnding": "LF",
+      "expectedDecodedStream": {
+        "events": [
+          {
+            "type": "message",
+            "data": "a"
+          },
+          {
+            "type": "message",
+            "data": "b"
+          },
+          {
+            "type": "message",
+            "data": "c"
+          }
+        ]
+      }
+    },
+    "id-persists-until-next-id": {
+      "description": "The last-event-id buffer persists across events that do not redeclare `id:`. Each subsequent decoded event surfaces the last value seen.",
+      "encodedBytes": "id: a1\ndata: one\n\ndata: two\n\nid: a2\ndata: three\n\n",
+      "lineEnding": "LF",
+      "expectedDecodedStream": {
+        "events": [
+          {
+            "type": "message",
+            "data": "one",
+            "id": "a1"
+          },
+          {
+            "type": "message",
+            "data": "two",
+            "id": "a1"
+          },
+          {
+            "type": "message",
+            "data": "three",
+            "id": "a2"
+          }
+        ],
+        "lastEventId": "a2"
+      }
+    },
+    "unterminated-final-frame-no-dispatch": {
+      "description": "Per WHATWG: at end-of-stream any pending data must be discarded; an incomplete frame that lacks the terminating empty line MUST NOT dispatch. A conformant decoder dispatches only the frames that were closed with a blank-line transition and drops the trailing partial frame.",
+      "encodedBytes": "data: completed\n\ndata: never-dispatches",
+      "lineEnding": "LF",
+      "expectedDecodedStream": {
+        "events": [
+          {
+            "type": "message",
+            "data": "completed"
+          }
+        ]
+      }
+    }
+  },
+  "wireCompliance": {
+    "contentTypeIsEventStream": true,
+    "encodingIsUtf8": true,
+    "acceptsLfCrlfAndCrLineTerminators": true,
+    "stripsLeadingBom": true,
+    "stripsSingleLeadingFieldSpace": true,
+    "dispatchesOnEmptyLine": true,
+    "ignoresCommentLines": true
+  }
+}
