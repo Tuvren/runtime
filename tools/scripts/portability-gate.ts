@@ -64,6 +64,7 @@ interface AdapterManifest {
   adapterId: string;
   authorityPackets: string[];
   boundary: string;
+  capabilities?: readonly string[];
 }
 
 interface PortabilityGateFailure {
@@ -116,7 +117,14 @@ const ALLOWED_CLASSIFICATIONS: ReadonlySet<string> = new Set([
   "telemetry",
 ]);
 const MANIFEST_FILE_NAME = "authority-packet.json";
-const ADAPTER_MANIFEST_FILE_NAME = "adapter.json";
+// Adapter manifests in this repo follow two naming patterns: a default
+// `adapter.json` and per-variant `adapter-<variant>.json` (e.g.
+// `adapter-sqlite.json`, `adapter-postgres.json`). Discovery must match both
+// so the adapter-coverage rule sees every measured lane — earlier waves only
+// matched the default name and silently skipped the variant adapters, which
+// is the exact "non-default adapter loses a packet without tripping the gate"
+// regression wave 5 flagged.
+const ADAPTER_MANIFEST_NAME_PATTERN = /^adapter(?:-[A-Za-z0-9._-]+)?\.json$/u;
 
 const EXECUTABLE_VERIFICATION_KINDS: ReadonlySet<string> = new Set([
   "schema-validation",
@@ -180,6 +188,7 @@ async function runPortabilityGate(
   );
 
   failures.push(...checkInventoryExists());
+  failures.push(...(await checkInventoryMdJsonConsistency(inventory)));
   failures.push(...checkExpectedTopologyIsUnique(inventory));
   failures.push(
     ...checkExpectedPacketsPresent(
@@ -200,6 +209,12 @@ async function runPortabilityGate(
   failures.push(...checkStandingExceptions(inventory, onDiskManifests));
   failures.push(...checkRequiredSources(inventory, onDiskManifests));
   failures.push(...checkAdapterCoverage(onDiskManifests, adapterManifests));
+  failures.push(
+    ...(await checkPlanApplicabilityHasAdapter(
+      onDiskManifests,
+      adapterManifests
+    ))
+  );
 
   return failures;
 }
@@ -609,9 +624,8 @@ async function loadAllAdapterManifests(): Promise<
   Map<string, AdapterManifest>
 > {
   const manifests = new Map<string, AdapterManifest>();
-  const paths = await findFilesByName(
-    BOUNDARIES_ROOT,
-    ADAPTER_MANIFEST_FILE_NAME
+  const paths = await findFiles(BOUNDARIES_ROOT, (name) =>
+    ADAPTER_MANIFEST_NAME_PATTERN.test(name)
   );
 
   for (const manifestPath of paths) {
@@ -628,6 +642,13 @@ async function findFilesByName(
   directory: string,
   fileName: string
 ): Promise<string[]> {
+  return await findFiles(directory, (name) => name === fileName);
+}
+
+async function findFiles(
+  directory: string,
+  matches: (fileName: string) => boolean
+): Promise<string[]> {
   if (!existsSync(directory)) {
     return [];
   }
@@ -639,11 +660,11 @@ async function findFilesByName(
     const entryPath = resolve(directory, entry.name);
 
     if (entry.isDirectory()) {
-      paths.push(...(await findFilesByName(entryPath, fileName)));
+      paths.push(...(await findFiles(entryPath, matches)));
       continue;
     }
 
-    if (entry.isFile() && entry.name === fileName) {
+    if (entry.isFile() && matches(entry.name)) {
       paths.push(entryPath);
     }
   }
@@ -662,6 +683,159 @@ function checkInventoryExists(): PortabilityGateFailure[] {
       message: `Epic AL inventory missing at ${relative(REPO_ROOT, INVENTORY_PATH)}; portability gate requires the inventory as the human-readable closure record.`,
     },
   ];
+}
+
+async function checkInventoryMdJsonConsistency(
+  inventory: PortabilityInventoryManifest
+): Promise<PortabilityGateFailure[]> {
+  // The previous version of this gate only checked that the human MD inventory
+  // existed on disk. That made the JSON sidecar the gate's source of truth but
+  // left the MD free to silently drift — a reviewer could rename a packet or
+  // add a new standing exception in JSON without touching the MD (or vice
+  // versa) and the gate would still pass.
+  //
+  // Two anchor classes catch the narrative drift cases without over-fitting
+  // to prose phrasing:
+  //   - Every packetId in JSON must appear verbatim in the MD. PacketIds are
+  //     dot-namespaced identifiers (`tuvren.foo.bar`); they are stable, short,
+  //     and unambiguous, so a literal substring match is appropriate.
+  //   - Every standing exception in JSON must have at least one of its
+  //     `forbiddenSurfaceNames` mentioned verbatim in the MD. Those names
+  //     are the actual package/surface identifiers the exception protects
+  //     against, so they're the right anchor — strict enough to catch the
+  //     "added a new exception in JSON, forgot to document it" case, loose
+  //     enough to let the MD pick whichever forbidden name reads most
+  //     naturally.
+  //
+  // Source-path drift is intentionally NOT checked here. The MD does not
+  // reliably name every required source by literal path (some paths are
+  // paraphrased in prose for readability). On-disk source path presence and
+  // packet-registration are already enforced by `checkRequiredSources`, which
+  // is the structural guard for that class of drift. Packet-path drift is
+  // similarly caught by `checkExpectedPacketsPresent`.
+  if (!existsSync(INVENTORY_PATH)) {
+    return [];
+  }
+
+  const mdContent = await readFile(INVENTORY_PATH, "utf8");
+  const failures: PortabilityGateFailure[] = [];
+  const inventoryRel = relative(REPO_ROOT, INVENTORY_PATH);
+
+  for (const entry of inventory.expectedPackets) {
+    if (!mdContent.includes(entry.packetId)) {
+      failures.push({
+        rule: "inventory-md-json-consistency",
+        message: `inventory JSON lists packetId ${entry.packetId} but ${inventoryRel} does not mention it; paired-edit drift — revise the MD and JSON together`,
+      });
+    }
+  }
+
+  for (const exception of inventory.standingExceptions) {
+    const anyMentioned = exception.forbiddenSurfaceNames.some((name) =>
+      mdContent.includes(name)
+    );
+
+    if (!anyMentioned) {
+      failures.push({
+        rule: "inventory-md-json-consistency",
+        message: `inventory JSON declares standing exception "${exception.label}" with forbidden surfaces [${exception.forbiddenSurfaceNames.join(", ")}] but ${inventoryRel} does not mention any of them; paired-edit drift — document the exception in the MD or remove it from the JSON`,
+      });
+    }
+  }
+
+  return failures;
+}
+
+async function checkPlanApplicabilityHasAdapter(
+  onDisk: ReadonlyMap<string, AuthorityPacketManifest>,
+  adapterManifests: ReadonlyMap<string, AdapterManifest>
+): Promise<PortabilityGateFailure[]> {
+  // A conformance plan that names capabilities under `applicability.capabilities`
+  // is only reachable as applicable evidence when at least one adapter in the
+  // packet's boundary advertises every one of those capabilities. If no
+  // adapter does, the plan's checks run as `nonApplicable` on every measured
+  // lane and the portability claim collapses to "the plan exists" rather
+  // than "the surface is measured." Wave 5 flagged exactly this for the SSE
+  // plan: the packet had been promoted to portable but no framework adapter
+  // declared `framework.event-stream-sse`, so every SSE check in compatibility
+  // evidence was nonApplicable. Catch the structural gap here.
+  const failures: PortabilityGateFailure[] = [];
+  const adaptersByBoundary = new Map<string, AdapterManifest[]>();
+
+  for (const adapter of adapterManifests.values()) {
+    const existing = adaptersByBoundary.get(adapter.boundary);
+
+    if (existing === undefined) {
+      adaptersByBoundary.set(adapter.boundary, [adapter]);
+    } else {
+      existing.push(adapter);
+    }
+  }
+
+  for (const [packetPath, manifest] of onDisk.entries()) {
+    const plans = manifest.conformancePlans ?? [];
+
+    if (plans.length === 0) {
+      continue;
+    }
+
+    const adapters = adaptersByBoundary.get(manifest.boundary) ?? [];
+
+    for (const plan of plans) {
+      const planCapabilities = await readPlanApplicabilityCapabilities(
+        plan.path
+      );
+
+      if (planCapabilities.length === 0) {
+        continue;
+      }
+
+      const advertisingAdapter = adapters.find(
+        (adapter) =>
+          adapter.authorityPackets.includes(packetPath) &&
+          planCapabilities.every((capability) =>
+            isAdapterCapability(adapter, capability)
+          )
+      );
+
+      if (advertisingAdapter === undefined) {
+        failures.push({
+          rule: "plan-applicability-has-adapter",
+          message: `plan ${plan.planId} at ${plan.path} requires applicability capabilities ${planCapabilities.sort().join(", ")} but no ${manifest.boundary}-boundary adapter advertises that full set; the portability promotion of ${manifest.packetId} would record zero applicable evidence`,
+        });
+      }
+    }
+  }
+
+  return failures;
+}
+
+async function readPlanApplicabilityCapabilities(
+  planPath: string
+): Promise<readonly string[]> {
+  const absolutePath = resolve(REPO_ROOT, planPath);
+
+  if (!existsSync(absolutePath)) {
+    return [];
+  }
+
+  const plan = JSON.parse(await readFile(absolutePath, "utf8")) as {
+    applicability?: { capabilities?: unknown };
+  };
+  const value = plan.applicability?.capabilities;
+
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.filter((entry): entry is string => typeof entry === "string");
+}
+
+function isAdapterCapability(
+  adapter: AdapterManifest,
+  capability: string
+): boolean {
+  return adapter.capabilities?.includes(capability) ?? false;
 }
 
 function checkExpectedPacketsPresent(

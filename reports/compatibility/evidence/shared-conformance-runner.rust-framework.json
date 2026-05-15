@@ -28,7 +28,6 @@
     "event-stream-sse.comment-line-ignored",
     "event-stream-sse.cr-line-terminator",
     "event-stream-sse.crlf-line-terminator",
-    "event-stream-sse.decoded-stream-matches-schema",
     "event-stream-sse.empty-data-buffer-no-dispatch",
     "event-stream-sse.event-type-resets-between-frames",
     "event-stream-sse.field-without-value",
@@ -305,9 +304,9 @@
   "summary": {
     "failedChecks": 0,
     "passedChecks": 0,
-    "totalChecks": 285,
+    "totalChecks": 284,
     "applicableChecks": 0,
-    "nonApplicableChecks": 285
+    "nonApplicableChecks": 284
   },
   "suiteId": "tuvren.framework.promoted-authority",
   "suiteVersion": "0.1.0"

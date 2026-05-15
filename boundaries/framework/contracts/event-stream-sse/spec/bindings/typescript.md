@@ -31,13 +31,11 @@ part of the cross-language contract.
 
 The shared conformance runner dispatches `event-stream-sse.decode-trace` and
 `event-stream-sse.report-wire-compliance` operations against any adapter that
-declares the `framework.event-stream-sse` capability. The current TypeScript
-framework adapter at `boundaries/framework/implementations/typescript/conformance-adapter/`
-does NOT yet declare this capability; until it does, every check in
-`event-stream-sse.json` runs as non-applicable on the TypeScript framework
-lane.
-
-The pending adapter work is a follow-up: the adapter must implement the two
-neutral operations against the existing `@tuvren/stream-sse` package, declare
-the new capability, and refresh compatibility evidence to flip the SSE plan
-from `unsupported` to `pass` on the TypeScript lane.
+declares the `framework.event-stream-sse` capability. The TypeScript framework
+adapter at `boundaries/framework/implementations/typescript/conformance-adapter/`
+declares that capability and routes both operations through
+`framework-adapter-event-stream-sse.ts`, which delegates to `decodeSseStream`
+and `reportSseWireCompliance` from `@tuvren/stream-sse`. Every check in
+`event-stream-sse.json` therefore runs as applicable evidence on the
+TypeScript framework lane and contributes to the checked-in compatibility
+matrix.

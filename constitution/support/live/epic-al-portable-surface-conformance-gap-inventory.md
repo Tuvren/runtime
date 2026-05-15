@@ -476,14 +476,16 @@ or names paths that disagree with the on-disk packet set.
 Follow-up items that are explicitly outside KRT-AL002's scope and remain
 candidates for future tickets:
 
-- §8.E5 SSE checks remain non-applicable on the TypeScript framework lane
-  until the framework conformance adapter declares
-  `framework.event-stream-sse` capability and dispatches
+- §8.E5 SSE checks were closed under the KRT-AL003 wave-5 review followup:
+  the TypeScript framework conformance adapter now declares the
+  `framework.event-stream-sse` capability and routes
   `event-stream-sse.decode-trace` / `event-stream-sse.report-wire-compliance`
-  against the existing `@tuvren/stream-sse` package. The TypeScript binding
-  appendix at
+  through a WHATWG-conformant decoder in `@tuvren/stream-sse`, so every check
+  in `event-stream-sse.json` runs as applicable evidence on the TypeScript
+  framework lane. The plan's bumped `planVersion` is `0.2.0`; the TypeScript
+  binding appendix at
   `boundaries/framework/contracts/event-stream-sse/spec/bindings/typescript.md`
-  documents the pending adapter work.
+  documents the wired adapter behavior.
 - §8.E6 tool argument streaming completeness assertion was not added in
   AL002; it requires either canonical `$.events` exposure or an adapter
   capability that surfaces concatenated `ToolCallArgsDelta` payloads.

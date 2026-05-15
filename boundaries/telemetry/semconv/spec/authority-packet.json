@@ -50,7 +50,9 @@
   "verificationPaths": [
     {
       "kind": "vocabulary-check",
-      "target": "telemetry/semconv/tuvren-runtime.yaml"
+      "target": "telemetry/semconv/tuvren-runtime.yaml",
+      "resolvedArtifact": "telemetry/otel-attributes.json",
+      "resolvedKeyPath": "attributes.*.key"
     },
     {
       "kind": "freshness-check",

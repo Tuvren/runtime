@@ -35,6 +35,7 @@ import {
 } from "../../../../../../tools/conformance/adapter-protocol/index.js";
 import { createFrameworkAdapterDriver } from "./framework-adapter-driver.ts";
 import { createFrameworkAdapterEventStream } from "./framework-adapter-event-stream.ts";
+import { createFrameworkAdapterEventStreamSse } from "./framework-adapter-event-stream-sse.ts";
 import { createFrameworkAdapterOrchestration } from "./framework-adapter-orchestration.ts";
 import type {
   AdapterProjection,
@@ -94,6 +95,8 @@ const orchestrationScenarios = createFrameworkAdapterOrchestration({
   readRecordString,
   readStringProperty,
 });
+
+const eventStreamSseScenarios = createFrameworkAdapterEventStreamSse();
 
 const eventStreamScenarios = createFrameworkAdapterEventStream({
   isRecord,
@@ -210,6 +213,7 @@ export class TypeScriptFrameworkAdapter implements ImplementationAdapter {
       capabilities: [
         "framework.driver-api",
         "framework.event-stream",
+        "framework.event-stream-sse",
         "framework.orchestration",
         "framework.run-liveness",
         "framework.react-driver",
@@ -309,6 +313,10 @@ export class TypeScriptFrameworkAdapter implements ImplementationAdapter {
         return eventStreamScenarios.runSseEagerSubscription(input);
       case "event-stream.runtime-sse-projection":
         return eventStreamScenarios.runSseProjection(input);
+      case "event-stream-sse.decode-trace":
+        return eventStreamSseScenarios.runDecodeTrace(input);
+      case "event-stream-sse.report-wire-compliance":
+        return eventStreamSseScenarios.runReportWireCompliance(input);
       default:
         throw new Error(
           `unsupported promoted framework operation ${operation}`

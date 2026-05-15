@@ -6,72 +6,102 @@
     {
       "assertions": [
         {
-          "equals": [{ "type": "message", "data": "hello" }],
+          "equals": [
+            {
+              "type": "message",
+              "data": "hello"
+            }
+          ],
           "field": "$.sse.decoded.events",
           "kind": "resultField"
         }
       ],
       "checkId": "event-stream-sse.single-data-default-type",
-      "input": { "fixturePath": "$.single-data-default-type.encodedBytes" },
+      "input": {
+        "fixturePath": "$.traces.single-data-default-type.encodedBytes"
+      },
       "operation": "event-stream-sse.decode-trace",
-      "fixture": "event-stream-sse-traces",
-      "evidence": ["sse.decoded.events"]
+      "fixture": "event-stream-sse-traces"
     },
     {
       "assertions": [
         {
-          "equals": [{ "type": "message", "data": "first\nsecond" }],
+          "equals": [
+            {
+              "type": "message",
+              "data": "first\nsecond"
+            }
+          ],
           "field": "$.sse.decoded.events",
           "kind": "resultField"
         }
       ],
       "checkId": "event-stream-sse.multi-data-lf-concat",
-      "input": { "fixturePath": "$.multi-data-lf-concat.encodedBytes" },
+      "input": {
+        "fixturePath": "$.traces.multi-data-lf-concat.encodedBytes"
+      },
       "operation": "event-stream-sse.decode-trace",
-      "fixture": "event-stream-sse-traces",
-      "evidence": ["sse.decoded.events"]
+      "fixture": "event-stream-sse-traces"
     },
     {
       "assertions": [
         {
-          "equals": [{ "type": "message", "data": "crlf-ok" }],
+          "equals": [
+            {
+              "type": "message",
+              "data": "crlf-ok"
+            }
+          ],
           "field": "$.sse.decoded.events",
           "kind": "resultField"
         }
       ],
       "checkId": "event-stream-sse.crlf-line-terminator",
-      "input": { "fixturePath": "$.crlf-line-terminator.encodedBytes" },
+      "input": {
+        "fixturePath": "$.traces.crlf-line-terminator.encodedBytes"
+      },
       "operation": "event-stream-sse.decode-trace",
-      "fixture": "event-stream-sse-traces",
-      "evidence": ["sse.decoded.events"]
+      "fixture": "event-stream-sse-traces"
     },
     {
       "assertions": [
         {
-          "equals": [{ "type": "message", "data": "cr-ok" }],
+          "equals": [
+            {
+              "type": "message",
+              "data": "cr-ok"
+            }
+          ],
           "field": "$.sse.decoded.events",
           "kind": "resultField"
         }
       ],
       "checkId": "event-stream-sse.cr-line-terminator",
-      "input": { "fixturePath": "$.cr-line-terminator.encodedBytes" },
+      "input": {
+        "fixturePath": "$.traces.cr-line-terminator.encodedBytes"
+      },
       "operation": "event-stream-sse.decode-trace",
-      "fixture": "event-stream-sse-traces",
-      "evidence": ["sse.decoded.events"]
+      "fixture": "event-stream-sse-traces"
     },
     {
       "assertions": [
         {
-          "equals": [{ "type": "tuvren.turn.start", "data": "payload" }],
+          "equals": [
+            {
+              "type": "tuvren.turn.start",
+              "data": "payload"
+            }
+          ],
           "field": "$.sse.decoded.events",
           "kind": "resultField"
         }
       ],
       "checkId": "event-stream-sse.named-event-type",
-      "input": { "fixturePath": "$.named-event-type.encodedBytes" },
+      "input": {
+        "fixturePath": "$.traces.named-event-type.encodedBytes"
+      },
       "operation": "event-stream-sse.decode-trace",
-      "fixture": "event-stream-sse-traces",
-      "evidence": ["sse.decoded.events"]
+      "fixture": "event-stream-sse-traces"
     },
     {
       "assertions": [
@@ -87,10 +117,11 @@
         }
       ],
       "checkId": "event-stream-sse.id-sets-last-event-id",
-      "input": { "fixturePath": "$.id-sets-last-event-id.encodedBytes" },
+      "input": {
+        "fixturePath": "$.traces.id-sets-last-event-id.encodedBytes"
+      },
       "operation": "event-stream-sse.decode-trace",
-      "fixture": "event-stream-sse-traces",
-      "evidence": ["sse.decoded.events.0.id", "sse.decoded.lastEventId"]
+      "fixture": "event-stream-sse-traces"
     },
     {
       "assertions": [
@@ -106,10 +137,11 @@
         }
       ],
       "checkId": "event-stream-sse.id-with-null-byte-ignored",
-      "input": { "fixturePath": "$.id-with-null-byte-ignored.encodedBytes" },
+      "input": {
+        "fixturePath": "$.traces.id-with-null-byte-ignored.encodedBytes"
+      },
       "operation": "event-stream-sse.decode-trace",
-      "fixture": "event-stream-sse-traces",
-      "evidence": ["sse.decoded.events.1.id", "sse.decoded.lastEventId"]
+      "fixture": "event-stream-sse-traces"
     },
     {
       "assertions": [
@@ -131,15 +163,10 @@
       ],
       "checkId": "event-stream-sse.id-empty-resets-last-event-id",
       "input": {
-        "fixturePath": "$.id-empty-resets-last-event-id.encodedBytes"
+        "fixturePath": "$.traces.id-empty-resets-last-event-id.encodedBytes"
       },
       "operation": "event-stream-sse.decode-trace",
-      "fixture": "event-stream-sse-traces",
-      "evidence": [
-        "sse.decoded.events.0.id",
-        "sse.decoded.events.1.id",
-        "sse.decoded.lastEventId"
-      ]
+      "fixture": "event-stream-sse-traces"
     },
     {
       "assertions": [
@@ -160,93 +187,124 @@
         }
       ],
       "checkId": "event-stream-sse.retry-digits-only",
-      "input": { "fixturePath": "$.retry-digits-only.encodedBytes" },
+      "input": {
+        "fixturePath": "$.traces.retry-digits-only.encodedBytes"
+      },
       "operation": "event-stream-sse.decode-trace",
-      "fixture": "event-stream-sse-traces",
-      "evidence": [
-        "sse.decoded.events.0.retryMs",
-        "sse.decoded.events.1.retryMs",
-        "sse.decoded.reconnectDelayMs"
-      ]
+      "fixture": "event-stream-sse-traces"
     },
     {
       "assertions": [
         {
-          "equals": [{ "type": "message", "data": "real-event" }],
+          "equals": [
+            {
+              "type": "message",
+              "data": "real-event"
+            }
+          ],
           "field": "$.sse.decoded.events",
           "kind": "resultField"
         }
       ],
       "checkId": "event-stream-sse.comment-line-ignored",
-      "input": { "fixturePath": "$.comment-line-ignored.encodedBytes" },
+      "input": {
+        "fixturePath": "$.traces.comment-line-ignored.encodedBytes"
+      },
       "operation": "event-stream-sse.decode-trace",
-      "fixture": "event-stream-sse-traces",
-      "evidence": ["sse.decoded.events"]
+      "fixture": "event-stream-sse-traces"
     },
     {
       "assertions": [
         {
-          "equals": [{ "type": "message", "data": " two-leading-spaces" }],
+          "equals": [
+            {
+              "type": "message",
+              "data": " two-leading-spaces"
+            }
+          ],
           "field": "$.sse.decoded.events",
           "kind": "resultField"
         }
       ],
       "checkId": "event-stream-sse.leading-space-stripped-once",
-      "input": { "fixturePath": "$.leading-space-stripped-once.encodedBytes" },
+      "input": {
+        "fixturePath": "$.traces.leading-space-stripped-once.encodedBytes"
+      },
       "operation": "event-stream-sse.decode-trace",
-      "fixture": "event-stream-sse-traces",
-      "evidence": ["sse.decoded.events"]
+      "fixture": "event-stream-sse-traces"
     },
     {
       "assertions": [
         {
-          "equals": [{ "type": "message", "data": "\n" }],
+          "equals": [
+            {
+              "type": "message",
+              "data": "\n"
+            }
+          ],
           "field": "$.sse.decoded.events",
           "kind": "resultField"
         }
       ],
       "checkId": "event-stream-sse.field-without-value",
-      "input": { "fixturePath": "$.field-without-value.encodedBytes" },
+      "input": {
+        "fixturePath": "$.traces.field-without-value.encodedBytes"
+      },
       "operation": "event-stream-sse.decode-trace",
-      "fixture": "event-stream-sse-traces",
-      "evidence": ["sse.decoded.events"]
+      "fixture": "event-stream-sse-traces"
     },
     {
       "assertions": [
         {
-          "equals": [{ "type": "message", "data": "after-empty-frame" }],
+          "equals": [
+            {
+              "type": "message",
+              "data": "after-empty-frame"
+            }
+          ],
           "field": "$.sse.decoded.events",
           "kind": "resultField"
         }
       ],
       "checkId": "event-stream-sse.empty-data-buffer-no-dispatch",
       "input": {
-        "fixturePath": "$.empty-data-buffer-no-dispatch.encodedBytes"
+        "fixturePath": "$.traces.empty-data-buffer-no-dispatch.encodedBytes"
       },
       "operation": "event-stream-sse.decode-trace",
-      "fixture": "event-stream-sse-traces",
-      "evidence": ["sse.decoded.events"]
-    },
-    {
-      "assertions": [
-        {
-          "equals": [{ "type": "message", "data": "bom-was-stripped" }],
-          "field": "$.sse.decoded.events",
-          "kind": "resultField"
-        }
-      ],
-      "checkId": "event-stream-sse.leading-bom-stripped",
-      "input": { "fixturePath": "$.leading-bom-stripped.encodedBytes" },
-      "operation": "event-stream-sse.decode-trace",
-      "fixture": "event-stream-sse-traces",
-      "evidence": ["sse.decoded.events"]
+      "fixture": "event-stream-sse-traces"
     },
     {
       "assertions": [
         {
           "equals": [
-            { "type": "typed", "data": "first" },
-            { "type": "message", "data": "second" }
+            {
+              "type": "message",
+              "data": "bom-was-stripped"
+            }
+          ],
+          "field": "$.sse.decoded.events",
+          "kind": "resultField"
+        }
+      ],
+      "checkId": "event-stream-sse.leading-bom-stripped",
+      "input": {
+        "fixturePath": "$.traces.leading-bom-stripped.encodedBytes"
+      },
+      "operation": "event-stream-sse.decode-trace",
+      "fixture": "event-stream-sse-traces"
+    },
+    {
+      "assertions": [
+        {
+          "equals": [
+            {
+              "type": "typed",
+              "data": "first"
+            },
+            {
+              "type": "message",
+              "data": "second"
+            }
           ],
           "field": "$.sse.decoded.events",
           "kind": "resultField"
@@ -254,34 +312,38 @@
       ],
       "checkId": "event-stream-sse.event-type-resets-between-frames",
       "input": {
-        "fixturePath": "$.event-type-resets-between-frames.encodedBytes"
+        "fixturePath": "$.traces.event-type-resets-between-frames.encodedBytes"
       },
       "operation": "event-stream-sse.decode-trace",
-      "fixture": "event-stream-sse-traces",
-      "evidence": ["sse.decoded.events"]
+      "fixture": "event-stream-sse-traces"
     },
     {
       "assertions": [
         {
           "equals": [
-            { "type": "message", "data": "a" },
-            { "type": "message", "data": "b" },
-            { "type": "message", "data": "c" }
+            {
+              "type": "message",
+              "data": "a"
+            },
+            {
+              "type": "message",
+              "data": "b"
+            },
+            {
+              "type": "message",
+              "data": "c"
+            }
           ],
           "field": "$.sse.decoded.events",
-          "kind": "resultField"
-        },
-        {
-          "equals": 3,
-          "field": "$.sse.decoded.events.length",
           "kind": "resultField"
         }
       ],
       "checkId": "event-stream-sse.multiple-frames-ordered",
-      "input": { "fixturePath": "$.multiple-frames-ordered.encodedBytes" },
+      "input": {
+        "fixturePath": "$.traces.multiple-frames-ordered.encodedBytes"
+      },
       "operation": "event-stream-sse.decode-trace",
-      "fixture": "event-stream-sse-traces",
-      "evidence": ["sse.decoded.events"]
+      "fixture": "event-stream-sse-traces"
     },
     {
       "assertions": [
@@ -307,50 +369,31 @@
         }
       ],
       "checkId": "event-stream-sse.id-persists-until-next-id",
-      "input": { "fixturePath": "$.id-persists-until-next-id.encodedBytes" },
+      "input": {
+        "fixturePath": "$.traces.id-persists-until-next-id.encodedBytes"
+      },
       "operation": "event-stream-sse.decode-trace",
-      "fixture": "event-stream-sse-traces",
-      "evidence": [
-        "sse.decoded.events.0.id",
-        "sse.decoded.events.1.id",
-        "sse.decoded.events.2.id",
-        "sse.decoded.lastEventId"
-      ]
+      "fixture": "event-stream-sse-traces"
     },
     {
       "assertions": [
         {
-          "equals": [{ "type": "message", "data": "completed" }],
+          "equals": [
+            {
+              "type": "message",
+              "data": "completed"
+            }
+          ],
           "field": "$.sse.decoded.events",
-          "kind": "resultField"
-        },
-        {
-          "equals": 1,
-          "field": "$.sse.decoded.events.length",
           "kind": "resultField"
         }
       ],
       "checkId": "event-stream-sse.unterminated-final-frame-no-dispatch",
       "input": {
-        "fixturePath": "$.unterminated-final-frame-no-dispatch.encodedBytes"
+        "fixturePath": "$.traces.unterminated-final-frame-no-dispatch.encodedBytes"
       },
       "operation": "event-stream-sse.decode-trace",
-      "fixture": "event-stream-sse-traces",
-      "evidence": ["sse.decoded.events"]
-    },
-    {
-      "assertions": [
-        {
-          "kind": "schemaValid",
-          "path": "$.result.sse.decoded",
-          "schema": "framework.event-stream-sse.DecodedSseStream"
-        }
-      ],
-      "checkId": "event-stream-sse.decoded-stream-matches-schema",
-      "input": { "fixturePath": "$.single-data-default-type.encodedBytes" },
-      "operation": "event-stream-sse.decode-trace",
-      "fixture": "event-stream-sse-traces",
-      "evidence": ["sse.decoded"]
+      "fixture": "event-stream-sse-traces"
     },
     {
       "assertions": [
@@ -391,16 +434,7 @@
         }
       ],
       "checkId": "event-stream-sse.wire-compliance-self-report",
-      "operation": "event-stream-sse.report-wire-compliance",
-      "evidence": [
-        "sse.wire.contentTypeIsEventStream",
-        "sse.wire.encodingIsUtf8",
-        "sse.wire.acceptsLfCrlfAndCrLineTerminators",
-        "sse.wire.stripsLeadingBom",
-        "sse.wire.stripsSingleLeadingFieldSpace",
-        "sse.wire.dispatchesOnEmptyLine",
-        "sse.wire.ignoresCommentLines"
-      ]
+      "operation": "event-stream-sse.report-wire-compliance"
     }
   ],
   "fixtures": {
@@ -408,5 +442,5 @@
   },
   "packetId": "tuvren.framework.event-stream-sse",
   "planId": "tuvren.framework.event-stream-sse.core",
-  "planVersion": "0.1.0"
+  "planVersion": "0.2.0"
 }

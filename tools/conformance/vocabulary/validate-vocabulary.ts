@@ -33,13 +33,11 @@ interface AuthorityPacketManifest {
   packetId: string;
   verificationPaths: Array<{
     kind: string;
+    resolvedArtifact?: string;
+    resolvedKeyPath?: string;
     target: string;
   }>;
   version: string;
-}
-
-interface ResolvedAttributeArtifact {
-  attributes: Array<{ key: string }>;
 }
 
 interface ValidationFailure {
@@ -96,7 +94,7 @@ async function validateVocabularies(): Promise<ValidationFailure[]> {
       await validateVocabularyTarget(
         manifestPath,
         manifest,
-        vocabularyPath.target,
+        vocabularyPath,
         failures
       );
     }
@@ -108,9 +106,10 @@ async function validateVocabularies(): Promise<ValidationFailure[]> {
 async function validateVocabularyTarget(
   manifestPath: string,
   manifest: AuthorityPacketManifest,
-  vocabularyTargetPath: string,
+  verificationPath: AuthorityPacketManifest["verificationPaths"][number],
   failures: ValidationFailure[]
 ): Promise<void> {
+  const vocabularyTargetPath = verificationPath.target;
   const absoluteTargetPath = resolve(REPO_ROOT, vocabularyTargetPath);
 
   if (!existsSync(absoluteTargetPath)) {
@@ -154,7 +153,7 @@ async function validateVocabularyTarget(
   if (extraction === undefined) {
     failures.push({
       manifestPath,
-      message: `vocabulary-check target ${vocabularyTargetPath} must be a Weaver semconv document with a top-level "groups" sequence`,
+      message: `vocabulary-check target ${vocabularyTargetPath} must be a Weaver semconv document — accepted shapes are a top-level "groups" sequence (definition/1) or a top-level "attribute_groups" / "attributes" / "metrics" / "events" / "resources" section (definition/2)`,
     });
     return;
   }
@@ -167,22 +166,41 @@ async function validateVocabularyTarget(
     return;
   }
 
-  const resolvedArtifact = findResolvedAttributesArtifact(manifest);
-
-  if (resolvedArtifact === undefined) {
+  if (verificationPath.resolvedArtifact === undefined) {
     failures.push({
       manifestPath,
-      message: `vocabulary-check requires a generatedArtifacts entry whose path ends in "otel-attributes.json"; none found`,
+      message: `vocabulary-check verificationPaths entry for ${vocabularyTargetPath} must declare resolvedArtifact (path to the Weaver-resolved registry JSON) so the validator does not hardcode any specific filename`,
     });
     return;
   }
 
-  const absoluteArtifactPath = resolve(REPO_ROOT, resolvedArtifact);
+  if (verificationPath.resolvedKeyPath === undefined) {
+    failures.push({
+      manifestPath,
+      message: `vocabulary-check verificationPaths entry for ${vocabularyTargetPath} must declare resolvedKeyPath (dot path with "*" array iteration, e.g. "attributes.*.key") so the validator does not hardcode any one resolved-registry shape`,
+    });
+    return;
+  }
+
+  const resolvedArtifactPath = verificationPath.resolvedArtifact;
+  const declaredAsGenerated = (manifest.generatedArtifacts ?? []).some(
+    (artifact) => artifact.path === resolvedArtifactPath
+  );
+
+  if (!declaredAsGenerated) {
+    failures.push({
+      manifestPath,
+      message: `vocabulary-check resolvedArtifact ${resolvedArtifactPath} must also appear under the packet's generatedArtifacts so its freshness is governed by the same packet`,
+    });
+    return;
+  }
+
+  const absoluteArtifactPath = resolve(REPO_ROOT, resolvedArtifactPath);
 
   if (!existsSync(absoluteArtifactPath)) {
     failures.push({
       manifestPath,
-      message: `vocabulary-check resolved artifact does not exist: ${resolvedArtifact}`,
+      message: `vocabulary-check resolved artifact does not exist: ${resolvedArtifactPath}`,
     });
     return;
   }
@@ -190,24 +208,27 @@ async function validateVocabularyTarget(
   const rawArtifact = JSON.parse(
     await readFile(absoluteArtifactPath, "utf8")
   ) as unknown;
+  const extractionResult = extractResolvedKeys(
+    rawArtifact,
+    verificationPath.resolvedKeyPath
+  );
 
-  if (!isResolvedAttributeArtifact(rawArtifact)) {
+  if (extractionResult.error !== undefined) {
     failures.push({
       manifestPath,
-      message: `vocabulary-check resolved artifact ${resolvedArtifact} must have the shape {attributes: [{key: string, ...}]}`,
+      message: `vocabulary-check resolved artifact ${resolvedArtifactPath} does not match resolvedKeyPath ${verificationPath.resolvedKeyPath}: ${extractionResult.error}`,
     });
     return;
   }
 
-  const resolvedKeys = new Set(
-    rawArtifact.attributes.map((attribute) => attribute.key)
-  );
+  const resolvedKeys = extractionResult.keys;
 
-  // The resolved artifact is an attribute registry (`otel-attributes.json`),
-  // so its keys must match attribute ids declared in the source YAML —
-  // group ids are NOT valid resolved keys. Accepting group ids here would
-  // widen the validator in the exact direction it should reject: a Weaver
-  // regression that emits a group name as a registry key has to fail.
+  // The resolved artifact is a registry whose identifier list lives at the
+  // manifest-declared `resolvedKeyPath`. Its values must match attribute ids
+  // declared in the source YAML — group ids are NOT valid resolved keys.
+  // Accepting group ids here would widen the validator in the exact direction
+  // it should reject: a Weaver regression that emits a group name as a
+  // registry key has to fail.
   const orphanedKeys = [...resolvedKeys].filter(
     (key) => !extraction.attributeIds.has(key)
   );
@@ -231,6 +252,85 @@ async function validateVocabularyTarget(
   }
 }
 
+interface ResolvedKeyExtraction {
+  error?: string;
+  keys: Set<string>;
+}
+
+function extractResolvedKeys(
+  artifact: unknown,
+  keyPath: string
+): ResolvedKeyExtraction {
+  // `resolvedKeyPath` is a dot-separated path with `*` as the array-iteration
+  // wildcard. Examples:
+  //   - `attributes.*.key`     → today's Weaver attribute registry
+  //   - `metrics.*.name`       → a hypothetical metric registry
+  //   - `attribute_groups.*.attributes.*.id` → nested registry shape
+  // The walker is deliberately simple: it supports literal property segments,
+  // single-level `*` iteration, and a final scalar-string leaf. Anything else
+  // returns an `error` so the validator surfaces a tooling-friendly message
+  // rather than silently accepting the wrong shape.
+  const segments = keyPath.split(".");
+  const keys = new Set<string>();
+  const errors: string[] = [];
+  walkResolvedKeyPath(artifact, segments, 0, keys, errors);
+
+  if (errors.length > 0) {
+    return { error: errors[0], keys };
+  }
+
+  if (keys.size === 0) {
+    return {
+      error: "resolvedKeyPath produced no identifier strings",
+      keys,
+    };
+  }
+
+  return { keys };
+}
+
+function walkResolvedKeyPath(
+  value: unknown,
+  segments: readonly string[],
+  index: number,
+  keys: Set<string>,
+  errors: string[]
+): void {
+  if (index === segments.length) {
+    if (typeof value !== "string") {
+      errors.push(`expected a string at resolved leaf, got ${typeof value}`);
+      return;
+    }
+
+    keys.add(value);
+    return;
+  }
+
+  const segment = segments[index] ?? "";
+
+  if (segment === "*") {
+    if (!Array.isArray(value)) {
+      errors.push(`expected an array at "*" segment ${index}`);
+      return;
+    }
+
+    for (const entry of value) {
+      walkResolvedKeyPath(entry, segments, index + 1, keys, errors);
+    }
+
+    return;
+  }
+
+  if (!isRecord(value)) {
+    errors.push(
+      `expected an object before segment "${segment}" at index ${index}`
+    );
+    return;
+  }
+
+  walkResolvedKeyPath(value[segment], segments, index + 1, keys, errors);
+}
+
 interface RawGroup {
   attributes: unknown;
   extendsId: string | undefined;
@@ -244,22 +344,37 @@ function extractSemconvVocabulary(
   // Parse the YAML structurally rather than line-scanning for `- id:` so that
   // deeply namespaced group ids (e.g. Weaver's `attributes.http.client.authority`
   // style) are still recognized as groups, not misclassified as attributes
-  // because of their dot depth. The Weaver semconv schema places attribute ids
-  // strictly under `groups[*].attributes[*].id` (or `attribute.ref` for
-  // attributes reused from a registry group); group ids live at `groups[*].id`.
-  // Groups may also declare `extends: <other-group-id>` to inherit the parent
-  // group's attributes, so we resolve that edge transitively before producing
-  // the effective per-group attribute set.
+  // because of their dot depth. Two top-level shapes are accepted:
+  //
+  //   - definition/1 (today's `tuvren-runtime.yaml`): a top-level `groups:`
+  //     sequence where each entry has `id`, `attributes`, optional
+  //     `member_attributes`, optional `extends: <other-group-id>`.
+  //   - definition/2 (Weaver's newer registry model): the file may instead
+  //     publish top-level sections like `attributes:`, `attribute_groups:`,
+  //     `metrics:`, `events:`, `resources:`. Each behaves like a group for
+  //     this validator's purposes: a sequence of records that own attribute
+  //     declarations either inline (`{id, type, ...}`), by reference
+  //     (`{ref: "..."}`), or by group reference (`{ref_group: "..."}`).
+  //
+  // Group ids and attribute ids are unioned across whichever sections are
+  // present; the `extends` and `ref_group` edges are resolved transitively
+  // through `resolveGroupAttributes`.
   const parsed: unknown = yaml.parse(yamlContent);
 
-  if (!(isRecord(parsed) && Array.isArray(parsed.groups))) {
+  if (!isRecord(parsed)) {
     return undefined;
   }
 
   const rawGroups = new Map<string, RawGroup>();
   const groupIds = new Set<string>();
 
-  for (const groupEntry of parsed.groups) {
+  const rawGroupSources = collectRawGroupSources(parsed);
+
+  if (rawGroupSources.length === 0) {
+    return undefined;
+  }
+
+  for (const groupEntry of rawGroupSources) {
     if (!isRecord(groupEntry)) {
       continue;
     }
@@ -295,7 +410,36 @@ function extractSemconvVocabulary(
     }
   }
 
+  // definition/2 also allows attribute declarations directly at the top-level
+  // `attributes:` sequence (no enclosing group). Treat each such entry as a
+  // synthetic single-attribute group so it contributes to the vocabulary.
+  collectAttributeIds(parsed.attributes, attributeIds, rawGroups, new Set());
+
   return { attributeIds, groupIds };
+}
+
+function collectRawGroupSources(parsed: Record<string, unknown>): unknown[] {
+  // Both legacy and definition/2 shapes are unioned. Each contributes
+  // group-like records to the raw group set; downstream resolution is
+  // identical because the per-group fields we care about (`id`,
+  // `attributes`, `member_attributes`, `extends`) line up across the two
+  // model versions.
+  const sections = [
+    parsed.groups,
+    parsed.attribute_groups,
+    parsed.metrics,
+    parsed.events,
+    parsed.resources,
+  ];
+  const collected: unknown[] = [];
+
+  for (const section of sections) {
+    if (Array.isArray(section)) {
+      collected.push(...section);
+    }
+  }
+
+  return collected;
 }
 
 function resolveGroupAttributes(
@@ -387,34 +531,6 @@ function collectAttributeIds(
       }
     }
   }
-}
-
-function findResolvedAttributesArtifact(
-  manifest: AuthorityPacketManifest
-): string | undefined {
-  for (const artifact of manifest.generatedArtifacts ?? []) {
-    if (artifact.path.endsWith("otel-attributes.json")) {
-      return artifact.path;
-    }
-  }
-
-  return undefined;
-}
-
-function isResolvedAttributeArtifact(
-  value: unknown
-): value is ResolvedAttributeArtifact {
-  if (!isRecord(value)) {
-    return false;
-  }
-
-  if (!Array.isArray(value.attributes)) {
-    return false;
-  }
-
-  return value.attributes.every(
-    (attribute) => isRecord(attribute) && typeof attribute.key === "string"
-  );
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

@@ -228,6 +228,23 @@ const CONFORMANCE_RUNNERS: readonly ConformanceRunner[] = [
     reportLabel: "TypeScript SQLite durable kernel",
   },
   {
+    // The Postgres-backed kernel is the third measured kernel persistence
+    // tier and is already part of the canonical `bun run conformance` set, so
+    // the compatibility matrix needs to record it alongside the memory and
+    // SQLite tiers — otherwise the PR's "memory + SQLite + PostgreSQL"
+    // platform-gate claim is not actually proved in checked-in evidence.
+    // This lane runs through Nx because the runner depends on devenv to spin
+    // up the local Postgres process; the Nx target encapsulates that
+    // start/stop wiring (`devenv up -d postgres` → run → `devenv processes
+    // down`).
+    adapterManifestPath:
+      "boundaries/kernel/implementations/typescript/conformance-adapter/adapter-postgres.json",
+    implementationId: "typescript-kernel-postgres",
+    language: "typescript",
+    project: "kernel-typescript-postgres-conformance-runner",
+    reportLabel: "TypeScript PostgreSQL durable kernel",
+  },
+  {
     adapterManifestPath:
       "boundaries/providers/implementations/typescript/conformance-adapter/adapter.json",
     command: [
@@ -588,10 +605,24 @@ async function computeExpectedCapabilitiesFromTopology(
   const adapterManifestPath = resolve(REPO_ROOT, adapterManifestPathRelative);
   const adapterManifest = JSON.parse(
     await readFile(adapterManifestPath, "utf8")
-  ) as { authorityPackets?: unknown };
+  ) as { authorityPackets?: unknown; capabilities?: unknown };
 
   const packetPaths = readStringArray(adapterManifest.authorityPackets);
   const capabilities = new Set<string>();
+
+  // Adapter-advertised capabilities that no conformance plan happens to
+  // mention still count toward this lane's "full coverage" claim — they're
+  // surface the lane publishes whether or not the portability matrix has a
+  // plan asserting against them. `trace.lifecycle` on the TypeScript
+  // framework adapter is the canonical example: its evidence rides through
+  // the telemetry vocabulary-check verification path, not through a
+  // conformance plan, so a plan-only union would silently weaken what
+  // `full_pass` means on the lane. Wave 5 flagged that drop; this restores
+  // the pre-wave-4 semantics while keeping the topology-derived contract
+  // for the plan-side of the union.
+  for (const capability of readStringArray(adapterManifest.capabilities)) {
+    capabilities.add(capability);
+  }
 
   for (const packetPath of packetPaths) {
     const packetManifest = JSON.parse(

@@ -15,5 +15,11 @@
  */
 
 // biome-ignore-all lint/performance/noBarrelFile: This package entrypoint is the intentional public implementation surface.
+export type {
+  TuvrenDecodedSseEvent,
+  TuvrenDecodedSseStream,
+  TuvrenSseWireCompliance,
+} from "./lib/sse-decoder.js";
+export { decodeSseStream, reportSseWireCompliance } from "./lib/sse-decoder.js";
 export type { TuvrenSseFrame } from "./lib/stream-sse.js";
 export { toSseFrames, toSseResponse } from "./lib/stream-sse.js";
