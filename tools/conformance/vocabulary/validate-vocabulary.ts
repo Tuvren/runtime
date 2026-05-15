@@ -306,9 +306,9 @@ function resolveGroupAttributes(
   const ids = new Set<string>();
 
   if (visited.has(groupId)) {
-    // Defensive: short-circuit on a cyclic `extends` chain rather than
-    // recursing forever. Weaver's schema forbids cycles, but we don't trust
-    // the source enough to assume it.
+    // Defensive: short-circuit on a cyclic `extends` / `ref_group` chain
+    // rather than recursing forever. Weaver's schema forbids cycles, but we
+    // don't trust the source enough to assume it.
     return ids;
   }
 
@@ -320,8 +320,8 @@ function resolveGroupAttributes(
     return ids;
   }
 
-  collectAttributeIds(raw.attributes, ids);
-  collectAttributeIds(raw.memberAttributes, ids);
+  collectAttributeIds(raw.attributes, ids, rawGroups, visited);
+  collectAttributeIds(raw.memberAttributes, ids, rawGroups, visited);
 
   if (raw.extendsId !== undefined) {
     const inherited = resolveGroupAttributes(raw.extendsId, rawGroups, visited);
@@ -336,7 +336,9 @@ function resolveGroupAttributes(
 
 function collectAttributeIds(
   attributesValue: unknown,
-  attributeIds: Set<string>
+  attributeIds: Set<string>,
+  rawGroups: ReadonlyMap<string, RawGroup>,
+  visited: Set<string>
 ): void {
   if (!Array.isArray(attributesValue)) {
     return;
@@ -347,15 +349,42 @@ function collectAttributeIds(
       continue;
     }
 
-    // Weaver supports two declaration shapes inside a group's attribute list:
-    //   - `{ id: "attr.name", type: ..., ... }` declares an attribute inline.
+    // Weaver supports three declaration shapes inside a group's attribute
+    // list:
+    //   - `{ id: "attr.name", type: ..., ... }` declares an attribute
+    //     inline.
     //   - `{ ref: "attr.name", ... }` reuses an attribute defined elsewhere
-    //     (typically in a registry group). Both forms contribute the same
-    //     attribute id to the effective vocabulary.
+    //     (typically in a registry group).
+    //   - `{ ref_group: "group.id", ... }` pulls in every attribute owned
+    //     by another group by id (forward-compat: tuvren-runtime.yaml does
+    //     not currently use this form, but Weaver's semconv schema does
+    //     support it and a future revision could land it without warning).
+    // All three forms contribute attribute ids to the effective vocabulary.
     if (typeof attribute.id === "string") {
       attributeIds.add(attribute.id);
-    } else if (typeof attribute.ref === "string") {
+      continue;
+    }
+
+    if (typeof attribute.ref === "string") {
       attributeIds.add(attribute.ref);
+      continue;
+    }
+
+    if (typeof attribute.ref_group === "string") {
+      // Resolve the named group's effective attribute set transitively
+      // through the same recursion that handles `extends`, so a nested
+      // `ref_group` chain or a `ref_group` that targets a group with its
+      // own `extends` parent resolves correctly. The `visited` set is
+      // shared with the caller so cyclic chains terminate.
+      const inherited = resolveGroupAttributes(
+        attribute.ref_group,
+        rawGroups,
+        visited
+      );
+
+      for (const id of inherited) {
+        attributeIds.add(id);
+      }
     }
   }
 }

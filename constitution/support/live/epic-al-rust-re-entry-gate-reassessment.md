@@ -65,7 +65,7 @@ are covered by the proving-host scenario lanes and the
 
 | Verify step | Underlying target | Evidence | Notes |
 | --- | --- | --- | --- |
-| `Epic AL portability gate` | `bun run portability:check` → `tools/scripts/portability-gate.ts` | Twelve expected packets enforced (kernel-protocol, kernel-interop-grpc, framework-runtime-api, framework-event-stream, framework-event-stream-sse, framework-tool-contracts, framework-driver-api, framework-react-driver, framework-interop-rust-kernel, providers-provider-api, shared-core-types, telemetry-semconv) plus two standing exceptions (AG-UI projection, AI SDK bridge), and nine required authoritative sources (kernel CDDL, tool-contracts TypeSpec, SSE TypeSpec, SSE fixtures, SSE conformance plan, kernel interop proto, framework rust-kernel interop suite manifest, framework rust-kernel interop suite schema, telemetry semconv YAML). | Replaces the AF gap plan freshness check as the canonical portability proxy. |
+| `Epic AL portability gate` | `bun run portability:check` → `tools/scripts/portability-gate.ts` | Twelve expected packets enforced (kernel-protocol, kernel-interop-grpc, framework-runtime-api, framework-event-stream, framework-event-stream-sse, framework-tool-contracts, framework-driver-api, framework-react-driver, framework-interop-rust-kernel, providers-provider-api, shared-core-types, telemetry-semconv) plus two standing exceptions (AG-UI projection, AI SDK bridge), and ten required authoritative sources (kernel CDDL, tool-contracts TypeSpec, SSE TypeSpec, SSE fixtures, SSE conformance plan, kernel interop services proto, kernel interop types proto, framework rust-kernel interop suite manifest, framework rust-kernel interop suite schema, telemetry semconv YAML). | Replaces the AF gap plan freshness check as the canonical portability proxy. |
 | `authority packet validation` | `tools/scripts/authority-packet/validate-authority-packets.ts` | Twelve packets validate against `tools/schemas/authority-packet.schema.json`; the `telemetry` boundary added in AL002 is enforced; every packet has an executable verification path (`schema-validation`, `openapi-validation`, `conformance-plan`, `interop-smoke`, or `vocabulary-check`). | The §4.11 manifest contract now reads as enforced rather than aspirational. |
 | `conformance plan validation` | `tools/conformance/plan-compiler/validate-plans.ts` | Nineteen conformance plans validated against `tools/conformance/plan-compiler/conformance-plan.schema.json`, including the two AL002-introduced plans (`tool-contracts-extended.json`, `event-stream-sse.json`). | ADR-030 decisive-assertion guarantee remains intact: `evidenceField` cannot be the only decisive assertion. |
 | `adapter protocol validation` | `tools/conformance/adapter-protocol/validate-adapter-protocol.ts` | Implementation adapter JSON-RPC manifests including the AL002 update that wires the framework adapters to the tool-contracts packet. | §4.13 contract intact. |
@@ -173,7 +173,7 @@ Under the fresh evidence captured by `bun run verify` on the AL closure branch:
   backend in the canonical verification path rather than an optional
   best-effort backend.
 - **`portability gate`** — **passed**. Twelve packets, nineteen plans, two
-  standing exceptions, and nine required authoritative sources are enforced
+  standing exceptions, and ten required authoritative sources are enforced
   by `tools/scripts/portability-gate.ts`. The canonical verification path
   consumes this gate as the decisive portability proxy in place of the
   historical `docs:af-gap-plan:check` proxy.

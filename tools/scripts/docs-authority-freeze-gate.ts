@@ -258,6 +258,24 @@ const EVIDENCE = {
     generatedArtifact:
       "boundaries/framework/contracts/runtime-api/artifacts/json-schema",
   },
+  // KRT-AL002 G1 split tool and approval-result authority out of
+  // `runtime-api` into a dedicated `tuvren.framework.tool-contracts`
+  // packet. Doc classifications that previously rooted tool/approval
+  // claims at `runtimeApi` now route here so the freeze gate stops
+  // blessing stale `runtime-api` anchors for those promoted claims.
+  toolContracts: {
+    adapterCapability: "framework.runtime-api",
+    authorityPacket:
+      "boundaries/framework/contracts/tool-contracts/spec/authority-packet.json",
+    compatibilityEvidence:
+      "reports/compatibility/evidence/shared-conformance-runner.typescript-framework.json",
+    conformancePlan:
+      "boundaries/framework/conformance/plans/tool-contracts-extended.json",
+    fixture:
+      "boundaries/framework/conformance/scenarios/runtime-api-scenarios.json",
+    generatedArtifact:
+      "boundaries/framework/contracts/tool-contracts/artifacts/json-schema; boundaries/framework/contracts/tool-contracts/artifacts/openapi/tool-contracts.openapi.json",
+  },
   runtimeOrchestration: {
     adapterCapability: "framework.orchestration",
     authorityPacket:
@@ -932,15 +950,21 @@ function classifyFrameworkControlSurfaceClaim(
   text: string
 ): ClassificationDecision | null {
   if (isApprovalControlClaim(text)) {
+    // KRT-AL002 G1 moved approval/tool authority onto the tool-contracts
+    // packet, so approval-control claims must anchor to that packet (not
+    // runtime-api) once the freeze gate routes its evidence accordingly.
     return missingConformanceDecision(
       "approval and cancellation control",
-      EVIDENCE.runtimeApi,
+      EVIDENCE.toolContracts,
       "KRT-AF004",
       "Approval resume, paused cancellation, rejection, and resolveApproval control semantics require AF tool/approval checks before freeze closure."
     );
   }
 
   if (isSection(section, "6.10") && text.includes("cancellation")) {
+    // Cancellation lifecycle stays on runtime-api: it is a lifecycle
+    // behavior on the runtime callable, not part of the tool/approval
+    // contract surface.
     return missingConformanceDecision(
       "runtime cancellation control",
       EVIDENCE.runtimeApi,
@@ -990,9 +1014,13 @@ function classifyFrameworkCoreSection(
   }
 
   if (isSection(section, "1.7") || isSectionMajor(section, "8")) {
+    // KRT-AL002 G1: tool and approval contracts now own a dedicated
+    // packet at `tuvren.framework.tool-contracts`; route here instead of
+    // runtime-api so the freeze evidence anchors to the packet that
+    // actually owns these shapes.
     return missingConformanceDecision(
       "tool and approval contracts",
-      EVIDENCE.runtimeApi,
+      EVIDENCE.toolContracts,
       "KRT-AF004",
       "Tool and approval shapes have TypeScript artifacts and runtime evidence, but the freeze pass keeps them out of portable truth until AF selects neutral checks."
     );
@@ -1022,9 +1050,12 @@ function classifyFrameworkEventStreamSection(
   section: string
 ): ClassificationDecision | null {
   if (isSection(section, "6.4")) {
+    // §6.4 covers parallel tool caps and mixed approval ordering, which
+    // live under the AL-promoted tool-contracts packet; runtime-api no
+    // longer owns these claims.
     return missingConformanceDecision(
       "tool parallelism and event ordering",
-      EVIDENCE.runtimeApi,
+      EVIDENCE.toolContracts,
       "KRT-AF004",
       "Parallel tool caps, known non-executed outcomes, and mixed approval ordering need AF tool/approval checks before freeze closure."
     );
@@ -1086,9 +1117,11 @@ function classifyFrameworkIntegrationSection(
   }
 
   if (section === "approval-resume") {
+    // KRT-AL002 G1: approval continuity is now owned by tool-contracts;
+    // route approval-resume claims through the tool-contracts packet.
     return missingConformanceDecision(
       "approval resume semantics",
-      EVIDENCE.runtimeApi,
+      EVIDENCE.toolContracts,
       "KRT-AF004",
       "Approval resume has TypeScript runtime evidence, but AF must promote the selected approval continuity checks into shared conformance."
     );

@@ -12,6 +12,12 @@ KRT-AL002 must add or revise to close the portability gate.
   generated artifact if AL002 introduces one.
 - This document is planning evidence under `constitution/support/live/`. It does not
   extend the live constitutional authority chain.
+- **Machine-readable companion**: `constitution/support/live/epic-al-portability-inventory.json`.
+  That JSON is the canonical machine projection of this inventory's closure state
+  (expected packets, standing exceptions, required authoritative sources). The
+  portability gate at `tools/scripts/portability-gate.ts` reads from the JSON and
+  fails if it drifts from the on-disk packet topology. The JSON and this MD must
+  be revised together — a one-sided change is unreviewed drift.
 
 ## 1. Inputs and authority sources
 
@@ -449,7 +455,11 @@ target (`bun run portability:check` / `tools/scripts/portability-gate.ts`)
 now enforces the post-AL002 packet topology so a future change cannot
 silently drop a portable surface, add an unauthorized packet, or promote a
 standing exception without revising both this inventory and the gate's
-expected-topology table.
+machine-readable companion at
+`constitution/support/live/epic-al-portability-inventory.json`. The gate
+no longer carries hardcoded topology constants — it reads the JSON
+companion at runtime and fails closed if the JSON is missing, malformed,
+or names paths that disagree with the on-disk packet set.
 
 | Gap | Status | Landing artifact |
 | --- | --- | --- |

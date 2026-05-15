@@ -31,7 +31,7 @@
         "tool.execution.executedNamesAfterCancel"
       ],
       "adapterCapability": "framework.runtime-api",
-      "authorityPacket": "boundaries/framework/contracts/runtime-api/spec/authority-packet.json",
+      "authorityPacket": "boundaries/framework/contracts/tool-contracts/spec/authority-packet.json",
       "claimIds": [
         "FWK-077DA00DEE7C",
         "FWK-0A405F74632B",
@@ -62,9 +62,9 @@
       ],
       "classifications": ["authority-backed-conformance-covered"],
       "compatibilityEvidence": "reports/compatibility/evidence/shared-conformance-runner.typescript-framework.json",
-      "conformancePlan": "boundaries/framework/conformance/plans/runtime-api-lifecycle.json; boundaries/framework/conformance/plans/runtime-api-lifecycle-extended.json; boundaries/framework/conformance/plans/runtime-api-callables.json; boundaries/framework/conformance/plans/runtime-api-callables-extended.json",
+      "conformancePlan": "boundaries/framework/conformance/plans/tool-contracts-extended.json",
       "fixture": "boundaries/framework/conformance/scenarios/runtime-api-scenarios.json",
-      "generatedArtifact": "boundaries/framework/contracts/runtime-api/artifacts/json-schema",
+      "generatedArtifact": "boundaries/framework/contracts/tool-contracts/artifacts/json-schema; boundaries/framework/contracts/tool-contracts/artifacts/openapi/tool-contracts.openapi.json",
       "matrixFollowUpTickets": ["KRT-AF004"],
       "surface": "approval and cancellation control"
     },
@@ -85,13 +85,13 @@
         "tool.execution.executedNamesAfterResume"
       ],
       "adapterCapability": "framework.runtime-api",
-      "authorityPacket": "boundaries/framework/contracts/runtime-api/spec/authority-packet.json",
+      "authorityPacket": "boundaries/framework/contracts/tool-contracts/spec/authority-packet.json",
       "claimIds": ["FWK-3EB6BD2E44C6"],
       "classifications": ["authority-backed-conformance-covered"],
       "compatibilityEvidence": "reports/compatibility/evidence/shared-conformance-runner.typescript-framework.json",
-      "conformancePlan": "boundaries/framework/conformance/plans/runtime-api-lifecycle.json; boundaries/framework/conformance/plans/runtime-api-lifecycle-extended.json; boundaries/framework/conformance/plans/runtime-api-callables.json; boundaries/framework/conformance/plans/runtime-api-callables-extended.json",
+      "conformancePlan": "boundaries/framework/conformance/plans/tool-contracts-extended.json",
       "fixture": "boundaries/framework/conformance/scenarios/runtime-api-scenarios.json",
-      "generatedArtifact": "boundaries/framework/contracts/runtime-api/artifacts/json-schema",
+      "generatedArtifact": "boundaries/framework/contracts/tool-contracts/artifacts/json-schema; boundaries/framework/contracts/tool-contracts/artifacts/openapi/tool-contracts.openapi.json",
       "matrixFollowUpTickets": ["KRT-AF004"],
       "surface": "approval resume semantics"
     },
@@ -477,7 +477,7 @@
       "classifications": ["authority-backed-conformance-covered"],
       "compatibilityEvidence": "reports/compatibility/evidence/shared-conformance-runner.typescript-framework.json",
       "fixture": "boundaries/framework/conformance/scenarios/runtime-api-scenarios.json",
-      "generatedArtifact": "boundaries/framework/contracts/runtime-api/artifacts/json-schema",
+      "generatedArtifact": "boundaries/framework/contracts/tool-contracts/artifacts/json-schema; boundaries/framework/contracts/tool-contracts/artifacts/openapi/tool-contracts.openapi.json",
       "matrixFollowUpTickets": ["KRT-AF004"],
       "surface": "tool and approval contracts"
     },
@@ -505,7 +505,7 @@
       "classifications": ["authority-backed-conformance-covered"],
       "compatibilityEvidence": "reports/compatibility/evidence/shared-conformance-runner.typescript-framework.json",
       "fixture": "boundaries/framework/conformance/scenarios/runtime-api-scenarios.json",
-      "generatedArtifact": "boundaries/framework/contracts/runtime-api/artifacts/json-schema",
+      "generatedArtifact": "boundaries/framework/contracts/tool-contracts/artifacts/json-schema; boundaries/framework/contracts/tool-contracts/artifacts/openapi/tool-contracts.openapi.json",
       "matrixFollowUpTickets": ["KRT-AF004"],
       "surface": "tool parallelism and event ordering"
     },

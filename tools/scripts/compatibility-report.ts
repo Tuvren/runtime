@@ -145,9 +145,15 @@ interface CompatibilitySuite {
 }
 
 interface ConformanceRunner {
+  // Path (relative to repo root) to the adapter manifest this lane drives.
+  // The expected "full capability set" is derived from the topology this
+  // manifest exposes (its `authorityPackets` → each packet's
+  // `conformancePlans` → each plan's plan-level and check-level
+  // `capabilities`). Compatibility-report no longer carries a parallel
+  // hardcoded list — see KRT-AL003 followup review wave 4.
+  adapterManifestPath: string;
   command?: string[];
   expectedFailure?: boolean;
-  fullCapabilities: readonly string[];
   implementationId: string;
   language: string;
   manifestPath?: string;
@@ -192,24 +198,13 @@ const ALLOW_FAILING_EVIDENCE_FLAG = "--allow-failing-evidence";
 
 const CONFORMANCE_RUNNERS: readonly ConformanceRunner[] = [
   {
+    adapterManifestPath:
+      "boundaries/framework/implementations/typescript/conformance-adapter/adapter.json",
     command: [
       "bun",
       "tools/conformance/runner/run.ts",
       "--adapter",
       "boundaries/framework/implementations/typescript/conformance-adapter/adapter.json",
-    ],
-    fullCapabilities: [
-      "framework.driver-api",
-      "framework.event-stream",
-      "framework.event-stream-sse",
-      "framework.orchestration",
-      "framework.run-liveness",
-      "framework.react-driver",
-      "framework.runtime-api",
-      "providers.framework-owned-approval-boundary",
-      "providers.framework-owned-tool-execution",
-      "providers.rejects-native-strict-structured-output",
-      "trace.lifecycle",
     ],
     implementationId: "typescript-framework",
     language: "typescript",
@@ -217,44 +212,29 @@ const CONFORMANCE_RUNNERS: readonly ConformanceRunner[] = [
     reportLabel: "TypeScript framework runtime baseline",
   },
   {
-    fullCapabilities: [
-      "kernel.protocol",
-      "kernel.logical",
-      "kernel.run-liveness",
-      "kernel.persistence.durable",
-      "kernel.restart-recovery",
-    ],
+    adapterManifestPath:
+      "boundaries/kernel/implementations/typescript/conformance-adapter/adapter.json",
     implementationId: "typescript-kernel-memory",
     language: "typescript",
     project: "kernel-typescript-conformance-runner",
     reportLabel: "TypeScript process-local kernel baseline",
   },
   {
-    fullCapabilities: [
-      "kernel.protocol",
-      "kernel.logical",
-      "kernel.run-liveness",
-      "kernel.persistence.durable",
-      "kernel.restart-recovery",
-    ],
+    adapterManifestPath:
+      "boundaries/kernel/implementations/typescript/conformance-adapter/adapter-sqlite.json",
     implementationId: "typescript-kernel-sqlite",
     language: "typescript",
     project: "kernel-typescript-sqlite-conformance-runner",
     reportLabel: "TypeScript SQLite durable kernel",
   },
   {
+    adapterManifestPath:
+      "boundaries/providers/implementations/typescript/conformance-adapter/adapter.json",
     command: [
       "bun",
       "tools/conformance/runner/run.ts",
       "--adapter",
       "boundaries/providers/implementations/typescript/conformance-adapter/adapter.json",
-    ],
-    fullCapabilities: [
-      "providers.provider-api",
-      "providers.ai-sdk-bridge",
-      "providers.framework-owned-approval-boundary",
-      "providers.framework-owned-tool-execution",
-      "providers.rejects-native-strict-structured-output",
     ],
     implementationId: "typescript-providers",
     language: "typescript",
@@ -262,18 +242,13 @@ const CONFORMANCE_RUNNERS: readonly ConformanceRunner[] = [
     reportLabel: "TypeScript AI SDK provider bridge",
   },
   {
+    adapterManifestPath:
+      "boundaries/kernel/implementations/rust/conformance-adapter/adapter.json",
     command: [
       "bun",
       "tools/conformance/runner/run.ts",
       "--adapter",
       "boundaries/kernel/implementations/rust/conformance-adapter/adapter.json",
-    ],
-    fullCapabilities: [
-      "kernel.protocol",
-      "kernel.logical",
-      "kernel.run-liveness",
-      "kernel.persistence.durable",
-      "kernel.restart-recovery",
     ],
     implementationId: "rust-kernel",
     language: "rust",
@@ -281,23 +256,13 @@ const CONFORMANCE_RUNNERS: readonly ConformanceRunner[] = [
     reportLabel: "Rust process-local kernel baseline",
   },
   {
+    adapterManifestPath:
+      "boundaries/framework/implementations/rust/conformance-adapter/adapter.json",
     command: [
       "bun",
       "tools/conformance/runner/run.ts",
       "--adapter",
       "boundaries/framework/implementations/rust/conformance-adapter/adapter.json",
-    ],
-    fullCapabilities: [
-      "framework.driver-api",
-      "framework.event-stream",
-      "framework.event-stream-sse",
-      "framework.run-liveness",
-      "framework.react-driver",
-      "framework.runtime-api",
-      "providers.framework-owned-approval-boundary",
-      "providers.framework-owned-tool-execution",
-      "providers.rejects-native-strict-structured-output",
-      "trace.lifecycle",
     ],
     implementationId: "rust-framework",
     language: "rust",
@@ -332,6 +297,21 @@ async function main(): Promise<void> {
   await rm(EVIDENCE_DIRECTORY, { force: true, recursive: true });
   await mkdir(EVIDENCE_DIRECTORY, { recursive: true });
 
+  // Derive the expected "full capability set" for each runner from the
+  // adapter manifest topology (its `authorityPackets` → packets' plans →
+  // plan-level + check-level `capabilities`). Computing this once up front
+  // means classifying each lane's pass/subset status remains a pure lookup
+  // in the inner loop while the source of truth stays on disk in the
+  // packets and plans.
+  const expectedCapabilitiesByRunner = new Map<string, ReadonlySet<string>>();
+
+  for (const runner of CONFORMANCE_RUNNERS) {
+    expectedCapabilitiesByRunner.set(
+      runner.implementationId,
+      await computeExpectedCapabilitiesFromTopology(runner.adapterManifestPath)
+    );
+  }
+
   const seenSuiteIds = new Set<string>();
   const suites: CompatibilitySuite[] = [];
   const implementations: CompatibilityImplementation[] = [];
@@ -343,7 +323,21 @@ async function main(): Promise<void> {
       runner.manifestPath === undefined
         ? undefined
         : await readSuiteManifest(runner.manifestPath);
-    const result = await runConformanceTarget(runner, suiteManifest);
+    const expectedCapabilities = expectedCapabilitiesByRunner.get(
+      runner.implementationId
+    );
+
+    if (expectedCapabilities === undefined) {
+      throw new Error(
+        `internal: expected capabilities not pre-computed for ${runner.implementationId}`
+      );
+    }
+
+    const result = await runConformanceTarget(
+      runner,
+      suiteManifest,
+      expectedCapabilities
+    );
 
     if (!seenSuiteIds.has(result.suite.suiteId)) {
       suites.push({
@@ -438,7 +432,8 @@ async function readSuiteManifest(
 
 async function runConformanceTarget(
   runner: ConformanceRunner,
-  suiteManifest: ConformanceSuiteManifest | undefined
+  suiteManifest: ConformanceSuiteManifest | undefined,
+  expectedCapabilities: ReadonlySet<string>
 ): Promise<{
   matrixResult: CompatibilityImplementationResult;
   suite: CompatibilitySuite;
@@ -495,7 +490,8 @@ async function runConformanceTarget(
   const reportStatus = classifyConformanceReportStatus(
     runner,
     evidencePayload,
-    status
+    status,
+    expectedCapabilities
   );
   const evidence: CompatibilityConformanceEvidence = {
     adapterId: evidencePayload.adapterId,
@@ -551,7 +547,8 @@ function sanitizeEvidenceCommand(command: readonly string[]): string[] {
 function classifyConformanceReportStatus(
   runner: ConformanceRunner,
   evidence: ConformanceEvidence,
-  rawStatus: CompatibilityResultStatus
+  rawStatus: CompatibilityResultStatus,
+  expectedCapabilities: ReadonlySet<string>
 ): CompatibilityReportStatus {
   if (rawStatus === "fail") {
     return runner.expectedFailure === true
@@ -572,12 +569,75 @@ function classifyConformanceReportStatus(
     return nonApplicableChecks > 0 ? "unsupported" : "not_applicable";
   }
 
+  // The expected set is derived from the topology rooted at this lane's
+  // adapter manifest, so adding or removing a plan/capability anywhere
+  // under that topology automatically reshapes what `full_pass` means
+  // without a parallel manual list in this file. See
+  // `computeExpectedCapabilitiesFromTopology` for the derivation.
   const declaredCapabilities = new Set(evidence.capabilities ?? []);
-  const hasFullCapabilitySet = runner.fullCapabilities.every((capability) =>
+  const hasFullCapabilitySet = [...expectedCapabilities].every((capability) =>
     declaredCapabilities.has(capability)
   );
 
   return hasFullCapabilitySet ? "full_pass" : "capability_subset_pass";
+}
+
+async function computeExpectedCapabilitiesFromTopology(
+  adapterManifestPathRelative: string
+): Promise<ReadonlySet<string>> {
+  const adapterManifestPath = resolve(REPO_ROOT, adapterManifestPathRelative);
+  const adapterManifest = JSON.parse(
+    await readFile(adapterManifestPath, "utf8")
+  ) as { authorityPackets?: unknown };
+
+  const packetPaths = readStringArray(adapterManifest.authorityPackets);
+  const capabilities = new Set<string>();
+
+  for (const packetPath of packetPaths) {
+    const packetManifest = JSON.parse(
+      await readFile(resolve(REPO_ROOT, packetPath), "utf8")
+    ) as {
+      conformancePlans?: Array<{ path?: unknown }>;
+    };
+
+    for (const plan of packetManifest.conformancePlans ?? []) {
+      if (typeof plan.path !== "string") {
+        continue;
+      }
+
+      collectPlanCapabilities(
+        await readFile(resolve(REPO_ROOT, plan.path), "utf8"),
+        capabilities
+      );
+    }
+  }
+
+  return capabilities;
+}
+
+function collectPlanCapabilities(planJson: string, sink: Set<string>): void {
+  const plan = JSON.parse(planJson) as {
+    applicability?: { capabilities?: unknown };
+    checks?: Array<{ capabilities?: unknown }>;
+  };
+
+  for (const capability of readStringArray(plan.applicability?.capabilities)) {
+    sink.add(capability);
+  }
+
+  for (const check of plan.checks ?? []) {
+    for (const capability of readStringArray(check.capabilities)) {
+      sink.add(capability);
+    }
+  }
+}
+
+function readStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.filter((entry): entry is string => typeof entry === "string");
 }
 
 function computeCompatibilityResultStatus(

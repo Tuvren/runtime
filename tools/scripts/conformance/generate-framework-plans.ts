@@ -54,6 +54,10 @@ async function main(): Promise<void> {
       plan: buildRuntimeApiCallablesExtended(),
     },
     {
+      fileName: "tool-contracts-extended.json",
+      plan: buildToolContractsExtended(),
+    },
+    {
       fileName: "runtime-api-lifecycle-extended.json",
       plan: buildRuntimeApiLifecycleExtended(),
     },
@@ -624,6 +628,128 @@ function buildRuntimeApiOrchestration(): Plan {
   };
 }
 
+// Tool-contracts extended plan — owns the AF-promoted tool/approval-result
+// checks that KRT-AL002 G1 relocated out of `runtime-api-callables-extended`
+// into the new `tuvren.framework.tool-contracts` authority packet. The
+// generator must emit these checks here (not under runtime-callable-af.*)
+// or the next legitimate regeneration would resurrect the retired IDs and
+// silently undo the migration.
+function buildToolContractsExtended(): Plan {
+  const checks: PlanCheck[] = [
+    {
+      assertions: [
+        {
+          equals: true,
+          field: "$.provider.stream.toolCallIdOwnedByFramework",
+          kind: "evidenceField",
+        },
+        {
+          equals: "native-call-1",
+          field:
+            "$.provider.stream.response.parts.0.providerMetadata.providerCallId",
+          kind: "evidenceField",
+        },
+      ],
+      checkId: "tool-contracts-af.tool-call-id-owned-by-framework",
+      evidence: [
+        "provider.stream.response.parts.0.providerMetadata.providerCallId",
+        "provider.stream.toolCallIdOwnedByFramework",
+      ],
+      input: { scenarioPath: "$.provider-stream-tool-call-native" },
+      operation: "runtime.provider-stream",
+      scenario: "runtime-api-scenarios",
+    },
+    {
+      assertions: [
+        {
+          equals: true,
+          field: "$.tool.execution.toolResults.0.isError",
+          kind: "evidenceField",
+        },
+        {
+          equals: "shared tool failed",
+          field: "$.tool.execution.toolResults.0.output.error",
+          kind: "evidenceField",
+        },
+        {
+          equals: "completed",
+          field: "$.toolExecution.status.phase",
+          kind: "stateField",
+        },
+      ],
+      checkId:
+        "tool-contracts-af.tool-failure-produces-error-result-not-run-fail",
+      evidence: [
+        "tool.execution.toolResults.0.isError",
+        "tool.execution.toolResults.0.output.error",
+        "toolExecution.status.phase",
+      ],
+      input: { scenarioPath: "$.tool-execute-failure" },
+      operation: "runtime.tool-execute",
+      scenario: "runtime-api-scenarios",
+    },
+    {
+      assertions: [
+        {
+          equals: true,
+          field: "$.tool.execution.parallelWaveStartedBeforeResults",
+          kind: "evidenceField",
+        },
+      ],
+      checkId: "tool-contracts-af.tool-parallel-wave-starts-before-results",
+      evidence: [
+        "tool.execution.eventTypes",
+        "tool.execution.parallelWaveStartedBeforeResults",
+      ],
+      input: { scenarioPath: "$.tool-execute-parallel-wave" },
+      operation: "runtime.tool-execute",
+      scenario: "runtime-api-scenarios",
+    },
+    {
+      assertions: [
+        {
+          equals: "Rejected by shared conformance.",
+          field: "$.approval.messageAttachment",
+          kind: "evidenceField",
+        },
+      ],
+      checkId: "tool-contracts-af.approval-message-attaches-to-tool-result",
+      evidence: ["approval.messageAttachment"],
+      input: { scenarioPath: "$.paused-turn-reject" },
+      operation: "runtime.approval-resolve",
+      scenario: "runtime-api-scenarios",
+    },
+    {
+      assertions: [
+        {
+          equals: true,
+          field: "$.approval.gatedToolStartAfterResume",
+          kind: "evidenceField",
+        },
+      ],
+      checkId: "tool-contracts-af.mixed-approval-gated-tool-start-after-resume",
+      evidence: [
+        "approval.resumedEventTypes",
+        "approval.gatedToolStartAfterResume",
+      ],
+      input: { scenarioPath: "$.paused-turn-resume" },
+      operation: "runtime.approval-resolve",
+      scenario: "runtime-api-scenarios",
+    },
+  ];
+
+  return {
+    applicability: { capabilities: ["framework.runtime-api"] },
+    checks: checks.map(normalizeGeneratedResultSurfaceCheck),
+    packetId: "tuvren.framework.tool-contracts",
+    planId: "tuvren.framework.tool-contracts.extended",
+    planVersion: "0.1.0",
+    scenarios: {
+      "runtime-api-scenarios": "../scenarios/runtime-api-scenarios.json",
+    },
+  };
+}
+
 // Runtime API callables — extends shape and value coverage of the six
 // per-callable operations that the typescript adapter implements.
 function buildRuntimeApiCallablesExtended(): Plan {
@@ -816,30 +942,9 @@ function buildRuntimeApiCallablesExtended(): Plan {
       input: { scenarioPath: "$.provider-stream-structured-final" },
       operation: "runtime.provider-stream",
       scenario: "runtime-api-scenarios",
-    },
-    {
-      assertions: [
-        {
-          equals: true,
-          field: "$.provider.stream.toolCallIdOwnedByFramework",
-          kind: "evidenceField",
-        },
-        {
-          equals: "native-call-1",
-          field:
-            "$.provider.stream.response.parts.0.providerMetadata.providerCallId",
-          kind: "evidenceField",
-        },
-      ],
-      checkId: "runtime-callable-af.tool-call-id-owned-by-framework",
-      evidence: [
-        "provider.stream.response.parts.0.providerMetadata.providerCallId",
-        "provider.stream.toolCallIdOwnedByFramework",
-      ],
-      input: { scenarioPath: "$.provider-stream-tool-call-native" },
-      operation: "runtime.provider-stream",
-      scenario: "runtime-api-scenarios",
     }
+    // KRT-AL002 G1 relocated `runtime-callable-af.tool-call-id-owned-by-framework`
+    // to the tool-contracts plan. See `buildToolContractsExtended`.
   );
 
   // runtime.tool-execute
@@ -905,53 +1010,10 @@ function buildRuntimeApiCallablesExtended(): Plan {
         kind: "stateField",
       },
       ["toolExecution.status.manifest.toolResults.total"]
-    ),
-    {
-      assertions: [
-        {
-          equals: true,
-          field: "$.tool.execution.toolResults.0.isError",
-          kind: "evidenceField",
-        },
-        {
-          equals: "shared tool failed",
-          field: "$.tool.execution.toolResults.0.output.error",
-          kind: "evidenceField",
-        },
-        {
-          equals: "completed",
-          field: "$.toolExecution.status.phase",
-          kind: "stateField",
-        },
-      ],
-      checkId:
-        "runtime-callable-af.tool-failure-produces-error-result-not-run-fail",
-      evidence: [
-        "tool.execution.toolResults.0.isError",
-        "tool.execution.toolResults.0.output.error",
-        "toolExecution.status.phase",
-      ],
-      input: { scenarioPath: "$.tool-execute-failure" },
-      operation: "runtime.tool-execute",
-      scenario: "runtime-api-scenarios",
-    },
-    {
-      assertions: [
-        {
-          equals: true,
-          field: "$.tool.execution.parallelWaveStartedBeforeResults",
-          kind: "evidenceField",
-        },
-      ],
-      checkId: "runtime-callable-af.tool-parallel-wave-starts-before-results",
-      evidence: [
-        "tool.execution.eventTypes",
-        "tool.execution.parallelWaveStartedBeforeResults",
-      ],
-      input: { scenarioPath: "$.tool-execute-parallel-wave" },
-      operation: "runtime.tool-execute",
-      scenario: "runtime-api-scenarios",
-    }
+    )
+    // KRT-AL002 G1 relocated `tool-failure-produces-error-result-not-run-fail`
+    // and `tool-parallel-wave-starts-before-results` to the tool-contracts
+    // plan. See `buildToolContractsExtended`.
   );
 
   // runtime.approval-resolve
@@ -1149,20 +1211,8 @@ function buildRuntimeApiCallablesExtended(): Plan {
       operation: "runtime.approval-resolve",
       scenario: "runtime-api-scenarios",
     },
-    {
-      assertions: [
-        {
-          equals: "Rejected by shared conformance.",
-          field: "$.approval.messageAttachment",
-          kind: "evidenceField",
-        },
-      ],
-      checkId: "runtime-callable-af.approval-message-attaches-to-tool-result",
-      evidence: ["approval.messageAttachment"],
-      input: { scenarioPath: "$.paused-turn-reject" },
-      operation: "runtime.approval-resolve",
-      scenario: "runtime-api-scenarios",
-    },
+    // KRT-AL002 G1 relocated `approval-message-attaches-to-tool-result` to
+    // the tool-contracts plan. See `buildToolContractsExtended`.
     {
       assertions: [
         {
@@ -1196,25 +1246,9 @@ function buildRuntimeApiCallablesExtended(): Plan {
       input: { scenarioPath: "$.paused-turn-cancel" },
       operation: "runtime.approval-resolve",
       scenario: "runtime-api-scenarios",
-    },
-    {
-      assertions: [
-        {
-          equals: true,
-          field: "$.approval.gatedToolStartAfterResume",
-          kind: "evidenceField",
-        },
-      ],
-      checkId:
-        "runtime-callable-af.mixed-approval-gated-tool-start-after-resume",
-      evidence: [
-        "approval.resumedEventTypes",
-        "approval.gatedToolStartAfterResume",
-      ],
-      input: { scenarioPath: "$.paused-turn-resume" },
-      operation: "runtime.approval-resolve",
-      scenario: "runtime-api-scenarios",
     }
+    // KRT-AL002 G1 relocated `mixed-approval-gated-tool-start-after-resume`
+    // to the tool-contracts plan. See `buildToolContractsExtended`.
   );
 
   // runtime.validate-structured-output
@@ -1359,7 +1393,11 @@ function buildRuntimeApiCallablesExtended(): Plan {
     checks: checks.map(normalizeGeneratedResultSurfaceCheck),
     packetId: "tuvren.framework.runtime-api",
     planId: "tuvren.framework.runtime-api.callables-extended",
-    planVersion: "0.1.0",
+    // KRT-AL002 G1 bumped this plan to 0.2.0 when it relocated the five
+    // AF tool/approval-result checks out into the new
+    // `tuvren.framework.tool-contracts` plan (removing a check is major
+    // per TechSpec §2.1 in the live 0.x line).
+    planVersion: "0.2.0",
     scenarios: {
       "runtime-api-scenarios": "../scenarios/runtime-api-scenarios.json",
     },
@@ -2809,7 +2847,12 @@ function isAfPromotedCheck(checkId: string): boolean {
     checkId.startsWith("react-driver-af.") ||
     checkId.startsWith("runtime-callable-af.") ||
     checkId.startsWith("runtime-lifecycle-af.") ||
-    checkId.startsWith("runtime-orchestration-af.")
+    checkId.startsWith("runtime-orchestration-af.") ||
+    // KRT-AL002 G1 relocated tool/approval AF checks from
+    // `runtime-callable-af.*` to `tool-contracts-af.*` (now owned by the
+    // tool-contracts authority packet). The normalizer must treat them as
+    // promoted-AF so their evidence paths stay untouched.
+    checkId.startsWith("tool-contracts-af.")
   );
 }
 
