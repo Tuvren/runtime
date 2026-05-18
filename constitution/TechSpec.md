@@ -305,7 +305,7 @@
 
 - **Status:** accepted
 - **Context:** PRD v0.7.0 CAP-P0-042 asserts that every execution handle must expose a unified terminal-value surface. The Kraken Framework Specification §7.1 currently defines `ExecutionHandle` with `events/cancel/steer/resolveApproval/status` only; §10.6 adds `awaitResult(): Promise<unknown>` to `OrchestrationHandle`. Single-turn hosts must currently derive completion by draining `events()` and inspecting `status()` — the REPL host hand-rolls exactly this plumbing in `startProjectionCapture`. The framework conformance plan `runtime-api-orchestration.json` contains two existing `awaitResult` checks scoped to `OrchestrationHandle`.
-- **Decision:** Promote `awaitResult(): Promise<ExecutionResult>` to the base `ExecutionHandle` interface in `@tuvren/core/execution`. Define `ExecutionResult` as a discriminated union typed as `| { status: "completed"; finalAssistantMessage?: TuvrenMessage; executionStatus: ExecutionStatus } | { status: "failed"; error: TuvrenError; executionStatus: ExecutionStatus }` where `status` is the sole discriminant (invariant: `executionStatus.phase === status` for all terminal results). `OrchestrationHandle.awaitResult()` is overridden to additionally include the subtree-aggregated final value when descendants exist, with its return type narrowed to `OrchestrationResult` extending `ExecutionResult`. Semantics: `awaitResult()` rejects only on cancellation (with `TuvrenRuntimeError code: execution_cancelled`); both `completed` and `failed` phases resolve the promise. Rationale for resolve-on-failure: discriminated-union resolution is safer than dual-path reject-on-failure because it prevents callers from silently swallowing `failed` results behind a bare catch and allows exhaustive pattern matching without try/catch; the cancellation path remains a rejection because it is not a normal execution outcome and represents an externally imposed termination. The same handle may be awaited multiple times and returns the same `ExecutionResult`. Per ADR-030 (Adapter Evidence Is Not a Semantic Oracle), this change requires migrating the two existing `awaitResult` checks in `runtime-api-orchestration.json` to a new `runtime-api-handle-terminal-value` check set in `runtime-api-callables.json` that exercises the base-handle surface; the orchestration plan keeps its subtree-result checks.
+- **Decision:** Promote `awaitResult(): Promise<ExecutionResult>` to the base `ExecutionHandle` interface in `@tuvren/core/execution`. Define `ExecutionResult` as a discriminated union typed as `| { status: "completed"; finalAssistantMessage?: TuvrenMessage; executionStatus: ExecutionStatus } | { status: "failed"; error: TuvrenError; executionStatus: ExecutionStatus }` where `status` is the sole discriminant (invariant: `executionStatus.phase === status` for all terminal results). `OrchestrationHandle.awaitResult()` is overridden to additionally include the subtree-aggregated final value when descendants exist, with its return type narrowed to `OrchestrationResult` (declared as `type OrchestrationResult = ExecutionResult & { childResults: Record<string, ExecutionResult> }` — a type intersection rather than an interface extension, because TS2312 forbids interfaces from extending discriminated unions). Semantics: `awaitResult()` rejects only on cancellation (with `TuvrenRuntimeError code: execution_cancelled`); both `completed` and `failed` phases resolve the promise. Rationale for resolve-on-failure: discriminated-union resolution is safer than dual-path reject-on-failure because it prevents callers from silently swallowing `failed` results behind a bare catch and allows exhaustive pattern matching without try/catch; the cancellation path remains a rejection because it is not a normal execution outcome and represents an externally imposed termination. The same handle may be awaited multiple times and returns the same `ExecutionResult`. Per ADR-030 (Adapter Evidence Is Not a Semantic Oracle), this change requires migrating the two existing `awaitResult` checks in `runtime-api-orchestration.json` to a new `runtime-api-handle-terminal-value` check set in `runtime-api-callables.json` that exercises the base-handle surface; the orchestration plan keeps its subtree-result checks.
 - **Consequences:** `docs/KrakenFrameworkSpecification.md` §7.1 bumps to v0.18 to add `awaitResult` to the base handle. The runtime-api authority packet binding appendix at `boundaries/framework/contracts/runtime-api/spec/bindings/typescript.md` adds `awaitResult` to its `ExecutionHandle` binding section. `@tuvren/core/execution` exports the new `ExecutionResult` discriminated union. `@tuvren/runtime`'s internal `RuntimeExecutionHandle` class implements `awaitResult` by collecting all events into a private buffer, returning on the first `turn.end` event, and synthesizing the result from event content plus the final `status()` snapshot. The conformance migration is part of the same epic.
 
 ### ADR-036 `TuvrenRuntime` Durable-Read Surface
@@ -319,7 +319,7 @@
   - `getTurnHistory(input: { threadId: string; branchId: string }, options?: { limit?: number; before?: TurnHistoryCursor }): AsyncIterableIterator<TurnSnapshot>` — newest-first iterator
   - `readBranchMessages(input: { branchId: string; limit?: number; after?: BranchMessagesCursor }): Promise<{ messages: TuvrenMessage[]; nextCursor?: BranchMessagesCursor }>` — oldest-first; `after` cursor advances forward through history
   
-  Pagination follows the Architecture §6 rule: history surfaces use cursor + async iterator (`getTurnHistory`); collection surfaces use cursor + optional limit (`listThreads`, `readBranchMessages`). All cursors are opaque to the host; runtime structure is specified in §3.8. The framework implementation composes existing kernel syscalls (`branch.list`, `node.get`, `node.walkBack`, `tree.resolve`, `tree.manifest`, `store.get`) plus the new `thread.list` syscall — no new kernel reads beyond `thread.list`.
+  Pagination follows the Architecture §6 rule: history surfaces use cursor + async iterator (`getTurnHistory`); collection surfaces use cursor + optional limit (`listThreads`, `readBranchMessages`). Exception: `listBranches` is intentionally unbounded — branches per thread are bounded by O(1) active divergence paths in v1, and the kernel primitive `kernel.branch.list(threadId)` is itself unpaginated, making a framework-level cursor degenerate without a new kernel-side syscall. If branch fanout becomes unbounded in a future version, `listBranches` will be paginated in a semver-major change. All cursors are opaque to the host; runtime structure is specified in §3.8. The framework implementation composes existing kernel syscalls (`branch.list`, `node.get`, `node.walkBack`, `tree.resolve`, `tree.manifest`, `store.get`) plus the new `thread.list` syscall — no new kernel reads beyond `thread.list`.
 - **Consequences:** `@tuvren/core/execution` exports the five new methods plus the `ThreadSummary`, `BranchSummary`, `TurnSnapshot`, `ListThreadsCursor`, `TurnHistoryCursor`, and `BranchMessagesCursor` types. `@tuvren/runtime` implements the surface in a new `durable-reads.ts` module within `runtime-core` (now folded into `@tuvren/runtime`); the implementation is a pure composition of kernel syscalls with no caching layer in v1. The runtime-api authority packet adds binding-only entries for the new methods; the runtime-api conformance plan `runtime-api-callables-extended.json` gains a `runtime-api-durable-reads` check set with positive-path, pagination, capability-rejected, and lineage-bounded coverage. The Reference Host's `createPlaygroundKernelInspector` is deleted in the same epic; the REPL consumes the new surface exclusively.
 
 ### ADR-037 Consolidate Shared Primitives Into `@tuvren/core` With Subpath Exports
@@ -1015,7 +1015,7 @@ Concrete code examples already defined in the authoritative specs such as `struc
 - **Driver note:** The host-facing framework API is driver-neutral. Callers may select a concrete driver, but the host surface does not become ReAct-specific.
 - **Package partition note:** Per ADR-037, the merged `boundaries/shared/contracts/core/spec/authority-packet.json` is the single machine authority anchor for the shared framework runtime semantics, host-facing runtime surface, event vocabulary, tool contracts, driver contracts, and provider contracts. `@tuvren/core` exposes these through subpath exports (`/messages`, `/tools`, `/events`, `/errors`, `/execution`, `/driver`, `/provider`, `/extensions`); the historical `@tuvren/runtime-api`, `@tuvren/event-stream`, `@tuvren/tool-contracts`, `@tuvren/driver-api`, and `@tuvren/core-types` packages remain as deprecated re-export shims for one cycle and then are removed. `@tuvren/runtime` is the slim convenience package exposing `createTuvren({...})` plus curated re-exports.
 - **Durable-read note:** Per ADR-036, the `TuvrenRuntime` interface now exposes `listThreads`, `listBranches`, `getTurnState`, `getTurnHistory`, and `readBranchMessages` as host-facing durable-read operations that compose existing kernel structural primitives plus the new `thread.list` syscall (ADR-034). Pagination follows the Architecture §6 rule: history surfaces use cursor + async iterator (`getTurnHistory`); collection surfaces use cursor + optional limit (`listThreads`, `readBranchMessages`). Cursors are opaque to the host; their runtime structure is specified in §3.8.
-- **Handle terminal-value note:** Per ADR-035, `ExecutionHandle` now exposes `awaitResult(): Promise<ExecutionResult>` on the base interface. `OrchestrationHandle.awaitResult()` overrides to return `OrchestrationResult` extending `ExecutionResult` with subtree-aggregated final values.
+- **Handle terminal-value note:** Per ADR-035, `ExecutionHandle` now exposes `awaitResult(): Promise<ExecutionResult>` on the base interface. `OrchestrationHandle.awaitResult()` overrides to return `OrchestrationResult` (a type intersection `ExecutionResult & { childResults: Record<string, ExecutionResult> }`) with subtree-aggregated final values.
 
 ```ts
 export type HashString = string;
@@ -1139,13 +1139,15 @@ export type ExecutionResult =
       executionStatus: ExecutionStatus;
     };
 
-export interface OrchestrationResult extends ExecutionResult {
+// Must be a type intersection because ExecutionResult is a discriminated union;
+// `interface extends` on a union type is TS2312-invalid.
+export type OrchestrationResult = ExecutionResult & {
   // Subtree-aggregated final values for spawned children, keyed by
   // descendant execution-source identity. Populated only when spawn()
   // produced child handles whose awaitResult() resolved before parent
   // completion. Empty when no children were spawned.
   childResults: Record<string, ExecutionResult>;
-}
+};
 
 export interface ExecutionHandle {
   events(): AsyncIterable<TuvrenStreamEvent>;
@@ -1414,10 +1416,12 @@ The target TypeScript implementation package for this surface is `@tuvren/kernel
 - **Error model:** backend-specific errors normalized into `TuvrenError` persistence codes
 
 ```ts
-// Note: RuntimeBackend also exposes capabilities() per §3.7;
-// the canonical definition lives there. Backends implementing this
-// contract must satisfy both this surface and the BackendCapability
-// descriptor accurately.
+// `BackendCapability` shape is specified in §3.7; see there for capability bits.
+export interface RuntimeBackend {
+  transact<T>(work: (tx: RuntimeBackendTx) => Promise<T>): Promise<T>;
+  health(): Promise<{ ok: true } | { ok: false; reason: string }>;
+  capabilities(): BackendCapability;
+}
 
 export interface ObjectRepository {
   get(hash: HashString): Promise<StoredObject | null>;
@@ -2752,6 +2756,7 @@ NO_COLOR / FORCE_COLOR            ANSI color control (interactive mode only)
 
 - Headless output: one JSON object per line on stdout. Each object is a `TranscriptOutputRecord` (§3.9). Errors are emitted as `TranscriptOutputRecord` with `output: null` and an additional `error` field carrying a structured error description; the next input is still processed.
 - Recording: while `--record <path>` is active, the same input/output pairs that drive interactive or headless dispatch are also written as `TranscriptInputRecord` + zero-or-more `TranscriptStreamEventRecord` + `TranscriptOutputRecord` + zero-or-more `TranscriptDurableReadRecord` to `<path>`. The header is written before the first input arrives.
+- Recording limitation: `--record` is only supported when the backend is specified by `BackendKind` string or kind-tagged object (`{ kind, options }`), because the transcript header encodes `config.backend` as `{ kind: BackendKind; options?: unknown }`. Starting the REPL with a pre-built `RuntimeBackend` instance is unsupported for recording; the host process must reject `--record` at startup if a raw `RuntimeBackend` was passed to `createTuvren`.
 - Replay: reads the transcript file, validates the header, constructs a fresh runtime via `createTuvren({ backend: header.config.backend })`, and replays each `TranscriptInputRecord` in order. For deterministic record types (any input that produced only `TranscriptOutputRecord`/`TranscriptStreamEventRecord`/`TranscriptDurableReadRecord` from a deterministic provider mode like `aimock-*` or `fixture`), the replay asserts equality between recorded and live outputs and fails on mismatch. For non-deterministic record types (real provider responses identified by `header.config.providerMode` being one of `ai-sdk-google`, `ai-sdk-openai`, `ai-sdk-anthropic`), the replay captures the live output but does not assert equality; the final replay report distinguishes deterministic-asserted from non-deterministic-recorded records.
 
 ## 5. Implementation Guidelines
