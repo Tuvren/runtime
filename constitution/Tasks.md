@@ -1190,20 +1190,22 @@ And the mock's transport-error simulation can be triggered through test configur
 And the mock is usable both from unit tests in @tuvren/mcp-client and from the providers-mcp-client conformance plan
 ```
 
-**KRT-AS007 MCP Authority Packet**
+**KRT-AS007 MCP Authority Packet + Portability Gate Update**
 - **Type:** Chore
 - **Effort:** 2
 - **Dependencies:** `KRT-AS005`
 - **Capability / Contract Mapping:** PRD `CAP-P0-041`, `CAP-P0-037`; TechSpec ADR-026, ADR-039
-- **Description:** Create the authority packet at `boundaries/providers/contracts/mcp/spec/authority-packet.json` declaring the MCP tool-source translation contract. The wire protocol itself is owned by `@modelcontextprotocol/sdk`; Tuvren's packet describes the translation rules and the conformance plan that verifies them.
+- **Description:** Create the authority packet at `boundaries/providers/contracts/mcp/spec/authority-packet.json` declaring the MCP tool-source translation contract. The wire protocol itself is owned by `@modelcontextprotocol/sdk`; Tuvren's packet describes the translation rules and the conformance plan that verifies them. Also update `tools/scripts/portability-gate.ts` to expect 9 packets (was 8 after Epic AP; this MCP packet is the 9th).
 - **Acceptance Criteria (Gherkin):**
 ```gherkin
-Given createMcpToolSource is implemented
+Given createMcpToolSource is implemented and portability-gate.ts expects 8 packets
 When the MCP authority packet is created
 Then the packet declares the translation contract as its authoritative source
 And the packet references the upcoming providers-mcp-client conformance plan
 And the packet declares forbidden authority sources (implementation language source, prose docs)
 And the packet passes authority-packet freshness verification
+And portability-gate.ts is updated to expect 9 packets
+And `bun run nx run-many --target=portability-gate` passes with the new count
 ```
 
 **KRT-AS008 `providers-mcp-client` Conformance Plan with Both-Transport Parity**
@@ -1225,9 +1227,9 @@ And `bun run conformance` includes the new plan automatically
 **KRT-AS009 Re-export `createMcpToolSource` from `@tuvren/runtime`**
 - **Type:** Chore
 - **Effort:** 1
-- **Dependencies:** `KRT-AS005`
+- **Dependencies:** `KRT-AS005`, `KRT-AR005`
 - **Capability / Contract Mapping:** PRD `CAP-P0-041`, `CAP-P0-049`; TechSpec ADR-039, ADR-040
-- **Description:** Re-export `createMcpToolSource` and `McpToolSource` from `@tuvren/runtime`'s curated re-export surface so hosts that compose through `createTuvren` can pass MCP sources without separately importing from `@tuvren/mcp-client`.
+- **Description:** Re-export `createMcpToolSource` and `McpToolSource` from `@tuvren/runtime`'s curated re-export surface so hosts that compose through `createTuvren` can pass MCP sources without separately importing from `@tuvren/mcp-client`. Depends on `KRT-AR005` because the re-export target (`@tuvren/runtime`) must have its curated surface established before MCP helpers are added to it.
 - **Acceptance Criteria (Gherkin):**
 ```gherkin
 Given createMcpToolSource exists in @tuvren/mcp-client

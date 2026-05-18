@@ -444,7 +444,7 @@
 
   export function createTuvren(options: CreateTuvrenOptions): Promise<TuvrenInstance>;
   ```
-  Defaults: `backend` is mandatory (no surprise persistence choice); `driver` defaults to `"react"`; `provider` is optional (turns may pass per-call providers in `AgentConfig.model`); `tools` accepts both literal `TuvrenToolDefinition` arrays and `McpToolSource` references that contribute their `.tools` to the global registry; `extensions` is optional. The factory wires the chosen backend through the appropriate backend factory, constructs the kernel via `createRuntimeKernel({ backend })`, builds a driver registry containing the requested driver, and constructs the framework runtime via the existing internal `createTuvrenRuntimeCore` (now an internal helper of `@tuvren/runtime`). `[Symbol.asyncDispose]` closes any MCP tool sources, releases backend resources (closes the SQLite file handle, returns the PostgreSQL pool, etc.), and resolves any pending kernel work cleanly. The function does not accept inline `RuntimeBackend` factory invocations — passing `{ backend: "sqlite", options: { path: "./db" } }` is preferred over the explicit-factory form to keep the batteries-included path obvious.
+  Defaults: `backend` is mandatory (no surprise persistence choice); `driver` defaults to `"react"`; `provider` is optional (turns may pass per-call providers in `AgentConfig.model`); `tools` accepts both literal `TuvrenToolDefinition` arrays and `McpToolSource` references that contribute their `.tools` to the global registry; `extensions` is optional. The factory wires the chosen backend through the appropriate backend factory, constructs the kernel via `createRuntimeKernel({ backend })`, builds a driver registry containing the requested driver, and constructs the framework runtime via the existing internal `createTuvrenRuntimeCore` (now an internal helper of `@tuvren/runtime`). `[Symbol.asyncDispose]` closes any MCP tool sources, releases backend resources (closes the SQLite file handle, returns the PostgreSQL pool, etc.), and resolves any pending kernel work cleanly. The function does not accept inline `RuntimeBackend` factory invocations — passing `{ backend: "sqlite", options: { databasePath: "./db" } }` is preferred over the explicit-factory form to keep the batteries-included path obvious.
 - **Consequences:** `@tuvren/runtime/src/index.ts` exports only `createTuvren`, the curated primitive re-exports from `@tuvren/core/*` subpaths, the backend factories, the kernel factories, the driver factory, and the orchestration runtime factory. The current `createTuvrenRuntimeCore` is renamed to `createTuvrenRuntime` internally (per Architecture §1 principle that internals must not bleed into the public name). The convenience composition is the only batteries-included entrypoint; advanced hosts that need fine-grained control still import the lower-level factories from `@tuvren/runtime` (they remain re-exported) or compose them from `@tuvren/core/execution` types and the leaf packages directly. A new conformance check set `runtime-api-batteries-included` in `runtime-api-callables-extended.json` exercises the factory's compositional correctness.
 
 ### ADR-041 Consolidate the Reference Host on `@tuvren/repl-host` and Retire `@tuvren/playground-host`
@@ -1123,16 +1123,16 @@ export interface TuvrenRuntime {
   }): Promise<{ messages: TuvrenMessage[]; nextCursor?: BranchMessagesCursor }>;
 }
 
+// `status` is the sole discriminant. `executionStatus.phase` always equals `status`
+// for terminal results (invariant: status === executionStatus.phase).
 export type ExecutionResult =
   | {
       status: "completed";
-      phase: "completed";
       finalAssistantMessage?: TuvrenMessage;
       executionStatus: ExecutionStatus;
     }
   | {
       status: "failed";
-      phase: "failed";
       error: TuvrenError;
       executionStatus: ExecutionStatus;
     };
@@ -2646,11 +2646,12 @@ export declare function createMcpToolSource(
 - **Error model:** `TuvrenValidationError` code `invalid_createtuvren_options` for malformed options; backend-specific construction errors normalize through the backend's own error contract; MCP construction errors surface via `TuvrenProviderError`.
 
 ```ts
-import type { TuvrenRuntime, OrchestrationRuntime } from "@tuvren/core/execution";
+import type { TuvrenRuntime, OrchestrationRuntime, RuntimeWarning } from "@tuvren/core/execution";
 import type { TuvrenProvider } from "@tuvren/core/provider";
 import type { TuvrenExtension } from "@tuvren/core/extensions";
 import type { TuvrenToolDefinition } from "@tuvren/core/tools";
 import type { RuntimeDriverFactory } from "@tuvren/core/driver";
+import type { EpochMs } from "@tuvren/core";
 // RuntimeKernel and RuntimeBackend are kernel-protocol types (not part of @tuvren/core)
 import type { RuntimeKernel, RuntimeBackend } from "@tuvren/kernel-protocol";
 import type { McpToolSource } from "@tuvren/mcp-client";
@@ -2699,7 +2700,7 @@ export interface CreateTuvrenOptions {
   extensions?: TuvrenExtension[];
   /** Advanced: supply a pre-built kernel instead of letting the factory build one from `backend`. */
   kernel?: RuntimeKernel;
-  runtimeOptions?: Omit<RuntimeCoreOptions, never>;
+  runtimeOptions?: Omit<RuntimeCoreOptions, "kernel" | "driverRegistry" | "defaultDriverId">;
 }
 
 export interface TuvrenInstance {
@@ -3043,7 +3044,7 @@ This section consolidates the bounded migration actions implied by ADR-034 throu
 Order within one epic:
 1. Bump `docs/KrakenKernelSpecification.md` to v0.10. Correct every "28 operations" mention to "30 operations." Add a new `thread.list` syscall section with full validation rules, the `KernelThreadListCursor` shape, and the `thread.enumeration` capability gate.
 2. Update `boundaries/kernel/contracts/protocol/spec/authority-packet.json` to declare the new syscall surface and bump its packet version.
-3. Add `thread.list` to the TypeScript `RuntimeKernel` interface in `boundaries/kernel/contracts/protocol/implementations/typescript/src/lib/kernel-types.ts` (which moves to `@tuvren/core/execution` per ADR-037; sequence kernel-protocol changes against either layout depending on whether ADR-037's migration has merged).
+3. Add `thread.list` to the TypeScript `RuntimeKernel` interface in `boundaries/kernel/contracts/protocol/implementations/typescript/src/lib/kernel-types.ts`. This file lives in `@tuvren/kernel-protocol` — it is NOT absorbed into `@tuvren/core/execution` by ADR-037; kernel-protocol is outside ADR-037's absorption list.
 4. Implement `thread.list` in the in-memory backend (`boundaries/kernel/implementations/typescript/backend-memory/`): trivial `Array.from(state.threads.values())` with sort by `(createdAtMs, threadId)` and cursor-based pagination.
 5. Implement `thread.list` in the SQLite backend (`boundaries/kernel/implementations/typescript/backend-sqlite/`): `SELECT * FROM threads WHERE (created_at_ms, thread_id) > (?, ?) [AND schema_id = ?] ORDER BY created_at_ms ASC, thread_id ASC LIMIT ?`. Add a covering index on `(created_at_ms, thread_id)`.
 6. Implement `thread.list` in the PostgreSQL backend (`boundaries/kernel/implementations/typescript/backend-postgres/`): identical SQL with PostgreSQL parameter binding; covering index per backend migration.
@@ -3093,7 +3094,7 @@ Order within one epic (must be atomic — no intermediate state where some leave
    - `boundaries/framework/contracts/driver-api/implementations/typescript/src/` → `@tuvren/core/src/driver/`
 3. Configure `package.json` exports field with 9 entries (root + 8 subpaths), each with `import` and `types` conditions pointing at the compiled `dist/<subpath>/index.js` and `dist/<subpath>/index.d.ts`.
 4. Configure `tsup.config.ts` with 9 entries; one per export.
-5. Declare `zod` and `@standard-schema/spec` as `optionalDependencies` in `@tuvren/core`'s `package.json` and as `peerDependencies` with `peerDependenciesMeta.<name>.optional = true`.
+5. Declare `zod` and `@standard-schema/spec` as optional `peerDependencies` in `@tuvren/core`'s `package.json` with `peerDependenciesMeta.<name>.optional = true`. Do not also list them as `optionalDependencies` — that would auto-install them from the registry and defeat the consumer-choice contract.
 6. Merge `boundaries/framework/contracts/runtime-api/spec/authority-packet.json` and the other three contract packets into a single new `boundaries/shared/contracts/core/spec/authority-packet.json` declaring all eight subpath surfaces as binding sections. Move existing TypeSpec sources to `boundaries/shared/contracts/core/spec/typespec/`.
 7. Update `tools/scripts/portability-gate.ts` to expect the new packet layout (8 packets instead of 12).
 8. Run one mechanical codemod across the workspace replacing imports:
