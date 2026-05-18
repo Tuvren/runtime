@@ -1376,9 +1376,9 @@ And `bun run conformance` includes the new check set automatically
 **KRT-AT009 Update `proving-host:scenario-*` Targets to Exercise Both Modes**
 - **Type:** Chore
 - **Effort:** 3
-- **Dependencies:** `KRT-AT008`
+- **Dependencies:** `KRT-AT008`, `KRT-AS009`
 - **Capability / Contract Mapping:** PRD `CAP-P1-050`; TechSpec §5.3, §5.4
-- **Description:** Update the existing `proving-host:scenario-sqlite`, `proving-host:scenario-postgres`, and `proving-host:interop-smoke` Nx targets to exercise both interactive and headless modes against the same scenarios. Headless coverage uses the new CLI flag. Wire the headless lane into `tools/scripts/verify.ts` so the canonical verification path covers both modes.
+- **Description:** Update the existing `proving-host:scenario-sqlite`, `proving-host:scenario-postgres`, and `proving-host:interop-smoke` Nx targets to exercise both interactive and headless modes against the same scenarios. Headless coverage uses the new CLI flag. Wire the headless lane into `tools/scripts/verify.ts` so the canonical verification path covers both modes. Extend the headless scenario set to include at least one MCP-tool scenario that exercises `createMcpToolSource` re-exported from `@tuvren/runtime` (depends on KRT-AS009 making the export available).
 - **Acceptance Criteria (Gherkin):**
 ```gherkin
 Given the headless mode and transcript subsystem are conformance-covered

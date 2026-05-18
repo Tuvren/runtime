@@ -2646,15 +2646,13 @@ export declare function createMcpToolSource(
 - **Error model:** `TuvrenValidationError` code `invalid_createtuvren_options` for malformed options; backend-specific construction errors normalize through the backend's own error contract; MCP construction errors surface via `TuvrenProviderError`.
 
 ```ts
-import type {
-  TuvrenRuntime,
-  OrchestrationRuntime,
-  TuvrenProvider,
-  TuvrenExtension,
-} from "@tuvren/core/execution";
+import type { TuvrenRuntime, OrchestrationRuntime } from "@tuvren/core/execution";
+import type { TuvrenProvider } from "@tuvren/core/provider";
+import type { TuvrenExtension } from "@tuvren/core/extensions";
 import type { TuvrenToolDefinition } from "@tuvren/core/tools";
-import type { RuntimeKernel, RuntimeBackend } from "@tuvren/core/execution";
 import type { RuntimeDriverFactory } from "@tuvren/core/driver";
+// RuntimeKernel and RuntimeBackend are kernel-protocol types (not part of @tuvren/core)
+import type { RuntimeKernel, RuntimeBackend } from "@tuvren/kernel-protocol";
 import type { McpToolSource } from "@tuvren/mcp-client";
 
 export type BackendKind = "memory" | "sqlite" | "postgres";
@@ -2847,10 +2845,11 @@ the multi-language transition foundation:
 │   │       └── scenarios/
 │   ├── providers/
 │   │   ├── contracts/
-│   │   │   ├── provider-api/                 # NOTE: provider-api is folded into @tuvren/core/provider
-│   │   │   │                                 # per ADR-037; this directory keeps its README and
-│   │   │   │                                 # authority-packet placeholder until the absorption
-│   │   │   │                                 # epic completes, then is retired
+│   │   │   ├── provider-api/                 # NOTE: provider-api is a separate leaf package
+│   │   │   │                                 # (peer-depends on @tuvren/core per ADR-037);
+│   │   │   │                                 # the @tuvren/core/provider subpath absorbs the
+│   │   │   │                                 # provider-facing types from @tuvren/runtime-api,
+│   │   │   │                                 # NOT the provider-api contract itself
 │   │   │   └── mcp/                          # ADR-039: new authority packet for MCP tool-source
 │   │   │       ├── spec/                     # translation rules and conformance plan
 │   │   │       │   └── authority-packet.json
