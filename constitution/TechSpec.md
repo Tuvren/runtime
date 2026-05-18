@@ -317,7 +317,7 @@
   - `listBranches(input: { threadId: string }): Promise<BranchSummary[]>`
   - `getTurnState(input: { threadId: string; branchId: string; turnNodeHash?: HashString }): Promise<TurnSnapshot>` — `turnNodeHash` defaults to the current branch head
   - `getTurnHistory(input: { threadId: string; branchId: string }, options?: { limit?: number; before?: TurnHistoryCursor }): AsyncIterableIterator<TurnSnapshot>` — newest-first iterator
-  - `readBranchMessages(input: { branchId: string; limit?: number; before?: BranchMessagesCursor }): Promise<{ messages: TuvrenMessage[]; nextCursor?: BranchMessagesCursor }>`
+  - `readBranchMessages(input: { branchId: string; limit?: number; after?: BranchMessagesCursor }): Promise<{ messages: TuvrenMessage[]; nextCursor?: BranchMessagesCursor }>` — oldest-first; `after` cursor advances forward through history
   
   Pagination follows the Architecture §6 rule: history surfaces use cursor + async iterator (`getTurnHistory`); collection surfaces use cursor + optional limit (`listThreads`, `readBranchMessages`). All cursors are opaque to the host; runtime structure is specified in §3.8. The framework implementation composes existing kernel syscalls (`branch.list`, `node.get`, `node.walkBack`, `tree.resolve`, `tree.manifest`, `store.get`) plus the new `thread.list` syscall — no new kernel reads beyond `thread.list`.
 - **Consequences:** `@tuvren/core/execution` exports the five new methods plus the `ThreadSummary`, `BranchSummary`, `TurnSnapshot`, `ListThreadsCursor`, `TurnHistoryCursor`, and `BranchMessagesCursor` types. `@tuvren/runtime` implements the surface in a new `durable-reads.ts` module within `runtime-core` (now folded into `@tuvren/runtime`); the implementation is a pure composition of kernel syscalls with no caching layer in v1. The runtime-api authority packet adds binding-only entries for the new methods; the runtime-api conformance plan `runtime-api-callables-extended.json` gains a `runtime-api-durable-reads` check set with positive-path, pagination, capability-rejected, and lineage-bounded coverage. The Reference Host's `createPlaygroundKernelInspector` is deleted in the same epic; the REPL consumes the new surface exclusively.
@@ -1103,11 +1103,9 @@ export interface TuvrenRuntime {
     filter?: { schemaId?: string };
   }): Promise<{ threads: ThreadSummary[]; nextCursor?: ListThreadsCursor }>;
 
-  listBranches(input: {
-    threadId: string;
-    limit?: number;
-    cursor?: ListBranchesCursor;
-  }): Promise<{ branches: BranchSummary[]; nextCursor?: ListBranchesCursor }>;
+  // listBranches is intentionally unbounded: branches per thread are bounded by O(1) active
+  // divergence paths in v1; paginating would require a kernel-side cursor that does not exist.
+  listBranches(input: { threadId: string }): Promise<BranchSummary[]>;
 
   getTurnState(input: {
     threadId: string;
@@ -2947,7 +2945,7 @@ conformance-plan JSON Schemas live under `tools/schemas/`.
 - Nx manages orchestration and target naming. Nx does not define the repo ontology and must delegate actual work to the native toolchain for the language or artifact family involved.
 - `shared/` must remain small and contain only truly cross-boundary primitives. It must not become a semantic dumping ground or a backdoor TypeScript convenience layer.
 - Contract-driven components such as backends, provider surfaces, driver contracts, tool contracts, event vocabulary, conformance suites, and interop seams must have an explicit boundary-owned home before any new implementation package is added.
-- `boundaries/framework/contracts/runtime-api/spec/authority-packet.json` is the machine authority entry for shared framework runtime contracts. Focused facade packages remain the preferred public home for event, tool, provider, and driver-specific imports, but compatibility re-exports from `@tuvren/runtime-api` are allowed while the partition settles as TypeScript binding projections.
+- `boundaries/shared/contracts/core/spec/authority-packet.json` is the machine authority entry for shared framework runtime contracts (replaces the former `boundaries/framework/contracts/runtime-api/spec/authority-packet.json`, which is absorbed into the merged core packet by ADR-037 / Epic AP). All eight subpath surfaces (`/messages`, `/tools`, `/events`, `/errors`, `/execution`, `/driver`, `/provider`, `/extensions`) are declared as binding sections within this single packet. Compatibility re-exports from the deprecated split packages remain valid binding projections for one release cycle.
 - Where a stable language-neutral structure exists, TypeScript adopts it first so later languages inherit a real system rather than a permanent TypeScript exception.
 - Per ADR-023, ADR-024, ADR-025, ADR-026, ADR-027, and ADR-028, every cross-implementation semantic surface must own one Authority Packet manifest declaring its authoritative sources, generated artifacts, conformance plans, binding projections, and forbidden authority sources. Implementation-language source trees, generic conformance runner source, and Markdown documents are forbidden authority sources for any cross-implementation semantic; they may project, validate, or describe authority but cannot become it. Generic runners must own only generic mechanics and consume product semantics from conformance plans referenced by an authority packet.
 - Per the final Epic Y conformance-engine adjustment, implementation language trees may host `conformance-adapter/` code that invokes native logic and returns neutral observations. Assertion evaluation, required-evidence enforcement, capability selection, adapter-error isolation, and compatibility evidence emission belong in the shared runner under `tools/conformance/runner/`, not in language adapter hosts.
