@@ -18,12 +18,10 @@ import { type EpochMs, TuvrenRuntimeError } from "@tuvren/core-types";
 import type {
   AgentConfig,
   ApprovalResponse,
-  ContentPart,
   ExecutionHandle,
   ExecutionResult,
   ExecutionStatus,
   InputSignal,
-  ToolResultPart,
   TuvrenErrorProjection,
   TuvrenStreamEvent,
 } from "@tuvren/runtime-api";
@@ -86,7 +84,6 @@ export class OrchestrationNode {
   private selfEventsClaimed = false;
   private selfEventsQueue?: AsyncEventQueue<TuvrenStreamEvent>;
   private selfResultResolved = false;
-  private selfVisibleResult?: ContentPart[];
   private startedExecution = false;
   private readonly subtreeEventSubscribers = new Set<
     AsyncEventQueue<TuvrenStreamEvent>
@@ -577,7 +574,7 @@ export class OrchestrationNode {
     }
 
     this.selfResultResolved = true;
-    this.resultState.resolve(this.selfVisibleResult);
+    this.resultState.resolve(undefined);
   }
 
   private async observeChildSettlement(
@@ -701,108 +698,27 @@ export class OrchestrationNode {
     }
   }
 
-  private trackVisibleResult(
-    event: TuvrenStreamEvent,
-    state: {
-      assistantParts: ContentPart[];
-      lastVisible: ContentPart[] | undefined;
-      toolResults: ToolResultPart[];
-    }
-  ): void {
-    switch (event.type) {
-      case "message.start":
-        state.assistantParts = [];
-        return;
-      case "file.done":
-        state.assistantParts.push({
-          data:
-            typeof event.data === "string"
-              ? event.data
-              : new Uint8Array(event.data),
-          filename: event.filename,
-          mediaType: event.mediaType,
-          type: "file",
-        });
-        return;
-      case "text.done":
-        state.assistantParts.push({
-          text: event.text,
-          type: "text",
-        });
-        return;
-      case "structured.done":
-        state.assistantParts.push({
-          data: structuredClone(event.data),
-          name: event.name,
-          type: "structured",
-        });
-        return;
-      case "tool.result":
-        state.toolResults.push({
-          callId: event.callId,
-          isError: event.isError,
-          name: event.name,
-          output: event.output,
-          type: "tool_result",
-        });
-        state.lastVisible = state.toolResults.map((result) => ({
-          ...result,
-          output: structuredClone(result.output),
-          providerMetadata:
-            result.providerMetadata === undefined
-              ? undefined
-              : structuredClone(result.providerMetadata),
-        }));
-        return;
-      case "message.done":
-        if (state.assistantParts.length > 0) {
-          state.lastVisible = state.assistantParts.map((part) =>
-            cloneVisibleContentPart(part)
-          );
-          state.toolResults = [];
-        }
-
-        state.assistantParts = [];
-        return;
-      case "error":
-        this.lastErrorProjection = event.error;
-        return;
-      default:
-        return;
-    }
-  }
-
   private async watchCurrentBinding(
     generation: number,
     bindingPromise: Promise<ExecutionBinding>
   ): Promise<void> {
     try {
       const binding = await bindingPromise;
-      const visibleState = {
-        assistantParts: [],
-        lastVisible: this.selfVisibleResult,
-        toolResults:
-          this.selfVisibleResult?.filter(
-            (part): part is ToolResultPart => part.type === "tool_result"
-          ) ?? [],
-      } satisfies {
-        assistantParts: ContentPart[];
-        lastVisible: ContentPart[] | undefined;
-        toolResults: ToolResultPart[];
-      };
 
       for await (const event of binding.handle.events()) {
         if (generation !== this.bindingGeneration) {
           return;
         }
 
+        if (event.type === "error") {
+          this.lastErrorProjection = event.error;
+        }
+
         const decoratedEvent = this.decorateEvent(event, binding);
-        this.trackVisibleResult(event, visibleState);
         this.selfEventsQueue?.push(cloneValue(decoratedEvent));
         this.publishSubtreeEvent(decoratedEvent);
       }
 
-      this.selfVisibleResult = visibleState.lastVisible;
       this.selfEventsQueue?.close();
 
       if (generation !== this.bindingGeneration) {
@@ -939,40 +855,3 @@ function createIteratorDoneResult<T>(): IteratorResult<T, undefined> {
   };
 }
 
-function cloneVisibleContentPart(part: ContentPart): ContentPart {
-  switch (part.type) {
-    case "file":
-      return {
-        data:
-          typeof part.data === "string" ? part.data : new Uint8Array(part.data),
-        filename: part.filename,
-        mediaType: part.mediaType,
-        providerMetadata:
-          part.providerMetadata === undefined
-            ? undefined
-            : structuredClone(part.providerMetadata),
-        type: "file",
-      };
-    case "structured":
-      return {
-        data: structuredClone(part.data),
-        name: part.name,
-        providerMetadata:
-          part.providerMetadata === undefined
-            ? undefined
-            : structuredClone(part.providerMetadata),
-        type: "structured",
-      };
-    case "text":
-      return {
-        providerMetadata:
-          part.providerMetadata === undefined
-            ? undefined
-            : structuredClone(part.providerMetadata),
-        text: part.text,
-        type: "text",
-      };
-    default:
-      return part;
-  }
-}

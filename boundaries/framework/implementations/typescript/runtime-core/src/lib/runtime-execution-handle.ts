@@ -256,6 +256,15 @@ export class RuntimeExecutionHandle implements ExecutionHandle {
           type: "structured",
         });
         return;
+      case "tool_call.done":
+        this.pendingAssistantParts.push({
+          callId: event.callId,
+          input: event.input,
+          name: event.name,
+          providerMetadata: event.providerMetadata,
+          type: "tool_call",
+        });
+        return;
       case "message.done":
         if (this.pendingAssistantParts.length > 0) {
           this.lastFinalAssistantMessage = {

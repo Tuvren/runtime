@@ -708,7 +708,7 @@ describe("orchestration-runtime child lifecycle", () => {
     });
   });
 
-  test("awaitResult preserves tool-only child completions in call order", async () => {
+  test("awaitResult captures tool call parts in finalAssistantMessage for tool-only completions", async () => {
     const harness = createFakeKernelHarness();
     const framework = createTuvrenRuntimeCore({
       defaultDriverId: "fake",
@@ -820,6 +820,25 @@ describe("orchestration-runtime child lifecycle", () => {
     if (childResult.status !== "completed") {
       throw new Error("unreachable");
     }
-    expect(childResult.finalAssistantMessage).toBeUndefined();
+    expect(childResult.finalAssistantMessage).toEqual({
+      parts: [
+        {
+          callId: "call-first",
+          input: { query: "first" },
+          name: "first",
+          providerMetadata: undefined,
+          type: "tool_call",
+        },
+        {
+          callId: "call-second",
+          input: { query: "second" },
+          name: "second",
+          providerMetadata: undefined,
+          type: "tool_call",
+        },
+      ],
+      providerMetadata: undefined,
+      role: "assistant",
+    });
   });
 });
