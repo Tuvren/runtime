@@ -368,18 +368,21 @@ export function createStaticExecutionHandle(
   status: ExecutionStatus
 ): ExecutionHandle {
   return {
-    async awaitResult(): Promise<ExecutionResult> {
+    awaitResult(): Promise<ExecutionResult> {
       if (status.phase === "completed") {
-        return { executionStatus: status, status: "completed" };
+        return Promise.resolve({
+          executionStatus: status,
+          status: "completed",
+        });
       }
 
-      return {
+      return Promise.resolve({
         error: new TuvrenRuntimeError("Execution failed", {
           code: "execution_failed",
         }),
         executionStatus: status,
         status: "failed",
-      };
+      });
     },
     cancel() {
       return undefined;

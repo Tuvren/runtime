@@ -333,7 +333,9 @@ describe("orchestration-runtime approval", () => {
 
     expect(resumedChildHandle).not.toBe(childHandle);
     expect(childResult.status).toBe("completed");
-    if (childResult.status !== "completed") throw new Error("unreachable");
+    if (childResult.status !== "completed") {
+      throw new Error("unreachable");
+    }
     expect(childResult.finalAssistantMessage).toEqual({
       parts: [{ text: "Worker resumed with approval.", type: "text" }],
       providerMetadata: undefined,

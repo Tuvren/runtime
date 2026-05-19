@@ -321,7 +321,9 @@ describe("orchestration-runtime child lifecycle", () => {
     });
     const childResult = await childHandle.awaitResult();
     expect(childResult.status).toBe("failed");
-    if (childResult.status !== "failed") throw new Error("unreachable");
+    if (childResult.status !== "failed") {
+      throw new Error("unreachable");
+    }
     expect(childResult.error.message).toBe("child start failed");
     await delay(40);
     const events = subtreeCapture.events;
@@ -386,7 +388,9 @@ describe("orchestration-runtime child lifecycle", () => {
     );
 
     expect(childResult.status).toBe("completed");
-    if (childResult.status !== "completed") throw new Error("unreachable");
+    if (childResult.status !== "completed") {
+      throw new Error("unreachable");
+    }
     expect(childResult.finalAssistantMessage).toEqual({
       parts: [{ text: "Worker complete.", type: "text" }],
       providerMetadata: undefined,
@@ -548,7 +552,9 @@ describe("orchestration-runtime child lifecycle", () => {
 
     const childResult = await childHandle.awaitResult();
     expect(childResult.status).toBe("completed");
-    if (childResult.status !== "completed") throw new Error("unreachable");
+    if (childResult.status !== "completed") {
+      throw new Error("unreachable");
+    }
     expect(childResult.finalAssistantMessage).toEqual({
       parts: [{ data: { ok: true }, name: "report", type: "structured" }],
       providerMetadata: undefined,
@@ -611,7 +617,9 @@ describe("orchestration-runtime child lifecycle", () => {
 
     const childResult = await childHandle.awaitResult();
     expect(childResult.status).toBe("completed");
-    if (childResult.status !== "completed") throw new Error("unreachable");
+    if (childResult.status !== "completed") {
+      throw new Error("unreachable");
+    }
     expect(childResult.finalAssistantMessage).toEqual({
       parts: [{ text: "Worker without explicit streaming.", type: "text" }],
       providerMetadata: undefined,
@@ -683,7 +691,9 @@ describe("orchestration-runtime child lifecycle", () => {
 
     const childResult = await childHandle.awaitResult();
     expect(childResult.status).toBe("completed");
-    if (childResult.status !== "completed") throw new Error("unreachable");
+    if (childResult.status !== "completed") {
+      throw new Error("unreachable");
+    }
     expect(childResult.finalAssistantMessage).toEqual({
       parts: [
         {
@@ -807,7 +817,9 @@ describe("orchestration-runtime child lifecycle", () => {
 
     const childResult = await childHandle.awaitResult();
     expect(childResult.status).toBe("completed");
-    if (childResult.status !== "completed") throw new Error("unreachable");
+    if (childResult.status !== "completed") {
+      throw new Error("unreachable");
+    }
     expect(childResult.finalAssistantMessage).toBeUndefined();
   });
 });

@@ -84,7 +84,9 @@ describe("framework-runtime-core awaitResult", () => {
     const result = await handle.awaitResult();
 
     expect(result.status).toBe("completed");
-    if (result.status !== "completed") throw new Error("unreachable");
+    if (result.status !== "completed") {
+      throw new Error("unreachable");
+    }
     expect(result.executionStatus.phase).toBe("completed");
     expect(result.finalAssistantMessage).toEqual({
       parts: [{ text: "Hello world.", type: "text" }],
@@ -121,7 +123,9 @@ describe("framework-runtime-core awaitResult", () => {
     const result = await handle.awaitResult();
 
     expect(result.status).toBe("failed");
-    if (result.status !== "failed") throw new Error("unreachable");
+    if (result.status !== "failed") {
+      throw new Error("unreachable");
+    }
     expect(result.executionStatus.phase).toBe("failed");
     expect(result.error).toBeDefined();
   });

@@ -259,7 +259,10 @@ export class RuntimeExecutionHandle implements ExecutionHandle {
       case "message.done":
         if (this.pendingAssistantParts.length > 0) {
           this.lastFinalAssistantMessage = {
-            parts: this.pendingAssistantParts as [ContentPart, ...ContentPart[]],
+            parts: this.pendingAssistantParts as [
+              ContentPart,
+              ...ContentPart[],
+            ],
             providerMetadata: undefined,
             role: "assistant",
           };
@@ -281,7 +284,12 @@ export class RuntimeExecutionHandle implements ExecutionHandle {
 
     this.resultSettled = true;
 
-    if (turnEndStatus === "failed" && this.abortController.signal.aborted) {
+    const { reason } = this.abortController.signal;
+    const cancelledByUser =
+      reason instanceof TuvrenRuntimeError &&
+      reason.code === "runtime_execution_cancelled";
+
+    if (turnEndStatus === "failed" && cancelledByUser) {
       this.resultReject(
         new TuvrenRuntimeError("Execution was cancelled", {
           code: "execution_cancelled",

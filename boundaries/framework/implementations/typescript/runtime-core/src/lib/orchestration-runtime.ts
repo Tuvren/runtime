@@ -56,8 +56,17 @@ class OrchestrationHandleImpl implements OrchestrationHandle {
     workerId: string;
   }> = [];
 
-  constructor(node: OrchestrationNode) {
+  constructor(
+    node: OrchestrationNode,
+    existingChildren?: ReadonlyArray<{
+      node: OrchestrationNode;
+      workerId: string;
+    }>
+  ) {
     this.node = node;
+    if (existingChildren !== undefined) {
+      this.spawnedChildNodes.push(...existingChildren);
+    }
   }
 
   allEvents(): AsyncIterable<TuvrenStreamEvent> {
@@ -102,7 +111,9 @@ class OrchestrationHandleImpl implements OrchestrationHandle {
     const pausedStatus = this.node.currentStatus();
     const resumedNode = this.node.replaceAfterApproval(response);
     this.deactivate(pausedStatus);
-    return new OrchestrationHandleImpl(resumedNode);
+    // Forward pre-pause children so awaitResult() on the resumed handle
+    // still aggregates their results.
+    return new OrchestrationHandleImpl(resumedNode, this.spawnedChildNodes);
   }
 
   spawn(input: { agent: string; signal: InputSignal }): OrchestrationHandle {
@@ -134,7 +145,9 @@ class OrchestrationHandleImpl implements OrchestrationHandle {
     this.node.steer(signal);
   }
 
-  private async collectChildResults(): Promise<Record<string, ExecutionResult>> {
+  private async collectChildResults(): Promise<
+    Record<string, ExecutionResult>
+  > {
     if (this.spawnedChildNodes.length === 0) {
       return {};
     }
@@ -150,8 +163,8 @@ class OrchestrationHandleImpl implements OrchestrationHandle {
             error:
               error instanceof TuvrenRuntimeError
                 ? error
-                : new TuvrenRuntimeError("Child execution was cancelled", {
-                    code: "execution_cancelled",
+                : new TuvrenRuntimeError("Child execution failed", {
+                    code: "execution_failed",
                   }),
             executionStatus: node.currentStatus(),
             status: "failed",

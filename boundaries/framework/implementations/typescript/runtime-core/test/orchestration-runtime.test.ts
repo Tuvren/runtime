@@ -114,7 +114,9 @@ describe("orchestration-runtime", () => {
     ]);
 
     expect(grandchildResult.status).toBe("completed");
-    if (grandchildResult.status !== "completed") throw new Error("unreachable");
+    if (grandchildResult.status !== "completed") {
+      throw new Error("unreachable");
+    }
     expect(grandchildResult.finalAssistantMessage).toEqual({
       parts: [{ text: "Grandchild complete.", type: "text" }],
       providerMetadata: undefined,
@@ -181,7 +183,9 @@ describe("orchestration-runtime", () => {
 
     const childResult = await childHandle.awaitResult();
     expect(childResult.status).toBe("failed");
-    if (childResult.status !== "failed") throw new Error("unreachable");
+    if (childResult.status !== "failed") {
+      throw new Error("unreachable");
+    }
     expect(childResult.error.message).toBe("worker exploded");
   });
 
@@ -566,7 +570,9 @@ describe("orchestration-runtime", () => {
     );
 
     expect(childResult.status).toBe("completed");
-    if (childResult.status !== "completed") throw new Error("unreachable");
+    if (childResult.status !== "completed") {
+      throw new Error("unreachable");
+    }
     expect(childResult.finalAssistantMessage).toEqual({
       parts: [{ text: "Reviewer done.", type: "text" }],
       providerMetadata: undefined,
@@ -830,7 +836,9 @@ describe("orchestration-runtime", () => {
     ).toBe(true);
     const childResult = await childHandle.awaitResult();
     expect(childResult.status).toBe("completed");
-    if (childResult.status !== "completed") throw new Error("unreachable");
+    if (childResult.status !== "completed") {
+      throw new Error("unreachable");
+    }
     expect(childResult.finalAssistantMessage).toEqual({
       parts: [{ text: "Worker complete.", type: "text" }],
       providerMetadata: undefined,
@@ -899,7 +907,9 @@ describe("orchestration-runtime", () => {
     const parentResult = await handle.awaitResult();
 
     expect(parentResult.status).toBe("completed");
-    if (parentResult.status !== "completed") throw new Error("unreachable");
+    if (parentResult.status !== "completed") {
+      throw new Error("unreachable");
+    }
     expect(parentResult.finalAssistantMessage).toEqual({
       parts: [{ text: "Parent complete.", type: "text" }],
       providerMetadata: undefined,
@@ -909,9 +919,13 @@ describe("orchestration-runtime", () => {
 
     const childTexts = Object.values(parentResult.childResults)
       .map((r) => {
-        if (r.status !== "completed") return undefined;
+        if (r.status !== "completed") {
+          return undefined;
+        }
         const msg = r.finalAssistantMessage;
-        if (msg?.role !== "assistant") return undefined;
+        if (msg?.role !== "assistant") {
+          return undefined;
+        }
         const part = msg.parts[0];
         return part.type === "text" ? part.text : undefined;
       })
