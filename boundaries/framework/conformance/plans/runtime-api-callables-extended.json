@@ -794,6 +794,258 @@
       },
       "operation": "runtime.cancel-execution",
       "evidence": ["result.runtime.phase"]
+    },
+    {
+      "assertions": [
+        {
+          "equals": 2,
+          "field": "$.durableRead.listThreads.threadCount",
+          "kind": "resultField"
+        }
+      ],
+      "checkId": "runtime-callable-ao.list-threads.thread-count-positive",
+      "operation": "runtime.durable-read.list-threads",
+      "evidence": ["result.durableRead.listThreads.threadCount"]
+    },
+    {
+      "assertions": [
+        {
+          "equals": false,
+          "field": "$.durableRead.listThreads.hasCursor",
+          "kind": "resultField"
+        }
+      ],
+      "checkId": "runtime-callable-ao.list-threads.no-cursor-when-all-consumed",
+      "operation": "runtime.durable-read.list-threads",
+      "evidence": ["result.durableRead.listThreads.hasCursor"]
+    },
+    {
+      "assertions": [
+        {
+          "equals": 1,
+          "field": "$.durableRead.listThreads.page1Count",
+          "kind": "resultField"
+        }
+      ],
+      "checkId": "runtime-callable-ao.list-threads-paginate.page1-count-one",
+      "operation": "runtime.durable-read.list-threads-paginate",
+      "evidence": ["result.durableRead.listThreads.page1Count"]
+    },
+    {
+      "assertions": [
+        {
+          "equals": true,
+          "field": "$.durableRead.listThreads.hasFirstCursor",
+          "kind": "resultField"
+        }
+      ],
+      "checkId": "runtime-callable-ao.list-threads-paginate.has-next-cursor",
+      "operation": "runtime.durable-read.list-threads-paginate",
+      "evidence": ["result.durableRead.listThreads.hasFirstCursor"]
+    },
+    {
+      "assertions": [
+        {
+          "equals": 1,
+          "field": "$.durableRead.listThreads.page2Count",
+          "kind": "resultField"
+        }
+      ],
+      "checkId": "runtime-callable-ao.list-threads-paginate.page2-count-one",
+      "operation": "runtime.durable-read.list-threads-paginate",
+      "evidence": ["result.durableRead.listThreads.page2Count"]
+    },
+    {
+      "assertions": [
+        {
+          "equals": false,
+          "field": "$.durableRead.listThreads.hasSecondCursor",
+          "kind": "resultField"
+        }
+      ],
+      "checkId": "runtime-callable-ao.list-threads-paginate.no-cursor-on-last-page",
+      "operation": "runtime.durable-read.list-threads-paginate",
+      "evidence": ["result.durableRead.listThreads.hasSecondCursor"]
+    },
+    {
+      "assertions": [
+        {
+          "equals": 2,
+          "field": "$.durableRead.listThreads.uniqueIds",
+          "kind": "resultField"
+        }
+      ],
+      "checkId": "runtime-callable-ao.list-threads-paginate.unique-thread-count",
+      "operation": "runtime.durable-read.list-threads-paginate",
+      "evidence": ["result.durableRead.listThreads.uniqueIds"]
+    },
+    {
+      "assertions": [
+        {
+          "equals": true,
+          "field": "$.durableRead.listThreads.raised",
+          "kind": "resultField"
+        }
+      ],
+      "checkId": "runtime-callable-ao.list-threads-cap-rejected.raised-true",
+      "operation": "runtime.durable-read.list-threads-capability-rejected",
+      "evidence": ["result.durableRead.listThreads.raised"]
+    },
+    {
+      "assertions": [
+        {
+          "equals": "kernel_capability_unsupported",
+          "field": "$.durableRead.listThreads.errorCode",
+          "kind": "resultField"
+        }
+      ],
+      "checkId": "runtime-callable-ao.list-threads-cap-rejected.error-code",
+      "operation": "runtime.durable-read.list-threads-capability-rejected",
+      "evidence": ["result.durableRead.listThreads.errorCode"]
+    },
+    {
+      "assertions": [
+        {
+          "equals": 2,
+          "field": "$.durableRead.listBranches.branchCount",
+          "kind": "resultField"
+        }
+      ],
+      "checkId": "runtime-callable-ao.list-branches.branch-count",
+      "operation": "runtime.durable-read.list-branches",
+      "evidence": ["result.durableRead.listBranches.branchCount"]
+    },
+    {
+      "assertions": [
+        {
+          "equals": true,
+          "field": "$.durableRead.listBranches.allHaveThreadId",
+          "kind": "resultField"
+        }
+      ],
+      "checkId": "runtime-callable-ao.list-branches.all-have-thread-id",
+      "operation": "runtime.durable-read.list-branches",
+      "evidence": ["result.durableRead.listBranches.allHaveThreadId"]
+    },
+    {
+      "assertions": [
+        {
+          "equals": true,
+          "field": "$.durableRead.getTurnState.hasTurnNodeHash",
+          "kind": "resultField"
+        }
+      ],
+      "checkId": "runtime-callable-ao.get-turn-state.has-turn-node-hash",
+      "operation": "runtime.durable-read.get-turn-state",
+      "evidence": ["result.durableRead.getTurnState.hasTurnNodeHash"]
+    },
+    {
+      "assertions": [
+        {
+          "equals": true,
+          "field": "$.durableRead.getTurnState.hasTurnTreeHash",
+          "kind": "resultField"
+        }
+      ],
+      "checkId": "runtime-callable-ao.get-turn-state.has-turn-tree-hash",
+      "operation": "runtime.durable-read.get-turn-state",
+      "evidence": ["result.durableRead.getTurnState.hasTurnTreeHash"]
+    },
+    {
+      "assertions": [
+        {
+          "equals": true,
+          "field": "$.durableRead.getTurnState.previousTurnNull",
+          "kind": "resultField"
+        }
+      ],
+      "checkId": "runtime-callable-ao.get-turn-state.previous-turn-null",
+      "operation": "runtime.durable-read.get-turn-state",
+      "evidence": ["result.durableRead.getTurnState.previousTurnNull"]
+    },
+    {
+      "assertions": [
+        {
+          "equals": true,
+          "field": "$.durableRead.getTurnState.matchesExpectedHash",
+          "kind": "resultField"
+        }
+      ],
+      "checkId": "runtime-callable-ao.get-turn-state-lineage.matches-expected-hash",
+      "operation": "runtime.durable-read.get-turn-state-lineage",
+      "evidence": ["result.durableRead.getTurnState.matchesExpectedHash"]
+    },
+    {
+      "assertions": [
+        {
+          "equals": 1,
+          "field": "$.durableRead.getTurnHistory.snapshotCount",
+          "kind": "resultField"
+        }
+      ],
+      "checkId": "runtime-callable-ao.get-turn-history.snapshot-count-one",
+      "operation": "runtime.durable-read.get-turn-history",
+      "evidence": ["result.durableRead.getTurnHistory.snapshotCount"]
+    },
+    {
+      "assertions": [
+        {
+          "equals": true,
+          "field": "$.durableRead.getTurnHistory.firstSnapshotHasHash",
+          "kind": "resultField"
+        }
+      ],
+      "checkId": "runtime-callable-ao.get-turn-history.first-snapshot-has-hash",
+      "operation": "runtime.durable-read.get-turn-history",
+      "evidence": ["result.durableRead.getTurnHistory.firstSnapshotHasHash"]
+    },
+    {
+      "assertions": [
+        {
+          "equals": 0,
+          "field": "$.durableRead.readBranchMessages.messageCount",
+          "kind": "resultField"
+        }
+      ],
+      "checkId": "runtime-callable-ao.read-branch-messages.message-count-zero",
+      "operation": "runtime.durable-read.read-branch-messages",
+      "evidence": ["result.durableRead.readBranchMessages.messageCount"]
+    },
+    {
+      "assertions": [
+        {
+          "equals": false,
+          "field": "$.durableRead.readBranchMessages.hasCursor",
+          "kind": "resultField"
+        }
+      ],
+      "checkId": "runtime-callable-ao.read-branch-messages.no-cursor",
+      "operation": "runtime.durable-read.read-branch-messages",
+      "evidence": ["result.durableRead.readBranchMessages.hasCursor"]
+    },
+    {
+      "assertions": [
+        {
+          "equals": true,
+          "field": "$.durableRead.readBranchMessages.raised",
+          "kind": "resultField"
+        }
+      ],
+      "checkId": "runtime-callable-ao.read-branch-messages-head-drift.raised-true",
+      "operation": "runtime.durable-read.read-branch-messages-head-drift",
+      "evidence": ["result.durableRead.readBranchMessages.raised"]
+    },
+    {
+      "assertions": [
+        {
+          "equals": "durable_read_cursor_head_drift",
+          "field": "$.durableRead.readBranchMessages.errorCode",
+          "kind": "resultField"
+        }
+      ],
+      "checkId": "runtime-callable-ao.read-branch-messages-head-drift.error-code",
+      "operation": "runtime.durable-read.read-branch-messages-head-drift",
+      "evidence": ["result.durableRead.readBranchMessages.errorCode"]
     }
   ],
   "packetId": "tuvren.framework.runtime-api",
