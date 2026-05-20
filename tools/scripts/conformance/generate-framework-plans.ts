@@ -621,7 +621,11 @@ function buildRuntimeApiOrchestration(): Plan {
     ].map(normalizeGeneratedResultSurfaceCheck),
     packetId: "tuvren.framework.runtime-api",
     planId: "tuvren.framework.runtime-api.orchestration",
-    planVersion: "0.1.0",
+    // 0.2.0: evidence path corrections and two pre-condition checks added
+    //        (pre-existing generator drift; version aligned here).
+    // 0.3.0: childResultText field renamed childResult.0.text (breaking shape
+    //        change per TechSpec §2.1 live 0.x rule).
+    planVersion: "0.3.0",
     scenarios: {
       "runtime-api-scenarios": "../scenarios/runtime-api-scenarios.json",
     },

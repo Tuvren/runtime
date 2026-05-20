@@ -16,6 +16,7 @@
 
 import {
   TuvrenLineageError,
+  TuvrenPersistenceError,
   TuvrenValidationError,
 } from "@tuvren/core-types";
 import {
@@ -65,18 +66,13 @@ function encodeCursor<T>(payload: T): string {
 }
 
 function decodeCursorRaw(token: string): unknown {
-  let raw: string;
-  try {
-    raw = Buffer.from(token, "base64url").toString("utf8");
-  } catch {
-    throw new TuvrenValidationError("cursor is not valid base64url", {
-      code: "invalid_durable_read_cursor",
-    });
-  }
+  // Buffer.from(token, "base64url") does not throw on invalid input; it
+  // silently emits garbage bytes. JSON.parse then catches the malformed result.
+  const raw = Buffer.from(token, "base64url").toString("utf8");
   try {
     return JSON.parse(raw);
   } catch {
-    throw new TuvrenValidationError("cursor payload is not valid JSON", {
+    throw new TuvrenValidationError("cursor is not valid base64url or JSON", {
       code: "invalid_durable_read_cursor",
     });
   }
@@ -457,9 +453,26 @@ export async function readBranchMessages(
           if (Array.isArray(resolved)) {
             recordedMessageHashes = resolved.filter((h): h is string => typeof h === "string");
           }
-        } catch {
-          // Resolve failure means the prefix cannot be verified; treat as drift.
+        } catch (error: unknown) {
+          if (
+            !(error instanceof TuvrenValidationError) ||
+            error.code !== "kernel_runtime_unknown_tree_path"
+          ) {
+            throw error;
+          }
+          // kernel_runtime_unknown_tree_path means no messages path on the
+          // recorded head — treat its prefix as empty, which will fail the
+          // length check below and throw durable_read_cursor_head_drift.
         }
+      }
+
+      // A position-0 cursor claims a specific head identity; reject when the
+      // head has moved even though there is no prefix to compare.
+      if (position === 0) {
+        throw new TuvrenValidationError(
+          "branch head moved and message history has diverged from the cursor position",
+          { code: "durable_read_cursor_head_drift" }
+        );
       }
 
       const currentPrefix = messageHashes.slice(0, position);
@@ -491,11 +504,15 @@ export async function readBranchMessages(
 
   for (const hash of slicedHashes) {
     const bytes = await kernel.store.get(hash);
-    if (bytes !== null) {
-      const decoded = decodeDeterministicKernelRecord(bytes);
-      assertTuvrenMessage(decoded, `message at "${hash}"`);
-      messages.push(decoded);
+    if (bytes === null) {
+      throw new TuvrenPersistenceError(
+        `message object "${hash}" is referenced in the branch tree but missing from the store`,
+        { code: "kernel_store_object_missing" }
+      );
     }
+    const decoded = decodeDeterministicKernelRecord(bytes);
+    assertTuvrenMessage(decoded, `message at "${hash}"`);
+    messages.push(decoded);
   }
 
   if (endIndex >= messageHashes.length) {

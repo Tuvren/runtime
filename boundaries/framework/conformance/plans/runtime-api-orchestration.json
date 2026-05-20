@@ -586,7 +586,7 @@
   ],
   "packetId": "tuvren.framework.runtime-api",
   "planId": "tuvren.framework.runtime-api.orchestration",
-  "planVersion": "0.1.0",
+  "planVersion": "0.3.0",
   "scenarios": {
     "runtime-api-scenarios": "../scenarios/runtime-api-scenarios.json"
   }
