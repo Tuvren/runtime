@@ -167,7 +167,7 @@
   },
   "bindingProjections": {
     "typescript": "boundaries/shared/contracts/core/implementations/typescript",
-    "typescript-runtime-core": "boundaries/framework/implementations/typescript/runtime"
+    "typescript-runtime": "boundaries/framework/implementations/typescript/runtime"
   },
   "bindingAppendices": [
     {

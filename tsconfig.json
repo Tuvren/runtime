@@ -21,75 +21,6 @@
       "path": "./boundaries/hosts/implementations/typescript/playground"
     },
     {
-      "path": "./.claude/worktrees/agent-ad857bba439e9a394/boundaries/framework/contracts/tool-contracts/implementations/typescript"
-    },
-    {
-      "path": "./.claude/worktrees/agent-ad857bba439e9a394/boundaries/framework/contracts/event-stream/implementations/typescript"
-    },
-    {
-      "path": "./.claude/worktrees/agent-ad857bba439e9a394/boundaries/providers/contracts/provider-api/implementations/typescript"
-    },
-    {
-      "path": "./.claude/worktrees/agent-ad857bba439e9a394/boundaries/framework/contracts/runtime-api/implementations/typescript"
-    },
-    {
-      "path": "./.claude/worktrees/agent-ad857bba439e9a394/boundaries/framework/contracts/driver-api/implementations/typescript"
-    },
-    {
-      "path": "./.claude/worktrees/agent-ad857bba439e9a394/boundaries/shared/contracts/core-types/implementations/typescript"
-    },
-    {
-      "path": "./.claude/worktrees/agent-ad857bba439e9a394/boundaries/kernel/contracts/protocol/implementations/typescript"
-    },
-    {
-      "path": "./.claude/worktrees/agent-ad857bba439e9a394/boundaries/kernel/implementations/typescript/backend-postgres"
-    },
-    {
-      "path": "./.claude/worktrees/agent-ad857bba439e9a394/boundaries/framework/implementations/typescript/drivers/react"
-    },
-    {
-      "path": "./.claude/worktrees/agent-ad857bba439e9a394/boundaries/providers/implementations/typescript/bridge-ai-sdk"
-    },
-    {
-      "path": "./.claude/worktrees/agent-ad857bba439e9a394/boundaries/framework/implementations/typescript/runtime-core"
-    },
-    {
-      "path": "./.claude/worktrees/agent-ad857bba439e9a394/boundaries/kernel/implementations/typescript/backend-memory"
-    },
-    {
-      "path": "./.claude/worktrees/agent-ad857bba439e9a394/boundaries/kernel/implementations/typescript/backend-sqlite"
-    },
-    {
-      "path": "./.claude/worktrees/agent-ad857bba439e9a394/boundaries/kernel/implementations/typescript/runtime-kernel"
-    },
-    {
-      "path": "./.claude/worktrees/agent-ad857bba439e9a394/boundaries/framework/implementations/typescript/stream-agui"
-    },
-    {
-      "path": "./.claude/worktrees/agent-ad857bba439e9a394/boundaries/framework/implementations/typescript/stream-core"
-    },
-    {
-      "path": "./.claude/worktrees/agent-ad857bba439e9a394/boundaries/framework/implementations/typescript/stream-sse"
-    },
-    {
-      "path": "./.claude/worktrees/agent-ad857bba439e9a394/boundaries/framework/implementations/typescript/testkit"
-    },
-    {
-      "path": "./.claude/worktrees/agent-ad857bba439e9a394/boundaries/providers/implementations/typescript/testkit"
-    },
-    {
-      "path": "./.claude/worktrees/agent-ad857bba439e9a394/boundaries/framework/implementations/typescript/runtime"
-    },
-    {
-      "path": "./.claude/worktrees/agent-ad857bba439e9a394/boundaries/hosts/implementations/typescript/playground"
-    },
-    {
-      "path": "./.claude/worktrees/agent-ad857bba439e9a394/boundaries/kernel/implementations/typescript/testkit"
-    },
-    {
-      "path": "./.claude/worktrees/agent-ad857bba439e9a394/boundaries/hosts/implementations/typescript/repl"
-    },
-    {
       "path": "./boundaries/framework/contracts/tool-contracts/implementations/typescript"
     },
     {
@@ -142,9 +73,6 @@
     },
     {
       "path": "./boundaries/hosts/implementations/typescript/repl"
-    },
-    {
-      "path": "./.claude/worktrees/agent-ad857bba439e9a394"
     }
   ]
 }
