@@ -11,7 +11,8 @@
       "options": {
         "cwd": "boundaries/shared/contracts/core-types/implementations/typescript",
         "command": "bunx --bun tsup --config tsup.config.ts && bunx --bun tsc --project tsconfig.dts.json --pretty false"
-      }
+      },
+      "dependsOn": ["^build"]
     },
     "codegen": {
       "executor": "nx:run-commands",

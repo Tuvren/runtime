@@ -14,11 +14,18 @@
   "types": "./dist/index.d.ts",
   "dependencies": {
     "@tuvren/kernel-protocol": "workspace:*",
-    "@tuvren/core-types": "workspace:*",
     "better-sqlite3": "12.8.0"
   },
   "devDependencies": {
     "@tuvren/kernel-testkit": "workspace:*",
     "@types/better-sqlite3": "7.6.13"
+  },
+  "peerDependencies": {
+    "@tuvren/core": "workspace:*"
+  },
+  "peerDependenciesMeta": {
+    "@tuvren/core": {
+      "optional": false
+    }
   }
 }

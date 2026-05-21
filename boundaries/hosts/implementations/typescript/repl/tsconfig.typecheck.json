@@ -14,9 +14,40 @@
       "@tuvren/backend-sqlite": [
         "../../../../kernel/implementations/typescript/backend-sqlite/src/index.ts"
       ],
+      "@tuvren/core": [
+        "../../../../shared/contracts/core/implementations/typescript/src/index.ts"
+      ],
+      "@tuvren/core/driver": [
+        "../../../../shared/contracts/core/implementations/typescript/src/driver/index.ts"
+      ],
+      "@tuvren/core/errors": [
+        "../../../../shared/contracts/core/implementations/typescript/src/errors/index.ts"
+      ],
+      "@tuvren/core/events": [
+        "../../../../shared/contracts/core/implementations/typescript/src/events/index.ts"
+      ],
+      "@tuvren/core/execution": [
+        "../../../../shared/contracts/core/implementations/typescript/src/execution/index.ts"
+      ],
+      "@tuvren/core/extensions": [
+        "../../../../shared/contracts/core/implementations/typescript/src/extensions/index.ts"
+      ],
+      "@tuvren/core/messages": [
+        "../../../../shared/contracts/core/implementations/typescript/src/messages/index.ts"
+      ],
+      "@tuvren/core/provider": [
+        "../../../../shared/contracts/core/implementations/typescript/src/provider/index.ts"
+      ],
+      "@tuvren/core/tools": [
+        "../../../../shared/contracts/core/implementations/typescript/src/tools/index.ts"
+      ],
+      "@tuvren/driver-react": [
+        "../../../../framework/implementations/typescript/drivers/react/src/index.ts"
+      ],
       "@tuvren/provider-bridge-ai-sdk": [
         "../../../../providers/implementations/typescript/bridge-ai-sdk/src/index.ts"
       ],
+      "@tuvren/repl-host": ["./src/index.ts"],
       "@tuvren/runtime": [
         "../../../../framework/implementations/typescript/runtime/src/index.ts"
       ],
@@ -28,8 +59,7 @@
       ],
       "@tuvren/stream-sse": [
         "../../../../framework/implementations/typescript/stream-sse/src/index.ts"
-      ],
-      "@tuvren/repl-host": ["./src/index.ts"]
+      ]
     },
     "types": ["bun", "node"]
   },
@@ -40,6 +70,7 @@
     "../../../../kernel/implementations/typescript/backend-memory/src/**/*.ts",
     "../../../../kernel/implementations/typescript/backend-postgres/src/**/*.ts",
     "../../../../kernel/implementations/typescript/backend-sqlite/src/**/*.ts",
+    "../../../../framework/implementations/typescript/drivers/react/src/**/*.ts",
     "../../../../framework/implementations/typescript/runtime/src/**/*.ts",
     "../../../../framework/implementations/typescript/stream-core/src/**/*.ts",
     "../../../../framework/implementations/typescript/stream-sse/src/**/*.ts",

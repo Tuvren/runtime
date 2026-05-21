@@ -19,8 +19,8 @@ import type { ProviderV3 } from "@ai-sdk/provider";
 import { createReActDriver } from "@tuvren/driver-react";
 import {
   createDriverRegistry,
-  createTuvrenRuntimeCore,
-} from "@tuvren/runtime-core";
+  createTuvrenRuntime as createTuvrenRuntimeCore,
+} from "@tuvren/runtime";
 import { createFakeKernelHarness } from "../../../../../framework/implementations/typescript/runtime-core/test/fake-kernel.ts";
 import {
   createAiSdkProviderBridge,

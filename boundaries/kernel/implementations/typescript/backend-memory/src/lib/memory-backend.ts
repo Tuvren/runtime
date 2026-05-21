@@ -15,7 +15,7 @@
  */
 
 import { AsyncLocalStorage } from "node:async_hooks";
-import type { EpochMs } from "@tuvren/core-types";
+import type { EpochMs } from "@tuvren/core";
 import {
   assertStoredBranch,
   assertStoredObject,

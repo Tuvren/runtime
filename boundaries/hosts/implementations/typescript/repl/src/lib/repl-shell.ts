@@ -762,10 +762,22 @@ async function awaitOrchestration(
 
   try {
     if (active.childHandle !== undefined) {
-      active.childResult = await active.childHandle.awaitResult();
+      const childResult = await active.childHandle.awaitResult();
+
+      if (childResult.status === "failed") {
+        throw childResult.error;
+      }
+
+      active.childResult = childResult;
     }
 
-    active.rootResult = await active.handle.awaitResult();
+    const rootResult = await active.handle.awaitResult();
+
+    if (rootResult.status === "failed") {
+      throw rootResult.error;
+    }
+
+    active.rootResult = rootResult;
     shell.lastOrchestrationEvents = await active.eventsPromise;
     shell.lastCanonicalEvents = shell.lastOrchestrationEvents;
     const projection = {

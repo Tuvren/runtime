@@ -15,20 +15,19 @@
  */
 
 import { isDeepStrictEqual } from "node:util";
-import { TuvrenRuntimeError } from "@tuvren/core-types";
+import { TuvrenRuntimeError } from "@tuvren/core";
 import type {
   DriverAssistantEventReconciliation,
   DriverExecutionContext,
   DriverExtensionStateUpdate,
-} from "@tuvren/driver-api";
+} from "@tuvren/core/driver";
+import type { CustomEvent } from "@tuvren/core/events";
 import type {
   AroundModelContext,
   AroundModelResult,
-  CustomEvent,
   TuvrenExtension,
-  TuvrenModelResponse,
-  TuvrenPrompt,
-} from "@tuvren/runtime-api";
+} from "@tuvren/core/extensions";
+import type { TuvrenModelResponse, TuvrenPrompt } from "@tuvren/core/provider";
 import {
   createAroundModelContextSnapshot,
   createExtensionStateSnapshot,

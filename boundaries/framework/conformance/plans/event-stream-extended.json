@@ -1623,7 +1623,7 @@
       "scenario": "event-stream-scenarios"
     }
   ],
-  "packetId": "tuvren.framework.event-stream",
+  "packetId": "tuvren.shared.core",
   "planId": "tuvren.framework.event-stream.extended",
   "planVersion": "0.1.0",
   "scenarios": {

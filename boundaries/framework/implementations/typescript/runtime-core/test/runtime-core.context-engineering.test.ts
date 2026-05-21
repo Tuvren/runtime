@@ -20,8 +20,8 @@ import type {
   DriverExecutionResult,
   RuntimeDriver as KrakenDriver,
   RuntimeDriverFactory as KrakenDriverFactory,
-} from "@tuvren/driver-api";
-import type { TuvrenStreamEvent } from "@tuvren/runtime-api";
+} from "@tuvren/core/driver";
+import type { TuvrenStreamEvent } from "@tuvren/core/events";
 import {
   createDriverRegistry as createBaseDriverRegistry,
   createContextManifest,

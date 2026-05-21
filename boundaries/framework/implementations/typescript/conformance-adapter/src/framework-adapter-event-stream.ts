@@ -14,11 +14,9 @@
  * limitations under the License.
  */
 
-import type {
-  ApprovalDecision,
-  TuvrenModelResponse,
-  TuvrenStreamEvent,
-} from "@tuvren/runtime-api";
+import type { TuvrenStreamEvent } from "@tuvren/core/events";
+import type { TuvrenModelResponse } from "@tuvren/core/provider";
+import type { ApprovalDecision } from "@tuvren/core/tools";
 import { toAgUiEvents } from "@tuvren/stream-agui";
 import { teeTuvrenStreamEvents } from "@tuvren/stream-core";
 import { toSseFrames } from "@tuvren/stream-sse";

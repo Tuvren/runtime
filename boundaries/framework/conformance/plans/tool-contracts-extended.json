@@ -112,7 +112,7 @@
       ]
     }
   ],
-  "packetId": "tuvren.framework.tool-contracts",
+  "packetId": "tuvren.shared.core",
   "planId": "tuvren.framework.tool-contracts.extended",
   "planVersion": "0.2.0",
   "scenarios": {

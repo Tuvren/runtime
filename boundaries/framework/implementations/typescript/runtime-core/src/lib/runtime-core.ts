@@ -20,18 +20,14 @@ import {
   type HashString,
   type KernelRecord,
   TuvrenRuntimeError,
-} from "@tuvren/core-types";
+} from "@tuvren/core";
 import type {
   DriverExecutionContext,
   DriverRegistry,
-} from "@tuvren/driver-api";
-import type {
-  RuntimeKernel as KrakenKernel,
-  TurnTreeSchema,
-} from "@tuvren/kernel-protocol";
+} from "@tuvren/core/driver";
+import type { TuvrenStreamEvent } from "@tuvren/core/events";
 import type {
   AgentConfig,
-  ApprovalResponse,
   BranchMessagesCursor,
   BranchSummary,
   ExecutionHandle,
@@ -39,15 +35,22 @@ import type {
   ListThreadsCursor,
   RuntimeResolution,
   ThreadSummary,
-  ToolCallPart,
-  ToolResultPart,
   TurnHistoryCursor,
   TurnSnapshot,
-  TuvrenMessage,
-  TuvrenModelResponse,
   TuvrenRuntime,
-  TuvrenStreamEvent,
-} from "@tuvren/runtime-api";
+} from "@tuvren/core/execution";
+import type {
+  ToolCallPart,
+  ToolResultPart,
+  TuvrenMessage,
+} from "@tuvren/core/messages";
+import type { TuvrenModelResponse } from "@tuvren/core/provider";
+import type { ApprovalResponse } from "@tuvren/core/tools";
+import type {
+  RuntimeKernel as KrakenKernel,
+  TurnTreeSchema,
+} from "@tuvren/kernel-protocol";
+import { createDriverRegistry } from "./driver-registry.js";
 import {
   getTurnHistory,
   getTurnState,
@@ -55,7 +58,6 @@ import {
   listThreads,
   readBranchMessages,
 } from "./durable-reads.js";
-import { createDriverRegistry } from "./driver-registry.js";
 import {
   executeRuntimeIterationPhaseFacade,
   runRuntimeExecutionLoopFacade,
@@ -591,7 +593,7 @@ class RuntimeCore implements TuvrenRuntime {
   }
 
   // ── Durable-Read Surface (KRT-AO003..AO005) ────────────────────────────
-  async listThreads(options?: {
+  listThreads(options?: {
     limit?: number;
     cursor?: ListThreadsCursor;
     filter?: { schemaId?: string };
@@ -599,11 +601,11 @@ class RuntimeCore implements TuvrenRuntime {
     return listThreads(this.options.kernel, options);
   }
 
-  async listBranches(input: { threadId: string }): Promise<BranchSummary[]> {
+  listBranches(input: { threadId: string }): Promise<BranchSummary[]> {
     return listBranches(this.options.kernel, input);
   }
 
-  async getTurnState(input: {
+  getTurnState(input: {
     threadId: string;
     branchId: string;
     turnNodeHash?: HashString;
@@ -618,11 +620,14 @@ class RuntimeCore implements TuvrenRuntime {
     return getTurnHistory(this.options.kernel, input, options);
   }
 
-  async readBranchMessages(input: {
+  readBranchMessages(input: {
     branchId: string;
     limit?: number;
     after?: BranchMessagesCursor;
-  }): Promise<{ messages: TuvrenMessage[]; nextCursor?: BranchMessagesCursor }> {
+  }): Promise<{
+    messages: TuvrenMessage[];
+    nextCursor?: BranchMessagesCursor;
+  }> {
     return readBranchMessages(this.options.kernel, input);
   }
 

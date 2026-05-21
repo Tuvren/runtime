@@ -6,7 +6,7 @@ Framework deferred-surface decisions are recorded from the docs-to-authority mat
 
 | Surface | Independent Claims | Classifications | Follow-up | Blocks future implementation line? |
 | --- | ---: | --- | --- | --- |
-| approval and cancellation control | 26 | authority-backed-conformance-covered | KRT-AF004 | No, if kept local/deferred |
+| approval and cancellation control | 27 | authority-backed-conformance-covered | KRT-AF004 | No, if kept local/deferred |
 | approval resume semantics | 1 | authority-backed-conformance-covered | KRT-AF004 | No, if kept local/deferred |
 | aroundModel live/durable reconciliation | 2 | authority-backed-conformance-covered | KRT-AF003 | No, if kept local/deferred |
 | driver contract | 14 | authority-backed-conformance-covered | N/A | No, if kept local/deferred |
@@ -26,7 +26,7 @@ Framework deferred-surface decisions are recorded from the docs-to-authority mat
 | runtime and ReAct execution | 8 | authority-backed-conformance-covered | N/A | No, if kept local/deferred |
 | runtime lifecycle recovery | 5 | authority-backed-conformance-covered | N/A | No, if kept local/deferred |
 | runtime loop policy | 1 | authority-backed-conformance-covered | KRT-AF003 | No, if kept local/deferred |
-| runtime orchestration | 13 | authority-backed-conformance-covered | N/A | No, if kept local/deferred |
+| runtime orchestration | 14 | authority-backed-conformance-covered | N/A | No, if kept local/deferred |
 | runtime resolution and errors | 2 | authority-backed-conformance-covered | N/A | No, if kept local/deferred |
 | shared framework type shapes | 8 | authority-backed-conformance-covered | KRT-AF001 | No, if kept local/deferred |
 | stream adapter package topology | 1 | implementation-defined | N/A unless AF promotes the surface | No, if kept local/deferred |

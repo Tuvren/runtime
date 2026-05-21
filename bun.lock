@@ -34,6 +34,7 @@
       "name": "@tuvren/driver-api",
       "version": "0.0.0",
       "dependencies": {
+        "@tuvren/core": "workspace:*",
         "@tuvren/core-types": "workspace:*",
         "@tuvren/runtime-api": "workspace:*",
       },
@@ -42,6 +43,7 @@
       "name": "@tuvren/event-stream",
       "version": "0.0.0",
       "dependencies": {
+        "@tuvren/core": "workspace:*",
         "@tuvren/runtime-api": "workspace:*",
       },
     },
@@ -49,6 +51,7 @@
       "name": "@tuvren/runtime-api",
       "version": "0.0.0",
       "dependencies": {
+        "@tuvren/core": "workspace:*",
         "@tuvren/core-types": "workspace:*",
       },
     },
@@ -56,6 +59,7 @@
       "name": "@tuvren/tool-contracts",
       "version": "0.0.0",
       "dependencies": {
+        "@tuvren/core": "workspace:*",
         "@tuvren/core-types": "workspace:*",
         "@tuvren/runtime-api": "workspace:*",
       },
@@ -75,43 +79,39 @@
       "name": "@tuvren/driver-react",
       "version": "0.0.0",
       "dependencies": {
-        "@tuvren/core-types": "workspace:*",
-        "@tuvren/driver-api": "workspace:*",
         "@tuvren/provider-api": "workspace:*",
-        "@tuvren/runtime-api": "workspace:*",
         "ajv": "8.18.0",
       },
       "devDependencies": {
-        "@tuvren/runtime-core": "workspace:*",
+        "@tuvren/runtime": "workspace:*",
         "@tuvren/stream-agui": "workspace:*",
         "@tuvren/stream-core": "workspace:*",
         "@tuvren/stream-sse": "workspace:*",
+      },
+      "peerDependencies": {
+        "@tuvren/core": "workspace:*",
       },
     },
     "boundaries/framework/implementations/typescript/runtime": {
       "name": "@tuvren/runtime",
       "version": "0.0.0",
       "dependencies": {
-        "@tuvren/core-types": "workspace:*",
-        "@tuvren/driver-react": "workspace:*",
+        "@bufbuild/protobuf": "2.11.0",
+        "@connectrpc/connect": "2.1.1",
+        "@connectrpc/connect-node": "2.1.1",
         "@tuvren/kernel-protocol": "workspace:*",
         "@tuvren/kernel-runtime": "workspace:*",
-        "@tuvren/runtime-api": "workspace:*",
-        "@tuvren/runtime-core": "workspace:*",
+        "ajv": "8.18.0",
+      },
+      "peerDependencies": {
+        "@tuvren/core": "workspace:*",
       },
     },
     "boundaries/framework/implementations/typescript/runtime-core": {
       "name": "@tuvren/runtime-core",
       "version": "0.0.0",
       "dependencies": {
-        "@bufbuild/protobuf": "2.11.0",
-        "@connectrpc/connect": "2.1.1",
-        "@connectrpc/connect-node": "2.1.1",
-        "@tuvren/core-types": "workspace:*",
-        "@tuvren/driver-api": "workspace:*",
-        "@tuvren/kernel-protocol": "workspace:*",
-        "@tuvren/runtime-api": "workspace:*",
-        "ajv": "8.18.0",
+        "@tuvren/runtime": "workspace:*",
       },
       "devDependencies": {
         "@ag-ui/core": "0.0.52",
@@ -126,40 +126,43 @@
       "version": "0.0.0",
       "dependencies": {
         "@ag-ui/core": "0.0.52",
-        "@tuvren/core-types": "workspace:*",
-        "@tuvren/event-stream": "workspace:*",
         "@tuvren/stream-core": "workspace:*",
       },
       "devDependencies": {
         "@tuvren/framework-testkit": "workspace:*",
       },
+      "peerDependencies": {
+        "@tuvren/core": "workspace:*",
+      },
     },
     "boundaries/framework/implementations/typescript/stream-core": {
       "name": "@tuvren/stream-core",
       "version": "0.0.0",
-      "dependencies": {
-        "@tuvren/core-types": "workspace:*",
-        "@tuvren/event-stream": "workspace:*",
-      },
       "devDependencies": {
         "@tuvren/framework-testkit": "workspace:*",
+      },
+      "peerDependencies": {
+        "@tuvren/core": "workspace:*",
       },
     },
     "boundaries/framework/implementations/typescript/stream-sse": {
       "name": "@tuvren/stream-sse",
       "version": "0.0.0",
       "dependencies": {
-        "@tuvren/event-stream": "workspace:*",
         "@tuvren/stream-core": "workspace:*",
       },
       "devDependencies": {
         "@tuvren/framework-testkit": "workspace:*",
+      },
+      "peerDependencies": {
+        "@tuvren/core": "workspace:*",
       },
     },
     "boundaries/framework/implementations/typescript/testkit": {
       "name": "@tuvren/framework-testkit",
       "version": "0.0.0",
       "dependencies": {
+        "@tuvren/core": "workspace:*",
         "@tuvren/event-stream": "workspace:*",
         "ajv": "8.18.0",
       },
@@ -175,6 +178,7 @@
         "@ai-sdk/provider": "3.0.8",
         "@tuvren/backend-memory": "workspace:*",
         "@tuvren/backend-sqlite": "workspace:*",
+        "@tuvren/driver-react": "workspace:*",
         "@tuvren/provider-bridge-ai-sdk": "workspace:*",
         "@tuvren/runtime": "workspace:*",
         "@tuvren/stream-agui": "workspace:*",
@@ -197,6 +201,7 @@
         "@tuvren/backend-memory": "workspace:*",
         "@tuvren/backend-postgres": "workspace:*",
         "@tuvren/backend-sqlite": "workspace:*",
+        "@tuvren/driver-react": "workspace:*",
         "@tuvren/provider-bridge-ai-sdk": "workspace:*",
         "@tuvren/runtime": "workspace:*",
         "@tuvren/stream-agui": "workspace:*",
@@ -211,44 +216,52 @@
       "name": "@tuvren/kernel-protocol",
       "version": "0.0.0",
       "dependencies": {
-        "@tuvren/core-types": "workspace:*",
         "cbor-x": "1.6.4",
+      },
+      "peerDependencies": {
+        "@tuvren/core": "workspace:*",
       },
     },
     "boundaries/kernel/implementations/typescript/backend-memory": {
       "name": "@tuvren/backend-memory",
       "version": "0.0.0",
       "dependencies": {
-        "@tuvren/core-types": "workspace:*",
         "@tuvren/kernel-protocol": "workspace:*",
       },
       "devDependencies": {
         "@tuvren/kernel-testkit": "workspace:*",
+      },
+      "peerDependencies": {
+        "@tuvren/core": "workspace:*",
       },
     },
     "boundaries/kernel/implementations/typescript/backend-postgres": {
       "name": "@tuvren/backend-postgres",
       "version": "0.0.0",
       "dependencies": {
-        "@tuvren/core-types": "workspace:*",
         "@tuvren/kernel-protocol": "workspace:*",
         "postgres": "3.4.9",
       },
       "devDependencies": {
         "@tuvren/kernel-testkit": "workspace:*",
       },
+      "peerDependencies": {
+        "@tuvren/core": "workspace:*",
+      },
     },
     "boundaries/kernel/implementations/typescript/backend-sqlite": {
       "name": "@tuvren/backend-sqlite",
       "version": "0.0.0",
       "dependencies": {
-        "@tuvren/core-types": "workspace:*",
         "@tuvren/kernel-protocol": "workspace:*",
         "better-sqlite3": "12.8.0",
       },
       "devDependencies": {
         "@tuvren/kernel-testkit": "workspace:*",
         "@types/better-sqlite3": "7.6.13",
+      },
+      "peerDependencies": {
+        "@tuvren/core": "workspace:*",
       },
     },
     "boundaries/kernel/implementations/typescript/conformance-runner": {
@@ -267,17 +280,20 @@
       "name": "@tuvren/kernel-runtime",
       "version": "0.0.0",
       "dependencies": {
-        "@tuvren/core-types": "workspace:*",
         "@tuvren/kernel-protocol": "workspace:*",
       },
       "devDependencies": {
         "@tuvren/backend-memory": "workspace:*",
+      },
+      "peerDependencies": {
+        "@tuvren/core": "workspace:*",
       },
     },
     "boundaries/kernel/implementations/typescript/testkit": {
       "name": "@tuvren/kernel-testkit",
       "version": "0.0.0",
       "dependencies": {
+        "@tuvren/core": "workspace:*",
         "@tuvren/core-types": "workspace:*",
         "@tuvren/kernel-protocol": "workspace:*",
         "ajv": "8.18.0",
@@ -287,6 +303,7 @@
       "name": "@tuvren/provider-api",
       "version": "0.0.0",
       "dependencies": {
+        "@tuvren/core": "workspace:*",
         "@tuvren/runtime-api": "workspace:*",
       },
     },
@@ -295,17 +312,18 @@
       "version": "0.0.0",
       "dependencies": {
         "@ai-sdk/provider": "3.0.8",
-        "@tuvren/core-types": "workspace:*",
         "@tuvren/provider-api": "workspace:*",
-        "@tuvren/runtime-api": "workspace:*",
         "ai": "6.0.142",
         "ajv": "8.18.0",
       },
       "devDependencies": {
         "@tuvren/driver-react": "workspace:*",
         "@tuvren/provider-testkit": "workspace:*",
-        "@tuvren/runtime-core": "workspace:*",
+        "@tuvren/runtime": "workspace:*",
         "@types/json-schema": "^7.0.15",
+      },
+      "peerDependencies": {
+        "@tuvren/core": "workspace:*",
       },
     },
     "boundaries/providers/implementations/typescript/conformance-runner": {
@@ -322,6 +340,7 @@
       "name": "@tuvren/provider-testkit",
       "version": "0.0.0",
       "dependencies": {
+        "@tuvren/core": "workspace:*",
         "@tuvren/provider-api": "workspace:*",
         "ajv": "8.18.0",
       },
@@ -329,6 +348,21 @@
     "boundaries/shared/contracts/core-types/implementations/typescript": {
       "name": "@tuvren/core-types",
       "version": "0.0.0",
+      "dependencies": {
+        "@tuvren/core": "workspace:*",
+      },
+    },
+    "boundaries/shared/contracts/core/implementations/typescript": {
+      "name": "@tuvren/core",
+      "version": "0.0.0",
+      "peerDependencies": {
+        "@standard-schema/spec": "^1.1.0",
+        "zod": "^4.4.3",
+      },
+      "optionalPeers": [
+        "@standard-schema/spec",
+        "zod",
+      ],
     },
   },
   "trustedDependencies": [
@@ -880,6 +914,8 @@
     "@tuvren/backend-postgres": ["@tuvren/backend-postgres@workspace:boundaries/kernel/implementations/typescript/backend-postgres"],
 
     "@tuvren/backend-sqlite": ["@tuvren/backend-sqlite@workspace:boundaries/kernel/implementations/typescript/backend-sqlite"],
+
+    "@tuvren/core": ["@tuvren/core@workspace:boundaries/shared/contracts/core/implementations/typescript"],
 
     "@tuvren/core-types": ["@tuvren/core-types@workspace:boundaries/shared/contracts/core-types/implementations/typescript"],
 

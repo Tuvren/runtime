@@ -28,7 +28,7 @@ import {
   TuvrenPersistenceError,
   TuvrenRuntimeError,
   TuvrenValidationError,
-} from "@tuvren/core-types";
+} from "@tuvren/core";
 import {
   deterministicKernelRecordFixture,
   encodeDeterministicKernelRecord,

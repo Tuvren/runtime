@@ -18,7 +18,7 @@ import { describe, expect, test } from "bun:test";
 import {
   type ApprovalRequest,
   assertApprovalRequest,
-} from "@tuvren/tool-contracts";
+} from "@tuvren/core/tools";
 
 describe("framework-tool-contracts package exports", () => {
   test("resolve from the built package surface", () => {

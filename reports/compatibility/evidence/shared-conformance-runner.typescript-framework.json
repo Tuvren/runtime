@@ -3300,6 +3300,110 @@
     {
       "assertionResults": [
         {
+          "assertionId": "runtime-api-handle-terminal-value.cancel-rejects.1.resultField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "runtime-api-handle-terminal-value.cancel-rejects.2.resultField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "runtime-api-handle-terminal-value.cancel-rejects.requiredEvidence.result.handle.awaitResult.error.code",
+          "status": "pass"
+        },
+        {
+          "assertionId": "runtime-api-handle-terminal-value.cancel-rejects.requiredEvidence.result.handle.awaitResult.rejected",
+          "status": "pass"
+        }
+      ],
+      "checkId": "runtime-api-handle-terminal-value.cancel-rejects",
+      "details": {
+        "adapterId": "typescript-framework",
+        "planId": "tuvren.framework.runtime-api.callables"
+      },
+      "status": "pass"
+    },
+    {
+      "assertionResults": [
+        {
+          "assertionId": "runtime-api-handle-terminal-value.complete.1.resultField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "runtime-api-handle-terminal-value.complete.2.resultField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "runtime-api-handle-terminal-value.complete.requiredEvidence.result.handle.awaitResult.finalAssistantMessage.parts.0.text",
+          "status": "pass"
+        },
+        {
+          "assertionId": "runtime-api-handle-terminal-value.complete.requiredEvidence.result.handle.awaitResult.status",
+          "status": "pass"
+        }
+      ],
+      "checkId": "runtime-api-handle-terminal-value.complete",
+      "details": {
+        "adapterId": "typescript-framework",
+        "planId": "tuvren.framework.runtime-api.callables"
+      },
+      "status": "pass"
+    },
+    {
+      "assertionResults": [
+        {
+          "assertionId": "runtime-api-handle-terminal-value.failure-resolves.1.resultField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "runtime-api-handle-terminal-value.failure-resolves.requiredEvidence.result.handle.awaitResult.status",
+          "status": "pass"
+        }
+      ],
+      "checkId": "runtime-api-handle-terminal-value.failure-resolves",
+      "details": {
+        "adapterId": "typescript-framework",
+        "planId": "tuvren.framework.runtime-api.callables"
+      },
+      "status": "pass"
+    },
+    {
+      "assertionResults": [
+        {
+          "assertionId": "runtime-api-handle-terminal-value.idempotent.1.resultField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "runtime-api-handle-terminal-value.idempotent.2.resultField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "runtime-api-handle-terminal-value.idempotent.3.resultField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "runtime-api-handle-terminal-value.idempotent.requiredEvidence.result.handle.awaitResult.allCompleted",
+          "status": "pass"
+        },
+        {
+          "assertionId": "runtime-api-handle-terminal-value.idempotent.requiredEvidence.result.handle.awaitResult.callCount",
+          "status": "pass"
+        },
+        {
+          "assertionId": "runtime-api-handle-terminal-value.idempotent.requiredEvidence.result.handle.awaitResult.resultsIdentical",
+          "status": "pass"
+        }
+      ],
+      "checkId": "runtime-api-handle-terminal-value.idempotent",
+      "details": {
+        "adapterId": "typescript-framework",
+        "planId": "tuvren.framework.runtime-api.callables"
+      },
+      "status": "pass"
+    },
+    {
+      "assertionResults": [
+        {
           "assertionId": "runtime-callable.approval-resolve.1.resultField",
           "status": "pass"
         },
@@ -3949,6 +4053,384 @@
         }
       ],
       "checkId": "runtime-callable-af.structured-validation-hard-fail-code",
+      "details": {
+        "adapterId": "typescript-framework",
+        "planId": "tuvren.framework.runtime-api.callables-extended"
+      },
+      "status": "pass"
+    },
+    {
+      "assertionResults": [
+        {
+          "assertionId": "runtime-callable-ao.get-turn-history.first-snapshot-has-hash.1.resultField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "runtime-callable-ao.get-turn-history.first-snapshot-has-hash.requiredEvidence.result.durableRead.getTurnHistory.firstSnapshotHasHash",
+          "status": "pass"
+        }
+      ],
+      "checkId": "runtime-callable-ao.get-turn-history.first-snapshot-has-hash",
+      "details": {
+        "adapterId": "typescript-framework",
+        "planId": "tuvren.framework.runtime-api.callables-extended"
+      },
+      "status": "pass"
+    },
+    {
+      "assertionResults": [
+        {
+          "assertionId": "runtime-callable-ao.get-turn-history.snapshot-count-one.1.resultField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "runtime-callable-ao.get-turn-history.snapshot-count-one.requiredEvidence.result.durableRead.getTurnHistory.snapshotCount",
+          "status": "pass"
+        }
+      ],
+      "checkId": "runtime-callable-ao.get-turn-history.snapshot-count-one",
+      "details": {
+        "adapterId": "typescript-framework",
+        "planId": "tuvren.framework.runtime-api.callables-extended"
+      },
+      "status": "pass"
+    },
+    {
+      "assertionResults": [
+        {
+          "assertionId": "runtime-callable-ao.get-turn-state-lineage.matches-expected-hash.1.resultField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "runtime-callable-ao.get-turn-state-lineage.matches-expected-hash.requiredEvidence.result.durableRead.getTurnState.matchesExpectedHash",
+          "status": "pass"
+        }
+      ],
+      "checkId": "runtime-callable-ao.get-turn-state-lineage.matches-expected-hash",
+      "details": {
+        "adapterId": "typescript-framework",
+        "planId": "tuvren.framework.runtime-api.callables-extended"
+      },
+      "status": "pass"
+    },
+    {
+      "assertionResults": [
+        {
+          "assertionId": "runtime-callable-ao.get-turn-state.has-turn-node-hash.1.resultField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "runtime-callable-ao.get-turn-state.has-turn-node-hash.requiredEvidence.result.durableRead.getTurnState.hasTurnNodeHash",
+          "status": "pass"
+        }
+      ],
+      "checkId": "runtime-callable-ao.get-turn-state.has-turn-node-hash",
+      "details": {
+        "adapterId": "typescript-framework",
+        "planId": "tuvren.framework.runtime-api.callables-extended"
+      },
+      "status": "pass"
+    },
+    {
+      "assertionResults": [
+        {
+          "assertionId": "runtime-callable-ao.get-turn-state.has-turn-tree-hash.1.resultField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "runtime-callable-ao.get-turn-state.has-turn-tree-hash.requiredEvidence.result.durableRead.getTurnState.hasTurnTreeHash",
+          "status": "pass"
+        }
+      ],
+      "checkId": "runtime-callable-ao.get-turn-state.has-turn-tree-hash",
+      "details": {
+        "adapterId": "typescript-framework",
+        "planId": "tuvren.framework.runtime-api.callables-extended"
+      },
+      "status": "pass"
+    },
+    {
+      "assertionResults": [
+        {
+          "assertionId": "runtime-callable-ao.get-turn-state.previous-turn-null.1.resultField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "runtime-callable-ao.get-turn-state.previous-turn-null.requiredEvidence.result.durableRead.getTurnState.previousTurnNull",
+          "status": "pass"
+        }
+      ],
+      "checkId": "runtime-callable-ao.get-turn-state.previous-turn-null",
+      "details": {
+        "adapterId": "typescript-framework",
+        "planId": "tuvren.framework.runtime-api.callables-extended"
+      },
+      "status": "pass"
+    },
+    {
+      "assertionResults": [
+        {
+          "assertionId": "runtime-callable-ao.list-branches.all-have-thread-id.1.resultField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "runtime-callable-ao.list-branches.all-have-thread-id.requiredEvidence.result.durableRead.listBranches.allHaveThreadId",
+          "status": "pass"
+        }
+      ],
+      "checkId": "runtime-callable-ao.list-branches.all-have-thread-id",
+      "details": {
+        "adapterId": "typescript-framework",
+        "planId": "tuvren.framework.runtime-api.callables-extended"
+      },
+      "status": "pass"
+    },
+    {
+      "assertionResults": [
+        {
+          "assertionId": "runtime-callable-ao.list-branches.branch-count.1.resultField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "runtime-callable-ao.list-branches.branch-count.requiredEvidence.result.durableRead.listBranches.branchCount",
+          "status": "pass"
+        }
+      ],
+      "checkId": "runtime-callable-ao.list-branches.branch-count",
+      "details": {
+        "adapterId": "typescript-framework",
+        "planId": "tuvren.framework.runtime-api.callables-extended"
+      },
+      "status": "pass"
+    },
+    {
+      "assertionResults": [
+        {
+          "assertionId": "runtime-callable-ao.list-threads-cap-rejected.error-code.1.resultField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "runtime-callable-ao.list-threads-cap-rejected.error-code.requiredEvidence.result.durableRead.listThreads.errorCode",
+          "status": "pass"
+        }
+      ],
+      "checkId": "runtime-callable-ao.list-threads-cap-rejected.error-code",
+      "details": {
+        "adapterId": "typescript-framework",
+        "planId": "tuvren.framework.runtime-api.callables-extended"
+      },
+      "status": "pass"
+    },
+    {
+      "assertionResults": [
+        {
+          "assertionId": "runtime-callable-ao.list-threads-cap-rejected.raised-true.1.resultField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "runtime-callable-ao.list-threads-cap-rejected.raised-true.requiredEvidence.result.durableRead.listThreads.raised",
+          "status": "pass"
+        }
+      ],
+      "checkId": "runtime-callable-ao.list-threads-cap-rejected.raised-true",
+      "details": {
+        "adapterId": "typescript-framework",
+        "planId": "tuvren.framework.runtime-api.callables-extended"
+      },
+      "status": "pass"
+    },
+    {
+      "assertionResults": [
+        {
+          "assertionId": "runtime-callable-ao.list-threads-paginate.has-next-cursor.1.resultField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "runtime-callable-ao.list-threads-paginate.has-next-cursor.requiredEvidence.result.durableRead.listThreads.hasFirstCursor",
+          "status": "pass"
+        }
+      ],
+      "checkId": "runtime-callable-ao.list-threads-paginate.has-next-cursor",
+      "details": {
+        "adapterId": "typescript-framework",
+        "planId": "tuvren.framework.runtime-api.callables-extended"
+      },
+      "status": "pass"
+    },
+    {
+      "assertionResults": [
+        {
+          "assertionId": "runtime-callable-ao.list-threads-paginate.no-cursor-on-last-page.1.resultField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "runtime-callable-ao.list-threads-paginate.no-cursor-on-last-page.requiredEvidence.result.durableRead.listThreads.hasSecondCursor",
+          "status": "pass"
+        }
+      ],
+      "checkId": "runtime-callable-ao.list-threads-paginate.no-cursor-on-last-page",
+      "details": {
+        "adapterId": "typescript-framework",
+        "planId": "tuvren.framework.runtime-api.callables-extended"
+      },
+      "status": "pass"
+    },
+    {
+      "assertionResults": [
+        {
+          "assertionId": "runtime-callable-ao.list-threads-paginate.page1-count-one.1.resultField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "runtime-callable-ao.list-threads-paginate.page1-count-one.requiredEvidence.result.durableRead.listThreads.page1Count",
+          "status": "pass"
+        }
+      ],
+      "checkId": "runtime-callable-ao.list-threads-paginate.page1-count-one",
+      "details": {
+        "adapterId": "typescript-framework",
+        "planId": "tuvren.framework.runtime-api.callables-extended"
+      },
+      "status": "pass"
+    },
+    {
+      "assertionResults": [
+        {
+          "assertionId": "runtime-callable-ao.list-threads-paginate.page2-count-one.1.resultField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "runtime-callable-ao.list-threads-paginate.page2-count-one.requiredEvidence.result.durableRead.listThreads.page2Count",
+          "status": "pass"
+        }
+      ],
+      "checkId": "runtime-callable-ao.list-threads-paginate.page2-count-one",
+      "details": {
+        "adapterId": "typescript-framework",
+        "planId": "tuvren.framework.runtime-api.callables-extended"
+      },
+      "status": "pass"
+    },
+    {
+      "assertionResults": [
+        {
+          "assertionId": "runtime-callable-ao.list-threads-paginate.unique-thread-count.1.resultField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "runtime-callable-ao.list-threads-paginate.unique-thread-count.requiredEvidence.result.durableRead.listThreads.uniqueIds",
+          "status": "pass"
+        }
+      ],
+      "checkId": "runtime-callable-ao.list-threads-paginate.unique-thread-count",
+      "details": {
+        "adapterId": "typescript-framework",
+        "planId": "tuvren.framework.runtime-api.callables-extended"
+      },
+      "status": "pass"
+    },
+    {
+      "assertionResults": [
+        {
+          "assertionId": "runtime-callable-ao.list-threads.no-cursor-when-all-consumed.1.resultField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "runtime-callable-ao.list-threads.no-cursor-when-all-consumed.requiredEvidence.result.durableRead.listThreads.hasCursor",
+          "status": "pass"
+        }
+      ],
+      "checkId": "runtime-callable-ao.list-threads.no-cursor-when-all-consumed",
+      "details": {
+        "adapterId": "typescript-framework",
+        "planId": "tuvren.framework.runtime-api.callables-extended"
+      },
+      "status": "pass"
+    },
+    {
+      "assertionResults": [
+        {
+          "assertionId": "runtime-callable-ao.list-threads.thread-count-positive.1.resultField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "runtime-callable-ao.list-threads.thread-count-positive.requiredEvidence.result.durableRead.listThreads.threadCount",
+          "status": "pass"
+        }
+      ],
+      "checkId": "runtime-callable-ao.list-threads.thread-count-positive",
+      "details": {
+        "adapterId": "typescript-framework",
+        "planId": "tuvren.framework.runtime-api.callables-extended"
+      },
+      "status": "pass"
+    },
+    {
+      "assertionResults": [
+        {
+          "assertionId": "runtime-callable-ao.read-branch-messages-head-drift.error-code.1.resultField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "runtime-callable-ao.read-branch-messages-head-drift.error-code.requiredEvidence.result.durableRead.readBranchMessages.errorCode",
+          "status": "pass"
+        }
+      ],
+      "checkId": "runtime-callable-ao.read-branch-messages-head-drift.error-code",
+      "details": {
+        "adapterId": "typescript-framework",
+        "planId": "tuvren.framework.runtime-api.callables-extended"
+      },
+      "status": "pass"
+    },
+    {
+      "assertionResults": [
+        {
+          "assertionId": "runtime-callable-ao.read-branch-messages-head-drift.raised-true.1.resultField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "runtime-callable-ao.read-branch-messages-head-drift.raised-true.requiredEvidence.result.durableRead.readBranchMessages.raised",
+          "status": "pass"
+        }
+      ],
+      "checkId": "runtime-callable-ao.read-branch-messages-head-drift.raised-true",
+      "details": {
+        "adapterId": "typescript-framework",
+        "planId": "tuvren.framework.runtime-api.callables-extended"
+      },
+      "status": "pass"
+    },
+    {
+      "assertionResults": [
+        {
+          "assertionId": "runtime-callable-ao.read-branch-messages.message-count-zero.1.resultField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "runtime-callable-ao.read-branch-messages.message-count-zero.requiredEvidence.result.durableRead.readBranchMessages.messageCount",
+          "status": "pass"
+        }
+      ],
+      "checkId": "runtime-callable-ao.read-branch-messages.message-count-zero",
+      "details": {
+        "adapterId": "typescript-framework",
+        "planId": "tuvren.framework.runtime-api.callables-extended"
+      },
+      "status": "pass"
+    },
+    {
+      "assertionResults": [
+        {
+          "assertionId": "runtime-callable-ao.read-branch-messages.no-cursor.1.resultField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "runtime-callable-ao.read-branch-messages.no-cursor.requiredEvidence.result.durableRead.readBranchMessages.hasCursor",
+          "status": "pass"
+        }
+      ],
+      "checkId": "runtime-callable-ao.read-branch-messages.no-cursor",
       "details": {
         "adapterId": "typescript-framework",
         "planId": "tuvren.framework.runtime-api.callables-extended"
@@ -6003,29 +6485,11 @@
     {
       "assertionResults": [
         {
-          "assertionId": "runtime-orchestration.surfaces.await-result-failure-rejects.1.resultField",
-          "status": "pass"
-        },
-        {
-          "assertionId": "runtime-orchestration.surfaces.await-result-failure-rejects.requiredEvidence.result.orchestration.surfaces.failedAwaitResultRejected",
-          "status": "pass"
-        }
-      ],
-      "checkId": "runtime-orchestration.surfaces.await-result-failure-rejects",
-      "details": {
-        "adapterId": "typescript-framework",
-        "planId": "tuvren.framework.runtime-api.orchestration"
-      },
-      "status": "pass"
-    },
-    {
-      "assertionResults": [
-        {
           "assertionId": "runtime-orchestration.surfaces.await-result-visible-result.1.resultField",
           "status": "pass"
         },
         {
-          "assertionId": "runtime-orchestration.surfaces.await-result-visible-result.requiredEvidence.result.orchestration.surfaces.childResult.0.text",
+          "assertionId": "runtime-orchestration.surfaces.await-result-visible-result.requiredEvidence.result.orchestration.surfaces.childResultText",
           "status": "pass"
         }
       ],
@@ -6292,9 +6756,9 @@
   "status": "pass",
   "summary": {
     "failedChecks": 0,
-    "passedChecks": 284,
-    "totalChecks": 284,
-    "applicableChecks": 284,
+    "passedChecks": 308,
+    "totalChecks": 308,
+    "applicableChecks": 308,
     "nonApplicableChecks": 0
   },
   "suiteId": "tuvren.framework.promoted-authority",

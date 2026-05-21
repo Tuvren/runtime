@@ -15,9 +15,13 @@
  */
 
 // biome-ignore-all lint/performance/noBarrelFile: This package entrypoint is the intentional public contract surface.
-// This package is intentionally a focused import home over the shared runtime
-// contract family. It now tracks the matching runtime-api subpath instead of
-// the broad root facade so the dependency shape stays as narrow as the surface.
+// DEPRECATED: @tuvren/event-stream will be removed in the next minor release.
+// Import from @tuvren/core/events instead.
+console.warn(
+  "[deprecated] @tuvren/event-stream is deprecated and will be removed in the next minor release. " +
+    "Import from @tuvren/core/events instead."
+);
+
 export type {
   ApprovalRequestedEvent,
   ApprovalResolvedEvent,
@@ -48,8 +52,8 @@ export type {
   TurnStartEvent,
   TuvrenErrorProjection,
   TuvrenStreamEvent,
-} from "@tuvren/runtime-api/events";
+} from "@tuvren/core/events";
 export {
   assertTuvrenStreamEvent,
   isTuvrenStreamEvent,
-} from "@tuvren/runtime-api/events";
+} from "@tuvren/core/events";

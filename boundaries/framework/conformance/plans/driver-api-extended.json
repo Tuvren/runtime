@@ -155,7 +155,7 @@
       "scenario": "driver-api-scenarios"
     }
   ],
-  "packetId": "tuvren.framework.driver-api",
+  "packetId": "tuvren.shared.core",
   "planId": "tuvren.framework.driver-api.extended",
   "planVersion": "0.1.0",
   "scenarios": {

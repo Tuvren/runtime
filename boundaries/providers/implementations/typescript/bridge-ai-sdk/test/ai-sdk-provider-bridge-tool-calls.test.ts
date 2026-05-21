@@ -15,7 +15,7 @@
  */
 
 import { describe, expect, test } from "bun:test";
-import { TuvrenProviderError } from "@tuvren/core-types";
+import { TuvrenProviderError } from "@tuvren/core";
 import { assertProviderFinishChunk } from "@tuvren/provider-testkit";
 import { createAiSdkProviderBridge } from "../src/index.ts";
 import {

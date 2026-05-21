@@ -14,14 +14,10 @@
  * limitations under the License.
  */
 
-import type { DriverExecutionContext } from "@tuvren/driver-api";
-import type {
-  ContextManifest,
-  InputSignal,
-  ToolRegistry,
-  TuvrenStreamEvent,
-  TuvrenToolDefinition,
-} from "@tuvren/runtime-api";
+import type { DriverExecutionContext } from "@tuvren/core/driver";
+import type { TuvrenStreamEvent } from "@tuvren/core/events";
+import type { ContextManifest, InputSignal } from "@tuvren/core/execution";
+import type { ToolRegistry, TuvrenToolDefinition } from "@tuvren/core/tools";
 
 export function createDriverExecutionContext(input?: {
   config?: DriverExecutionContext["config"];

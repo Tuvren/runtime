@@ -1,0 +1,249 @@
+{
+  "packetId": "tuvren.shared.core",
+  "version": "1.0.0",
+  "boundary": "framework",
+  "surface": "core",
+  "description": "Merged shared-primitive authority packet for @tuvren/core. Absorbs tuvren.shared.core-types, tuvren.framework.runtime-api, tuvren.framework.event-stream, tuvren.framework.tool-contracts, and tuvren.framework.driver-api into a single packet with 8 binding sections per ADR-037 (Epic AP).",
+  "humanAuthorityRefs": [
+    "docs/KrakenKernelSpecification.md",
+    "docs/KrakenFrameworkSpecification.md",
+    "constitution/TechSpec.md#adr-037"
+  ],
+  "authoritativeSources": [
+    {
+      "path": "boundaries/shared/contracts/core-types/spec/typespec/main.tsp",
+      "format": "typespec",
+      "bindingSection": "errors"
+    },
+    {
+      "path": "boundaries/framework/contracts/runtime-api/spec/typespec/main.tsp",
+      "format": "typespec",
+      "bindingSection": "messages,events,execution,tools,provider,extensions"
+    },
+    {
+      "path": "boundaries/framework/contracts/event-stream/spec/typespec/main.tsp",
+      "format": "typespec",
+      "bindingSection": "events"
+    },
+    {
+      "path": "boundaries/framework/contracts/tool-contracts/spec/typespec/main.tsp",
+      "format": "typespec",
+      "bindingSection": "tools"
+    },
+    {
+      "path": "boundaries/framework/contracts/driver-api/spec/typespec/main.tsp",
+      "format": "typespec",
+      "bindingSection": "driver"
+    },
+    {
+      "path": "boundaries/framework/conformance/plans/runtime-api-lifecycle.json",
+      "format": "conformance-plan"
+    },
+    {
+      "path": "boundaries/framework/conformance/plans/runtime-api-callables.json",
+      "format": "conformance-plan"
+    },
+    {
+      "path": "boundaries/framework/conformance/plans/runtime-api-callables-extended.json",
+      "format": "conformance-plan"
+    },
+    {
+      "path": "boundaries/framework/conformance/plans/runtime-api-lifecycle-extended.json",
+      "format": "conformance-plan"
+    },
+    {
+      "path": "boundaries/framework/conformance/plans/runtime-api-orchestration.json",
+      "format": "conformance-plan"
+    },
+    {
+      "path": "boundaries/framework/conformance/plans/event-stream-core.json",
+      "format": "conformance-plan"
+    },
+    {
+      "path": "boundaries/framework/conformance/plans/event-stream-extended.json",
+      "format": "conformance-plan"
+    },
+    {
+      "path": "boundaries/framework/conformance/plans/tool-contracts-extended.json",
+      "format": "conformance-plan"
+    },
+    {
+      "path": "boundaries/framework/conformance/plans/driver-api-core.json",
+      "format": "conformance-plan"
+    },
+    {
+      "path": "boundaries/framework/conformance/plans/driver-api-extended.json",
+      "format": "conformance-plan"
+    }
+  ],
+  "generatedArtifacts": [
+    {
+      "path": "boundaries/shared/contracts/core/artifacts/json-schema",
+      "generatedFrom": "boundaries/shared/contracts/core-types/spec/typespec",
+      "generator": "@typespec/json-schema",
+      "note": "Consolidated from core-types TypeSpec; runtime-api and other TypeSpec consolidation is a follow-up."
+    }
+  ],
+  "conformancePlans": [
+    {
+      "planId": "tuvren.framework.runtime-api.lifecycle",
+      "planVersion": "0.1.0",
+      "path": "boundaries/framework/conformance/plans/runtime-api-lifecycle.json"
+    },
+    {
+      "planId": "tuvren.framework.runtime-api.callables",
+      "planVersion": "0.2.0",
+      "path": "boundaries/framework/conformance/plans/runtime-api-callables.json"
+    },
+    {
+      "planId": "tuvren.framework.runtime-api.callables-extended",
+      "planVersion": "0.3.0",
+      "path": "boundaries/framework/conformance/plans/runtime-api-callables-extended.json"
+    },
+    {
+      "planId": "tuvren.framework.runtime-api.lifecycle-extended",
+      "planVersion": "0.1.0",
+      "path": "boundaries/framework/conformance/plans/runtime-api-lifecycle-extended.json"
+    },
+    {
+      "planId": "tuvren.framework.runtime-api.orchestration",
+      "planVersion": "0.3.0",
+      "path": "boundaries/framework/conformance/plans/runtime-api-orchestration.json"
+    },
+    {
+      "planId": "tuvren.framework.event-stream.core",
+      "planVersion": "0.1.0",
+      "path": "boundaries/framework/conformance/plans/event-stream-core.json"
+    },
+    {
+      "planId": "tuvren.framework.event-stream.extended",
+      "planVersion": "0.1.0",
+      "path": "boundaries/framework/conformance/plans/event-stream-extended.json"
+    },
+    {
+      "planId": "tuvren.framework.tool-contracts.extended",
+      "planVersion": "0.2.0",
+      "path": "boundaries/framework/conformance/plans/tool-contracts-extended.json"
+    },
+    {
+      "planId": "tuvren.framework.driver-api.core",
+      "planVersion": "0.1.0",
+      "path": "boundaries/framework/conformance/plans/driver-api-core.json"
+    },
+    {
+      "planId": "tuvren.framework.driver-api.extended",
+      "planVersion": "0.1.0",
+      "path": "boundaries/framework/conformance/plans/driver-api-extended.json"
+    }
+  ],
+  "bindingSections": {
+    "root": {
+      "description": "Primitive types: HashString, EpochMs, KernelRecord family + error base classes"
+    },
+    "errors": {
+      "description": "TuvrenError hierarchy and error-code types"
+    },
+    "messages": {
+      "description": "TuvrenMessage, content parts, model config and response types"
+    },
+    "events": {
+      "description": "TuvrenStreamEvent discriminated union and all event types"
+    },
+    "execution": {
+      "description": "ExecutionHandle, TuvrenRuntime, OrchestrationHandle, context/policy types, durable-read cursors"
+    },
+    "tools": {
+      "description": "TuvrenToolDefinition, approval types, tool execution contracts"
+    },
+    "driver": {
+      "description": "RuntimeDriver, DriverExecutionContext, driver contracts"
+    },
+    "provider": {
+      "description": "TuvrenProvider, ProviderStreamChunk, model response/prompt types"
+    },
+    "extensions": {
+      "description": "TuvrenExtension, ExtensionContext, lifecycle handler types"
+    }
+  },
+  "bindingProjections": {
+    "typescript": "boundaries/shared/contracts/core/implementations/typescript",
+    "typescript-runtime-core": "boundaries/framework/implementations/typescript/runtime"
+  },
+  "bindingAppendices": [
+    {
+      "language": "typescript",
+      "path": "boundaries/shared/contracts/core/spec/bindings/typescript.md"
+    }
+  ],
+  "forbiddenAuthoritySources": [
+    "boundaries/shared/contracts/core/implementations/typescript",
+    "boundaries/shared/contracts/core-types/implementations/typescript",
+    "boundaries/framework/contracts/runtime-api/implementations/typescript",
+    "boundaries/framework/contracts/event-stream/implementations/typescript",
+    "boundaries/framework/contracts/tool-contracts/implementations/typescript",
+    "boundaries/framework/contracts/driver-api/implementations/typescript",
+    "boundaries/framework/implementations/typescript/runtime",
+    "boundaries/framework/implementations/typescript/conformance-runner",
+    "boundaries/framework/implementations/typescript/conformance-adapter",
+    "boundaries/framework/implementations/rust/conformance-runner",
+    "boundaries/framework/implementations/rust/conformance-adapter",
+    "docs",
+    "constitution"
+  ],
+  "verificationPaths": [
+    {
+      "kind": "schema-validation",
+      "target": "boundaries/shared/contracts/core/artifacts/json-schema"
+    },
+    {
+      "kind": "conformance-plan",
+      "target": "boundaries/framework/conformance/plans/runtime-api-lifecycle.json"
+    },
+    {
+      "kind": "conformance-plan",
+      "target": "boundaries/framework/conformance/plans/runtime-api-callables.json"
+    },
+    {
+      "kind": "conformance-plan",
+      "target": "boundaries/framework/conformance/plans/runtime-api-callables-extended.json"
+    },
+    {
+      "kind": "conformance-plan",
+      "target": "boundaries/framework/conformance/plans/runtime-api-lifecycle-extended.json"
+    },
+    {
+      "kind": "conformance-plan",
+      "target": "boundaries/framework/conformance/plans/runtime-api-orchestration.json"
+    },
+    {
+      "kind": "conformance-plan",
+      "target": "boundaries/framework/conformance/plans/event-stream-core.json"
+    },
+    {
+      "kind": "conformance-plan",
+      "target": "boundaries/framework/conformance/plans/event-stream-extended.json"
+    },
+    {
+      "kind": "conformance-plan",
+      "target": "boundaries/framework/conformance/plans/tool-contracts-extended.json"
+    },
+    {
+      "kind": "conformance-plan",
+      "target": "boundaries/framework/conformance/plans/driver-api-core.json"
+    },
+    {
+      "kind": "conformance-plan",
+      "target": "boundaries/framework/conformance/plans/driver-api-extended.json"
+    },
+    {
+      "kind": "freshness-check",
+      "target": "boundaries/shared/contracts/core/artifacts/json-schema"
+    }
+  ],
+  "freshnessChecks": [
+    {
+      "artifact": "boundaries/shared/contracts/core/artifacts/json-schema",
+      "regenerateCommand": "bun run nx run shared-core:codegen"
+    }
+  ]
+}

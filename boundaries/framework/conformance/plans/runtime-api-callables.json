@@ -1,7 +1,7 @@
 {
   "planId": "tuvren.framework.runtime-api.callables",
   "planVersion": "0.2.0",
-  "packetId": "tuvren.framework.runtime-api",
+  "packetId": "tuvren.shared.core",
   "applicability": {
     "capabilities": ["framework.runtime-api"]
   },

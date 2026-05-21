@@ -15,13 +15,13 @@
  */
 
 import { randomUUID } from "node:crypto";
-import type { EpochMs } from "@tuvren/core-types";
-import { TuvrenProviderError, TuvrenRuntimeError } from "@tuvren/core-types";
+import type { EpochMs } from "@tuvren/core";
+import { TuvrenProviderError, TuvrenRuntimeError } from "@tuvren/core";
+import type { TuvrenStreamEvent } from "@tuvren/core/events";
 import type {
   ProviderStreamChunk,
   TuvrenModelResponse,
 } from "@tuvren/provider-api";
-import type { TuvrenStreamEvent } from "@tuvren/runtime-api";
 
 interface PendingToolCall {
   argsDelta: string;

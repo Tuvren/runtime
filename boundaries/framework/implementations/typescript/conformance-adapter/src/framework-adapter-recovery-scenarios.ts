@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-import type { RuntimeDriver } from "@tuvren/driver-api";
+import type { RuntimeDriver } from "@tuvren/core/driver";
 import { encodeDeterministicKernelRecord } from "@tuvren/kernel-protocol";
 import {
   createDriverRegistry,

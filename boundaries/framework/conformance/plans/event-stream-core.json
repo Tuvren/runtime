@@ -1,7 +1,7 @@
 {
   "planId": "tuvren.framework.event-stream.core",
   "planVersion": "0.1.0",
-  "packetId": "tuvren.framework.event-stream",
+  "packetId": "tuvren.shared.core",
   "applicability": {
     "capabilities": ["framework.event-stream"]
   },

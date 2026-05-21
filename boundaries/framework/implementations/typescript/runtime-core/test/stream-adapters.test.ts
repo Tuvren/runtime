@@ -17,9 +17,9 @@
 // biome-ignore-all lint/suspicious/useAwait: Test drivers intentionally match the async framework driver contract.
 import { describe, expect, test } from "bun:test";
 import { EventType } from "@ag-ui/core";
-import type { RuntimeDriver } from "@tuvren/driver-api";
+import type { RuntimeDriver } from "@tuvren/core/driver";
+import type { TuvrenToolDefinition } from "@tuvren/core/tools";
 import { startAsyncCapture } from "@tuvren/framework-testkit";
-import type { TuvrenToolDefinition } from "@tuvren/runtime-api";
 import { toAgUiEvents } from "@tuvren/stream-agui";
 import { teeTuvrenStreamEvents } from "@tuvren/stream-core";
 import { toSseFrames } from "@tuvren/stream-sse";

@@ -21,7 +21,7 @@ import {
   throws,
 } from "node:assert/strict";
 import { describe, test } from "node:test";
-import { TuvrenPersistenceError } from "@tuvren/core-types";
+import { TuvrenPersistenceError } from "@tuvren/core";
 import {
   encodeDeterministicKernelRecord,
   type RuntimeBackendTx as KrakenBackendTx,

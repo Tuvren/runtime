@@ -20,8 +20,8 @@ import type {
   DriverExecutionResult,
   RuntimeDriver as KrakenDriver,
   RuntimeDriverFactory as KrakenDriverFactory,
-} from "@tuvren/driver-api";
-import type { AgentConfig } from "@tuvren/runtime-api";
+} from "@tuvren/core/driver";
+import type { AgentConfig } from "@tuvren/core/execution";
 import {
   createDriverRegistry as createBaseDriverRegistry,
   createTuvrenRuntimeCore,

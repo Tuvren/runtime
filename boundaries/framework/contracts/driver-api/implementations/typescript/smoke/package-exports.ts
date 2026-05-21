@@ -18,7 +18,7 @@ import { describe, expect, test } from "bun:test";
 import {
   assertDriverExecutionResult,
   type DriverExecutionResult,
-} from "@tuvren/driver-api";
+} from "@tuvren/core/driver";
 
 describe("framework-driver-api package exports", () => {
   test("resolve from the built package surface", () => {

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-import type { KernelRecord } from "@tuvren/core-types";
+import type { KernelRecord } from "@tuvren/core";
 import { hashTurnNodeIdentity } from "./kernel-identity.js";
 import type {
   BranchHeadListEntry,

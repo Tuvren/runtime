@@ -1048,7 +1048,7 @@
       "operation": "runtime.durable-read.read-branch-messages-head-drift"
     }
   ],
-  "packetId": "tuvren.framework.runtime-api",
+  "packetId": "tuvren.shared.core",
   "planId": "tuvren.framework.runtime-api.callables-extended",
   "planVersion": "0.3.0",
   "scenarios": {

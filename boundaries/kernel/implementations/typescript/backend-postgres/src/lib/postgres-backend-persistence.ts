@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-import type { EpochMs } from "@tuvren/core-types";
+import type { EpochMs } from "@tuvren/core";
 import {
   assertStoredBranch,
   assertStoredObject,

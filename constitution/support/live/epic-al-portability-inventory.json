@@ -1,14 +1,14 @@
 {
-  "manifestVersion": "0.1.0",
+  "manifestVersion": "0.2.0",
   "manifestId": "epic-al.portability-inventory",
   "humanInventoryRef": "constitution/support/live/epic-al-portable-surface-conformance-gap-inventory.md",
-  "description": "Machine-readable companion to the Epic AL portable-surface conformance gap inventory. The portability gate at `tools/scripts/portability-gate.ts` consumes this file to enforce that the on-disk packet topology, standing exceptions, and required authoritative sources have not drifted from the inventory's recorded closure state. Editing either the human inventory MD or this JSON without the matching counterpart change must be treated as drift and rejected during review. The gate fails closed if this file is missing, malformed, or names paths that do not exist on disk.",
+  "description": "Machine-readable companion to the Epic AL portable-surface conformance gap inventory. v0.2.0 reflects the Epic AP package consolidation (ADR-037): tuvren.shared.core-types, tuvren.framework.runtime-api, tuvren.framework.event-stream, tuvren.framework.driver-api, and tuvren.framework.tool-contracts are absorbed into tuvren.shared.core; expectedPackets count drops from 12 to 8. The portability gate at `tools/scripts/portability-gate.ts` consumes this file to enforce that the on-disk packet topology, standing exceptions, and required authoritative sources have not drifted from the inventory's recorded closure state. Editing either the human inventory MD or this JSON without the matching counterpart change must be treated as drift and rejected during review. The gate fails closed if this file is missing, malformed, or names paths that do not exist on disk.",
   "expectedPackets": [
     {
-      "packetId": "tuvren.shared.core-types",
-      "packetPath": "boundaries/shared/contracts/core-types/spec/authority-packet.json",
+      "packetId": "tuvren.shared.core",
+      "packetPath": "boundaries/shared/contracts/core/spec/authority-packet.json",
       "classification": "portable",
-      "inventorySection": "§3 / §9b"
+      "inventorySection": "§3 / §9b (ADR-037 consolidated)"
     },
     {
       "packetId": "tuvren.kernel.protocol",
@@ -17,40 +17,16 @@
       "inventorySection": "§3 / §6.G2 / §9b"
     },
     {
-      "packetId": "tuvren.framework.runtime-api",
-      "packetPath": "boundaries/framework/contracts/runtime-api/spec/authority-packet.json",
-      "classification": "portable",
-      "inventorySection": "§3 / §9b"
-    },
-    {
-      "packetId": "tuvren.framework.event-stream",
-      "packetPath": "boundaries/framework/contracts/event-stream/spec/authority-packet.json",
-      "classification": "portable",
-      "inventorySection": "§3 / §9b"
-    },
-    {
       "packetId": "tuvren.framework.event-stream-sse",
       "packetPath": "boundaries/framework/contracts/event-stream-sse/spec/authority-packet.json",
       "classification": "portable",
       "inventorySection": "§6.G3 / §9b"
     },
     {
-      "packetId": "tuvren.framework.driver-api",
-      "packetPath": "boundaries/framework/contracts/driver-api/spec/authority-packet.json",
-      "classification": "portable",
-      "inventorySection": "§3 / §9b"
-    },
-    {
       "packetId": "tuvren.framework.react-driver",
       "packetPath": "boundaries/framework/contracts/react-driver/spec/authority-packet.json",
       "classification": "portable",
       "inventorySection": "§3 / §9b"
-    },
-    {
-      "packetId": "tuvren.framework.tool-contracts",
-      "packetPath": "boundaries/framework/contracts/tool-contracts/spec/authority-packet.json",
-      "classification": "portable",
-      "inventorySection": "§6.G1 / §9b"
     },
     {
       "packetId": "tuvren.providers.provider-api",
@@ -102,10 +78,10 @@
       "inventorySection": "§6.G2 / §9b"
     },
     {
-      "packetId": "tuvren.framework.tool-contracts",
+      "packetId": "tuvren.shared.core",
       "sourcePath": "boundaries/framework/contracts/tool-contracts/spec/typespec/main.tsp",
       "sourceFormat": "typespec",
-      "rationale": "KRT-AL002 G1: tool-contracts TypeSpec source",
+      "rationale": "KRT-AL002 G1 (absorbed): tool-contracts TypeSpec source now lives under tuvren.shared.core binding section",
       "inventorySection": "§6.G1 / §9b"
     },
     {

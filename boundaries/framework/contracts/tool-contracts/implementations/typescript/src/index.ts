@@ -15,9 +15,13 @@
  */
 
 // biome-ignore-all lint/performance/noBarrelFile: This package entrypoint is the intentional public contract surface.
-// This package is intentionally a focused import home over the shared runtime
-// contract family. It now tracks the matching runtime-api subpath instead of
-// the broad root facade so the dependency shape stays as narrow as the surface.
+// DEPRECATED: @tuvren/tool-contracts will be removed in the next minor release.
+// Import from @tuvren/core/tools instead.
+console.warn(
+  "[deprecated] @tuvren/tool-contracts is deprecated and will be removed in the next minor release. " +
+    "Import from @tuvren/core/tools instead."
+);
+
 export type {
   ApprovalDecision,
   ApprovalPolicy,
@@ -42,7 +46,7 @@ export type {
   TuvrenToolResultBatch,
   ValidationErrorPayload,
   ValidationResult,
-} from "@tuvren/runtime-api/tools";
+} from "@tuvren/core/tools";
 export {
   assertApprovalRequest,
   assertApprovalResponse,
@@ -52,4 +56,4 @@ export {
   isApprovalResponse,
   isApprovalResponseForRequest,
   isTuvrenToolDefinition,
-} from "@tuvren/runtime-api/tools";
+} from "@tuvren/core/tools";

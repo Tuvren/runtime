@@ -16,7 +16,7 @@
 
 import { describe, expect, test } from "bun:test";
 import { EventSchemas, EventType } from "@ag-ui/core";
-import type { TuvrenStreamEvent } from "@tuvren/event-stream";
+import type { TuvrenStreamEvent } from "@tuvren/core/events";
 import { readFrameworkStreamFixtures } from "@tuvren/framework-testkit";
 import {
   createFixtureStream,

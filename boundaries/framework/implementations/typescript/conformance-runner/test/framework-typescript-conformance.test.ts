@@ -24,9 +24,8 @@ import {
 
 const REPO_ROOT = resolve(import.meta.dir, "../../../../../..");
 const FRAMEWORK_PACKET_PATHS: readonly string[] = [
-  "boundaries/framework/contracts/event-stream/spec/authority-packet.json",
-  "boundaries/framework/contracts/runtime-api/spec/authority-packet.json",
-  "boundaries/framework/contracts/driver-api/spec/authority-packet.json",
+  "boundaries/shared/contracts/core/spec/authority-packet.json",
+  "boundaries/framework/contracts/event-stream-sse/spec/authority-packet.json",
   "boundaries/framework/contracts/react-driver/spec/authority-packet.json",
 ];
 

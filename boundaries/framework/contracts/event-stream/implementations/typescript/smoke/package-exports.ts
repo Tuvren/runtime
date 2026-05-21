@@ -19,7 +19,7 @@ import {
   assertTuvrenStreamEvent,
   type FileDoneEvent,
   type TextDoneEvent,
-} from "@tuvren/event-stream";
+} from "@tuvren/core/events";
 
 describe("framework-event-stream package exports", () => {
   test("resolve from the built package surface", () => {

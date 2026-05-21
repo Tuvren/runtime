@@ -20,12 +20,9 @@ import type {
   DriverExecutionResult,
   RuntimeDriver as KrakenDriver,
   RuntimeDriverFactory as KrakenDriverFactory,
-} from "@tuvren/driver-api";
-import type {
-  AgentConfig,
-  HandoffSourceContext,
-  TuvrenModelResponse,
-} from "@tuvren/runtime-api";
+} from "@tuvren/core/driver";
+import type { AgentConfig, HandoffSourceContext } from "@tuvren/core/execution";
+import type { TuvrenModelResponse } from "@tuvren/core/provider";
 import {
   createDriverRegistry as createBaseDriverRegistry,
   createPreserveTraceHandoffContextBuilder,

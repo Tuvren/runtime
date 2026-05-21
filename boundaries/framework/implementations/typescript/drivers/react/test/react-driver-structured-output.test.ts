@@ -17,8 +17,11 @@
 // biome-ignore-all lint/suspicious/useAwait: Mock async provider interfaces intentionally preserve promise-based signatures in these validation tests.
 
 import { describe, expect, test } from "bun:test";
-import type { DriverExecutionContext } from "@tuvren/driver-api";
-import type { TuvrenModelResponse, TuvrenProvider } from "@tuvren/runtime-api";
+import type { DriverExecutionContext } from "@tuvren/core/driver";
+import type {
+  TuvrenModelResponse,
+  TuvrenProvider,
+} from "@tuvren/core/provider";
 import { createReActDriver } from "../src/index.ts";
 import { createDriverExecutionContext } from "./react-driver-test-helpers.ts";
 

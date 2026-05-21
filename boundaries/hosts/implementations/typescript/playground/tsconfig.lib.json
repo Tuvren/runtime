@@ -8,6 +8,9 @@
   "include": ["src/**/*.ts"],
   "references": [
     {
+      "path": "../../../../framework/implementations/typescript/drivers/react/tsconfig.lib.json"
+    },
+    {
       "path": "../../../../framework/implementations/typescript/runtime/tsconfig.lib.json"
     },
     {

@@ -21,11 +21,11 @@ import type {
   ProviderStreamChunk,
   TuvrenModelResponse,
   TuvrenProvider,
-} from "@tuvren/runtime-api";
+} from "@tuvren/core/provider";
 import {
   createDriverRegistry,
-  createTuvrenRuntimeCore,
-} from "@tuvren/runtime-core";
+  createTuvrenRuntime as createTuvrenRuntimeCore,
+} from "@tuvren/runtime";
 import { createFakeKernelHarness } from "../../../runtime-core/test/fake-kernel.ts";
 import { createReActDriver, REACT_DRIVER_ID } from "../src/index.ts";
 import {

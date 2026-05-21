@@ -573,7 +573,7 @@
       ]
     }
   ],
-  "packetId": "tuvren.framework.runtime-api",
+  "packetId": "tuvren.shared.core",
   "planId": "tuvren.framework.runtime-api.lifecycle-extended",
   "planVersion": "0.1.0",
   "scenarios": {

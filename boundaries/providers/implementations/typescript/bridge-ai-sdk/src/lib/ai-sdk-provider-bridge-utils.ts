@@ -21,7 +21,7 @@ import type {
   SharedV3ProviderOptions,
 } from "@ai-sdk/provider";
 import { AISDKError } from "@ai-sdk/provider";
-import { TuvrenProviderError } from "@tuvren/core-types";
+import { TuvrenProviderError } from "@tuvren/core";
 import type {
   StructuredOutputRequest,
   TuvrenPrompt,

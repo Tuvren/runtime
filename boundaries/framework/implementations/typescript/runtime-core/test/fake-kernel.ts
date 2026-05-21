@@ -21,7 +21,7 @@ import {
   type HashString,
   type KernelRecord,
   TuvrenRuntimeError,
-} from "@tuvren/core-types";
+} from "@tuvren/core";
 import {
   type BranchHeadListEntry,
   type BranchRecord,

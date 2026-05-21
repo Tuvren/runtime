@@ -14,17 +14,14 @@
  * limitations under the License.
  */
 
-import { assertHashString } from "@tuvren/core-types";
-import { assertDriverExecutionResult } from "@tuvren/driver-api";
+import { assertHashString } from "@tuvren/core";
+import { assertDriverExecutionResult } from "@tuvren/core/driver";
+import type { TuvrenStreamEvent } from "@tuvren/core/events";
+import type { IterationDecision, LoopPolicy } from "@tuvren/core/execution";
+import type { TuvrenExtension } from "@tuvren/core/extensions";
+import type { TuvrenModelResponse } from "@tuvren/core/provider";
+import type { ApprovalDecision } from "@tuvren/core/tools";
 import type { ProviderStreamChunk, TuvrenProvider } from "@tuvren/provider-api";
-import type {
-  ApprovalDecision,
-  IterationDecision,
-  LoopPolicy,
-  TuvrenExtension,
-  TuvrenModelResponse,
-  TuvrenStreamEvent,
-} from "@tuvren/runtime-api";
 import { createReActDriver } from "../../drivers/react/src/index.ts";
 import {
   createDriverRegistry,

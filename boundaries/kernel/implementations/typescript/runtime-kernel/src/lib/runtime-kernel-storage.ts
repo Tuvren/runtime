@@ -21,7 +21,7 @@ import {
   type KernelRecord,
   TuvrenRuntimeError,
   TuvrenValidationError,
-} from "@tuvren/core-types";
+} from "@tuvren/core";
 import {
   assertPathValueForCollectionKind,
   assertStagedResult,

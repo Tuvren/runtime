@@ -13,7 +13,14 @@
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "dependencies": {
-    "@tuvren/core-types": "workspace:*",
     "cbor-x": "1.6.4"
+  },
+  "peerDependencies": {
+    "@tuvren/core": "workspace:*"
+  },
+  "peerDependenciesMeta": {
+    "@tuvren/core": {
+      "optional": false
+    }
   }
 }

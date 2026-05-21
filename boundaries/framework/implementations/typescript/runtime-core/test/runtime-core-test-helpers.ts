@@ -14,13 +14,10 @@
  * limitations under the License.
  */
 
-import { TuvrenRuntimeError } from "@tuvren/core-types";
-import type { RuntimeDriver as KrakenDriver } from "@tuvren/driver-api";
-import {
-  decodeDeterministicKernelRecord,
-  encodeDeterministicKernelRecord,
-  type RuntimeKernel as KrakenKernel,
-} from "@tuvren/kernel-protocol";
+import type { KernelRecord } from "@tuvren/core";
+import { TuvrenRuntimeError } from "@tuvren/core";
+import type { RuntimeDriver as KrakenDriver } from "@tuvren/core/driver";
+import type { TuvrenStreamEvent } from "@tuvren/core/events";
 import type {
   AgentConfig,
   ContextManifest,
@@ -30,14 +27,15 @@ import type {
   HandoffContextPlan,
   HandoffSourceContext,
   InputSignal,
-  KernelRecord,
-  TuvrenMessage,
-  TuvrenStreamEvent,
-} from "@tuvren/runtime-api";
+} from "@tuvren/core/execution";
+import { assertContextManifest } from "@tuvren/core/execution";
+import type { TuvrenMessage } from "@tuvren/core/messages";
+import { assertTuvrenMessage } from "@tuvren/core/messages";
 import {
-  assertContextManifest,
-  assertTuvrenMessage,
-} from "@tuvren/runtime-api";
+  decodeDeterministicKernelRecord,
+  encodeDeterministicKernelRecord,
+  type RuntimeKernel as KrakenKernel,
+} from "@tuvren/kernel-protocol";
 
 export async function collectEvents<T>(events: AsyncIterable<T>): Promise<T[]> {
   const collected: T[] = [];

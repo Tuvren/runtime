@@ -15,27 +15,30 @@
  */
 
 // biome-ignore-all lint/performance/noBarrelFile: This package entrypoint is the intentional public contract surface.
+// DEPRECATED: @tuvren/core-types will be removed in the next minor release.
+// Import from @tuvren/core instead.
+console.warn(
+  "[deprecated] @tuvren/core-types is deprecated and will be removed in the next minor release. " +
+    "Import from @tuvren/core instead."
+);
+
 export type {
   EpochMs,
   HashString,
   KernelArray,
   KernelObject,
   KernelRecord,
-} from "./lib/kernel-records.js";
+  TuvrenErrorCode,
+  TuvrenErrorOptions,
+} from "@tuvren/core";
 export {
   assertEpochMs,
   assertHashString,
   assertKernelRecord,
+  assertTuvrenErrorCode,
   isEpochMs,
   isHashString,
   isKernelRecord,
-} from "./lib/kernel-records.js";
-export type {
-  TuvrenErrorCode,
-  TuvrenErrorOptions,
-} from "./lib/tuvren-error.js";
-export {
-  assertTuvrenErrorCode,
   isTuvrenErrorCode,
   TuvrenError,
   TuvrenLineageError,
@@ -44,4 +47,4 @@ export {
   TuvrenRecoveryError,
   TuvrenRuntimeError,
   TuvrenValidationError,
-} from "./lib/tuvren-error.js";
+} from "@tuvren/core";

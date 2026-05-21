@@ -14,15 +14,15 @@
  * limitations under the License.
  */
 
+import { beforeEach, describe, expect, test } from "bun:test";
 import { createMemoryBackend } from "@tuvren/backend-memory";
-import { TuvrenLineageError, TuvrenValidationError } from "@tuvren/core-types";
-import { createRuntimeKernel } from "@tuvren/kernel-runtime";
+import { TuvrenLineageError } from "@tuvren/core";
 import type {
   BranchMessagesCursor,
   ListThreadsCursor,
   TurnHistoryCursor,
-} from "@tuvren/runtime-api";
-import { beforeEach, describe, expect, test } from "bun:test";
+} from "@tuvren/core/execution";
+import { createRuntimeKernel } from "@tuvren/kernel-runtime";
 import {
   getTurnHistory,
   getTurnState,
@@ -30,8 +30,11 @@ import {
   listThreads,
   readBranchMessages,
 } from "../src/lib/durable-reads.js";
-import { createTuvrenRuntimeCore, DEFAULT_AGENT_SCHEMA } from "../src/lib/runtime-core.js";
 import type { RuntimeCoreOptions } from "../src/lib/runtime-core.js";
+import {
+  createTuvrenRuntimeCore,
+  DEFAULT_AGENT_SCHEMA,
+} from "../src/lib/runtime-core.js";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -39,7 +42,9 @@ function makeKernel() {
   return createRuntimeKernel({ backend: createMemoryBackend() });
 }
 
-function makeCoreOptions(kernel: ReturnType<typeof makeKernel>): RuntimeCoreOptions {
+function makeCoreOptions(
+  kernel: ReturnType<typeof makeKernel>
+): RuntimeCoreOptions {
   return {
     defaultDriverId: "test-driver",
     kernel,
@@ -52,8 +57,8 @@ describe("KRT-AO002 cursor encode/decode", () => {
   test("listThreads cursor round-trips list-threads payload", async () => {
     const kernel = makeKernel();
     await kernel.schema.register(DEFAULT_AGENT_SCHEMA);
-    const t1 = await kernel.thread.create("t1", DEFAULT_AGENT_SCHEMA.schemaId, "b1");
-    const t2 = await kernel.thread.create("t2", DEFAULT_AGENT_SCHEMA.schemaId, "b2");
+    await kernel.thread.create("t1", DEFAULT_AGENT_SCHEMA.schemaId, "b1");
+    await kernel.thread.create("t2", DEFAULT_AGENT_SCHEMA.schemaId, "b2");
 
     const page1 = await listThreads(kernel, { limit: 1 });
     expect(page1.threads).toHaveLength(1);
@@ -66,7 +71,10 @@ describe("KRT-AO002 cursor encode/decode", () => {
     expect(page2.threads).toHaveLength(1);
     expect(page2.nextCursor).toBeUndefined();
 
-    const allIds = [page1.threads[0].threadId, page2.threads[0].threadId].sort();
+    const allIds = [
+      page1.threads[0].threadId,
+      page2.threads[0].threadId,
+    ].sort();
     expect(allIds).toEqual(["t1", "t2"].sort());
   });
 
@@ -79,7 +87,12 @@ describe("KRT-AO002 cursor encode/decode", () => {
 
   test("decoding a valid-base64 but wrong-kind cursor raises invalid_durable_read_cursor", async () => {
     const wrongKind = Buffer.from(
-      JSON.stringify({ v: 1, kind: "wrong-kind", lastThreadId: "x", lastCreatedAtMs: 1 })
+      JSON.stringify({
+        v: 1,
+        kind: "wrong-kind",
+        lastThreadId: "x",
+        lastCreatedAtMs: 1,
+      })
     ).toString("base64url");
     const kernel = makeKernel();
     await expect(
@@ -93,7 +106,10 @@ describe("KRT-AO002 cursor encode/decode", () => {
     await kernel.thread.create("t1", DEFAULT_AGENT_SCHEMA.schemaId, "b1");
     await kernel.thread.create("t2", DEFAULT_AGENT_SCHEMA.schemaId, "b2");
 
-    const page1 = await listThreads(kernel, { limit: 1, filter: { schemaId: "tuvren.agent.v1" } });
+    const page1 = await listThreads(kernel, {
+      limit: 1,
+      filter: { schemaId: "tuvren.agent.v1" },
+    });
     expect(page1.nextCursor).toBeDefined();
 
     await expect(
@@ -107,9 +123,15 @@ describe("KRT-AO002 cursor encode/decode", () => {
   test("turn-history cursor: decoding a malformed cursor raises invalid_durable_read_cursor", async () => {
     const kernel = makeKernel();
     await kernel.schema.register(DEFAULT_AGENT_SCHEMA);
-    const thread = await kernel.thread.create("t1", DEFAULT_AGENT_SCHEMA.schemaId, "b1");
+    const thread = await kernel.thread.create(
+      "t1",
+      DEFAULT_AGENT_SCHEMA.schemaId,
+      "b1"
+    );
 
-    const badCursor = Buffer.from(JSON.stringify({ v: 1, kind: "list-threads" })).toString("base64url");
+    const badCursor = Buffer.from(
+      JSON.stringify({ v: 1, kind: "list-threads" })
+    ).toString("base64url");
 
     const gen = getTurnHistory(
       kernel,
@@ -117,7 +139,9 @@ describe("KRT-AO002 cursor encode/decode", () => {
       { before: badCursor as TurnHistoryCursor }
     );
 
-    await expect(gen.next()).rejects.toMatchObject({ code: "invalid_durable_read_cursor" });
+    await expect(gen.next()).rejects.toMatchObject({
+      code: "invalid_durable_read_cursor",
+    });
   });
 
   test("branch-messages cursor: head drift raises durable_read_cursor_head_drift", async () => {
@@ -126,7 +150,11 @@ describe("KRT-AO002 cursor encode/decode", () => {
     // references a position beyond the new head's message count.
     const kernel = makeKernel();
     await kernel.schema.register(DEFAULT_AGENT_SCHEMA);
-    const thread = await kernel.thread.create("t1", DEFAULT_AGENT_SCHEMA.schemaId, "b1");
+    const thread = await kernel.thread.create(
+      "t1",
+      DEFAULT_AGENT_SCHEMA.schemaId,
+      "b1"
+    );
 
     // Issue a cursor with a made-up branchHeadAtCursorIssuance that doesn't match
     // any real head, referencing position 5 (beyond any actual messages).
@@ -155,7 +183,11 @@ describe("KRT-AO003 listBranches", () => {
   test("returns BranchSummary[] for a thread with one branch", async () => {
     const kernel = makeKernel();
     await kernel.schema.register(DEFAULT_AGENT_SCHEMA);
-    const thread = await kernel.thread.create("t1", DEFAULT_AGENT_SCHEMA.schemaId, "b1");
+    const thread = await kernel.thread.create(
+      "t1",
+      DEFAULT_AGENT_SCHEMA.schemaId,
+      "b1"
+    );
 
     const branches = await listBranches(kernel, { threadId: thread.threadId });
     expect(branches).toHaveLength(1);
@@ -169,7 +201,11 @@ describe("KRT-AO003 listBranches", () => {
   test("returns all branches including diverged ones", async () => {
     const kernel = makeKernel();
     await kernel.schema.register(DEFAULT_AGENT_SCHEMA);
-    const thread = await kernel.thread.create("t1", DEFAULT_AGENT_SCHEMA.schemaId, "b1");
+    const thread = await kernel.thread.create(
+      "t1",
+      DEFAULT_AGENT_SCHEMA.schemaId,
+      "b1"
+    );
     await kernel.branch.create("b2", thread.threadId, thread.rootTurnNodeHash);
 
     const branches = await listBranches(kernel, { threadId: thread.threadId });
@@ -185,7 +221,11 @@ describe("KRT-AO004 getTurnState", () => {
   test("returns TurnSnapshot for the current branch head when turnNodeHash is omitted", async () => {
     const kernel = makeKernel();
     await kernel.schema.register(DEFAULT_AGENT_SCHEMA);
-    const thread = await kernel.thread.create("t1", DEFAULT_AGENT_SCHEMA.schemaId, "b1");
+    const thread = await kernel.thread.create(
+      "t1",
+      DEFAULT_AGENT_SCHEMA.schemaId,
+      "b1"
+    );
 
     const snapshot = await getTurnState(kernel, {
       threadId: thread.threadId,
@@ -196,7 +236,9 @@ describe("KRT-AO004 getTurnState", () => {
     expect(snapshot.previousTurnNodeHash).toBeNull();
     expect(typeof snapshot.turnTreeHash).toBe("string");
     expect(snapshot.schemaId).toBe(DEFAULT_AGENT_SCHEMA.schemaId);
-    expect(snapshot.eventHash === null || typeof snapshot.eventHash === "string").toBe(true);
+    expect(
+      snapshot.eventHash === null || typeof snapshot.eventHash === "string"
+    ).toBe(true);
     expect(snapshot.manifest).toBeNull();
     expect(typeof snapshot.paths).toBe("object");
   });
@@ -204,7 +246,11 @@ describe("KRT-AO004 getTurnState", () => {
   test("returns TurnSnapshot for a specific turnNodeHash", async () => {
     const kernel = makeKernel();
     await kernel.schema.register(DEFAULT_AGENT_SCHEMA);
-    const thread = await kernel.thread.create("t1", DEFAULT_AGENT_SCHEMA.schemaId, "b1");
+    const thread = await kernel.thread.create(
+      "t1",
+      DEFAULT_AGENT_SCHEMA.schemaId,
+      "b1"
+    );
 
     const snapshot = await getTurnState(kernel, {
       threadId: thread.threadId,
@@ -231,7 +277,11 @@ describe("KRT-AO004 getTurnHistory", () => {
   test("yields TurnSnapshot values newest-first, respecting limit", async () => {
     const kernel = makeKernel();
     await kernel.schema.register(DEFAULT_AGENT_SCHEMA);
-    const thread = await kernel.thread.create("t1", DEFAULT_AGENT_SCHEMA.schemaId, "b1");
+    const thread = await kernel.thread.create(
+      "t1",
+      DEFAULT_AGENT_SCHEMA.schemaId,
+      "b1"
+    );
 
     // The root node has no previous — only one turn node to walk.
     const snapshots: import("@tuvren/runtime-api").TurnSnapshot[] = [];
@@ -250,7 +300,11 @@ describe("KRT-AO004 getTurnHistory", () => {
   test("respects limit of 0 and yields nothing", async () => {
     const kernel = makeKernel();
     await kernel.schema.register(DEFAULT_AGENT_SCHEMA);
-    const thread = await kernel.thread.create("t1", DEFAULT_AGENT_SCHEMA.schemaId, "b1");
+    const thread = await kernel.thread.create(
+      "t1",
+      DEFAULT_AGENT_SCHEMA.schemaId,
+      "b1"
+    );
 
     const snapshots: import("@tuvren/runtime-api").TurnSnapshot[] = [];
     for await (const snap of getTurnHistory(
@@ -266,7 +320,10 @@ describe("KRT-AO004 getTurnHistory", () => {
 
   test("throws TuvrenLineageError for an unknown branchId", async () => {
     const kernel = makeKernel();
-    const gen = getTurnHistory(kernel, { threadId: "t1", branchId: "nonexistent" });
+    const gen = getTurnHistory(kernel, {
+      threadId: "t1",
+      branchId: "nonexistent",
+    });
 
     await expect(gen.next()).rejects.toBeInstanceOf(TuvrenLineageError);
   });
@@ -278,9 +335,15 @@ describe("KRT-AO005 readBranchMessages", () => {
   test("returns empty messages for a fresh branch (no messages stored)", async () => {
     const kernel = makeKernel();
     await kernel.schema.register(DEFAULT_AGENT_SCHEMA);
-    const thread = await kernel.thread.create("t1", DEFAULT_AGENT_SCHEMA.schemaId, "b1");
+    const thread = await kernel.thread.create(
+      "t1",
+      DEFAULT_AGENT_SCHEMA.schemaId,
+      "b1"
+    );
 
-    const result = await readBranchMessages(kernel, { branchId: thread.branchId });
+    const result = await readBranchMessages(kernel, {
+      branchId: thread.branchId,
+    });
     expect(result.messages).toHaveLength(0);
     expect(result.nextCursor).toBeUndefined();
   });
@@ -294,7 +357,9 @@ describe("KRT-AO005 readBranchMessages", () => {
     });
     const thread = await kernel.thread.create("t1", "schema_no_messages", "b1");
 
-    const result = await readBranchMessages(kernel, { branchId: thread.branchId });
+    const result = await readBranchMessages(kernel, {
+      branchId: thread.branchId,
+    });
     expect(result.messages).toHaveLength(0);
     expect(result.nextCursor).toBeUndefined();
   });
@@ -302,7 +367,11 @@ describe("KRT-AO005 readBranchMessages", () => {
   test("returns TuvrenValidationError with durable_read_cursor_head_drift on prefix divergence", async () => {
     const kernel = makeKernel();
     await kernel.schema.register(DEFAULT_AGENT_SCHEMA);
-    const thread = await kernel.thread.create("t1", DEFAULT_AGENT_SCHEMA.schemaId, "b1");
+    const thread = await kernel.thread.create(
+      "t1",
+      DEFAULT_AGENT_SCHEMA.schemaId,
+      "b1"
+    );
 
     // Manufacture a stale cursor beyond actual message count.
     const staleCursor = Buffer.from(
@@ -378,7 +447,9 @@ describe("TuvrenRuntime durable-read surface wiring", () => {
 
   test("readBranchMessages is accessible on the assembled runtime", async () => {
     const thread = await runtime.createThread({});
-    const result = await runtime.readBranchMessages({ branchId: thread.branchId });
+    const result = await runtime.readBranchMessages({
+      branchId: thread.branchId,
+    });
     expect(result.messages).toHaveLength(0);
   });
 });

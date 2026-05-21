@@ -16,7 +16,7 @@
 
 // biome-ignore-all lint/suspicious/useAwait: Test drivers intentionally match the async framework driver contract.
 import { describe, expect, test } from "bun:test";
-import type { AgentConfig, TuvrenRuntime } from "@tuvren/runtime-api";
+import type { AgentConfig, TuvrenRuntime } from "@tuvren/core/execution";
 import {
   createOrchestrationRuntime,
   createTuvrenRuntimeCore,
@@ -377,7 +377,9 @@ describe("orchestration-runtime", () => {
       async getTurnState() {
         throw new Error("getTurnState was not expected");
       },
-      async *getTurnHistory() {},
+      getTurnHistory() {
+        throw new Error("getTurnHistory was not expected");
+      },
       async readBranchMessages() {
         return { messages: [] };
       },
@@ -685,7 +687,9 @@ describe("orchestration-runtime", () => {
       async getTurnState() {
         throw new Error("getTurnState was not expected");
       },
-      async *getTurnHistory() {},
+      getTurnHistory() {
+        throw new Error("getTurnHistory was not expected");
+      },
       async readBranchMessages() {
         return { messages: [] };
       },

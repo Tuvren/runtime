@@ -14,11 +14,11 @@
  * limitations under the License.
  */
 
-import { TuvrenRuntimeError } from "@tuvren/core-types";
+import { TuvrenRuntimeError } from "@tuvren/core";
 import {
   assertTuvrenStreamEvent,
   type TuvrenStreamEvent,
-} from "@tuvren/event-stream";
+} from "@tuvren/core/events";
 
 const UINT8_ARRAY_JSON_MARKER = "Uint8Array";
 

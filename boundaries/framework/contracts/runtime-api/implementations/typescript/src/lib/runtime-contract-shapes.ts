@@ -782,12 +782,12 @@ export type OrchestrationResult = ExecutionResult & {
 };
 
 export interface ExecutionHandle {
+  awaitResult(): Promise<ExecutionResult>;
   cancel(): void;
   events(): AsyncIterable<TuvrenStreamEvent>;
   resolveApproval(response: ApprovalResponse): ExecutionHandle;
   status(): ExecutionStatus;
   steer(signal: InputSignal): void;
-  awaitResult(): Promise<ExecutionResult>;
 }
 
 export interface OrchestrationHandle extends ExecutionHandle {
@@ -813,30 +813,30 @@ export interface OrchestrationRuntime {
 // ── Durable-Read Return Types (ADR-036) ─────────────────────────────────────
 
 export interface ThreadSummary {
-  threadId: string;
-  schemaId: string;
-  rootTurnNodeHash: HashString;
   createdAtMs: EpochMs;
+  rootTurnNodeHash: HashString;
+  schemaId: string;
+  threadId: string;
 }
 
 export interface BranchSummary {
   branchId: string;
-  threadId: string;
   headTurnNodeHash: HashString;
+  threadId: string;
 }
 
 export interface TurnSnapshot {
-  turnNodeHash: HashString;
-  previousTurnNodeHash: HashString | null;
-  turnTreeHash: HashString;
-  schemaId: string;
   eventHash: HashString | null;
   manifest: ContextManifest | null;
   paths: Record<string, HashString[] | HashString | null>;
+  previousTurnNodeHash: HashString | null;
+  schemaId: string;
+  turnNodeHash: HashString;
+  turnTreeHash: HashString;
 }
 
-export type ListThreadsCursor = string;   // opaque to host; see TechSpec §3.8
-export type TurnHistoryCursor = string;   // opaque to host; see TechSpec §3.8
+export type ListThreadsCursor = string; // opaque to host; see TechSpec §3.8
+export type TurnHistoryCursor = string; // opaque to host; see TechSpec §3.8
 export type BranchMessagesCursor = string; // opaque to host; see TechSpec §3.8
 
 export interface TuvrenRuntime {
@@ -874,14 +874,21 @@ export interface TuvrenRuntime {
     schemaId: string;
     rootTurnNodeHash: HashString;
   } | null>;
-  setBranchHead(input: {
+
+  getTurnHistory(
+    input: { threadId: string; branchId: string },
+    options?: { limit?: number; before?: TurnHistoryCursor }
+  ): AsyncIterableIterator<TurnSnapshot>;
+
+  getTurnState(input: {
+    threadId: string;
     branchId: string;
-    turnNodeHash: HashString;
-  }): Promise<{
-    branchId: string;
-    headTurnNodeHash: HashString;
-    archiveBranchId?: string;
-  }>;
+    turnNodeHash?: HashString;
+  }): Promise<TurnSnapshot>;
+
+  // listBranches is intentionally unbounded: branches per thread are bounded
+  // by O(1) active divergence paths in v1 and kernel.branch.list is unpaginated.
+  listBranches(input: { threadId: string }): Promise<BranchSummary[]>;
 
   // ── Durable-Read Surface (ADR-036) ──────────────────────────────────────
   listThreads(options?: {
@@ -890,24 +897,17 @@ export interface TuvrenRuntime {
     filter?: { schemaId?: string };
   }): Promise<{ threads: ThreadSummary[]; nextCursor?: ListThreadsCursor }>;
 
-  // listBranches is intentionally unbounded: branches per thread are bounded
-  // by O(1) active divergence paths in v1 and kernel.branch.list is unpaginated.
-  listBranches(input: { threadId: string }): Promise<BranchSummary[]>;
-
-  getTurnState(input: {
-    threadId: string;
-    branchId: string;
-    turnNodeHash?: HashString;
-  }): Promise<TurnSnapshot>;
-
-  getTurnHistory(
-    input: { threadId: string; branchId: string },
-    options?: { limit?: number; before?: TurnHistoryCursor },
-  ): AsyncIterableIterator<TurnSnapshot>;
-
   readBranchMessages(input: {
     branchId: string;
     limit?: number;
     after?: BranchMessagesCursor;
   }): Promise<{ messages: TuvrenMessage[]; nextCursor?: BranchMessagesCursor }>;
+  setBranchHead(input: {
+    branchId: string;
+    turnNodeHash: HashString;
+  }): Promise<{
+    branchId: string;
+    headTurnNodeHash: HashString;
+    archiveBranchId?: string;
+  }>;
 }

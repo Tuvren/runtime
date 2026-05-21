@@ -16,12 +16,12 @@
 
 // biome-ignore-all lint/suspicious/useAwait: Test drivers intentionally match the async framework driver contract.
 import { describe, expect, test } from "bun:test";
-import { TuvrenRuntimeError } from "@tuvren/core-types";
+import { TuvrenRuntimeError } from "@tuvren/core";
 import type {
   DriverExecutionResult,
   RuntimeDriver as KrakenDriver,
   RuntimeDriverFactory as KrakenDriverFactory,
-} from "@tuvren/driver-api";
+} from "@tuvren/core/driver";
 import type {
   RuntimeKernel as KrakenKernel,
   RuntimeKernelRunLiveness,

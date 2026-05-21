@@ -21,7 +21,7 @@ import type {
   DriverExecutionResult,
   RuntimeDriver as KrakenDriver,
   RuntimeDriverFactory as KrakenDriverFactory,
-} from "@tuvren/driver-api";
+} from "@tuvren/core/driver";
 import { createDriverRegistry as createBaseDriverRegistry } from "../src/index.ts";
 
 export function createDriverRegistry(

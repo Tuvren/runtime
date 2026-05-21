@@ -19,9 +19,7 @@ import {
   createDriverRegistry,
   createGrpcRuntimeKernel,
   createOrchestrationRuntime,
-  createReActDriver,
   createRuntimeKernel,
-  REACT_DRIVER_ID,
   TUVREN_RUNTIME_TELEMETRY_ATTRIBUTE_KEYS,
   TUVREN_RUNTIME_TELEMETRY_SCHEMA_URL,
   TuvrenRuntimeError,
@@ -32,9 +30,7 @@ describe("runtime package exports", () => {
     expect(typeof createDriverRegistry).toBe("function");
     expect(typeof createGrpcRuntimeKernel).toBe("function");
     expect(typeof createOrchestrationRuntime).toBe("function");
-    expect(typeof createReActDriver).toBe("function");
     expect(typeof createRuntimeKernel).toBe("function");
-    expect(REACT_DRIVER_ID.length > 0).toBe(true);
     expect(TUVREN_RUNTIME_TELEMETRY_ATTRIBUTE_KEYS).toContain(
       "tuvren.runtime.turn.id"
     );

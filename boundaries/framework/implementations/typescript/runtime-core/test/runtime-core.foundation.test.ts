@@ -15,11 +15,9 @@
  */
 
 import { describe, expect, test } from "bun:test";
-import type {
-  ContextManifest,
-  TuvrenExtension,
-  TuvrenToolDefinition,
-} from "@tuvren/runtime-api";
+import type { ContextManifest } from "@tuvren/core/execution";
+import type { TuvrenExtension } from "@tuvren/core/extensions";
+import type { TuvrenToolDefinition } from "@tuvren/core/tools";
 import {
   collectSystemPrompts,
   createContextManifest,

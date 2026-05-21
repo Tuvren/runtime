@@ -14,10 +14,7 @@
  * limitations under the License.
  */
 
-import {
-  TuvrenPersistenceError,
-  TuvrenValidationError,
-} from "@tuvren/core-types";
+import { TuvrenPersistenceError, TuvrenValidationError } from "@tuvren/core";
 
 export function persistenceError(
   message: string,

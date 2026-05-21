@@ -16,13 +16,13 @@
 
 // biome-ignore-all lint/performance/noBarrelFile: This focused contract subpath intentionally re-exports deterministic identity helpers alongside local identity guards.
 
-import type { HashString, KernelRecord } from "@tuvren/core-types";
+import type { HashString, KernelRecord } from "@tuvren/core";
 import {
   assertEpochMs,
   assertHashString,
   assertKernelRecord,
   TuvrenValidationError,
-} from "@tuvren/core-types";
+} from "@tuvren/core";
 import type {
   StagedResult,
   TurnNode,

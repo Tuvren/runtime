@@ -14,19 +14,20 @@
  * limitations under the License.
  */
 
-import type { HashString } from "@tuvren/core-types";
+import type { HashString } from "@tuvren/core";
+import type { TuvrenStreamEvent } from "@tuvren/core/events";
+import { assertTuvrenStreamEvent } from "@tuvren/core/events";
 import type {
   ContextManifest,
   RuntimeResolution,
+} from "@tuvren/core/execution";
+import type { TuvrenExtension } from "@tuvren/core/extensions";
+import type {
   ToolCallPart,
-  ToolRegistry,
   ToolResultPart,
-  TuvrenExtension,
   TuvrenMessage,
-  TuvrenStreamEvent,
-  TuvrenToolDefinition,
-} from "@tuvren/runtime-api";
-import { assertTuvrenStreamEvent } from "@tuvren/runtime-api";
+} from "@tuvren/core/messages";
+import type { ToolRegistry, TuvrenToolDefinition } from "@tuvren/core/tools";
 import {
   createContextManifest,
   createToolRegistry,

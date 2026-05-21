@@ -14,22 +14,22 @@ Epic AD generated the normative claim inventory, coverage matrix, deferred-surfa
 
 ## Claim Counts
 
-- Matrix rows: 231
-- Independent claims: 228
+- Matrix rows: 233
+- Independent claims: 230
 - Duplicate rows linked by `duplicateOf`: 3
 
 ## Independent Claims By Boundary
 
 | Boundary | Count |
 | --- | ---: |
-| framework | 148 |
+| framework | 150 |
 | kernel | 80 |
 
 ## Independent Claims By Primary Classification
 
 | Classification | Count |
 | --- | ---: |
-| authority-backed-conformance-covered | 195 |
+| authority-backed-conformance-covered | 197 |
 | explicitly-deferred | 10 |
 | implementation-defined | 20 |
 | missing-conformance-follow-up | 3 |

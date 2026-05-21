@@ -15,6 +15,13 @@
  */
 
 // biome-ignore-all lint/performance/noBarrelFile: This package entrypoint is the intentional public contract surface.
+// DEPRECATED: @tuvren/driver-api will be removed in the next minor release.
+// Import from @tuvren/core/driver instead.
+console.warn(
+  "[deprecated] @tuvren/driver-api is deprecated and will be removed in the next minor release. " +
+    "Import from @tuvren/core/driver instead."
+);
+
 export type {
   DriverAssistantEventReconciliation,
   DriverExecutionContext,
@@ -27,7 +34,7 @@ export type {
   DriverToolExecutionMode,
   RuntimeDriver,
   RuntimeDriverFactory,
-} from "./lib/driver-contracts.js";
+} from "@tuvren/core/driver";
 export {
   assertDriverExecutionResult,
   assertDriverHandoffContextPlan,
@@ -35,4 +42,4 @@ export {
   assertDriverRuntimeResolution,
   assertRuntimeDriver,
   isRuntimeDriver,
-} from "./lib/driver-contracts.js";
+} from "@tuvren/core/driver";

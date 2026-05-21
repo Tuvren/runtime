@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-import type { KernelObject, KernelRecord } from "@tuvren/core-types";
+import type { KernelObject, KernelRecord } from "@tuvren/core";
 import {
   assertEpochMs as assertSharedEpochMs,
   assertHashString as assertSharedHashString,
@@ -22,7 +22,7 @@ import {
   isEpochMs,
   isHashString,
   TuvrenValidationError,
-} from "@tuvren/core-types";
+} from "@tuvren/core";
 import { decodeDeterministicKernelRecord } from "./kernel-identity.js";
 
 export function isStringLiteral<const T extends readonly string[]>(

@@ -17,11 +17,11 @@
 // biome-ignore-all lint/suspicious/useAwait: Mock async runtime/provider interfaces intentionally preserve promise-based signatures in these stream-mapping tests.
 
 import { describe, expect, test } from "bun:test";
+import type { TuvrenStreamEvent } from "@tuvren/core/events";
 import type {
   ProviderStreamChunk,
   TuvrenProvider,
-  TuvrenStreamEvent,
-} from "@tuvren/runtime-api";
+} from "@tuvren/core/provider";
 import { createReActDriver } from "../src/index.ts";
 import {
   createDriverExecutionContext,
