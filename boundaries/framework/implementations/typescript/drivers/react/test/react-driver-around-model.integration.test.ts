@@ -27,8 +27,8 @@ import {
   createDriverRegistry,
   createTuvrenRuntime as createTuvrenRuntimeCore,
 } from "@tuvren/runtime";
-import { createFakeKernelHarness } from "../../../runtime-core/test/fake-kernel.ts";
-import { readBranchContextManifest } from "../../../runtime-core/test/runtime-core-test-helpers.ts";
+import { createFakeKernelHarness } from "../../../runtime/test/fake-kernel.ts";
+import { readBranchContextManifest } from "../../../runtime/test/runtime-core-test-helpers.ts";
 import { createReActDriver, REACT_DRIVER_ID } from "../src/index.ts";
 import {
   collectEvents,

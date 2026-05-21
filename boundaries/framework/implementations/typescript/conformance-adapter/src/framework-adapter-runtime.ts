@@ -35,12 +35,12 @@ import {
 } from "@tuvren/kernel-protocol";
 import { createRuntimeKernel } from "@tuvren/kernel-runtime";
 import type { TuvrenProvider } from "@tuvren/provider-api";
-import { decodeStoredRun } from "../../../../../kernel/implementations/typescript/runtime-kernel/src/lib/runtime-kernel-storage.ts";
-import { createReActDriver } from "../../drivers/react/src/index.ts";
 import {
   createDriverRegistry,
-  createTuvrenRuntimeCore,
-} from "../../runtime-core/src/index.ts";
+  createTuvrenRuntime as createTuvrenRuntimeCore,
+} from "@tuvren/runtime";
+import { decodeStoredRun } from "../../../../../kernel/implementations/typescript/runtime-kernel/src/lib/runtime-kernel-storage.ts";
+import { createReActDriver } from "../../drivers/react/src/index.ts";
 
 export interface AdapterProjection {
   events?: readonly unknown[];

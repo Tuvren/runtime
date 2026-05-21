@@ -17,8 +17,8 @@
 import {
   createDriverRegistry,
   createOrchestrationRuntime,
-  createTuvrenRuntimeCore,
-} from "../../runtime-core/src/index.ts";
+  createTuvrenRuntime as createTuvrenRuntimeCore,
+} from "@tuvren/runtime";
 import {
   type AdapterProjection,
   assistantText,
@@ -342,8 +342,8 @@ export function createFrameworkAdapterOrchestrationLifecycle(
       signal: textSignal("approval"),
     });
     await collectValues(childHandle.events());
-    // Child is now paused. Capture state before resuming to avoid deadlock:
-    // handle.awaitResult() collects child results, so we must resume the child first.
+    // Child is now paused. Wait for the parent to complete independently (it does not
+    // collect child results), then resume the child and collect both results.
     const pausedPhase = childHandle.status().phase;
     await waitUntil(() => handle.status().phase === "completed");
     const parentPhaseWhileChildPaused = handle.status().phase;

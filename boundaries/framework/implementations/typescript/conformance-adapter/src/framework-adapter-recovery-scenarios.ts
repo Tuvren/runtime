@@ -18,9 +18,9 @@ import type { RuntimeDriver } from "@tuvren/core/driver";
 import { encodeDeterministicKernelRecord } from "@tuvren/kernel-protocol";
 import {
   createDriverRegistry,
-  createTuvrenRuntimeCore,
+  createTuvrenRuntime as createTuvrenRuntimeCore,
   DEFAULT_AGENT_SCHEMA,
-} from "../../runtime-core/src/index.ts";
+} from "@tuvren/runtime";
 import {
   type AdapterProjection,
   assistantText,

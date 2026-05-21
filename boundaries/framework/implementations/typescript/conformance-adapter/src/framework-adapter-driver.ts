@@ -22,11 +22,11 @@ import type { TuvrenExtension } from "@tuvren/core/extensions";
 import type { TuvrenModelResponse } from "@tuvren/core/provider";
 import type { ApprovalDecision } from "@tuvren/core/tools";
 import type { ProviderStreamChunk, TuvrenProvider } from "@tuvren/provider-api";
-import { createReActDriver } from "../../drivers/react/src/index.ts";
 import {
   createDriverRegistry,
-  createTuvrenRuntimeCore,
-} from "../../runtime-core/src/index.ts";
+  createTuvrenRuntime as createTuvrenRuntimeCore,
+} from "@tuvren/runtime";
+import { createReActDriver } from "../../drivers/react/src/index.ts";
 import {
   type AdapterProjection,
   AGENT_NAME,

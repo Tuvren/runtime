@@ -28,8 +28,8 @@ import type {
 } from "@tuvren/core/tools";
 import {
   createDriverRegistry,
-  createTuvrenRuntimeCore,
-} from "../../runtime-core/src/index.ts";
+  createTuvrenRuntime as createTuvrenRuntimeCore,
+} from "@tuvren/runtime";
 import { createFrameworkAdapterProviderScenarios } from "./framework-adapter-provider-scenarios.ts";
 import { createFrameworkAdapterRecoveryScenarios } from "./framework-adapter-recovery-scenarios.ts";
 import {

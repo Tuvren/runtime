@@ -72,8 +72,23 @@
       "@tuvren/runtime": [
         "../../../../framework/implementations/typescript/runtime/src/index.ts"
       ],
+      "@ag-ui/core": [
+        "../../../../framework/implementations/typescript/stream-agui/node_modules/@ag-ui/core/dist/index.d.ts"
+      ],
+      "@tuvren/framework-testkit": [
+        "../../../../framework/implementations/typescript/testkit/src/index.ts"
+      ],
       "@tuvren/runtime-core": [
         "../../../../framework/implementations/typescript/runtime-core/src/index.ts"
+      ],
+      "@tuvren/stream-agui": [
+        "../../../../framework/implementations/typescript/stream-agui/src/index.ts"
+      ],
+      "@tuvren/stream-core": [
+        "../../../../framework/implementations/typescript/stream-core/src/index.ts"
+      ],
+      "@tuvren/stream-sse": [
+        "../../../../framework/implementations/typescript/stream-sse/src/index.ts"
       ]
     },
     "types": ["bun"]
@@ -87,7 +102,11 @@
     "../../../../framework/contracts/runtime-api/implementations/typescript/src/**/*.ts",
     "../../../../framework/implementations/typescript/drivers/react/src/**/*.ts",
     "../../../../framework/implementations/typescript/runtime/src/**/*.ts",
-    "../../../../framework/implementations/typescript/runtime-core/test/**/*.ts",
+    "../../../../framework/implementations/typescript/runtime/test/**/*.ts",
+    "../../../../framework/implementations/typescript/testkit/src/**/*.ts",
+    "../../../../framework/implementations/typescript/stream-agui/src/**/*.ts",
+    "../../../../framework/implementations/typescript/stream-core/src/**/*.ts",
+    "../../../../framework/implementations/typescript/stream-sse/src/**/*.ts",
     "../../../../kernel/contracts/protocol/implementations/typescript/src/**/*.ts",
     "../../../../shared/contracts/core-types/implementations/typescript/src/**/*.ts"
   ]

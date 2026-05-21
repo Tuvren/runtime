@@ -29,17 +29,37 @@
         "command": "bunx --bun @biomejs/biome check boundaries/framework/implementations/typescript/runtime"
       }
     },
-    "test": {
+    "bench": {
       "executor": "nx:run-commands",
-      "dependsOn": ["build"],
       "options": {
         "cwd": "boundaries/framework/implementations/typescript/runtime",
-        "command": "bun test ./smoke/package-exports.ts"
+        "command": "bun bench/runtime-boundary.bench.ts"
+      }
+    },
+    "test": {
+      "executor": "nx:run-commands",
+      "dependsOn": [
+        {
+          "projects": ["kernel-interop-grpc"],
+          "target": "codegen",
+          "params": "ignore"
+        }
+      ],
+      "options": {
+        "cwd": "boundaries/framework/implementations/typescript/runtime",
+        "command": "bun test"
       }
     },
     "typecheck": {
       "executor": "nx:run-commands",
-      "dependsOn": ["^build"],
+      "dependsOn": [
+        {
+          "projects": ["kernel-interop-grpc"],
+          "target": "codegen",
+          "params": "ignore"
+        },
+        "^build"
+      ],
       "options": {
         "cwd": "boundaries/framework/implementations/typescript/runtime",
         "command": "bunx --bun tsc --project tsconfig.lib.json --noEmit --pretty false && bunx --bun tsc --project tsconfig.typecheck.json --noEmit --pretty false && bunx --bun tsc --project tsconfig.dts.json --noEmit --pretty false"

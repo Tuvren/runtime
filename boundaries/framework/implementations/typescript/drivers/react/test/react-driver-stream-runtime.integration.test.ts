@@ -26,7 +26,7 @@ import {
 import { toAgUiEvents } from "@tuvren/stream-agui";
 import { teeTuvrenStreamEvents } from "@tuvren/stream-core";
 import { toSseFrames } from "@tuvren/stream-sse";
-import { createFakeKernelHarness } from "../../../runtime-core/test/fake-kernel.ts";
+import { createFakeKernelHarness } from "../../../runtime/test/fake-kernel.ts";
 import { createReActDriver, REACT_DRIVER_ID } from "../src/index.ts";
 import {
   collectEvents,

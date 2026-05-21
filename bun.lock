@@ -103,6 +103,9 @@
         "@tuvren/kernel-runtime": "workspace:*",
         "ajv": "8.18.0",
       },
+      "devDependencies": {
+        "@ag-ui/core": "0.0.52",
+      },
       "peerDependencies": {
         "@tuvren/core": "workspace:*",
       },
