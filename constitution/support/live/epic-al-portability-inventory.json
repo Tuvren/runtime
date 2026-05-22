@@ -79,9 +79,9 @@
     },
     {
       "packetId": "tuvren.shared.core",
-      "sourcePath": "boundaries/framework/contracts/tool-contracts/spec/typespec/main.tsp",
+      "sourcePath": "boundaries/shared/contracts/core/spec/typespec/main.tsp",
       "sourceFormat": "typespec",
-      "rationale": "KRT-AL002 G1 (absorbed): tool-contracts TypeSpec is an authoritative source for tuvren.shared.core; path remains valid until the deprecated shim is removed in the next minor cycle",
+      "rationale": "KRT-AL002 G1 (absorbed): consolidated core TypeSpec at boundaries/shared/contracts/core/spec/typespec/main.tsp is the canonical authority source for tuvren.shared.core (Epic AP)",
       "inventorySection": "§6.G1 / §9b"
     },
     {

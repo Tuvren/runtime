@@ -11,6 +11,11 @@
   ],
   "authoritativeSources": [
     {
+      "path": "boundaries/shared/contracts/core/spec/typespec/main.tsp",
+      "format": "typespec",
+      "bindingSection": "errors,messages,events,execution,tools,provider,extensions,driver"
+    },
+    {
       "path": "boundaries/shared/contracts/core-types/spec/typespec/main.tsp",
       "format": "typespec",
       "bindingSection": "errors"
@@ -79,9 +84,9 @@
   "generatedArtifacts": [
     {
       "path": "boundaries/shared/contracts/core/artifacts/json-schema",
-      "generatedFrom": "boundaries/shared/contracts/core-types/spec/typespec",
+      "generatedFrom": "boundaries/shared/contracts/core/spec/typespec",
       "generator": "@typespec/json-schema",
-      "note": "Consolidated from core-types TypeSpec; runtime-api and other TypeSpec consolidation is a follow-up."
+      "note": "Generated from the consolidated core TypeSpec at boundaries/shared/contracts/core/spec/typespec/main.tsp (Epic AP)."
     }
   ],
   "conformancePlans": [
