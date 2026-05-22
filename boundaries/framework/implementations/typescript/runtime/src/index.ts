@@ -21,7 +21,7 @@ export type {
   KernelRecord,
   TuvrenErrorCode,
   TuvrenErrorOptions,
-} from "@tuvren/core-types";
+} from "@tuvren/core";
 export {
   assertHashString,
   TuvrenError,
@@ -31,14 +31,70 @@ export {
   TuvrenRecoveryError,
   TuvrenRuntimeError,
   TuvrenValidationError,
-} from "@tuvren/core-types";
+} from "@tuvren/core";
 export type {
-  ReActDriverOptions,
-  ReActDriverProviderCallMode,
-  ReActDriverProviderCallModeResolver,
-  ReActDriverToolExecutionModeResolver,
-} from "@tuvren/driver-react";
-export { createReActDriver, REACT_DRIVER_ID } from "@tuvren/driver-react";
+  CustomEvent,
+  ErrorEvent,
+  EventSource,
+  IterationEndEvent,
+  IterationStartEvent,
+  MessageDoneEvent,
+  MessageStartEvent,
+  StateCheckpointEvent,
+  SteeringIncorporatedEvent,
+  TurnEndEvent,
+  TurnStartEvent,
+  TuvrenStreamEvent,
+} from "@tuvren/core/events";
+export { assertTuvrenStreamEvent } from "@tuvren/core/events";
+export type {
+  AgentConfig,
+  ContextManifest,
+  ExecutionHandle,
+  ExecutionStatus,
+  InputSignal,
+  LoopPolicy,
+  OrchestrationHandle,
+  OrchestrationRuntime,
+  RuntimeResolution,
+  TuvrenRuntime,
+} from "@tuvren/core/execution";
+export { assertExecutionStatus } from "@tuvren/core/execution";
+export type { TuvrenExtension } from "@tuvren/core/extensions";
+export type {
+  ContentPart,
+  FilePart,
+  ReasoningPart,
+  StructuredPart,
+  TextPart,
+  ToolCallPart,
+  ToolResultPart,
+  TuvrenJsonSchema,
+  TuvrenMessage,
+  TuvrenModelConfig,
+} from "@tuvren/core/messages";
+export { assertTuvrenMessage } from "@tuvren/core/messages";
+export type {
+  ProviderStreamChunk,
+  ProviderUsage,
+  StructuredOutputRequest,
+  TuvrenModelResponse,
+  TuvrenPrompt,
+  TuvrenProvider,
+} from "@tuvren/core/provider";
+export { assertTuvrenModelResponse } from "@tuvren/core/provider";
+export type {
+  ApprovalRequest,
+  ApprovalResponse,
+  PendingToolCall,
+  ToolExecutionResult,
+  TuvrenToolDefinition,
+} from "@tuvren/core/tools";
+export {
+  assertApprovalRequest,
+  assertApprovalResponse,
+  assertTuvrenToolDefinition,
+} from "@tuvren/core/tools";
 export type {
   RuntimeBackend,
   RuntimeKernel,
@@ -52,85 +108,49 @@ export {
 } from "@tuvren/kernel-protocol";
 export type { RuntimeKernelOptions } from "@tuvren/kernel-runtime";
 export { createRuntimeKernel } from "@tuvren/kernel-runtime";
-export type {
-  AgentConfig,
-  ApprovalRequest,
-  ApprovalResponse,
-  ContentPart,
-  ContextManifest,
-  CustomEvent,
-  ErrorEvent,
-  EventSource,
-  ExecutionHandle,
-  ExecutionStatus,
-  FilePart,
-  InputSignal,
-  IterationEndEvent,
-  IterationStartEvent,
-  LoopPolicy,
-  MessageDoneEvent,
-  MessageStartEvent,
-  OrchestrationHandle,
-  OrchestrationRuntime,
-  PendingToolCall,
-  ProviderStreamChunk,
-  ProviderUsage,
-  ReasoningPart,
-  RuntimeResolution,
-  StateCheckpointEvent,
-  SteeringIncorporatedEvent,
-  StructuredOutputRequest,
-  StructuredPart,
-  TextPart,
-  ToolCallPart,
-  ToolExecutionResult,
-  ToolResultPart,
-  TurnEndEvent,
-  TurnStartEvent,
-  TuvrenExtension,
-  TuvrenJsonSchema,
-  TuvrenMessage,
-  TuvrenModelConfig,
-  TuvrenModelResponse,
-  TuvrenPrompt,
-  TuvrenProvider,
-  TuvrenRuntime,
-  TuvrenStreamEvent,
-  TuvrenToolDefinition,
-} from "@tuvren/runtime-api";
 export {
-  assertApprovalRequest,
-  assertApprovalResponse,
-  assertExecutionStatus,
-  assertTuvrenMessage,
-  assertTuvrenModelResponse,
-  assertTuvrenStreamEvent,
-  assertTuvrenToolDefinition,
-} from "@tuvren/runtime-api";
+  createContextManifest,
+  createEmptyContextManifest,
+  updateContextManifest,
+} from "./lib/context-manifest.js";
+export { createDriverRegistry } from "./lib/driver-registry.js";
+export type { ExtensionStateUpdate } from "./lib/extension-runtime.js";
+export {
+  buildSharedExports,
+  collectSystemPrompts,
+  runAfterIterationHooks,
+  runAfterTurnHooks,
+  runBeforeIterationHooks,
+  runBeforeTurnHooks,
+} from "./lib/extension-runtime.js";
 export type {
-  ExecutionSessionRequest,
-  GrpcRuntimeKernelOptions,
-  OrchestrationRuntimeOptions,
+  TuvrenRuntimeTelemetryAttributeDefinition,
+  TuvrenRuntimeTelemetryAttributeKey,
+} from "./lib/generated/tuvren-runtime-telemetry.js";
+export {
+  TUVREN_RUNTIME_TELEMETRY_ATTRIBUTE_KEYS,
+  TUVREN_RUNTIME_TELEMETRY_ATTRIBUTES,
+  TUVREN_RUNTIME_TELEMETRY_SCHEMA_URL,
+} from "./lib/generated/tuvren-runtime-telemetry.js";
+export {
+  createLastOutputOnlyHandoffContextBuilder,
+  createPreserveTraceHandoffContextBuilder,
+} from "./lib/handoff-builders.js";
+export type { OrchestrationRuntimeOptions } from "./lib/orchestration-runtime.js";
+export { createOrchestrationRuntime } from "./lib/orchestration-runtime.js";
+export type {
   RuntimeCoreOptions,
   RuntimeRunLivenessOptions,
   RuntimeWarning,
-  TuvrenRuntimeTelemetryAttributeDefinition,
-  TuvrenRuntimeTelemetryAttributeKey,
-} from "@tuvren/runtime-core";
+} from "./lib/runtime-core.js";
 export {
-  createContextManifest,
-  createDriverRegistry,
-  createEmptyContextManifest,
-  createGrpcRuntimeKernel,
-  createOrchestrationRuntime,
-  createToolRegistry,
-  createTuvrenRuntimeCore,
+  createTuvrenRuntime,
   DEFAULT_AGENT_SCHEMA,
   DEFAULT_AGENT_SCHEMA_ID,
   DEFAULT_MANIFEST_EXTENSION_STATE_WARNING_BUDGET_BYTES,
   DEFAULT_MAX_PARALLEL_TOOL_CALLS,
-  TUVREN_RUNTIME_TELEMETRY_ATTRIBUTE_KEYS,
-  TUVREN_RUNTIME_TELEMETRY_ATTRIBUTES,
-  TUVREN_RUNTIME_TELEMETRY_SCHEMA_URL,
-  updateContextManifest,
-} from "@tuvren/runtime-core";
+} from "./lib/runtime-core.js";
+export type { ExecutionSessionRequest } from "./lib/runtime-execution-types.js";
+export type { GrpcRuntimeKernelOptions } from "./lib/runtime-kernel-grpc.js";
+export { createGrpcRuntimeKernel } from "./lib/runtime-kernel-grpc.js";
+export { createToolRegistry } from "./lib/tool-registry.js";

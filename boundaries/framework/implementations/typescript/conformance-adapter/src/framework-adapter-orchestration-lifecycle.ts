@@ -17,8 +17,8 @@
 import {
   createDriverRegistry,
   createOrchestrationRuntime,
-  createTuvrenRuntimeCore,
-} from "../../runtime-core/src/index.ts";
+  createTuvrenRuntime as createTuvrenRuntimeCore,
+} from "@tuvren/runtime";
 import {
   type AdapterProjection,
   assistantText,
@@ -342,12 +342,16 @@ export function createFrameworkAdapterOrchestrationLifecycle(
       signal: textSignal("approval"),
     });
     await collectValues(childHandle.events());
-    const parentResult = await handle.awaitResult();
+    // Child is now paused. Wait for the parent to complete independently (it does not
+    // collect child results), then resume the child and collect both results.
     const pausedPhase = childHandle.status().phase;
+    await waitUntil(() => handle.status().phase === "completed");
+    const parentPhaseWhileChildPaused = handle.status().phase;
     const resumedChildHandle = childHandle.resolveApproval({
       decisions: [{ callId: "call-approve-worker", type: "approve" }],
     });
     const resumedChildResult = await resumedChildHandle.awaitResult();
+    const parentResult = await handle.awaitResult();
     await parentEventsPromise;
 
     const lifecycle = {
@@ -355,7 +359,7 @@ export function createFrameworkAdapterOrchestrationLifecycle(
       childResumedPhase: resumedChildHandle.status().phase,
       parentCompletedWhileChildPaused:
         pausedPhase === "paused" &&
-        handle.status().phase === "completed" &&
+        parentPhaseWhileChildPaused === "completed" &&
         firstVisibleText(parentResult) === parentText,
       resumedChildResult,
     };
@@ -674,23 +678,31 @@ export function createFrameworkAdapterOrchestrationLifecycle(
   }
 
   function firstVisibleText(result: unknown): string | undefined {
-    if (!Array.isArray(result)) {
-      return undefined;
-    }
-
-    const [firstPart] = result;
     if (
-      typeof firstPart !== "object" ||
-      firstPart === null ||
-      !("type" in firstPart) ||
-      firstPart.type !== "text"
+      typeof result !== "object" ||
+      result === null ||
+      Array.isArray(result)
     ) {
       return undefined;
     }
-
-    return "text" in firstPart && typeof firstPart.text === "string"
-      ? firstPart.text
-      : undefined;
+    type KV = Record<string, unknown>;
+    const r = result as KV;
+    const msg = r.finalAssistantMessage;
+    if (typeof msg !== "object" || msg === null) {
+      return undefined;
+    }
+    const parts = (msg as KV).parts;
+    if (!Array.isArray(parts)) {
+      return undefined;
+    }
+    const textPart = parts.find(
+      (p) => typeof p === "object" && p !== null && (p as KV).type === "text"
+    );
+    if (textPart === undefined) {
+      return undefined;
+    }
+    const text = (textPart as KV).text;
+    return typeof text === "string" ? text : undefined;
   }
 
   function captureActionError(

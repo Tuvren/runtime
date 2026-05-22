@@ -17,7 +17,7 @@
 // biome-ignore-all lint/suspicious/useAwait: Mock AI SDK model hooks intentionally preserve async provider signatures in rejection tests.
 
 import { describe, expect, test } from "bun:test";
-import { TuvrenProviderError } from "@tuvren/core-types";
+import { TuvrenProviderError } from "@tuvren/core";
 import { verifyProviderRejects } from "@tuvren/provider-testkit";
 import { createAiSdkProviderBridge } from "../src/index.ts";
 import {

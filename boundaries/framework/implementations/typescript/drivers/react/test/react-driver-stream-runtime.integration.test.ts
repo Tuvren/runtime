@@ -17,15 +17,16 @@
 // biome-ignore-all lint/suspicious/useAwait: Mock async runtime/provider interfaces intentionally preserve promise-based signatures in these integration tests.
 
 import { describe, expect, test } from "bun:test";
-import type { TuvrenProvider, TuvrenStreamEvent } from "@tuvren/runtime-api";
+import type { TuvrenStreamEvent } from "@tuvren/core/events";
+import type { TuvrenProvider } from "@tuvren/core/provider";
 import {
   createDriverRegistry,
-  createTuvrenRuntimeCore,
-} from "@tuvren/runtime-core";
+  createTuvrenRuntime as createTuvrenRuntimeCore,
+} from "@tuvren/runtime";
 import { toAgUiEvents } from "@tuvren/stream-agui";
 import { teeTuvrenStreamEvents } from "@tuvren/stream-core";
 import { toSseFrames } from "@tuvren/stream-sse";
-import { createFakeKernelHarness } from "../../../runtime-core/test/fake-kernel.ts";
+import { createFakeKernelHarness } from "../../../runtime/test/fake-kernel.ts";
 import { createReActDriver, REACT_DRIVER_ID } from "../src/index.ts";
 import {
   collectEvents,

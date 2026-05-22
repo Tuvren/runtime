@@ -13,10 +13,17 @@
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "dependencies": {
-    "@tuvren/event-stream": "workspace:*",
     "@tuvren/stream-core": "workspace:*"
   },
   "devDependencies": {
     "@tuvren/framework-testkit": "workspace:*"
+  },
+  "peerDependencies": {
+    "@tuvren/core": "workspace:*"
+  },
+  "peerDependenciesMeta": {
+    "@tuvren/core": {
+      "optional": false
+    }
   }
 }

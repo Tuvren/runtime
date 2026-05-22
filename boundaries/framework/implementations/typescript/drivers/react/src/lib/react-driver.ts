@@ -18,7 +18,7 @@ import {
   TuvrenProviderError,
   TuvrenRuntimeError,
   TuvrenValidationError,
-} from "@tuvren/core-types";
+} from "@tuvren/core";
 import type {
   DriverExecutionContext,
   DriverExecutionResult,
@@ -26,19 +26,20 @@ import type {
   DriverToolExecutionMode,
   RuntimeDriver,
   RuntimeDriverFactory,
-} from "@tuvren/driver-api";
-import { assertTuvrenModelResponse } from "@tuvren/provider-api";
+} from "@tuvren/core/driver";
+import type { AgentConfig, IterationDecision } from "@tuvren/core/execution";
+import type { AroundModelContext } from "@tuvren/core/extensions";
 import type {
-  AgentConfig,
-  AroundModelContext,
-  IterationDecision,
   StructuredPart,
   TuvrenJsonSchema,
   TuvrenMessage,
+} from "@tuvren/core/messages";
+import type {
   TuvrenModelResponse,
   TuvrenPrompt,
   TuvrenProvider,
-} from "@tuvren/runtime-api";
+} from "@tuvren/core/provider";
+import { assertTuvrenModelResponse } from "@tuvren/provider-api";
 import Ajv from "ajv";
 import Ajv2019 from "ajv/dist/2019.js";
 import Ajv2020 from "ajv/dist/2020.js";

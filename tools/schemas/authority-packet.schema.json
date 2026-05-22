@@ -18,6 +18,7 @@
       "pattern": "^tuvren\\.[a-z][a-z0-9-]*(?:\\.[a-z][a-z0-9-]*)+$"
     },
     "version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" },
+    "description": { "type": "string", "minLength": 1 },
     "boundary": {
       "type": "string",
       "enum": [
@@ -55,7 +56,8 @@
               "semconv-yaml",
               "fixture-set"
             ]
-          }
+          },
+          "bindingSection": { "type": "string", "minLength": 1 }
         }
       }
     },
@@ -68,7 +70,8 @@
         "properties": {
           "path": { "type": "string", "minLength": 1 },
           "generatedFrom": { "type": "string", "minLength": 1 },
-          "generator": { "type": "string", "minLength": 1 }
+          "generator": { "type": "string", "minLength": 1 },
+          "note": { "type": "string", "minLength": 1 }
         }
       },
       "default": []
@@ -89,6 +92,18 @@
         }
       },
       "default": []
+    },
+    "bindingSections": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["description"],
+        "additionalProperties": false,
+        "properties": {
+          "description": { "type": "string", "minLength": 1 }
+        }
+      },
+      "default": {}
     },
     "bindingProjections": {
       "type": "object",

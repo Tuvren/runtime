@@ -20,7 +20,7 @@ import type {
   LanguageModelV3GenerateResult,
   LanguageModelV3StreamPart,
 } from "@ai-sdk/provider";
-import { TuvrenProviderError } from "@tuvren/core-types";
+import { TuvrenProviderError } from "@tuvren/core";
 import {
   assertProviderStreamChunk,
   assertTuvrenModelResponse,

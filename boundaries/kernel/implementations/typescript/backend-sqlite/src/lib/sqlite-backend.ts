@@ -18,7 +18,7 @@ import { AsyncLocalStorage } from "node:async_hooks";
 import { mkdirSync, readFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import type { EpochMs } from "@tuvren/core-types";
+import type { EpochMs } from "@tuvren/core";
 import {
   assertStoredObjectIdentity,
   assertStoredOrderedPathChunkIdentity,

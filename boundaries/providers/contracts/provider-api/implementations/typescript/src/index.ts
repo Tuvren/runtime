@@ -25,10 +25,10 @@ export type {
   TuvrenModelResponse,
   TuvrenPrompt,
   TuvrenProvider,
-} from "@tuvren/runtime-api/provider";
+} from "@tuvren/core/provider";
 export {
   assertProviderStreamChunk,
   assertTuvrenModelResponse,
   isProviderStreamChunk,
   isTuvrenModelResponse,
-} from "@tuvren/runtime-api/provider";
+} from "@tuvren/core/provider";

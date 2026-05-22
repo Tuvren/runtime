@@ -14,12 +14,12 @@
  * limitations under the License.
  */
 
-import type { HashString, KernelRecord } from "@tuvren/core-types";
+import type { HashString, KernelRecord } from "@tuvren/core";
 import {
   assertHashString,
   assertKernelRecord,
   TuvrenValidationError,
-} from "@tuvren/core-types";
+} from "@tuvren/core";
 import { Decoder, Encoder } from "cbor-x";
 
 const deterministicEncoderOptions = {

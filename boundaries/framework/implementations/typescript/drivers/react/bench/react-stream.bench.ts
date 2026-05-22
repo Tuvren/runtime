@@ -14,15 +14,15 @@
  * limitations under the License.
  */
 
-import type { DriverRuntimePort } from "@tuvren/driver-api";
+import type { DriverRuntimePort } from "@tuvren/core/driver";
+import type { TuvrenStreamEvent } from "@tuvren/core/events";
+import { assertTuvrenStreamEvent } from "@tuvren/core/events";
 import type {
   ProviderStreamChunk,
   TuvrenModelResponse,
   TuvrenPrompt,
   TuvrenProvider,
 } from "@tuvren/provider-api";
-import type { TuvrenStreamEvent } from "@tuvren/runtime-api";
-import { assertTuvrenStreamEvent } from "@tuvren/runtime-api";
 import {
   executeGenerateCall,
   executeStreamCall,

@@ -12,11 +12,15 @@
   },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
-  "dependencies": {
-    "@tuvren/core-types": "workspace:*",
-    "@tuvren/event-stream": "workspace:*"
-  },
   "devDependencies": {
     "@tuvren/framework-testkit": "workspace:*"
+  },
+  "peerDependencies": {
+    "@tuvren/core": "workspace:*"
+  },
+  "peerDependenciesMeta": {
+    "@tuvren/core": {
+      "optional": false
+    }
   }
 }

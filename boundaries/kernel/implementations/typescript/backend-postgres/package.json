@@ -13,11 +13,18 @@
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "dependencies": {
-    "@tuvren/core-types": "workspace:*",
     "@tuvren/kernel-protocol": "workspace:*",
     "postgres": "3.4.9"
   },
   "devDependencies": {
     "@tuvren/kernel-testkit": "workspace:*"
+  },
+  "peerDependencies": {
+    "@tuvren/core": "workspace:*"
+  },
+  "peerDependenciesMeta": {
+    "@tuvren/core": {
+      "optional": false
+    }
   }
 }

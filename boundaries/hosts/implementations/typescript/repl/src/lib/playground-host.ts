@@ -17,14 +17,13 @@
 import { createMemoryBackend } from "@tuvren/backend-memory";
 import { createPostgresBackend } from "@tuvren/backend-postgres";
 import { createSqliteBackend } from "@tuvren/backend-sqlite";
+import { createReActDriver, REACT_DRIVER_ID } from "@tuvren/driver-react";
 import {
   createDriverRegistry,
   createGrpcRuntimeKernel,
-  createReActDriver,
   createRuntimeKernel,
-  createTuvrenRuntimeCore,
+  createTuvrenRuntime as createTuvrenRuntimeCore,
   type ExecutionHandle,
-  REACT_DRIVER_ID,
   type RuntimeBackend,
   TuvrenRuntimeError,
 } from "@tuvren/runtime";

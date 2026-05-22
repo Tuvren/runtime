@@ -13,10 +13,17 @@
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "dependencies": {
-    "@tuvren/kernel-protocol": "workspace:*",
-    "@tuvren/core-types": "workspace:*"
+    "@tuvren/kernel-protocol": "workspace:*"
   },
   "devDependencies": {
     "@tuvren/kernel-testkit": "workspace:*"
+  },
+  "peerDependencies": {
+    "@tuvren/core": "workspace:*"
+  },
+  "peerDependenciesMeta": {
+    "@tuvren/core": {
+      "optional": false
+    }
   }
 }

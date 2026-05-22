@@ -14,27 +14,27 @@
  * limitations under the License.
  */
 
-import { assertHashString } from "@tuvren/core-types";
+import { assertHashString } from "@tuvren/core";
 import {
   assertDriverExecutionResult,
   type DriverExecutionContext,
-} from "@tuvren/driver-api";
-import type { ProviderStreamChunk, TuvrenProvider } from "@tuvren/provider-api";
+} from "@tuvren/core/driver";
+import type { TuvrenStreamEvent } from "@tuvren/core/events";
 import type {
   StructuredOutputRequest,
   TuvrenModelResponse,
   TuvrenPrompt,
-  TuvrenStreamEvent,
-} from "@tuvren/runtime-api";
+} from "@tuvren/core/provider";
+import type { ProviderStreamChunk, TuvrenProvider } from "@tuvren/provider-api";
+import {
+  createDriverRegistry,
+  createTuvrenRuntime as createTuvrenRuntimeCore,
+} from "@tuvren/runtime";
 import { createReActDriver } from "../../drivers/react/src/index.ts";
 import {
   executeGenerateCall,
   executeStreamCall,
 } from "../../drivers/react/src/lib/react-driver-stream.ts";
-import {
-  createDriverRegistry,
-  createTuvrenRuntimeCore,
-} from "../../runtime-core/src/index.ts";
 import {
   type AdapterProjection,
   AGENT_NAME,

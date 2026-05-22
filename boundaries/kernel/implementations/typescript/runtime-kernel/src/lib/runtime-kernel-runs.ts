@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-import { type EpochMs, TuvrenRuntimeError } from "@tuvren/core-types";
+import { type EpochMs, TuvrenRuntimeError } from "@tuvren/core";
 import type {
   RecoveryState,
   RuntimeBackend,

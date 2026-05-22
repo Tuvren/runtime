@@ -239,12 +239,16 @@ async function runOrchestrationScenario(
   return createReport({
     checks: {
       childCompleted: childHandle.status().phase === "completed",
-      childResultObserved: Array.isArray(childResult) && childResult.length > 0,
+      childResultObserved:
+        childResult.status === "completed" &&
+        childResult.finalAssistantMessage !== undefined,
       descendantEventsObserved: canonical.some(
         (event) => event.source?.workerId !== undefined
       ),
       rootCompleted: handle.status().phase === "completed",
-      rootResultObserved: Array.isArray(rootResult) && rootResult.length > 0,
+      rootResultObserved:
+        rootResult.status === "completed" &&
+        rootResult.finalAssistantMessage !== undefined,
     },
     config,
     handle,

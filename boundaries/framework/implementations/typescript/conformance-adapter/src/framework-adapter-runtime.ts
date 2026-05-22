@@ -15,15 +15,17 @@
  */
 
 import { createMemoryBackend } from "@tuvren/backend-memory";
-import {
-  type HashString as CoreHashString,
-  isHashString,
-} from "@tuvren/core-types";
+import { type HashString as CoreHashString, isHashString } from "@tuvren/core";
 import type {
   DriverExecutionContext,
   DriverExecutionResult,
   RuntimeDriver,
-} from "@tuvren/driver-api";
+} from "@tuvren/core/driver";
+import type { TuvrenStreamEvent } from "@tuvren/core/events";
+import type { ContextManifest, InputSignal } from "@tuvren/core/execution";
+import type { ToolCallPart, TuvrenMessage } from "@tuvren/core/messages";
+import type { TuvrenModelResponse } from "@tuvren/core/provider";
+import type { ToolRegistry, TuvrenToolDefinition } from "@tuvren/core/tools";
 import {
   decodeDeterministicKernelRecord,
   type RunRecord,
@@ -33,22 +35,12 @@ import {
 } from "@tuvren/kernel-protocol";
 import { createRuntimeKernel } from "@tuvren/kernel-runtime";
 import type { TuvrenProvider } from "@tuvren/provider-api";
-import type {
-  ContextManifest,
-  InputSignal,
-  ToolCallPart,
-  ToolRegistry,
-  TuvrenMessage,
-  TuvrenModelResponse,
-  TuvrenStreamEvent,
-  TuvrenToolDefinition,
-} from "@tuvren/runtime-api";
-import { decodeStoredRun } from "../../../../../kernel/implementations/typescript/runtime-kernel/src/lib/runtime-kernel-storage.ts";
-import { createReActDriver } from "../../drivers/react/src/index.ts";
 import {
   createDriverRegistry,
-  createTuvrenRuntimeCore,
-} from "../../runtime-core/src/index.ts";
+  createTuvrenRuntime as createTuvrenRuntimeCore,
+} from "@tuvren/runtime";
+import { decodeStoredRun } from "../../../../../kernel/implementations/typescript/runtime-kernel/src/lib/runtime-kernel-storage.ts";
+import { createReActDriver } from "../../drivers/react/src/index.ts";
 
 export interface AdapterProjection {
   events?: readonly unknown[];

@@ -15,8 +15,8 @@
  * limitations under the License.
  */
 
-import type { KernelRecord } from "@tuvren/core-types";
-import { assertKernelRecord } from "@tuvren/core-types";
+import type { KernelRecord } from "@tuvren/core";
+import { assertKernelRecord } from "@tuvren/core";
 import { Encoder } from "cbor-x";
 
 // Binding-local probes only: shared core-types authority lives in the packet

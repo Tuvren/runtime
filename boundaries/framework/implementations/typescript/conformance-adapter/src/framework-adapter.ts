@@ -14,19 +14,19 @@
  * limitations under the License.
  */
 
+import type { TuvrenJsonSchema } from "@tuvren/core/messages";
+import { assertTuvrenMessage } from "@tuvren/core/messages";
+import type {
+  StructuredOutputRequest,
+  TuvrenModelResponse,
+  TuvrenPrompt,
+} from "@tuvren/core/provider";
+import type { ApprovalDecision } from "@tuvren/core/tools";
 import {
   assertProviderStreamChunk,
   assertTuvrenModelResponse,
   type ProviderStreamChunk,
 } from "@tuvren/provider-api";
-import type {
-  ApprovalDecision,
-  StructuredOutputRequest,
-  TuvrenJsonSchema,
-  TuvrenModelResponse,
-  TuvrenPrompt,
-} from "@tuvren/runtime-api";
-import { assertTuvrenMessage } from "@tuvren/runtime-api";
 import {
   type AdapterCapabilities,
   type AdapterControls,

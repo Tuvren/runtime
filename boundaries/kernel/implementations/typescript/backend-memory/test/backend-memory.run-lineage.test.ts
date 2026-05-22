@@ -16,7 +16,7 @@
 
 import { describe, expect, test } from "bun:test";
 import { createMemoryBackend } from "@tuvren/backend-memory";
-import { TuvrenPersistenceError } from "@tuvren/core-types";
+import { TuvrenPersistenceError } from "@tuvren/core";
 import {
   encodeDeterministicKernelRecord,
   type StoredBranch,

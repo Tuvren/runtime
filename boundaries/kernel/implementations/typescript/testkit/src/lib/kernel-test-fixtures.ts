@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-import type { KernelRecord } from "@tuvren/core-types";
+import type { KernelRecord } from "@tuvren/core";
 import {
   encodeDeterministicKernelRecord,
   hashKernelRecord,

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-import type { TuvrenStreamEvent } from "@tuvren/event-stream";
+import type { TuvrenStreamEvent } from "@tuvren/core/events";
 import {
   createStreamAdapterWarningReporter,
   type StreamAdapterOptions,

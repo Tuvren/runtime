@@ -14,20 +14,22 @@
  * limitations under the License.
  */
 
-import { assertHashString, TuvrenPersistenceError } from "@tuvren/core-types";
-import type { RuntimeDriver } from "@tuvren/driver-api";
+import { assertHashString, TuvrenPersistenceError } from "@tuvren/core";
+import type { RuntimeDriver } from "@tuvren/core/driver";
 import type {
-  ApprovalDecision,
   BranchMessagesCursor,
   ExecutionHandle,
   InputSignal,
-  TuvrenMessage,
+} from "@tuvren/core/execution";
+import type { TuvrenMessage } from "@tuvren/core/messages";
+import type {
+  ApprovalDecision,
   TuvrenToolDefinition,
-} from "@tuvren/runtime-api";
+} from "@tuvren/core/tools";
 import {
   createDriverRegistry,
-  createTuvrenRuntimeCore,
-} from "../../runtime-core/src/index.ts";
+  createTuvrenRuntime as createTuvrenRuntimeCore,
+} from "@tuvren/runtime";
 import { createFrameworkAdapterProviderScenarios } from "./framework-adapter-provider-scenarios.ts";
 import { createFrameworkAdapterRecoveryScenarios } from "./framework-adapter-recovery-scenarios.ts";
 import {
@@ -715,9 +717,171 @@ export function createFrameworkAdapterRuntimeScenarios(
     }
   }
 
-  async function runHandleTerminalValue(
-    input: unknown
-  ): Promise<AdapterProjection> {
+  async function runTerminalValueComplete(): Promise<AdapterProjection> {
+    const harness = createConformanceKernelHarness();
+    const runtime = createTuvrenRuntimeCore({
+      createId: createConformanceIdFactory(),
+      defaultDriverId: DRIVER_ID,
+      driverRegistry: createDriverRegistry([
+        createStaticDriver(() => ({
+          messages: [assistantText("Terminal complete.")],
+          resolution: { reason: "done", type: "end_turn" },
+        })),
+      ]),
+      kernel: harness.kernel,
+    });
+    const thread = await runtime.createThread({});
+    const handle = runtime.executeTurn({
+      branchId: thread.branchId,
+      config: { name: AGENT_NAME },
+      signal: textSignal("complete"),
+      threadId: thread.threadId,
+    });
+    const result = await handle.awaitResult();
+    const finalMsg =
+      result.status === "completed" ? result.finalAssistantMessage : undefined;
+    const textPart =
+      finalMsg?.role === "assistant"
+        ? finalMsg.parts.find((p) => p.type === "text")
+        : undefined;
+
+    return {
+      result: {
+        handle: {
+          awaitResult: {
+            finalAssistantMessage:
+              textPart?.type === "text"
+                ? { parts: [{ text: textPart.text, type: "text" }] }
+                : undefined,
+            status: result.status,
+          },
+        },
+      },
+    };
+  }
+
+  async function runTerminalValueFailure(): Promise<AdapterProjection> {
+    const harness = createConformanceKernelHarness();
+    const failureDriver = {
+      execute() {
+        return Promise.resolve({
+          messages: JSON.parse('[{"role":"assistant","parts":[123]}]'),
+          resolution: { reason: "done", type: "end_turn" },
+        });
+      },
+      id: DRIVER_ID,
+    } satisfies RuntimeDriver;
+    const runtime = createTuvrenRuntimeCore({
+      createId: createConformanceIdFactory(),
+      defaultDriverId: DRIVER_ID,
+      driverRegistry: createDriverRegistry([failureDriver]),
+      kernel: harness.kernel,
+    });
+    const thread = await runtime.createThread({});
+    const handle = runtime.executeTurn({
+      branchId: thread.branchId,
+      config: { name: AGENT_NAME },
+      signal: textSignal("failure"),
+      threadId: thread.threadId,
+    });
+    const result = await handle.awaitResult();
+
+    return {
+      result: { handle: { awaitResult: { status: result.status } } },
+    };
+  }
+
+  async function runTerminalValueCancelled(): Promise<AdapterProjection> {
+    const harness = createConformanceKernelHarness();
+    let driverStarted = false;
+    const cancelDriver = {
+      async execute(context) {
+        driverStarted = true;
+        await waitForAbort(context.signal);
+        return { resolution: { type: "continue_iteration" } };
+      },
+      id: DRIVER_ID,
+    } satisfies RuntimeDriver;
+    const runtime = createTuvrenRuntimeCore({
+      createId: createConformanceIdFactory(),
+      defaultDriverId: DRIVER_ID,
+      driverRegistry: createDriverRegistry([cancelDriver]),
+      kernel: harness.kernel,
+    });
+    const thread = await runtime.createThread({});
+    const handle = runtime.executeTurn({
+      branchId: thread.branchId,
+      config: { name: AGENT_NAME },
+      signal: textSignal("cancel"),
+      threadId: thread.threadId,
+    });
+    const resultPromise = handle.awaitResult();
+
+    while (!driverStarted) {
+      await new Promise<void>((resolve) => {
+        setTimeout(resolve, 5);
+      });
+    }
+
+    handle.cancel();
+
+    let rejected = false;
+    let errorEnvelope: Record<string, unknown> | undefined;
+
+    try {
+      await resultPromise;
+    } catch (error: unknown) {
+      rejected = true;
+      errorEnvelope = readErrorEnvelope(error);
+    }
+
+    return {
+      result: { handle: { awaitResult: { error: errorEnvelope, rejected } } },
+    };
+  }
+
+  async function runTerminalValueIdempotent(): Promise<AdapterProjection> {
+    const harness = createConformanceKernelHarness();
+    const runtime = createTuvrenRuntimeCore({
+      createId: createConformanceIdFactory(),
+      defaultDriverId: DRIVER_ID,
+      driverRegistry: createDriverRegistry([
+        createStaticDriver(() => ({
+          messages: [assistantText("Idempotent.")],
+          resolution: { reason: "done", type: "end_turn" },
+        })),
+      ]),
+      kernel: harness.kernel,
+    });
+    const thread = await runtime.createThread({});
+    const handle = runtime.executeTurn({
+      branchId: thread.branchId,
+      config: { name: AGENT_NAME },
+      signal: textSignal("idempotent"),
+      threadId: thread.threadId,
+    });
+    const result1 = await handle.awaitResult();
+    const result2 = await handle.awaitResult();
+    const result3 = await handle.awaitResult();
+
+    const allCompleted =
+      result1.status === "completed" &&
+      result2.status === "completed" &&
+      result3.status === "completed";
+    const resultsIdentical =
+      JSON.stringify(result2) === JSON.stringify(result1) &&
+      JSON.stringify(result3) === JSON.stringify(result1);
+
+    return {
+      result: {
+        handle: {
+          awaitResult: { allCompleted, callCount: 3, resultsIdentical },
+        },
+      },
+    };
+  }
+
+  function runHandleTerminalValue(input: unknown): Promise<AdapterProjection> {
     const scenario = dependencies.readOperationScenario(
       input,
       "runtime.handle-terminal-value"
@@ -726,176 +890,16 @@ export function createFrameworkAdapterRuntimeScenarios(
       dependencies.readRecordString(scenario, "case") ?? "complete";
 
     if (caseValue === "complete") {
-      const harness = createConformanceKernelHarness();
-      const runtime = createTuvrenRuntimeCore({
-        createId: createConformanceIdFactory(),
-        defaultDriverId: DRIVER_ID,
-        driverRegistry: createDriverRegistry([
-          createStaticDriver(() => ({
-            messages: [assistantText("Terminal complete.")],
-            resolution: { reason: "done", type: "end_turn" },
-          })),
-        ]),
-        kernel: harness.kernel,
-      });
-      const thread = await runtime.createThread({});
-      const handle = runtime.executeTurn({
-        branchId: thread.branchId,
-        config: { name: AGENT_NAME },
-        signal: textSignal("complete"),
-        threadId: thread.threadId,
-      });
-      const result = await handle.awaitResult();
-      const finalMsg =
-        result.status === "completed" ? result.finalAssistantMessage : undefined;
-      const textPart =
-        finalMsg?.role === "assistant"
-          ? finalMsg.parts.find((p) => p.type === "text")
-          : undefined;
-
-      return {
-        result: {
-          handle: {
-            awaitResult: {
-              finalAssistantMessage:
-                textPart?.type === "text"
-                  ? { parts: [{ text: textPart.text, type: "text" }] }
-                  : undefined,
-              status: result.status,
-            },
-          },
-        },
-      };
+      return runTerminalValueComplete();
     }
-
     if (caseValue === "failure") {
-      const harness = createConformanceKernelHarness();
-      const failureDriver = {
-        async execute() {
-          return {
-            // biome-ignore lint/performance/useTopLevelRegex: conformance test bypass
-            messages: JSON.parse('[{"role":"assistant","parts":[123]}]'),
-            resolution: { reason: "done", type: "end_turn" },
-          };
-        },
-        id: DRIVER_ID,
-      } satisfies RuntimeDriver;
-      const runtime = createTuvrenRuntimeCore({
-        createId: createConformanceIdFactory(),
-        defaultDriverId: DRIVER_ID,
-        driverRegistry: createDriverRegistry([failureDriver]),
-        kernel: harness.kernel,
-      });
-      const thread = await runtime.createThread({});
-      const handle = runtime.executeTurn({
-        branchId: thread.branchId,
-        config: { name: AGENT_NAME },
-        signal: textSignal("failure"),
-        threadId: thread.threadId,
-      });
-      const result = await handle.awaitResult();
-
-      return {
-        result: {
-          handle: {
-            awaitResult: { status: result.status },
-          },
-        },
-      };
+      return runTerminalValueFailure();
     }
-
     if (caseValue === "cancelled") {
-      const harness = createConformanceKernelHarness();
-      let driverStarted = false;
-      const cancelDriver = {
-        async execute(context) {
-          driverStarted = true;
-          await waitForAbort(context.signal);
-          return { resolution: { type: "continue_iteration" } };
-        },
-        id: DRIVER_ID,
-      } satisfies RuntimeDriver;
-      const runtime = createTuvrenRuntimeCore({
-        createId: createConformanceIdFactory(),
-        defaultDriverId: DRIVER_ID,
-        driverRegistry: createDriverRegistry([cancelDriver]),
-        kernel: harness.kernel,
-      });
-      const thread = await runtime.createThread({});
-      const handle = runtime.executeTurn({
-        branchId: thread.branchId,
-        config: { name: AGENT_NAME },
-        signal: textSignal("cancel"),
-        threadId: thread.threadId,
-      });
-      const resultPromise = handle.awaitResult();
-
-      while (!driverStarted) {
-        await new Promise<void>((resolve) => {
-          setTimeout(resolve, 5);
-        });
-      }
-
-      handle.cancel();
-
-      let rejected = false;
-      let errorEnvelope: Record<string, unknown> | undefined;
-
-      try {
-        await resultPromise;
-      } catch (error: unknown) {
-        rejected = true;
-        errorEnvelope = readErrorEnvelope(error);
-      }
-
-      return {
-        result: {
-          handle: {
-            awaitResult: { error: errorEnvelope, rejected },
-          },
-        },
-      };
+      return runTerminalValueCancelled();
     }
-
     if (caseValue === "idempotent") {
-      const harness = createConformanceKernelHarness();
-      const runtime = createTuvrenRuntimeCore({
-        createId: createConformanceIdFactory(),
-        defaultDriverId: DRIVER_ID,
-        driverRegistry: createDriverRegistry([
-          createStaticDriver(() => ({
-            messages: [assistantText("Idempotent.")],
-            resolution: { reason: "done", type: "end_turn" },
-          })),
-        ]),
-        kernel: harness.kernel,
-      });
-      const thread = await runtime.createThread({});
-      const handle = runtime.executeTurn({
-        branchId: thread.branchId,
-        config: { name: AGENT_NAME },
-        signal: textSignal("idempotent"),
-        threadId: thread.threadId,
-      });
-      const result1 = await handle.awaitResult();
-      const result2 = await handle.awaitResult();
-      const result3 = await handle.awaitResult();
-
-      const allCompleted =
-        result1.status === "completed" &&
-        result2.status === "completed" &&
-        result3.status === "completed";
-      const resultsIdentical =
-        JSON.stringify(result2) === JSON.stringify(result1) &&
-        JSON.stringify(result3) === JSON.stringify(result1);
-
-      return {
-        result: {
-          handle: {
-            awaitResult: { allCompleted, callCount: 3, resultsIdentical },
-          },
-        },
-      };
+      return runTerminalValueIdempotent();
     }
 
     throw new Error(
@@ -905,7 +909,9 @@ export function createFrameworkAdapterRuntimeScenarios(
 
   // ── Durable-read scenarios (KRT-AO006) ────────────────────────────────────
 
-  function makeDurableReadRuntime(harness: ReturnType<typeof createConformanceKernelHarness>) {
+  function makeDurableReadRuntime(
+    harness: ReturnType<typeof createConformanceKernelHarness>
+  ) {
     return createTuvrenRuntimeCore({
       createId: createConformanceIdFactory(),
       defaultDriverId: DRIVER_ID,
@@ -955,7 +961,10 @@ export function createFrameworkAdapterRuntimeScenarios(
         },
       };
     }
-    const page2 = await runtime.listThreads({ limit: 10, cursor: page1.nextCursor });
+    const page2 = await runtime.listThreads({
+      limit: 10,
+      cursor: page1.nextCursor,
+    });
     const uniqueIds = new Set([
       ...page1.threads.map((t) => t.threadId),
       ...page2.threads.map((t) => t.threadId),
@@ -981,7 +990,7 @@ export function createFrameworkAdapterRuntimeScenarios(
       ...harness.kernel,
       thread: {
         ...harness.kernel.thread,
-        list: async () => {
+        list: () => {
           throw new TuvrenPersistenceError(
             "thread enumeration unsupported by this backend",
             { code: "kernel_capability_unsupported" }
@@ -1033,7 +1042,9 @@ export function createFrameworkAdapterRuntimeScenarios(
       threadId: thread.threadId,
     });
     const branches = await runtime.listBranches({ threadId: thread.threadId });
-    const allHaveThreadId = branches.every((b) => b.threadId === thread.threadId);
+    const allHaveThreadId = branches.every(
+      (b) => b.threadId === thread.threadId
+    );
     return {
       result: {
         durableRead: {

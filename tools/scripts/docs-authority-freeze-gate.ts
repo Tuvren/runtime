@@ -185,7 +185,7 @@ const EVIDENCE = {
   driverApi: {
     adapterCapability: "framework.driver-api",
     authorityPacket:
-      "boundaries/framework/contracts/driver-api/spec/authority-packet.json",
+      "boundaries/shared/contracts/core/spec/authority-packet.json",
     compatibilityEvidence:
       "reports/compatibility/evidence/shared-conformance-runner.typescript-framework.json",
     conformancePlan:
@@ -198,7 +198,7 @@ const EVIDENCE = {
   eventStream: {
     adapterCapability: "framework.event-stream",
     authorityPacket:
-      "boundaries/framework/contracts/event-stream/spec/authority-packet.json",
+      "boundaries/shared/contracts/core/spec/authority-packet.json",
     compatibilityEvidence:
       "reports/compatibility/evidence/shared-conformance-runner.typescript-framework.json",
     conformancePlan:
@@ -248,7 +248,7 @@ const EVIDENCE = {
   runtimeApi: {
     adapterCapability: "framework.runtime-api",
     authorityPacket:
-      "boundaries/framework/contracts/runtime-api/spec/authority-packet.json",
+      "boundaries/shared/contracts/core/spec/authority-packet.json",
     compatibilityEvidence:
       "reports/compatibility/evidence/shared-conformance-runner.typescript-framework.json",
     conformancePlan:
@@ -266,7 +266,7 @@ const EVIDENCE = {
   toolContracts: {
     adapterCapability: "framework.runtime-api",
     authorityPacket:
-      "boundaries/framework/contracts/tool-contracts/spec/authority-packet.json",
+      "boundaries/shared/contracts/core/spec/authority-packet.json",
     compatibilityEvidence:
       "reports/compatibility/evidence/shared-conformance-runner.typescript-framework.json",
     conformancePlan:
@@ -279,7 +279,7 @@ const EVIDENCE = {
   runtimeOrchestration: {
     adapterCapability: "framework.orchestration",
     authorityPacket:
-      "boundaries/framework/contracts/runtime-api/spec/authority-packet.json",
+      "boundaries/shared/contracts/core/spec/authority-packet.json",
     compatibilityEvidence:
       "reports/compatibility/evidence/shared-conformance-runner.typescript-framework.json",
     conformancePlan:

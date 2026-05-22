@@ -15,9 +15,9 @@
  * limitations under the License.
  */
 
+import type { TuvrenStreamEvent } from "@tuvren/core/events";
 import type {
   AgentConfig,
-  ApprovalRequest,
   ContextManifest,
   ExecutionHandle,
   ExecutionResult,
@@ -25,12 +25,11 @@ import type {
   OrchestrationHandle,
   OrchestrationResult,
   OrchestrationRuntime,
-  ProviderStreamChunk,
-  TuvrenMessage,
   TuvrenRuntime,
-  TuvrenStreamEvent,
-  TuvrenToolDefinition,
-} from "@tuvren/runtime-api";
+} from "@tuvren/core/execution";
+import type { TuvrenMessage } from "@tuvren/core/messages";
+import type { ProviderStreamChunk } from "@tuvren/core/provider";
+import type { ApprovalRequest, TuvrenToolDefinition } from "@tuvren/core/tools";
 
 // Binding-local harness only: cross-implementation runtime-api authority lives
 // in the packet TypeSpec and conformance plans, not in these TypeScript values.
@@ -41,11 +40,11 @@ function emptyEvents<T>(): AsyncIterable<T> {
 }
 
 const noopExecutionHandle: ExecutionHandle = {
-  async awaitResult(): Promise<ExecutionResult> {
-    return {
+  awaitResult(): Promise<ExecutionResult> {
+    return Promise.resolve({
       executionStatus: { iterationCount: 0, phase: "completed" },
       status: "completed",
-    };
+    });
   },
   cancel() {
     return;
@@ -65,11 +64,11 @@ const noopExecutionHandle: ExecutionHandle = {
 };
 
 const resumedExecutionHandle: ExecutionHandle = {
-  async awaitResult(): Promise<ExecutionResult> {
-    return {
+  awaitResult(): Promise<ExecutionResult> {
+    return Promise.resolve({
       executionStatus: { iterationCount: 2, phase: "completed" },
       status: "completed",
-    };
+    });
   },
   cancel() {
     return;

@@ -15,9 +15,11 @@
  */
 
 import { randomUUID } from "node:crypto";
-import type { EpochMs } from "@tuvren/core-types";
-import { TuvrenRuntimeError } from "@tuvren/core-types";
-import type { DriverRuntimePort } from "@tuvren/driver-api";
+import type { EpochMs } from "@tuvren/core";
+import { TuvrenRuntimeError } from "@tuvren/core";
+import type { DriverRuntimePort } from "@tuvren/core/driver";
+import type { TuvrenStreamEvent } from "@tuvren/core/events";
+import type { TuvrenMessage } from "@tuvren/core/messages";
 import type {
   TuvrenModelResponse,
   TuvrenPrompt,
@@ -27,7 +29,6 @@ import {
   assertProviderStreamChunk,
   assertTuvrenModelResponse,
 } from "@tuvren/provider-api";
-import type { TuvrenMessage, TuvrenStreamEvent } from "@tuvren/runtime-api";
 import {
   closeProviderIterator,
   isExecutionCancelledError,

@@ -15,7 +15,7 @@
  */
 
 import { deepStrictEqual, rejects, strictEqual } from "node:assert/strict";
-import { TuvrenPersistenceError } from "@tuvren/core-types";
+import { TuvrenPersistenceError } from "@tuvren/core";
 import {
   encodeDeterministicKernelRecord,
   type StoredBranch,

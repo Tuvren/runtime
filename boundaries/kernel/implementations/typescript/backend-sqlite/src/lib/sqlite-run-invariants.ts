@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-import { assertHashString } from "@tuvren/core-types";
+import { assertHashString } from "@tuvren/core";
 import {
   decodeDeterministicKernelRecord,
   type StoredBranch,

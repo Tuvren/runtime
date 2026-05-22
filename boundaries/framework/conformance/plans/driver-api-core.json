@@ -1,7 +1,7 @@
 {
   "planId": "tuvren.framework.driver-api.core",
   "planVersion": "0.1.0",
-  "packetId": "tuvren.framework.driver-api",
+  "packetId": "tuvren.shared.core",
   "applicability": {
     "capabilities": ["framework.driver-api"]
   },

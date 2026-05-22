@@ -16,17 +16,23 @@
 
 import { describe, expect, test } from "bun:test";
 import {
-  assertApprovalRequest,
-  assertContextManifest,
-  assertProviderStreamChunk,
-  assertTuvrenMessage,
+  assertTuvrenStreamEvent as assertKrakenStreamEventFromEvents,
   assertTuvrenStreamEvent,
-} from "@tuvren/runtime-api";
-import { assertTuvrenStreamEvent as assertKrakenStreamEventFromEvents } from "@tuvren/runtime-api/events";
-import { assertContextManifest as assertContextManifestFromExecution } from "@tuvren/runtime-api/execution";
-import type { OrchestrationHandle } from "@tuvren/runtime-api/orchestration";
-import { assertProviderStreamChunk as assertProviderStreamChunkFromProvider } from "@tuvren/runtime-api/provider";
-import { assertApprovalRequest as assertApprovalRequestFromTools } from "@tuvren/runtime-api/tools";
+} from "@tuvren/core/events";
+import type { OrchestrationHandle } from "@tuvren/core/execution";
+import {
+  assertContextManifest,
+  assertContextManifest as assertContextManifestFromExecution,
+} from "@tuvren/core/execution";
+import { assertTuvrenMessage } from "@tuvren/core/messages";
+import {
+  assertProviderStreamChunk,
+  assertProviderStreamChunk as assertProviderStreamChunkFromProvider,
+} from "@tuvren/core/provider";
+import {
+  assertApprovalRequest,
+  assertApprovalRequest as assertApprovalRequestFromTools,
+} from "@tuvren/core/tools";
 
 async function* createEmptyEventStream() {
   // Smoke tests only need an async iterable shape, not delivered events.

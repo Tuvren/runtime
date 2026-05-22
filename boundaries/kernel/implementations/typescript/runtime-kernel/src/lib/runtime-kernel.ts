@@ -21,7 +21,7 @@ import {
   TuvrenPersistenceError,
   TuvrenRuntimeError,
   TuvrenValidationError,
-} from "@tuvren/core-types";
+} from "@tuvren/core";
 import {
   assertTurnTreeSchema,
   type BranchHeadListEntry,

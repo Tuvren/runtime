@@ -15,7 +15,7 @@
  */
 
 import { describe, expect, test } from "bun:test";
-import { TuvrenValidationError } from "@tuvren/core-types";
+import { TuvrenValidationError } from "@tuvren/core";
 import { deterministicKernelRecordFixture } from "../../../../../../shared/contracts/core-types/implementations/typescript/test/kernel-record-fixtures.js";
 import {
   decodeDeterministicKernelRecord,

@@ -14,16 +14,22 @@
   "types": "./dist/index.d.ts",
   "dependencies": {
     "@ai-sdk/provider": "3.0.8",
-    "@tuvren/core-types": "workspace:*",
     "@tuvren/provider-api": "workspace:*",
-    "@tuvren/runtime-api": "workspace:*",
     "ai": "6.0.142",
     "ajv": "8.18.0"
   },
   "devDependencies": {
     "@tuvren/driver-react": "workspace:*",
     "@tuvren/provider-testkit": "workspace:*",
-    "@tuvren/runtime-core": "workspace:*",
+    "@tuvren/runtime": "workspace:*",
     "@types/json-schema": "^7.0.15"
+  },
+  "peerDependencies": {
+    "@tuvren/core": "workspace:*"
+  },
+  "peerDependenciesMeta": {
+    "@tuvren/core": {
+      "optional": false
+    }
   }
 }

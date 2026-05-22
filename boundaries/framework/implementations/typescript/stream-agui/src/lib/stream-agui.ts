@@ -15,8 +15,8 @@
  */
 
 import { type AGUIEvent, EventSchemas, EventType } from "@ag-ui/core";
-import { TuvrenRuntimeError } from "@tuvren/core-types";
-import type { TuvrenStreamEvent } from "@tuvren/event-stream";
+import { TuvrenRuntimeError } from "@tuvren/core";
+import type { TuvrenStreamEvent } from "@tuvren/core/events";
 import {
   cloneTuvrenStreamEvent,
   createStreamAdapterWarningReporter,

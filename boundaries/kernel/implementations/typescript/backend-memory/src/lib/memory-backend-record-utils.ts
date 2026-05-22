@@ -18,7 +18,7 @@ import {
   assertHashString,
   type EpochMs,
   TuvrenPersistenceError,
-} from "@tuvren/core-types";
+} from "@tuvren/core";
 import type {
   StoredBranch,
   StoredObject,

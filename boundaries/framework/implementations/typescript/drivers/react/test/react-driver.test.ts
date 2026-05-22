@@ -16,12 +16,12 @@
 
 // biome-ignore-all lint/suspicious/useAwait: Test doubles intentionally match async provider and extension contracts.
 import { describe, expect, test } from "bun:test";
+import type { TuvrenExtension } from "@tuvren/core/extensions";
+import type { TuvrenMessage } from "@tuvren/core/messages";
 import type {
-  TuvrenExtension,
-  TuvrenMessage,
   TuvrenModelResponse,
   TuvrenProvider,
-} from "@tuvren/runtime-api";
+} from "@tuvren/core/provider";
 import { createReActDriver } from "../src/index.ts";
 import {
   createDriverExecutionContext,

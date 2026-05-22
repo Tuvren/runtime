@@ -15,18 +15,15 @@
  */
 
 import { isDeepStrictEqual } from "node:util";
+import type { AgentConfig, ContextManifest } from "@tuvren/core/execution";
 import type {
-  AgentConfig,
   AroundModelContext,
   AroundModelResult,
-  ContextManifest,
-  RenderedToolDefinition,
   TuvrenExtension,
-  TuvrenMessage,
-  TuvrenModelConfig,
-  TuvrenModelResponse,
-  TuvrenPrompt,
-} from "@tuvren/runtime-api";
+} from "@tuvren/core/extensions";
+import type { TuvrenMessage, TuvrenModelConfig } from "@tuvren/core/messages";
+import type { TuvrenModelResponse, TuvrenPrompt } from "@tuvren/core/provider";
+import type { RenderedToolDefinition } from "@tuvren/core/tools";
 
 export interface PreparedPromptState {
   config: TuvrenModelConfig;

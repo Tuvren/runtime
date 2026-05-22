@@ -21,7 +21,7 @@ import {
   assertEpochMs,
   assertHashString,
   assertKernelRecord,
-} from "@tuvren/core-types";
+} from "@tuvren/core";
 import { parse } from "cddl";
 import { assertRunRecord, assertTurnTreeSchema } from "../src/index.ts";
 

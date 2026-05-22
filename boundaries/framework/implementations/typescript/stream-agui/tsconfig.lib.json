@@ -8,13 +8,19 @@
   "include": ["src/**/*.ts"],
   "references": [
     {
-      "path": "../../../../shared/contracts/core-types/implementations/typescript/tsconfig.lib.json"
+      "path": "../../../../shared/contracts/core/implementations/typescript/tsconfig.lib.json"
+    },
+    {
+      "path": "../stream-core/tsconfig.lib.json"
     },
     {
       "path": "../../../contracts/event-stream/implementations/typescript/tsconfig.lib.json"
     },
     {
-      "path": "../stream-core/tsconfig.lib.json"
+      "path": "../../../../shared/contracts/core-types/implementations/typescript/tsconfig.lib.json"
+    },
+    {
+      "path": "../testkit/tsconfig.lib.json"
     }
   ]
 }
