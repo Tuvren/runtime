@@ -65,14 +65,14 @@ are covered by the proving-host scenario lanes and the
 
 | Verify step | Underlying target | Evidence | Notes |
 | --- | --- | --- | --- |
-| `Epic AL portability gate` | `bun run portability:check` → `tools/scripts/portability-gate.ts` | Twelve expected packets enforced (kernel-protocol, kernel-interop-grpc, framework-runtime-api, framework-event-stream, framework-event-stream-sse, framework-tool-contracts, framework-driver-api, framework-react-driver, framework-interop-rust-kernel, providers-provider-api, shared-core-types, telemetry-semconv) plus two standing exceptions (AG-UI projection, AI SDK bridge), and ten required authoritative sources (kernel CDDL, tool-contracts TypeSpec, SSE TypeSpec, SSE fixtures, SSE conformance plan, kernel interop services proto, kernel interop types proto, framework rust-kernel interop suite manifest, framework rust-kernel interop suite schema, telemetry semconv YAML). | Replaces the AF gap plan freshness check as the canonical portability proxy. |
-| `authority packet validation` | `tools/scripts/authority-packet/validate-authority-packets.ts` | Twelve packets validate against `tools/schemas/authority-packet.schema.json`; the `telemetry` boundary added in AL002 is enforced; every packet has an executable verification path (`schema-validation`, `openapi-validation`, `conformance-plan`, `interop-smoke`, or `vocabulary-check`). | The §4.11 manifest contract now reads as enforced rather than aspirational. |
-| `conformance plan validation` | `tools/conformance/plan-compiler/validate-plans.ts` | Nineteen conformance plans validated against `tools/conformance/plan-compiler/conformance-plan.schema.json`, including the two AL002-introduced plans (`tool-contracts-extended.json`, `event-stream-sse.json`). | ADR-030 decisive-assertion guarantee remains intact: `evidenceField` cannot be the only decisive assertion. |
-| `adapter protocol validation` | `tools/conformance/adapter-protocol/validate-adapter-protocol.ts` | Implementation adapter JSON-RPC manifests including the AL002 update that wires the framework adapters to the tool-contracts packet. | §4.13 contract intact. |
+| `Epic AL portability gate` | `bun run portability:check` → `tools/scripts/portability-gate.ts` | Eight expected packets enforced after the Epic AP package consolidation (`shared-core`, kernel-protocol, kernel-interop-grpc, framework-event-stream-sse, framework-react-driver, framework-interop-rust-kernel, providers-provider-api, telemetry-semconv) plus two standing exceptions (AG-UI projection, AI SDK bridge), and ten required authoritative sources (kernel CDDL, consolidated core TypeSpec, SSE TypeSpec, SSE fixtures, SSE conformance plan, kernel interop services proto, kernel interop types proto, framework rust-kernel interop suite manifest, framework rust-kernel interop suite schema, telemetry semconv YAML). | Replaces the AF gap plan freshness check as the canonical portability proxy. |
+| `authority packet validation` | `tools/scripts/authority-packet/validate-authority-packets.ts` | Eight packets validate against `tools/schemas/authority-packet.schema.json`; the `telemetry` boundary added in AL002 is enforced; every packet has an executable verification path (`schema-validation`, `openapi-validation`, `conformance-plan`, `interop-smoke`, or `vocabulary-check`). | The §4.11 manifest contract now reads as enforced rather than aspirational. |
+| `conformance plan validation` | `tools/conformance/plan-compiler/validate-plans.ts` | Nineteen conformance plans validated against `tools/conformance/plan-compiler/conformance-plan.schema.json`, including `tool-contracts-extended.json` (now referenced through the consolidated core packet) and `event-stream-sse.json`. | ADR-030 decisive-assertion guarantee remains intact: `evidenceField` cannot be the only decisive assertion. |
+| `adapter protocol validation` | `tools/conformance/adapter-protocol/validate-adapter-protocol.ts` | Implementation adapter JSON-RPC manifests including the AL002 update that wires the framework adapters to the tool-contracts surface now carried by the consolidated core packet. | §4.13 contract intact. |
 | `shared conformance runner meta-conformance` | `tools/conformance/meta-conformance/run.ts` | Meta-conformance runs the shared assertion-evaluator against curated golden traces — nineteen plans plus one thousand scripted golden cases. | Guards the runner against assertion-evaluator regressions that would otherwise mask conformance drift. |
 | `vocabulary-check verification` | `tools/conformance/vocabulary/validate-vocabulary.ts` | The telemetry semconv attribute identifiers in the resolved `otel-attributes.json` match the source IDs in `telemetry/semconv/tuvren-runtime.yaml`. | New AL002 runner. The `vocabulary-check` verification path kind is now genuinely runnable, not just declared. |
 | `machine authority guardrails` | `tools/scripts/authority-guardrails/authority-guardrails.ts` | Plan self-certification rule, plan-evidence oracle shape rule, runner oracle literal rule, forbidden-vocabulary rule, forbidden-authority-evidence rule, and freshness-drift rule all pass. Freshness drift now groups checks by regenerate command so multi-artifact regenerators (telemetry codegen, kernel-interop codegen) cannot mask drift on artifacts past the first. | Counter-cheating guardrail intact. |
-| `docs-to-authority freeze gate` | `tools/scripts/docs-authority-freeze-gate.ts --check` | Two hundred twenty-six normative claims in `docs/KrakenKernelSpecification.md` plus `docs/KrakenFrameworkSpecification.md` mapped to packet/plan/runner evidence. | Continues to anchor the documentation-to-authority bridge from Epic AD. |
+| `docs-to-authority freeze gate` | `tools/scripts/docs-authority-freeze-gate.ts --check` | Two hundred thirty-three normative claims in `docs/KrakenKernelSpecification.md` plus `docs/KrakenFrameworkSpecification.md` mapped to packet/plan/runner evidence. | Continues to anchor the documentation-to-authority bridge from Epic AD. |
 | `Epic AF conformance gap plan freshness` | `tools/scripts/epic-af-conformance-gap-plan.ts --check` | Surface-by-surface AF promotion record stays in sync with the on-disk plan files (after the AL002 tool-check relocation under `tool-contracts-af.*` prefix). | Confirms the AF closure was not invalidated by AL002's plan reshuffle. |
 | `boundary-owned conformance suites` | `bun run conformance` | See §2.2; the shared runner emits assertion-evaluated evidence rather than implementation-self-reported summaries. | The portability gate consumes runner-observed evidence, not adapter-self-attestation. |
 
@@ -105,29 +105,23 @@ new epic that explicitly reopens that scope. The following items are recorded
 explicitly so the next planning step does not mistake them for either passed
 gates or for blockers of the existing staged gates:
 
-- **§8.E5 SSE adapter capability** — The framework TypeScript and Rust
-  conformance adapter manifests now both reference
-  `boundaries/framework/contracts/event-stream-sse/spec/authority-packet.json`,
-  so the nineteen SSE plan checks enter the shared runner's plan
-  discovery and surface in the measured conformance evidence rows.
-  Neither framework adapter has yet declared the
-  `framework.event-stream-sse` capability or implemented the
-  `event-stream-sse.decode-trace` and `event-stream-sse.report-wire-compliance`
-  operations, so the checks land as `nonApplicable` rather than as pass
-  evidence on each adapter's evidence file. Closing this remaining wiring
-  would convert those `nonApplicable` lines into pass evidence; it does
-  not change the portability gate's pass verdict because the surface,
-  packet, plan, fixtures, runner, and adapter-manifest references are
-  all in place. The portability gate now enforces the adapter-coverage
-  rule as the structural guarantee that future packet promotions cannot
-  skip this wiring.
+- **§8.E5 SSE adapter capability** — The TypeScript framework conformance adapter
+  now declares `framework.event-stream-sse` and implements
+  `event-stream-sse.decode-trace` plus
+  `event-stream-sse.report-wire-compliance`, so the nineteen SSE plan checks run
+  as applicable evidence on the TypeScript framework lane. The Rust framework
+  adapter still declares no capabilities and remains outside the reopened product
+  scope until a future epic resumes Rust framework/product work. This does not
+  change the portability gate's pass verdict because the surface, packet, plan,
+  fixtures, runner, and TypeScript adapter wiring are in place for the active
+  product line.
 - **§8.E6 tool-argument streaming completeness assertion** — AL002 promoted
-  the tool-contracts packet and plan but did not add a decisive assertion over
-  concatenated `ToolCallArgsDelta` payloads. The portable surface for tool
-  argument streaming is owned by the canonical event stream rather than by
-  tool-contracts proper; a future ticket may add a `resultField` assertion in
-  `runtime-api-callables-extended` or expose `$.events` in a way that allows a
-  decisive completeness check.
+  the tool-contract binding section and plan under the consolidated core packet,
+  but did not add a decisive assertion over concatenated `ToolCallArgsDelta`
+  payloads. The portable surface for tool argument streaming is owned by the
+  canonical event stream rather than by tool-contracts proper; a future ticket may
+  add a `resultField` assertion in `runtime-api-callables-extended` or expose
+  `$.events` in a way that allows a decisive completeness check.
 - **§8.E1, E2, E7, E9, E11 future productization items** — Recorded in
   `constitution/support/live/epic-al-portable-surface-conformance-gap-inventory.md`
   §8 as expert-grade observations. None are gate-blocking under ADR-033 and
@@ -172,7 +166,7 @@ Under the fresh evidence captured by `bun run verify` on the AL closure branch:
   PostgreSQL) the proving-host reload lane. PostgreSQL is a first-class
   backend in the canonical verification path rather than an optional
   best-effort backend.
-- **`portability gate`** — **passed**. Twelve packets, nineteen plans, two
+- **`portability gate`** — **passed**. Eight packets, nineteen plans, two
   standing exceptions, and ten required authoritative sources are enforced
   by `tools/scripts/portability-gate.ts`. The canonical verification path
   consumes this gate as the decisive portability proxy in place of the

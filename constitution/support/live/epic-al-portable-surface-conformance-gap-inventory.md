@@ -4,11 +4,11 @@ This inventory is the KRT-AL001 spike output. It classifies every cross-implemen
 semantic surface in the active TypeScript product scope as one of `portable`,
 `exception:ag-ui`, `exception:ai-sdk-bridge`, `memory-proof-obligation`,
 `ts-ai-sdk-bridge-product-obligation`, or `gap`, and lists the concrete artifacts
-KRT-AL002 must add or revise to close the portability gate.
+KRT-AL002 added or revised to close the portability gate.
 
 - Authored under KRT-AL001 as a spike inventory. Hand-authored Markdown, surface-level.
   Unlike `epic-af-conformance-gap-plan.md`, this file has no generator script; it is
-  consumed by KRT-AL002 as the gap-closure punch list and may be replaced by a
+  preserved as the KRT-AL002 gap-closure punch list and may be replaced by a
   generated artifact if AL002 introduces one.
 - This document is planning evidence under `constitution/support/live/`. It does not
   extend the live constitutional authority chain.
@@ -36,23 +36,25 @@ authoritative behavioral specs are not authority for any cross-language semantic
 - Prior planning evidence:
   - `constitution/support/live/epic-af-conformance-gap-plan.md` / `.json`
   - `constitution/support/live/epic-ad-docs-to-authority-coverage-matrix.json`
-- Current authority packets (the 7 promoted surfaces):
-  - `boundaries/shared/contracts/core-types/spec/authority-packet.json`
+- Current authority packets (the 8 promoted surfaces after Epic AP package consolidation):
+  - `boundaries/shared/contracts/core/spec/authority-packet.json`
   - `boundaries/kernel/contracts/protocol/spec/authority-packet.json`
-  - `boundaries/framework/contracts/runtime-api/spec/authority-packet.json`
-  - `boundaries/framework/contracts/event-stream/spec/authority-packet.json`
-  - `boundaries/framework/contracts/driver-api/spec/authority-packet.json`
+  - `boundaries/framework/contracts/event-stream-sse/spec/authority-packet.json`
   - `boundaries/framework/contracts/react-driver/spec/authority-packet.json`
   - `boundaries/providers/contracts/provider-api/spec/authority-packet.json`
-- Current conformance plans (17):
+  - `boundaries/kernel/interop/grpc/spec/authority-packet.json`
+  - `boundaries/framework/interop/rust-kernel/spec/authority-packet.json`
+  - `boundaries/telemetry/semconv/spec/authority-packet.json`
+- Current conformance plans (19):
   - kernel: `kernel-protocol-core`, `kernel-protocol-extended`, `kernel-restart-recovery`, `kernel-run-liveness`
-  - framework: `runtime-api-lifecycle`, `runtime-api-lifecycle-extended`, `runtime-api-callables`, `runtime-api-callables-extended`, `runtime-api-orchestration`, `event-stream-core`, `event-stream-extended`, `driver-api-core`, `driver-api-extended`, `react-driver-callables`, `react-driver-extended`
+  - framework: `runtime-api-lifecycle`, `runtime-api-lifecycle-extended`, `runtime-api-callables`, `runtime-api-callables-extended`, `runtime-api-orchestration`, `event-stream-core`, `event-stream-extended`, `event-stream-sse`, `driver-api-core`, `driver-api-extended`, `react-driver-callables`, `react-driver-extended`, `tool-contracts-extended`
   - providers: `provider-api-bridge`, `provider-api-bridge-extended`
-- Canonical verification path entries used as portability proxies today:
-  - `tools/scripts/verify.ts` step `docs:af-gap-plan:check` (line 199) — the AF gap plan freshness gate, currently the standing portability proxy
-  - `tools/scripts/verify.ts` step `docs:authority-freeze:check` (line 195) — the docs-to-authority freeze gate from Epic AD
+- Canonical verification path entries relevant to portability today:
+  - `tools/scripts/verify.ts` step `Epic AL portability gate` (`bun run portability:check`) — the current portability proxy over the eight-packet inventory, two standing exceptions, and ten required authoritative sources
+  - `tools/scripts/verify.ts` step `docs:authority-freeze:check` — the docs-to-authority freeze gate from Epic AD
+  - `tools/scripts/verify.ts` step `docs:af-gap-plan:check` — historical AF gap plan freshness evidence; retained in `verify` and `codegen`, but no longer the portability proxy
   - `tools/scripts/portability-check.ts` — verifies that 18 `@tuvren/*` packages can be `import()`-ed from both Bun and Node; package-publish health, not semantic conformance
-  - `package.json` `codegen` script (line 21) — also gates on `docs:af-gap-plan:check`
+  - `package.json` `codegen` script — gates on `docs:authority-freeze:check`, `portability:check`, `docs:af-gap-plan:check`, authority-packet validation, conformance-plan validation, adapter-protocol validation, meta-conformance, vocabulary validation, authority guardrails, and generator freshness
 - Proving-host lanes that anchor TypeScript product-proof obligations:
   - `proving-host:interop-smoke` -> `host-repl:interop-smoke`
   - `proving-host:scenario-sqlite` -> `host-repl:scenario-sqlite`
@@ -76,11 +78,9 @@ the surface's current decisive-assertion coverage.
 
 | Surface | Packet | Plans | Decisive coverage | Notes |
 | --- | --- | --- | --- | --- |
-| Shared core types | `tuvren.shared.core-types` (`boundaries/shared/contracts/core-types/spec/authority-packet.json`) | none — schema-validation + freshness only | shape-only via `@typespec/json-schema` artifacts | Pure structural surface. No semantic plan needed today, but see §6.G1 about adding a `vocabulary-check` to anchor reserved type identifiers. |
-| Kernel protocol semantics | `tuvren.kernel.protocol` (`boundaries/kernel/contracts/protocol/spec/authority-packet.json`) | `kernel-protocol-core`, `kernel-protocol-extended`, `kernel-run-liveness`, `kernel-restart-recovery` | `resultField`, `stateField`, `eventSequence` per plan inspection | Records appendix matrix and recovery edges promoted by AF KRT-AF006 are runner-observed. **CDDL grammar exists at `spec/cddl/kernel-records.cddl` but is not registered as an authoritative source on the packet** — see §6.G2. |
-| Framework runtime API (lifecycle, callables, orchestration) | `tuvren.framework.runtime-api` (`boundaries/framework/contracts/runtime-api/spec/authority-packet.json`) | `runtime-api-lifecycle{,-extended}`, `runtime-api-callables{,-extended}`, `runtime-api-orchestration` | `resultField`, `stateField`, `eventSequence`, `terminalEvent`, `noEvent` per plan inspection | AF promoted approval, steering, cancellation, structured output, tool execution, parallel ordering, handoff, and worker-subtree attribution. The packet's TypeSpec source is the type anchor; behavior comes from the plans. |
-| Framework canonical event stream | `tuvren.framework.event-stream` (`boundaries/framework/contracts/event-stream/spec/authority-packet.json`) | `event-stream-core`, `event-stream-extended` | `eventSequence`, `resultField` per plan inspection | TypeSpec source + generated JSON Schema artifacts. Canonical-stream identity for portable hosts. |
-| Framework driver API contract | `tuvren.framework.driver-api` (`boundaries/framework/contracts/driver-api/spec/authority-packet.json`) | `driver-api-core`, `driver-api-extended` | `resultField` with `errorEnvelope` per plan inspection | AF promoted `driver-api-af.invalid-loop-policy-tool-call-hard-fail`. Both TypeScript and Rust binding appendices declared (even with Rust deferred). |
+| Shared core primitives | `tuvren.shared.core` (`boundaries/shared/contracts/core/spec/authority-packet.json`) | `runtime-api-lifecycle{,-extended}`, `runtime-api-callables{,-extended}`, `runtime-api-orchestration`, `event-stream-core`, `event-stream-extended`, `driver-api-core`, `driver-api-extended`, `tool-contracts-extended` | `resultField`, `stateField`, `eventSequence`, `terminalEvent`, `noEvent`, `errorEnvelope` per plan inspection | Epic AP absorbed the former `core-types`, `runtime-api`, `event-stream`, `driver-api`, and `tool-contracts` packets into one consolidated core packet with binding sections for the eight `@tuvren/core/*` subpaths. |
+| Kernel protocol semantics | `tuvren.kernel.protocol` (`boundaries/kernel/contracts/protocol/spec/authority-packet.json`) | `kernel-protocol-core`, `kernel-protocol-extended`, `kernel-run-liveness`, `kernel-restart-recovery` | `resultField`, `stateField`, `eventSequence` per plan inspection | Records appendix matrix and recovery edges promoted by AF KRT-AF006 are runner-observed. KRT-AL002 registered `spec/cddl/kernel-records.cddl` as a CDDL authoritative source on the packet. |
+| Framework SSE projection | `tuvren.framework.event-stream-sse` (`boundaries/framework/contracts/event-stream-sse/spec/authority-packet.json`) | `event-stream-sse` | `eventSequence`, `resultField`, `ordering`, `errorEnvelope` per plan inspection | KRT-AL002/AL003 promoted the EventSource-compatible wire projection through TypeSpec, byte-trace fixtures, and WHATWG-conformant adapter decoding. |
 | Framework ReAct driver behavior | `tuvren.framework.react-driver` (`boundaries/framework/contracts/react-driver/spec/authority-packet.json`) | `react-driver-callables`, `react-driver-extended` | `eventSequence`, `stateField`, `noEvent` per plan inspection | No TypeSpec; data-owned per ADR-025. AF promoted hook ordering, around-hook nesting, after-iteration terminality, and live/durable aroundModel reconciliation. |
 | Provider bridge contract | `tuvren.providers.provider-api` (`boundaries/providers/contracts/provider-api/spec/authority-packet.json`) | `provider-api-bridge`, `provider-api-bridge-extended` | `resultField`, `eventSequence`, `errorEnvelope` per plan inspection | The provider-neutral contract is portable. The `bridge-ai-sdk` projection (TS implementation that adapts the AI SDK to this contract) is a standing exception — see §4. |
 
@@ -138,31 +138,29 @@ they are recorded separately so they do not get folded into the portable scope.
 
 ## 6. Portability gaps
 
-Each gap row names: current state, missing artifact(s), proposed packet/plan home,
-recommended decisive assertion kinds, and the concrete hand-off to KRT-AL002.
+Each gap row preserves the AL001 pre-closure inventory: current state at the time,
+missing artifact(s), proposed packet/plan home, recommended decisive assertion kinds,
+and the concrete hand-off to KRT-AL002. The closure table in §9b is the current
+post-AL002 / post-AP source of truth for which gaps are closed and where their
+artifacts landed.
 
-### G1. Tool contracts have no authority packet
+### G1. Tool contracts are absorbed into the consolidated core packet
 
-- **Current state**: `boundaries/framework/contracts/tool-contracts/` has TypeSpec
+- **AL001 gap state**: `boundaries/framework/contracts/tool-contracts/` had TypeSpec
   (`spec/typespec/main.tsp`), generated JSON Schema artifacts, generated OpenAPI
-  artifacts, a TypeScript projection, and a workspace test target — but no
-  `spec/authority-packet.json`. Tool-call, approval, and result behavior is currently
-  only exercised inside `runtime-api-callables{,-extended}` and `react-driver-extended`.
-- **What is missing**: `packetId tuvren.framework.tool-contracts`; at least one
-  Conformance Plan that names tool-execution and approval behavior; binding
-  projection + binding appendix; freshness checks for the existing artifacts.
-- **Proposed packet home**: `boundaries/framework/contracts/tool-contracts/spec/authority-packet.json`
-- **Proposed plan home**: either promote tool-execution checks from `runtime-api-callables*` into a new
-  `boundaries/framework/conformance/plans/tool-contracts-core.json` referenced by both packets, or keep tool checks inside `runtime-api-callables*`
-  and have the tool-contracts packet reference the same plans through its
-  `conformancePlans` array. The first option is cleaner and avoids `runtime-api` becoming the de facto tool authority.
-- **Recommended decisive assertion kinds**: `resultField` over tool-result shapes,
+  artifacts, a TypeScript projection, and a workspace test target, but no authority
+  packet or tool-specific conformance plan.
+- **Closure state after AL002 + AP**: tool-call, approval, and result behavior now
+  live under the consolidated `tuvren.shared.core` authority packet at
+  `boundaries/shared/contracts/core/spec/authority-packet.json`. The packet declares
+  the `tool-contracts-extended.json` conformance plan and a tool-contract binding
+  section instead of introducing a standalone `tuvren.framework.tool-contracts`
+  packet.
+- **Decisive assertion kinds landed / still relevant**: `resultField` over tool-result shapes,
   `eventSequence` over `ToolStart`/`ToolCallStart`/`ToolCallArgsDelta`/`ToolCallDone`/`ToolResult`,
   `ordering` for parallel-wave traces, `errorEnvelope` for tool failure codes.
-- **Hand-off to AL002**: create the packet, write the plan (or move tool checks from
-  runtime-api plans), register `framework-tool-contracts` codegen + freshness in
-  `package.json`, ensure the existing OpenAPI/JSON-Schema artifacts pass freshness
-  check.
+- **Remaining note**: §9b records G1 as closed; §9b's E6 note preserves the future
+  productization follow-up for concatenated streamed tool arguments.
 
 ### G2. Kernel record CDDL grammar is unregistered authority
 
@@ -183,31 +181,22 @@ recommended decisive assertion kinds, and the concrete hand-off to KRT-AL002.
   to `authoritativeSources`, version-bump per `§2.1` compatibility-rules (minor —
   adding a declared authoritative source is minor).
 
-### G3. SSE projection has no authority packet
+### G3. SSE projection authority packet is closed
 
-- **Current state**: `boundaries/framework/implementations/typescript/stream-sse/` is
-  a TypeScript implementation with build/test/exports-smoke targets and is listed as
-  "Bun-and-Node validated" in `portability-check.ts`. There is no
-  `boundaries/framework/contracts/event-stream-sse/` or equivalent, no SSE-specific
-  authority packet, no SSE-specific conformance plan, and no SSE fixtures. Tasks.md
-  §1 explicitly names SSE as a required portable surface alongside the canonical
-  stream.
-- **What is missing**: a packet `tuvren.framework.event-stream-sse` (or
-  `tuvren.framework.sse-projection`), TypeSpec or JSON-Schema source for the
-  on-the-wire SSE event projection, fixtures over the SSE field layout
-  (`event:`/`data:`/`id:`/`retry:` and any heartbeat/comment lines), and a
-  conformance plan with runner-observed decisive assertions over the SSE byte
-  layout, ordering, and reconnection contract.
-- **Proposed packet home**: `boundaries/framework/contracts/event-stream-sse/spec/authority-packet.json`
-- **Proposed plan home**: `boundaries/framework/conformance/plans/event-stream-sse.json`
-- **Recommended decisive assertion kinds**: `eventSequence` over decoded SSE frames,
+- **AL001 gap state**: `boundaries/framework/implementations/typescript/stream-sse/`
+  was a TypeScript implementation with build/test/exports-smoke targets, but had no
+  SSE-specific authority packet, conformance plan, or fixtures.
+- **Closure state after AL002 + AL003 follow-up**: `tuvren.framework.event-stream-sse`
+  now owns `boundaries/framework/contracts/event-stream-sse/spec/authority-packet.json`,
+  a TypeSpec source, WHATWG-normative byte-trace fixtures, generated JSON Schema
+  artifacts, and the `event-stream-sse.json` conformance plan.
+- **Decisive assertion kinds landed / still relevant**: `eventSequence` over decoded SSE frames,
   `resultField` over framing details (Content-Type, line endings, terminator),
   `ordering` between SSE projection events and canonical-stream events, `errorEnvelope`
   for malformed SSE traces. See §8.E5 for SSE specifics worth contracting.
-- **Hand-off to AL002**: create the packet, author the source (TypeSpec for the SSE
-  projection shape and a separate fixture set for byte-level traces), write the plan,
-  add the corresponding freshness check, register `framework-stream-sse` codegen if a
-  source generator is introduced.
+- **Remaining note**: §9b records G3 as closed; §9b also notes the AL003 follow-up
+  that wires the TypeScript framework conformance adapter through a WHATWG-conformant
+  decoder in `@tuvren/stream-sse`.
 
 ### G4. Kernel gRPC interop seam has no authority packet
 
@@ -351,11 +340,11 @@ promoted. They identify productization concerns a senior backend/library reviewe
 would normally raise at the same review pass as a portability inventory. Each one is
 marked `[blocking AL002]`, `[non-blocking AL002]`, or `[future epic]`.
 
-- **E1. Packet version posture.** All seven existing packets are at `version 0.1.0`
-  and `planVersion 0.1.0`. `§2.1` defines semver semantics for packets, but no
-  packet has yet been promoted to a stability tier. Recommend AL002 explicitly
-  decide whether the post-AL packet set graduates to `0.2.0` (additive surface
-  expansion) or to a higher tier per ADR-033 once the portability gate passes.
+- **E1. Packet version posture.** The AL001 inventory observed the pre-closure packet
+  set at `version 0.1.0` and `planVersion 0.1.0`. `§2.1` defines semver semantics
+  for packets, but no packet had yet been promoted to a stability tier. Recommend
+  future packet work explicitly decide whether an additive surface expansion graduates
+  a packet to `0.2.0` or to a higher tier per ADR-033 once the portability gate passes.
   `[non-blocking AL002]`
 - **E2. Error envelope universe.** Conformance plans assert error codes via
   `equals` (`approval_pause_phase_mismatch`, `orchestration_parent_not_started`,
@@ -463,7 +452,7 @@ or names paths that disagree with the on-disk packet set.
 
 | Gap | Status | Landing artifact |
 | --- | --- | --- |
-| G1 tool-contracts | closed | `tuvren.framework.tool-contracts` packet + `tool-contracts-extended.json` plan; AF tool checks relocated under `tool-contracts-af.*` prefix |
+| G1 tool-contracts | closed | `tool-contracts-extended.json` plan plus tool-contract binding section in the consolidated `tuvren.shared.core` packet; AF tool checks relocated under `tool-contracts-af.*` prefix |
 | G2 kernel CDDL registration | closed | `boundaries/kernel/contracts/protocol/spec/cddl/kernel-records.cddl` registered as `cddl` authoritative source on the kernel-protocol packet (version 0.2.0) |
 | G3 SSE projection | closed | `tuvren.framework.event-stream-sse` packet, TypeSpec source, eighteen WHATWG-normative byte-trace fixtures (including the empty-`id:` reset and the unterminated-final-frame edge added under AL003 review followup), and `event-stream-sse.core` conformance plan with nineteen decisive checks |
 | G4 kernel gRPC interop packet | closed | `tuvren.kernel.interop-grpc` packet referencing the existing `.proto` files and interop-smoke target |
@@ -516,25 +505,27 @@ under `backend-postgres` and the kernel TypeScript conformance adapter, and
 a `devenv up -d postgres` readiness race in the backend-postgres test
 helper.
 
-## 10. Hand-off to KRT-AL002
+## 10. Historical Hand-off to KRT-AL002
 
-The concrete punch list AL002 must execute. Each item is the implementation form of
-a §6 gap.
+The concrete punch list AL002 executed. This section is preserved as historical
+planning evidence; §9b records the current closure artifacts and supersedes the
+pre-closure recommendations when package consolidation changed the landing shape.
 
-1. **G1** — Add `tuvren.framework.tool-contracts` packet at
-   `boundaries/framework/contracts/tool-contracts/spec/authority-packet.json`. Add
-   `tool-contracts-core` (or equivalent) plan with decisive
+1. **G1** — Close tool contracts through the consolidated
+   `tuvren.shared.core` packet at
+   `boundaries/shared/contracts/core/spec/authority-packet.json`. Add the
+   `tool-contracts-extended` plan with decisive
    `resultField`/`eventSequence`/`ordering`/`errorEnvelope` assertions over
-   tool execution, approval flow, and tool argument streaming (E6). Wire the new
-   plan into the existing tool-execution scenarios. Update the `runtime-api`
-   packet to either reference the new plan or drop tool-only checks now owned by
-   tool-contracts.
+   tool execution and approval flow. Wire the plan into the existing
+   tool-execution scenarios and record the tool-contract binding section in the
+   consolidated core packet. The streamed-argument completeness assertion from E6
+   remains future work, as recorded in §9b.
 2. **G2** — Edit `boundaries/kernel/contracts/protocol/spec/authority-packet.json`
    to add the existing CDDL grammar as an authoritative source
    (`format: "cddl"`). Minor packet version bump per §2.1.
-3. **G3** — Add `tuvren.framework.event-stream-sse` packet and
+3. **G3** — Add the `tuvren.framework.event-stream-sse` packet and
    `event-stream-sse.json` plan. Add an SSE source (TypeSpec for the projection
-   shape, fixture set for byte-level traces). Plan must include the SSE specifics
+   shape) and byte-level trace fixtures. The plan must include the SSE specifics
    listed in §8.E5 as decisive assertions where applicable (Last-Event-ID
    reconnection, `retry:` semantics, Content-Type, line-ending normalization).
 4. **G4** — Add `tuvren.kernel.interop.grpc` packet at
@@ -562,9 +553,10 @@ a §6 gap.
 9. **G9** — Record in the AL003 reassessment that the `hosts` boundary remains
    intentionally unopened. No code change.
 
-Estimated artifact footprint for AL002:
+Historical estimated artifact footprint for AL002:
 
-- 5 new authority packet files (G1, G3, G4, G5, G6)
+- 4 new authority packet files (G3, G4, G5, G6) plus the consolidated-core packet
+  edit that absorbed G1 after ADR-037 / Epic AP
 - 1 packet edit (G2)
 - 2-3 new conformance plan files (G1, G3, optional G6 fixture set)
 - 1 TypeSpec source (G3 SSE projection), optionally 1 fixture set (G3 byte traces)
