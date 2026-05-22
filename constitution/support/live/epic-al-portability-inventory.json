@@ -81,7 +81,7 @@
       "packetId": "tuvren.shared.core",
       "sourcePath": "boundaries/framework/contracts/tool-contracts/spec/typespec/main.tsp",
       "sourceFormat": "typespec",
-      "rationale": "KRT-AL002 G1 (absorbed): tool-contracts TypeSpec source now lives under tuvren.shared.core binding section",
+      "rationale": "KRT-AL002 G1 (absorbed): tool-contracts TypeSpec is an authoritative source for tuvren.shared.core; path remains valid until the deprecated shim is removed in the next minor cycle",
       "inventorySection": "§6.G1 / §9b"
     },
     {

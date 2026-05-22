@@ -62,7 +62,7 @@ This plan is generated from the Epic AD docs-to-authority coverage matrix. It is
 - Delivery ticket: `KRT-AF001`
 - Matrix follow-up tickets: `KRT-AF001 if portability is selected`
 - Claim IDs: `FWK-0A368D92CB9D`, `FWK-A346B29D8195`, `FWK-A9611C7D2C6F`
-- Authority packet: `boundaries/framework/contracts/runtime-api/spec/authority-packet.json`
+- Authority packet: `boundaries/shared/contracts/core/spec/authority-packet.json`
 - Conformance plan: `boundaries/framework/conformance/plans/runtime-api-lifecycle-extended.json`
 - Fixture or scenario: `boundaries/framework/conformance/scenarios/runtime-api-scenarios.json`
 - Adapter operation: `runtime.context-transform; runtime.cancel-execution`
@@ -206,7 +206,7 @@ This plan is generated from the Epic AD docs-to-authority coverage matrix. It is
 - Delivery ticket: `KRT-AF004`
 - Matrix follow-up tickets: `KRT-AF004`
 - Claim IDs: `FWK-097D5A1C6AA2`, `FWK-86DBC9E570C8`, `FWK-8EB24EEFC45C`, `FWK-9F20F73A9745`, `FWK-AEFDB52BDBF9`, `FWK-B9434E23AB69`, `FWK-C9356EE09017`
-- Authority packet: `boundaries/framework/contracts/tool-contracts/spec/authority-packet.json`
+- Authority packet: `boundaries/shared/contracts/core/spec/authority-packet.json`
 - Conformance plan: `boundaries/framework/conformance/plans/tool-contracts-extended.json`
 - Fixture or scenario: `boundaries/framework/conformance/scenarios/runtime-api-scenarios.json`
 - Adapter operation: `runtime.tool-execute; runtime.approval-resolve`
@@ -222,7 +222,7 @@ This plan is generated from the Epic AD docs-to-authority coverage matrix. It is
 - Delivery ticket: `KRT-AF004`
 - Matrix follow-up tickets: `KRT-AF004`
 - Claim IDs: `FWK-4193D2A613E0`, `FWK-BC7142393BAA`
-- Authority packet: `boundaries/framework/contracts/tool-contracts/spec/authority-packet.json`
+- Authority packet: `boundaries/shared/contracts/core/spec/authority-packet.json`
 - Conformance plan: `boundaries/framework/conformance/plans/tool-contracts-extended.json`
 - Fixture or scenario: `boundaries/framework/conformance/scenarios/runtime-api-scenarios.json`
 - Adapter operation: `runtime.tool-execute`
