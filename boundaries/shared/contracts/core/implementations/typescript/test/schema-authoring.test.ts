@@ -15,6 +15,8 @@
  */
 
 import { describe, expect, test } from "bun:test";
+import { z as z3 } from "zod/v3";
+import { z as z4 } from "zod/v4";
 import type { FlexibleSchema, Schema } from "../src/lib/schema-authoring.js";
 import {
   asSchema,
@@ -335,7 +337,9 @@ describe("asSchema() — branch 5: lazy function", () => {
 
   test("lazy returning a lazy is resolved transitively", () => {
     const inner = jsonSchema<number>({ type: "number" });
-    const schema = asSchema(() => (() => inner) as FlexibleSchema<number>);
+    // LazySchema<T> now returns FlexibleSchema<T>, so () => () => inner is
+    // LazySchema<number> without a cast.
+    const schema = asSchema<number>(() => () => inner);
     expect(schema.jsonSchema).toEqual({ type: "number" });
   });
 });
@@ -525,5 +529,71 @@ describe("defineTool()", () => {
     });
     // asSchema resolves the lazy once during defineTool construction
     expect(callCount).toBe(1);
+  });
+});
+
+// ── Real-library integration — guards against Zod internals churn ─────────────
+// These tests use the real zod@4 library (v4 native + v3 compat surface) to
+// verify that _zod detection, toJSONSchema() extraction, and safeParse routing
+// hold against actual library instances, not just structural mocks.
+
+describe("Real library integration — Zod v4 native", () => {
+  test("z4.string() routes via _zod branch (branch 2)", () => {
+    const schema = asSchema(z4.string());
+    expect(schema[schemaSymbol]).toBe(true);
+  });
+
+  test("z4.string() extracts JSON schema via toJSONSchema()", () => {
+    const schema = asSchema(z4.string());
+    expect(schema.jsonSchema).toMatchObject({ type: "string" });
+  });
+
+  test("z4.string() validates correctly via safeParse", () => {
+    const schema = asSchema(z4.string());
+    expect(schema.validate?.("hello")).toEqual({
+      success: true,
+      value: "hello",
+    });
+    const bad = schema.validate?.(42);
+    expect(bad?.success).toBe(false);
+    if (bad && !bad.success) {
+      expect(bad.error).toBeInstanceOf(TuvrenValidationError);
+    }
+  });
+
+  test("defineTool with z4.object() toJSONSchema() includes required fields", () => {
+    const tool = defineTool({
+      name: "greet",
+      description: "greet",
+      inputSchema: z4.object({ name: z4.string() }),
+      execute: ({ name }) => `Hello ${name}`,
+    });
+    const js = tool.inputSchema.toJSONSchema();
+    expect(js).toMatchObject({ type: "object" });
+  });
+});
+
+describe("Real library integration — Zod v3 compat", () => {
+  test("z3.string() routes via branch 4 (~standard.vendor === 'zod')", () => {
+    const schema = asSchema(z3.string());
+    expect(schema[schemaSymbol]).toBe(true);
+  });
+
+  test("z3.string() falls back to {} JSON schema (no toJSONSchema on v3)", () => {
+    const schema = asSchema(z3.string());
+    expect(schema.jsonSchema).toEqual({});
+  });
+
+  test("z3.string() validates via safeParse, not ~standard.validate", () => {
+    const schema = asSchema(z3.string());
+    expect(schema.validate?.("hello")).toEqual({
+      success: true,
+      value: "hello",
+    });
+    const bad = schema.validate?.(42);
+    expect(bad?.success).toBe(false);
+    if (bad && !bad.success) {
+      expect(bad.error).toBeInstanceOf(TuvrenValidationError);
+    }
   });
 });

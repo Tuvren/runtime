@@ -54,11 +54,8 @@ export type ZodSchema<T = unknown> =
 /** Standard Schema (https://github.com/standard-schema/standard-schema) */
 export type StandardSchema<T = unknown> = StandardSchemaV1<unknown, T>;
 
-/** Lazy schema — a zero-arg function returning a FlexibleSchema. */
-export type LazySchema<T = unknown> = () =>
-  | Schema<T>
-  | ZodSchema<T>
-  | StandardSchema<T>;
+/** Lazy schema — a zero-arg function returning any FlexibleSchema (including another lazy). */
+export type LazySchema<T = unknown> = () => FlexibleSchema<T>;
 
 /**
  * Union of all supported input schema authoring shapes. Passed to
@@ -195,13 +192,9 @@ export function asSchema<T>(schema: FlexibleSchema<T>): Schema<T> {
     // The union member Schema<T> has [schemaSymbol]: true, so after this
     // check we can safely return the value typed as Schema<T>.
     if (schemaSymbol in schema) {
-      // `schema` is narrowed by the `in` operator to the union members that
-      // declare [schemaSymbol].  Only Schema<T> does, so this assignment is
-      // sound.  The phantom _type field makes Schema<T> appear non-assignable
-      // to Schema<T> when TypeScript infers S<unknown>; we return through
-      // jsonSchema to rebuild with the correct generic seat.
-      const wrapped = schema as Schema<T>;
-      return wrapped;
+      // Only Schema<T> declares [schemaSymbol]; the `as` is a sound identity
+      // passthrough — no re-wrapping needed.
+      return schema as Schema<T>;
     }
 
     // Branch 2: Zod v4 — all Zod v4 schemas carry an `_zod` internals bag.
@@ -240,6 +233,10 @@ export function asSchema<T>(schema: FlexibleSchema<T>): Schema<T> {
  * Defines a typed tool whose `inputSchema` is normalized once at
  * definition time via `asSchema`. Returns a `TuvrenToolDefinition`
  * whose `inputSchema` satisfies the `CustomSchema` boundary contract.
+ *
+ * `OUTPUT` is inferred from `execute`'s return type but is not carried
+ * into the unparameterized `TuvrenToolDefinition` return type.  It is
+ * reserved for a forthcoming typed-definition surface.
  */
 export function defineTool<INPUT, OUTPUT>(options: {
   name: string;
