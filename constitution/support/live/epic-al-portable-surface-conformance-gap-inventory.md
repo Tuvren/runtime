@@ -516,9 +516,10 @@ pre-closure recommendations when package consolidation changed the landing shape
    `boundaries/shared/contracts/core/spec/authority-packet.json`. Add the
    `tool-contracts-extended` plan with decisive
    `resultField`/`eventSequence`/`ordering`/`errorEnvelope` assertions over
-   tool execution, approval flow, and tool argument streaming (E6). Wire the plan
-   into the existing tool-execution scenarios and record the tool-contract binding
-   section in the consolidated core packet.
+   tool execution and approval flow. Wire the plan into the existing
+   tool-execution scenarios and record the tool-contract binding section in the
+   consolidated core packet. The streamed-argument completeness assertion from E6
+   remains future work, as recorded in §9b.
 2. **G2** — Edit `boundaries/kernel/contracts/protocol/spec/authority-packet.json`
    to add the existing CDDL grammar as an authoritative source
    (`format: "cddl"`). Minor packet version bump per §2.1.
