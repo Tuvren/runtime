@@ -9,7 +9,7 @@
 
 ## 1. Executive Summary & Active Critical Path
 
-- **Total Active Story Points:** 95 (across 4 active epics — AQ 15, AR 15, AS 31, AT 34 — 34 atomic tickets total). Epics AM (32), AN (13), AO (26), and AP (37) are closed and remain in this live plan only as recently completed context for their downstream dependencies.
+- **Total Active Story Points:** 95 (across 4 active epics — AQ 15, AR 15, AS 31, AT 34 — 28 atomic tickets total). Epics AM (32), AN (13), AO (26), and AP (37) are closed and remain in this live plan only as recently completed context for their downstream dependencies.
 - **Critical Path:** `(KRT-AQ001..AQ005, KRT-AR001..AR005) → KRT-AS001..AS009 → KRT-AT009`. Epic AR is sequenceable in parallel with Epic AQ until `KRT-AR005` gates `KRT-AS009`; AT001..AT003 can start after the already-closed AO/AP prerequisites, AT004..AT008 wait on their specific AR prerequisites and can run alongside AS, and only KRT-AT009 depends on KRT-AS009. The remaining longest single-thread path runs through the schema helper, the batteries-included factory, the MCP client, and the MCP-backed proving-host scenario.
 - **Planning Assumptions:** PRD v0.7.0, Architecture v0.7.0, and TechSpec v0.27.1 (ADR-034 through ADR-041) are approved upstream and govern this execution chain. The `docs/KrakenKernelSpecification.md` bump to v0.10 (count correction plus `thread.list`) and `docs/KrakenFrameworkSpecification.md` bump to v0.18 (base-handle `awaitResult`) are now landed. The `product proof gate`, `platform gate`, and `portability gate` from Epic AL remain the staged-gate baseline; this chain extends the productized TypeScript line without reopening Rust framework/product work. `@modelcontextprotocol/sdk@1.29.0`, `zod@4.4.3`, and `@standard-schema/spec@1.1.0` are the locked external dependency versions per TechSpec §1. The host-facing SDK consolidation into source-bearing `@tuvren/core` plus the slim `@tuvren/runtime` convenience package is landed; deprecated one-cycle shims preserve the old contract handles and `@tuvren/runtime-core` until the next minor cleanup.
 
@@ -89,17 +89,19 @@ flowchart LR
   end
 
   subgraph block3["Block 3 — Capability spikes"]
-    AS["Epic AS — MCP Client Container"]
+    AS_PRE["Epic AS001-AS008 — MCP Client Container"]
+    AS9["KRT-AS009 — MCP runtime re-export"]
     AT["Epic AT — Reference Host consolidation + headless + transcript"]
-    AS --> AT
+    AS_PRE --> AS9
+    AS9 --> AT
   end
 
   AO --> AP
   AO --> AT
   AP --> AT
   AR --> AT
-  AQ --> AS
-  AR --> AS
+  AQ --> AS_PRE
+  AR --> AS9
 ```
 
 ## 4. Ticket List
@@ -504,7 +506,7 @@ And the REPL proving-host scenario suite still passes
 
 ### Epic AP — `@tuvren/core` Consolidation + Fold `runtime-core` Into `@tuvren/runtime` (KRT)
 
-**Status:** Closed — all 11 tickets implemented and verified under `bun run verify` + `bun run compatibility:evidence`. Closure kept the five retired contract handles and `@tuvren/runtime-core` as deprecated one-cycle compatibility shims while making `@tuvren/core` and `@tuvren/runtime` the source-bearing surfaces.
+**Status:** Closed — all 11 tickets implemented and verified under `bun run verify` + `bun run compatibility:evidence`. Correction to KRT-AP008 scope: the source-bearing `@tuvren/runtime-core` package was folded into `@tuvren/runtime`, while the old workspace handle remains for one cycle as a deprecated compatibility shim. Closure also kept the five retired contract handles as deprecated one-cycle shims while making `@tuvren/core` and `@tuvren/runtime` the source-bearing surfaces.
 
 **KRT-AP001 Atomic-Merge Feasibility Spike**
 - **Type:** Spike
@@ -617,17 +619,18 @@ And the shim packages are flagged in their README as removal-targets for the nex
 And the workspace continues to build and test
 ```
 
-**KRT-AP008 Fold `runtime-core` Into `@tuvren/runtime`**
+**KRT-AP008 Fold Source-Bearing `runtime-core` Into `@tuvren/runtime`**
 - **Type:** Chore
 - **Effort:** 5
 - **Dependencies:** `KRT-AP006`
 - **Capability / Contract Mapping:** PRD `CAP-P0-049`; TechSpec ADR-037, ADR-040
-- **Description:** Move source from `boundaries/framework/implementations/typescript/runtime-core/src/` into `boundaries/framework/implementations/typescript/runtime/src/lib/` (replacing the current thin barrel). `@tuvren/runtime` becomes the slim convenience package per ADR-040 with one root export entry. Rename the internal `createTuvrenRuntimeCore` factory to `createTuvrenRuntime` (the `Core` suffix exposed an internal name; ADR-040). Update internal imports.
+- **Description:** Move source from `boundaries/framework/implementations/typescript/runtime-core/src/` into `boundaries/framework/implementations/typescript/runtime/src/lib/` (replacing the current thin barrel). `@tuvren/runtime` becomes the slim convenience package per ADR-040 with one root export entry. Rename the internal `createTuvrenRuntimeCore` factory to `createTuvrenRuntime` (the `Core` suffix exposed an internal name; ADR-040). Update internal imports. Keep `@tuvren/runtime-core` only as a deprecated re-export shim for one cycle, matching the retired contract-handle shim policy.
 - **Acceptance Criteria (Gherkin):**
 ```gherkin
 Given the @tuvren/core consolidation has landed
-When @tuvren/runtime-core is folded into @tuvren/runtime
-Then @tuvren/runtime-core no longer exists as a separate workspace package
+When the source-bearing @tuvren/runtime-core implementation is folded into @tuvren/runtime
+Then @tuvren/runtime-core no longer exists as a source-bearing workspace package
+And the old @tuvren/runtime-core handle remains only as a deprecated re-export shim for one cycle
 And the createTuvrenRuntimeCore factory is renamed to createTuvrenRuntime and exported from @tuvren/runtime
 And all workspace consumers import from @tuvren/runtime instead of @tuvren/runtime-core
 And typecheck and conformance still pass
