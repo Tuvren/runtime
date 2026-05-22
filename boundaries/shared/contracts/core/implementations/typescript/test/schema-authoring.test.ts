@@ -501,11 +501,11 @@ describe("defineTool()", () => {
       description: "d",
       inputSchema: { type: "string" },
       execute: (input) => input,
-      approval: "always",
+      approval: true,
       timeout: 5000,
       metadata: { version: 1 },
     });
-    expect(tool.approval).toBe("always");
+    expect(tool.approval).toBe(true);
     expect(tool.timeout).toBe(5000);
     expect(tool.metadata).toEqual({ version: 1 });
   });

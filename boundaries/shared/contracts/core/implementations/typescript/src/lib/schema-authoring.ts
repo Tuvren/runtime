@@ -323,9 +323,7 @@ function buildZodSchema<T>(zod: ZodLike<T>): Schema<T> {
   return {
     [schemaSymbol]: true as const,
     _type: undefined as T,
-    get jsonSchema() {
-      return extractJsonSchema(zod);
-    },
+    jsonSchema: extractJsonSchema(zod),
     validate(value) {
       const result = zod.safeParse(value);
       if (result.success) {
@@ -349,9 +347,7 @@ function buildStandardSchema<T>(std: StandardLike<T>): Schema<T> {
   return {
     [schemaSymbol]: true as const,
     _type: undefined as T,
-    get jsonSchema() {
-      return extractJsonSchema(std);
-    },
+    jsonSchema: extractJsonSchema(std),
     validate(value) {
       const result = std["~standard"].validate(value);
 
