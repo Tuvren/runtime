@@ -348,7 +348,13 @@ function buildStandardSchema<T>(std: StandardLike<T>): Schema<T> {
     validate(value) {
       const result = std["~standard"].validate(value);
 
-      if (result instanceof Promise) {
+      // `instanceof Promise` narrows TypeScript's union; the `.then` guard
+      // additionally catches cross-realm Promises and custom thenables that
+      // slip past instanceof but are still async.
+      if (
+        result instanceof Promise ||
+        typeof (result as { then?: unknown }).then === "function"
+      ) {
         throw new TuvrenValidationError(
           "Async Standard Schema validation is not supported in synchronous tool contexts",
           { code: "invalid_tool_schema_authoring" }

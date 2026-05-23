@@ -17,6 +17,7 @@
 import { describe, expect, test } from "bun:test";
 import { z as z3 } from "zod/v3";
 import { z as z4 } from "zod/v4";
+import type { CustomSchema } from "../src/lib/runtime-contract-shapes.js";
 import type { FlexibleSchema, Schema } from "../src/lib/schema-authoring.js";
 import {
   asSchema,
@@ -132,9 +133,9 @@ describe("jsonSchema()", () => {
   test("validate option is forwarded", () => {
     const validate = (v: unknown) =>
       v === "ok"
-        ? { success: true, value: v as string }
+        ? { success: true as const, value: v as string }
         : {
-            success: false,
+            success: false as const,
             error: new TuvrenValidationError("bad", {
               code: "tool_input_validation_failed",
             }),
@@ -160,8 +161,8 @@ describe("jsonSchema()", () => {
       }
     );
     const result = schema.validate?.("hello");
-    expect(result.success).toBe(true);
-    if (result.success) {
+    expect(result?.success).toBe(true);
+    if (result?.success) {
       expect(result.value).toBe("hello");
     }
   });
@@ -211,8 +212,8 @@ describe("asSchema() — branch 2: Zod v4 (_zod in schema)", () => {
     });
     const schema = asSchema(mock as FlexibleSchema<number>);
     const result = schema.validate?.("nope");
-    expect(result.success).toBe(false);
-    if (!result.success) {
+    expect(result?.success).toBe(false);
+    if (result && !result.success) {
       expect(result.error).toBeInstanceOf(TuvrenValidationError);
       expect(result.error.code).toBe("tool_input_validation_failed");
     }
@@ -252,8 +253,8 @@ describe("asSchema() — branch 3: Standard Schema (non-zod vendor)", () => {
     });
     const schema = asSchema(mock as unknown as FlexibleSchema<string>);
     const result = schema.validate?.("");
-    expect(result.success).toBe(false);
-    if (!result.success) {
+    expect(result?.success).toBe(false);
+    if (result && !result.success) {
       expect(result.error).toBeInstanceOf(TuvrenValidationError);
       expect(result.error.code).toBe("tool_input_validation_failed");
       expect(result.error.details).toEqual([{ message: "too short" }]);
@@ -308,8 +309,8 @@ describe("asSchema() — branch 4: Zod v3 compat (~standard.vendor === 'zod')", 
     });
     const schema = asSchema(mock as FlexibleSchema<number>);
     const result = schema.validate?.("nope");
-    expect(result.success).toBe(false);
-    if (!result.success) {
+    expect(result?.success).toBe(false);
+    if (result && !result.success) {
       expect(result.error).toBeInstanceOf(TuvrenValidationError);
       expect(result.error.code).toBe("tool_input_validation_failed");
     }
@@ -440,7 +441,7 @@ describe("defineTool()", () => {
       inputSchema: raw,
       execute: (input) => input,
     });
-    expect(tool.inputSchema.toJSONSchema()).toEqual(raw);
+    expect((tool.inputSchema as CustomSchema).toJSONSchema()).toEqual(raw);
   });
 
   test("inputSchema.validate() passes through when no schema validate defined", () => {
@@ -450,7 +451,7 @@ describe("defineTool()", () => {
       inputSchema: { type: "string" },
       execute: (input) => input,
     });
-    const result = tool.inputSchema.validate("hello");
+    const result = (tool.inputSchema as CustomSchema).validate("hello");
     expect(result).toEqual({ valid: true, value: "hello" });
   });
 
@@ -462,7 +463,10 @@ describe("defineTool()", () => {
       inputSchema: mock as FlexibleSchema<number>,
       execute: (input) => input,
     });
-    expect(tool.inputSchema.validate(0)).toEqual({ valid: true, value: 99 });
+    expect((tool.inputSchema as CustomSchema).validate(0)).toEqual({
+      valid: true,
+      value: 99,
+    });
   });
 
   test("inputSchema.validate() propagates schema validation failure", () => {
@@ -477,7 +481,7 @@ describe("defineTool()", () => {
       inputSchema: mock as FlexibleSchema<number>,
       execute: (input) => input,
     });
-    const result = tool.inputSchema.validate("bad");
+    const result = (tool.inputSchema as CustomSchema).validate("bad");
     expect(result.valid).toBe(false);
     if (!result.valid) {
       expect(result.error.message).toBe("not a number");
@@ -568,7 +572,7 @@ describe("Real library integration — Zod v4 native", () => {
       inputSchema: z4.object({ name: z4.string() }),
       execute: ({ name }) => `Hello ${name}`,
     });
-    const js = tool.inputSchema.toJSONSchema();
+    const js = (tool.inputSchema as CustomSchema).toJSONSchema();
     expect(js).toMatchObject({ type: "object" });
   });
 });
