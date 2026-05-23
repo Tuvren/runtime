@@ -12,6 +12,14 @@
     "build-batteries-included": {
       "executor": "nx:run-commands",
       "dependsOn": ["^build"],
+      "inputs": [
+        "{projectRoot}/src/**",
+        "{projectRoot}/tsup.config.batteries-included.ts",
+        {
+          "externalDependencies": ["tsup"]
+        }
+      ],
+      "outputs": ["{projectRoot}/dist"],
       "options": {
         "cwd": "boundaries/framework/implementations/typescript/conformance-adapter",
         "command": "bunx --bun tsup --config tsup.config.batteries-included.ts"

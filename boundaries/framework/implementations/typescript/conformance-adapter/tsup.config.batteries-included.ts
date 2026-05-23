@@ -36,7 +36,7 @@ export default defineConfig({
   external: ["better-sqlite3"],
   format: ["esm"],
   noExternal: [/^@tuvren\//],
-  onSuccess: `cp -r "${MIGRATIONS_SRC}" "${MIGRATIONS_DEST}"`,
+  onSuccess: `rm -rf "${MIGRATIONS_DEST}" && cp -r "${MIGRATIONS_SRC}" "${MIGRATIONS_DEST}"`,
   outDir: "dist",
   sourcemap: false,
   target: "esnext",
