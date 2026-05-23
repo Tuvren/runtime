@@ -2,17 +2,16 @@
 
 ## 0. Version History & Changelog
 
+- v0.28.4 - Maintenance alignment: reflected TechSpec v0.27.2, closed the stale AQ status marker, narrowed active scope language to AS-AT, and corrected Epic AS planning around `@modelcontextprotocol/sdk@1.29.0`'s inherited `zod` peer requirement.
 - v0.28.3 - Closed Epic AR: `createTuvren` factory, `TuvrenInstance` types, `[Symbol.asyncDispose]` cleanup wiring, curated re-exports on `@tuvren/runtime`, and full `runtime-api-batteries-included` conformance across memory, SQLite, and PostgreSQL backends. Active scope drops to AS-AT (19 tickets, 65 points). Block 2 is fully closed.
 - v0.28.2 - Reflected current repo reality after Epics AM, AN, AO, and AP landed: the active critical path now starts at Epic AQ, active scope drops to AQ-AT, and the package posture records `@tuvren/core` / `@tuvren/runtime` as the source-bearing surface with one-cycle compatibility shims for the retired contract handles and `@tuvren/runtime-core`.
-- v0.28.1 - Pruned inactive completed epic ticket bodies from the live ticket list and restored the stage-4 changelog to the required three-entry history shape; archived scope remains summarized in Project Phasing for continuity.
-- v0.28.0 - Opened the v0.27.0 constitutional revision execution chain (PRD v0.7.0, Architecture v0.7.0, TechSpec v0.27.0): Epic AM (kernel `thread.list` syscall + 28→30 count correction), Epic AN (`ExecutionHandle.awaitResult` promotion to base + `ExecutionResult` type), Epic AO (`TuvrenRuntime` durable-read surface + REPL kernel-inspector deletion), Epic AP (`@tuvren/core` consolidation + folding `runtime-core` into `@tuvren/runtime`), Epic AQ (Schema Authoring Helper with `defineTool` + `FlexibleSchema` + `asSchema`), Epic AR (`createTuvren` batteries-included factory), Epic AS (`@tuvren/mcp-client` MCP Client Container with stdio + HTTP/SSE transports), Epic AT (Reference Host consolidation, headless stdin mode, transcript capture/replay, `@tuvren/playground-host` retirement). Set Epic AM as the active critical path entry.
 - ... [Older history truncated, refer to git logs]
 
 ## 1. Executive Summary & Active Critical Path
 
 - **Total Active Story Points:** 65 (across 2 active epics — AS 31, AT 34 — 19 atomic tickets total). Epics AM (32), AN (13), AO (26), AP (37), AQ (15), and AR (15) are closed and remain in this live plan only as recently completed context for their downstream dependencies.
 - **Critical Path:** `KRT-AS001..AS009 → KRT-AT009`. AT001..AT003 can start after the already-closed AO/AP prerequisites, AT004..AT008 wait on their specific AR prerequisites and can run alongside AS, and only KRT-AT009 depends on KRT-AS009. The remaining longest single-thread path runs through the MCP client and the MCP-backed proving-host scenario.
-- **Planning Assumptions:** PRD v0.7.0, Architecture v0.7.0, and TechSpec v0.27.1 (ADR-034 through ADR-041) are approved upstream and govern this execution chain. The `docs/KrakenKernelSpecification.md` bump to v0.10 (count correction plus `thread.list`) and `docs/KrakenFrameworkSpecification.md` bump to v0.18 (base-handle `awaitResult`) are now landed. The `product proof gate`, `platform gate`, and `portability gate` from Epic AL remain the staged-gate baseline; this chain extends the productized TypeScript line without reopening Rust framework/product work. `@modelcontextprotocol/sdk@1.29.0`, `zod@4.4.3`, and `@standard-schema/spec@1.1.0` are the locked external dependency versions per TechSpec §1. The host-facing SDK consolidation into source-bearing `@tuvren/core` plus the slim `@tuvren/runtime` convenience package is landed; deprecated one-cycle shims preserve the old contract handles and `@tuvren/runtime-core` until the next minor cleanup.
+- **Planning Assumptions:** PRD v0.7.0, Architecture v0.7.0, and TechSpec v0.27.2 (ADR-034 through ADR-041) are approved upstream and govern this execution chain. The `docs/KrakenKernelSpecification.md` bump to v0.10 (count correction plus `thread.list`) and `docs/KrakenFrameworkSpecification.md` bump to v0.18 (base-handle `awaitResult`) are now landed. The `product proof gate`, `platform gate`, and `portability gate` from Epic AL remain the staged-gate baseline; this chain extends the productized TypeScript line without reopening Rust framework/product work. `@modelcontextprotocol/sdk@1.29.0`, `zod@4.4.3`, and `@standard-schema/spec@1.1.0` are the locked external dependency versions per TechSpec §1; the MCP client package must satisfy the pinned SDK's upstream `zod` peer requirement internally without adding `zod` to Tuvren's public peer surface. The host-facing SDK consolidation into source-bearing `@tuvren/core` plus the slim `@tuvren/runtime` convenience package is landed; deprecated one-cycle shims preserve the old contract handles and `@tuvren/runtime-core` until the next minor cleanup.
 
 ### Brownfield Continuity Note
 
@@ -67,7 +66,7 @@
 - Epic AL closed the portability gate by promoting tool contracts, kernel CDDL registration, SSE projection, kernel and framework interop packets, and telemetry semantic conventions into packet/plan/runner-owned authority, by landing `tools/scripts/portability-gate.ts` as the canonical portability proxy in the verify lane, and by recording the staged-gate re-entry verdict in `constitution/support/live/epic-al-rust-re-entry-gate-reassessment.md`.
 - Epics R-AG established the multi-language transition foundation, shared conformance architecture, kernel interop, and the AG hardening subset that remains historical evidence for promoted surfaces.
 - Epics AM through AP closed the kernel enumeration, base-handle terminal-value, durable-read, and package-consolidation portions of the v0.27.0 constitutional revision chain.
-- That work remains valuable audit context. The active forward path is now Epics AQ through AT.
+- That work remains valuable audit context. The active forward path is now Epics AS through AT.
 
 ## 3. Build Order (Mermaid)
 
@@ -686,7 +685,7 @@ And no stale support artifact references the retired package handles in a normat
 
 ### Epic AQ — Schema Authoring Helper (`defineTool` + `FlexibleSchema`) (KRT)
 
-**Status:** Active — depends on Epic AP (lives in `@tuvren/core/tools`)
+**Status:** Closed — all 5 tickets implemented and verified through the schema-authoring unit tests, `runtime-api-schema-authoring` conformance coverage, and curated `@tuvren/runtime` re-exports.
 
 **KRT-AQ001 `@tuvren/core` Schema-Authoring Type Exports**
 - **Type:** Feature
@@ -859,7 +858,7 @@ And the workspace continues to build and test
 - **Effort:** 3
 - **Dependencies:** `KRT-AQ002`
 - **Capability / Contract Mapping:** PRD `CAP-P0-041`; TechSpec ADR-039, §1
-- **Description:** Verify that `@modelcontextprotocol/sdk@1.29.0`'s public API surface matches the assumptions in TechSpec §4.15 and ADR-039. Confirm: (1) the SDK exports a unified client that supports both stdio and HTTP/SSE transports through a single interface; (2) the SDK's Standard Schema integration (added in v1.29) is usable from `@tuvren/mcp-client` without forcing a `zod` peer dependency; (3) tool advertisements include `inputSchema`, optional `outputSchema`, and optional `annotations`; (4) transport-error envelopes are translatable to `TuvrenProviderError`. If any assumption is wrong, document the necessary contract or implementation amendment.
+- **Description:** Verify that `@modelcontextprotocol/sdk@1.29.0`'s public API surface matches the assumptions in TechSpec §4.15 and ADR-039. Confirm: (1) the SDK exports a shared `Client` core that supports stdio plus HTTP/SSE-family transports through a pluggable transport interface; (2) the package's inherited `zod` peer/runtime requirement can be satisfied inside `@tuvren/mcp-client` through the TechSpec-approved direct dependency without adding `zod` to Tuvren's public peer surface; (3) tool advertisements include `inputSchema`, optional `outputSchema`, and optional `annotations`; (4) transport-error envelopes are translatable to `TuvrenProviderError`. If any assumption is wrong, document the necessary contract or implementation amendment.
 - **Acceptance Criteria (Gherkin):**
 ```gherkin
 Given @modelcontextprotocol/sdk@1.29.0 is the locked dependency
@@ -874,12 +873,13 @@ And the spike output is recorded under constitution/support/live/ for future aud
 - **Effort:** 2
 - **Dependencies:** `KRT-AS001`
 - **Capability / Contract Mapping:** PRD `CAP-P0-041`; TechSpec ADR-039, §5.1
-- **Description:** Create the new `@tuvren/mcp-client` workspace package at `boundaries/providers/implementations/typescript/mcp-client/`. Configure `package.json` with `@modelcontextprotocol/sdk@1.29.0` as a direct dependency and `@tuvren/core` as a `peerDependency`. Configure `tsup.config.ts` and `tsconfig*.json` per the boundary conventions.
+- **Description:** Create the new `@tuvren/mcp-client` workspace package at `boundaries/providers/implementations/typescript/mcp-client/`. Configure `package.json` with `@modelcontextprotocol/sdk@1.29.0` and `zod@4.4.3` as direct dependencies, and `@tuvren/core` as the only required Tuvren peer dependency. Configure `tsup.config.ts` and `tsconfig*.json` per the boundary conventions.
 - **Acceptance Criteria (Gherkin):**
 ```gherkin
 Given the spike confirms the SDK assumptions
 When @tuvren/mcp-client is scaffolded
 Then the package exists as a workspace member with the locked SDK dependency
+And the package declares `zod@4.4.3` as a direct dependency to satisfy the pinned SDK's upstream peer requirement
 And the package peer-depends on @tuvren/core
 And `bun run nx run @tuvren/mcp-client:build` produces empty dist artifacts (no source yet)
 ```
@@ -897,7 +897,7 @@ When the internal MCPClient interface and stdio transport are implemented
 Then the MCPClient exposes initialize, listTools, invokeTool, and close
 And the stdio implementation handles process spawning, stdin/stdout framing, and graceful close
 And unit tests cover handshake success, listTools, a successful invokeTool round-trip, and graceful close
-And the stdio implementation does not import zod directly (the SDK's internal zod usage is internal)
+And the stdio implementation does not expose zod in @tuvren/mcp-client's public API
 ```
 
 **KRT-AS004 HTTP/SSE Transport Implementation**
@@ -1152,6 +1152,8 @@ And the refreshed compatibility evidence reflects both-mode coverage for the pro
 ```
 
 ## 5. Issue-Level Definition of Done
+
+The execution chain is not closed until every applicable statement below is true in the repository and in the live constitution.
 
 - Historical constitutional support material no longer behaves like live authority once archived.
 - The serious REPL host proves the SDK through the same host-facing abstractions downstream hosts are expected to use.
