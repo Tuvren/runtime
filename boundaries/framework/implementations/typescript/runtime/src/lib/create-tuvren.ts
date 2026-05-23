@@ -100,8 +100,21 @@ export interface TuvrenInstance {
 export function createTuvren(
   options: CreateTuvrenOptions
 ): Promise<TuvrenInstance> {
-  const { backend, disposeBackend } = buildBackend(options.backend);
-  const kernel = options.kernel ?? createRuntimeKernel({ backend });
+  // When a pre-built kernel is supplied, skip backend construction entirely.
+  // The kernel already owns its backend; constructing a second one would open
+  // an idle connection pool / file handle that is immediately discarded.
+  let resolvedBackend: RuntimeBackend;
+  let disposeBackend: () => Promise<void>;
+  if (options.kernel === undefined) {
+    ({ backend: resolvedBackend, disposeBackend } = buildBackend(
+      options.backend
+    ));
+  } else {
+    resolvedBackend = undefined as unknown as RuntimeBackend;
+    disposeBackend = () => Promise.resolve();
+  }
+  const kernel =
+    options.kernel ?? createRuntimeKernel({ backend: resolvedBackend });
 
   const driver = buildDriver(options.driver);
   const driverRegistry = createDriverRegistry([driver]);

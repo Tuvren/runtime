@@ -270,15 +270,7 @@ class PostgresBackend implements KrakenBackend {
   }
 
   private async dropSchema(): Promise<void> {
-    const cleanupClient = createPostgresClient(this.connectionOptions);
-
-    try {
-      await cleanupClient.unsafe(
-        `DROP SCHEMA IF EXISTS ${quoteIdentifier(this.schemaName)} CASCADE`
-      );
-    } finally {
-      await cleanupClient.end({ timeout: 0 });
-    }
+    await destroyPostgresBackend(this.connectionOptions);
   }
 }
 
