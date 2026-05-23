@@ -1245,6 +1245,19 @@
     {
       "assertions": [
         {
+          "equals": true,
+          "field": "$.schemaAuthoring.jsonSchemaIsBoolean",
+          "kind": "resultField"
+        }
+      ],
+      "checkId": "schema-authoring.branch6-bool-false.json-schema-is-boolean",
+      "evidence": ["result.schemaAuthoring.jsonSchemaIsBoolean"],
+      "input": { "branch": "json-schema-bool-false" },
+      "operation": "runtime.schema-authoring.route"
+    },
+    {
+      "assertions": [
+        {
           "equals": false,
           "field": "$.schemaAuthoring.jsonSchemaValue",
           "kind": "resultField"
