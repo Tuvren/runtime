@@ -66,6 +66,13 @@ export interface McpToolSource {
 }
 
 export interface CreateTuvrenOptions {
+  /**
+   * Backend spec or pre-built `RuntimeBackend` instance. When an explicit
+   * instance is passed, `createTuvren` takes ownership: `[Symbol.asyncDispose]`
+   * will call `close()` on it. Do not share a backend across multiple
+   * `TuvrenInstance` objects unless you manage its lifecycle externally and
+   * pass a no-op wrapper.
+   */
   backend:
     | BackendKind
     | RuntimeBackend
@@ -103,18 +110,7 @@ export function createTuvren(
   // When a pre-built kernel is supplied, skip backend construction entirely.
   // The kernel already owns its backend; constructing a second one would open
   // an idle connection pool / file handle that is immediately discarded.
-  let resolvedBackend: RuntimeBackend;
-  let disposeBackend: () => Promise<void>;
-  if (options.kernel === undefined) {
-    ({ backend: resolvedBackend, disposeBackend } = buildBackend(
-      options.backend
-    ));
-  } else {
-    resolvedBackend = undefined as unknown as RuntimeBackend;
-    disposeBackend = () => Promise.resolve();
-  }
-  const kernel =
-    options.kernel ?? createRuntimeKernel({ backend: resolvedBackend });
+  const { kernel, disposeBackend } = resolveKernelAndDispose(options);
 
   const driver = buildDriver(options.driver);
   const driverRegistry = createDriverRegistry([driver]);
@@ -176,6 +172,17 @@ export function createTuvren(
 }
 
 // ── Internal helpers ─────────────────────────────────────────────────────────
+
+function resolveKernelAndDispose(options: CreateTuvrenOptions): {
+  kernel: RuntimeKernel;
+  disposeBackend: () => Promise<void>;
+} {
+  if (options.kernel !== undefined) {
+    return { kernel: options.kernel, disposeBackend: () => Promise.resolve() };
+  }
+  const { backend, disposeBackend } = buildBackend(options.backend);
+  return { kernel: createRuntimeKernel({ backend }), disposeBackend };
+}
 
 function buildBackend(spec: CreateTuvrenOptions["backend"]): {
   backend: RuntimeBackend;
