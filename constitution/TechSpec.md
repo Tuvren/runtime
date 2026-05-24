@@ -430,6 +430,8 @@
     provider?: TuvrenProvider;
     tools?: Array<TuvrenToolDefinition | McpToolSource>;
     extensions?: TuvrenExtension[];
+    telemetry?: TuvrenTelemetrySink;
+    bounds?: ExecutionBounds;
     kernel?: RuntimeKernel;
     runtimeOptions?: Omit<RuntimeCoreOptions, "kernel" | "driverRegistry" | "defaultDriverId">;
   }
@@ -475,8 +477,8 @@
 
 - **Status:** accepted
 - **Context:** PRD v0.8.0 CAP-P0-054 requires bounded execution so a single turn cannot run unbounded iterations, tool calls, or resource consumption, stopping safely and surfacing the outcome. Architecture v0.8.0 §1.2 and §5 place Execution Bound enforcement on Framework Shared Services above driver discretion precisely so a misbehaving or adversarial driver cannot opt out. Today the ReAct driver owns its `LoopPolicy` (continue/stop) but there is no framework-level hard cap that holds regardless of driver behavior; a driver that always returns "continue" loops until cancellation.
-- **Decision:** Add a framework-enforced `ExecutionBounds` guard, evaluated by `@tuvren/runtime` at every iteration and tool-batch boundary, above the driver's own loop policy. Shape (§3.11): `maxIterations` (default 64), `maxToolCalls` (default 256, cumulative per turn), `maxWallClockMs` (default 600_000), `maxConcurrentToolCalls` (default 16). Bounds are configured per runtime instance via `createTuvren({ bounds?: ExecutionBounds })` and `RuntimeCoreOptions.bounds`; unset fields take the safe defaults, and every configured bound must be a finite positive integer. Hosts may raise or lower finite limits, but may not disable the guard with `Infinity`, `NaN`, zero, or negative values. When a bound is reached, the framework — not the driver — stops the loop, checkpoints a safe terminal outcome, and finalizes the turn as a `failed` `ExecutionResult` (ADR-035) carrying `TuvrenRuntimeError` with code `execution_bound_exceeded` and `details: ExecutionBoundExceededDetails` (`{ bound; limit; observed }`). A `turn.end` event with the same bound metadata is emitted so the stop is host-visible and agent-visible, and a bounded-execution telemetry event (ADR-042) is emitted. Reusing the existing `failed` discriminant (rather than adding a new `ExecutionResult` variant) keeps ADR-035's union stable and the change semver-minor. The driver retains loop-continuation policy strictly within these bounds and cannot raise or disable them.
-- **Consequences:** `@tuvren/core/errors` documents the new stable `TuvrenRuntimeError` code `execution_bound_exceeded`. `@tuvren/core/execution` exports the `ExecutionBounds` and `ExecutionBoundExceededDetails` types. `@tuvren/runtime` implements the guard in the turn/run orchestration shell and threads `bounds` through `createTuvren` and `RuntimeCoreOptions`. A new check set `runtime-api-execution-bounds` in `runtime-api-callables-extended.json` asserts that exceeding each bound yields a `failed` result with code `execution_bound_exceeded` and the correct `details`, that invalid non-finite or non-positive bound configuration is rejected, and that a within-bounds turn is unaffected, using a runaway aimock driver fixture. `docs/KrakenFrameworkSpecification.md` gains a normative "Execution Bounds" section (minor bump) describing the framework-owned guard so future drivers inherit it rather than re-implement it.
+- **Decision:** Add a framework-enforced `ExecutionBounds` guard, above the driver's own loop policy. Shape (§3.11): `maxIterations` (default 64), `maxToolCalls` (default 256, cumulative per turn), `maxWallClockMs` (default 600_000), `maxConcurrentToolCalls` (default 16). Bounds are configured per runtime instance via `createTuvren({ bounds?: ExecutionBounds })` and `RuntimeCoreOptions.bounds`; unset fields take the safe defaults, and every configured bound must be a finite positive integer. Hosts may raise or lower finite limits, but may not disable the guard with `Infinity`, `NaN`, zero, or negative values. `maxIterations`, `maxToolCalls`, and `maxWallClockMs` are hard-stop bounds: iteration and cumulative tool-count limits are checked at iteration and tool-batch boundaries, while `maxWallClockMs` is enforced as an end-to-end deadline over the whole turn, including in-flight model calls and tool executions, through cancellation or deadline propagation into the provider and tool-execution paths. `maxConcurrentToolCalls` is a concurrency cap rather than a terminal bound: the framework throttles tool work so execution never exceeds the configured parallelism. When a hard-stop bound is reached, the framework — not the driver — stops the loop, checkpoints a safe terminal outcome, and finalizes the turn as a `failed` `ExecutionResult` (ADR-035) carrying `TuvrenRuntimeError` with code `execution_bound_exceeded` and `details: ExecutionBoundExceededDetails` (`{ bound; limit; observed }`). A `turn.end` event with the same bound metadata is emitted so the stop is host-visible and agent-visible, and a bounded-execution telemetry event (ADR-042) is emitted. Reusing the existing `failed` discriminant (rather than adding a new `ExecutionResult` variant) keeps ADR-035's union stable and the change semver-minor. The driver retains loop-continuation policy strictly within these bounds and cannot raise or disable them.
+- **Consequences:** `@tuvren/core/errors` documents the new stable `TuvrenRuntimeError` code `execution_bound_exceeded`. `@tuvren/core/execution` exports the `ExecutionBounds` and `ExecutionBoundExceededDetails` types. `@tuvren/runtime` implements the guard in the turn/run orchestration shell and threads `bounds` through `createTuvren` and `RuntimeCoreOptions`. A new check set `runtime-api-execution-bounds` in `runtime-api-callables-extended.json` asserts that exceeding the hard-stop bounds (`maxIterations`, `maxToolCalls`, `maxWallClockMs`) yields a `failed` result with code `execution_bound_exceeded` and the correct `details`, that `maxConcurrentToolCalls` is enforced by throttling parallel tool execution to the configured cap, that invalid non-finite or non-positive bound configuration is rejected, and that a within-bounds turn is unaffected, using a runaway aimock driver fixture. `docs/KrakenFrameworkSpecification.md` gains a normative "Execution Bounds" section (minor bump) describing the framework-owned guard so future drivers inherit it rather than re-implement it.
 
 ### ADR-044 Secret Isolation Across Durable, Telemetry, and Transcript Surfaces
 
@@ -1066,8 +1068,10 @@ export interface TelemetryEvent {
 - **Constraints / Invariants:**
   - Unset bound fields take the documented safe defaults; the guard is always active and there is no "disable all bounds" mode.
   - Each configured bound must be a finite positive integer; `Infinity`, `NaN`, zero, and negative values are invalid configuration.
-  - Bounds are evaluated by the framework at iteration and tool-batch boundaries, never delegated to the driver.
-  - Reaching a bound produces a `failed` result with code `execution_bound_exceeded`; it is not a crash and not a silent stop.
+  - `maxIterations` and `maxToolCalls` are evaluated by the framework at iteration and tool-batch boundaries, never delegated to the driver.
+  - `maxWallClockMs` is enforced as an end-to-end deadline over the whole turn, including in-flight model calls and tool executions, via cancellation or deadline propagation through the provider and tool-execution paths.
+  - `maxConcurrentToolCalls` is enforced by throttling parallel tool execution to the configured cap.
+  - Reaching a hard-stop bound produces a `failed` result with code `execution_bound_exceeded`; it is not a crash and not a silent stop.
 - **Shapes:**
 
 ```ts
@@ -1080,7 +1084,7 @@ export interface ExecutionBounds {
 
 // Surfaced via TuvrenRuntimeError.details when a bound is hit:
 export interface ExecutionBoundExceededDetails {
-  bound: "maxIterations" | "maxToolCalls" | "maxWallClockMs" | "maxConcurrentToolCalls";
+  bound: "maxIterations" | "maxToolCalls" | "maxWallClockMs";
   limit: number;
   observed: number;
 }
@@ -2796,12 +2800,18 @@ export declare function createMcpToolSource(
 - **Style:** library API
 - **Authentication / Authorization:** Not applicable
 - **Compatibility Strategy:** Adding a new accepted `BackendKind` or `DriverKind` is semver-minor; removing one is semver-major. Changing the default `driver` is semver-major. Renaming a field on `CreateTuvrenOptions` is semver-major.
-- **Error model:** `TuvrenValidationError` code `invalid_createtuvren_options` for malformed options; backend-specific construction errors normalize through the backend's own error contract; MCP construction errors surface via `TuvrenProviderError`.
+- **Error model:** `TuvrenValidationError` code `invalid_createtuvren_options` for malformed options, including conflicting duplicate configuration between top-level `telemetry` / `bounds` and their `runtimeOptions` aliases; backend-specific construction errors normalize through the backend's own error contract; MCP construction errors surface via `TuvrenProviderError`.
 
 ```ts
-import type { TuvrenRuntime, OrchestrationRuntime, RuntimeWarning } from "@tuvren/core/execution";
+import type {
+  TuvrenRuntime,
+  OrchestrationRuntime,
+  RuntimeWarning,
+  ExecutionBounds,
+} from "@tuvren/core/execution";
 import type { TuvrenProvider } from "@tuvren/core/provider";
 import type { TuvrenExtension } from "@tuvren/core/extensions";
+import type { TuvrenTelemetrySink } from "@tuvren/core/telemetry";
 import type { TuvrenToolDefinition } from "@tuvren/core/tools";
 import type { RuntimeDriverFactory } from "@tuvren/core/driver";
 import type { EpochMs } from "@tuvren/core";
@@ -2842,11 +2852,14 @@ export interface RuntimeWarning {
 // renaming it would be a semver-major breaking change and is deferred to a future API cleanup.
 // The actual RuntimeCoreOptions (in runtime-core/src/lib/runtime-core.ts) includes additional
 // factory-managed fields: kernel, driverRegistry, defaultDriverId. createTuvren controls those
-// internally and excludes them via the Omit below; hosts only ever configure the three fields shown.
+// internally and excludes them via the Omit below; hosts only ever configure the five public
+// fields shown before the internal ones.
 export interface RuntimeCoreOptions {
   defaultMaxParallelToolCalls?: number;
   manifestExtensionStateWarningBudgetBytes?: number | false;
   onWarning?: (warning: RuntimeWarning) => void;
+  telemetry?: TuvrenTelemetrySink;
+  bounds?: ExecutionBounds;
   /** @internal — managed by createTuvren */ kernel?: RuntimeKernel;
   /** @internal — managed by createTuvren */ driverRegistry?: unknown;
   /** @internal — managed by createTuvren */ defaultDriverId?: string;
@@ -2866,6 +2879,8 @@ export interface CreateTuvrenOptions {
   provider?: TuvrenProvider;
   tools?: Array<TuvrenToolDefinition | McpToolSource>;
   extensions?: TuvrenExtension[];
+  telemetry?: TuvrenTelemetrySink;
+  bounds?: ExecutionBounds;
   /** Advanced: supply a pre-built kernel instead of letting the factory build one from `backend`. */
   kernel?: RuntimeKernel;
   runtimeOptions?: Omit<RuntimeCoreOptions, "kernel" | "driverRegistry" | "defaultDriverId">;
@@ -2884,6 +2899,7 @@ export declare function createTuvren(
 ): Promise<TuvrenInstance>;
 ```
 
+- `telemetry` and `bounds` are convenience aliases for `runtimeOptions.telemetry` and `runtimeOptions.bounds`; supplying both top-level and nested copies of the same setting is invalid and surfaces `invalid_createtuvren_options`.
 - `[Symbol.asyncDispose]` closes any `McpToolSource` references in `tools`, releases backend resources (closes the SQLite file handle, returns the PostgreSQL pool), and resolves any pending kernel work cleanly. Hosts using TC39 `using` syntax can write `await using tuvren = await createTuvren({ backend: "memory" });` for automatic cleanup.
 - `provider` is optional; turns may pass per-call providers in `AgentConfig.model` instead.
 - The `tools` array accepts both literal `TuvrenToolDefinition` arrays and `McpToolSource` references. MCP sources contribute their advertised `.tools` to the global registry at construction; the registry refreshes when a host calls `source.refresh()`.
@@ -2941,10 +2957,10 @@ export declare const NoopTelemetrySink: TuvrenTelemetrySink;
 - **Style:** library configuration plus terminal-result semantics
 - **Ownership:** `@tuvren/core/execution` owns the `ExecutionBounds` and `ExecutionBoundExceededDetails` types (§3.11); `@tuvren/core/errors` owns the `execution_bound_exceeded` code; `@tuvren/runtime` owns the guard.
 - **Compatibility Strategy:** §2.1 execution bounds compatibility. Reuses the `failed` `ExecutionResult` discriminant from ADR-035; no new union variant.
-- **Error model:** Reaching a bound finalizes the turn as a `failed` `ExecutionResult` whose `error` is a `TuvrenRuntimeError` with code `execution_bound_exceeded` and `details: ExecutionBoundExceededDetails`. A matching `turn.end` event carries the same bound metadata.
+- **Error model:** Reaching a hard-stop bound finalizes the turn as a `failed` `ExecutionResult` whose `error` is a `TuvrenRuntimeError` with code `execution_bound_exceeded` and `details: ExecutionBoundExceededDetails`. A matching `turn.end` event carries the same bound metadata.
 
-- Bounds are configured via `createTuvren({ bounds?: ExecutionBounds })` and `RuntimeCoreOptions.bounds`. Unset fields take the documented safe defaults (§3.11). Each configured field must be a finite positive integer; the runtime rejects `Infinity`, `NaN`, zero, and negative values during construction. The framework evaluates bounds at every iteration and tool-batch boundary, above the driver's `LoopPolicy`. A driver cannot raise or disable a framework bound.
-- `maxConcurrentToolCalls` bounds parallel tool execution within one batch; the framework caps concurrency rather than rejecting the batch, and only converts to a bounded-execution stop if a hard structural limit would otherwise be violated.
+- Bounds are configured via `createTuvren({ bounds?: ExecutionBounds })` and `RuntimeCoreOptions.bounds`. Unset fields take the documented safe defaults (§3.11). Each configured field must be a finite positive integer; the runtime rejects `Infinity`, `NaN`, zero, and negative values during construction. `maxIterations` and `maxToolCalls` are checked at iteration and tool-batch boundaries, `maxWallClockMs` wraps the whole turn with a deadline that propagates cancellation into in-flight model/tool work, and `maxConcurrentToolCalls` throttles tool execution to the configured cap. A driver cannot raise or disable a framework bound.
+- `maxConcurrentToolCalls` is a resource cap, not a terminal failure threshold: the framework queues or throttles work so a compliant turn stays within the configured parallelism instead of surfacing `execution_bound_exceeded` purely for requesting more parallel tools than the cap allows.
 
 ### 4.20 Fault-Injection and Recovery Verification Seam (Test-Only)
 
@@ -3197,7 +3213,7 @@ conformance-plan JSON Schemas live under `tools/schemas/`.
   - compatibility-matrix generation from actual conformance and interop-smoke results
   - runtime portability tests for core packages on Bun and Node; Deno compatibility tests for core non-native packages as soon as package surfaces stabilize
   - per ADR-042, operational-telemetry tests that drive a deterministic turn and assert the expected lineage-keyed spans/events through an in-memory capture sink, plus a targeted restart/recovery fixture for recovery telemetry and an implementation-specific `@tuvren/telemetry-otel` mapping test
-  - per ADR-043, execution-bounds tests asserting that exceeding each bound yields a `failed` result with code `execution_bound_exceeded` and correct `details`, that invalid non-finite or non-positive bound configuration is rejected, and that within-bounds turns are unaffected, using a runaway aimock driver fixture
+  - per ADR-043, execution-bounds tests asserting that exceeding the hard-stop bounds (`maxIterations`, `maxToolCalls`, `maxWallClockMs`) yields a `failed` result with code `execution_bound_exceeded` and correct `details`, that `maxConcurrentToolCalls` is enforced by throttling tool concurrency to the configured cap, that invalid non-finite or non-positive bound configuration is rejected, and that within-bounds turns are unaffected, using a runaway aimock driver fixture
   - per ADR-044, secret-isolation tests asserting that a configured provider key and MCP bearer token never appear in persisted kernel records, captured telemetry attributes or error summaries, or a recorded transcript
   - per ADR-045, crash-recovery tests using `createFaultInjectingBackend` that inject faults at each commit point and under a concurrent writer, asserting resume-or-fail-clean with no torn or partial lineage across the SQLite and PostgreSQL backends
 - **Observability Hooks:**
@@ -3392,7 +3408,7 @@ Order within the epic:
 
 Order within the epic (must include §5.6.3's telemetry secret-screening rules):
 1. Add the `./telemetry` subpath to `@tuvren/core`: `TuvrenTelemetrySink`, `TelemetrySpan`, `TelemetryEvent`, `TelemetryLineage`, and `NoopTelemetrySink` (§3.10, §4.18). Update the export map (10 entries), `tsup.config.ts` (10 entries), and the merged core authority packet (one new binding section). Update `tools/scripts/portability-gate.ts` for the new subpath.
-2. Wire emission in `@tuvren/runtime` at the points named in §4.18, reusing the canonical event vocabulary. Isolate a throwing sink. Add `telemetry?: TuvrenTelemetrySink` to `CreateTuvrenOptions` and `RuntimeCoreOptions`; default `NoopTelemetrySink`.
+2. Wire emission in `@tuvren/runtime` at the points named in §4.18 that already have producers in the runtime, reusing the canonical event vocabulary. Isolate a throwing sink. Add `telemetry?: TuvrenTelemetrySink` to `CreateTuvrenOptions` and `RuntimeCoreOptions`; default `NoopTelemetrySink`. The bounded-execution telemetry producer lands with §5.6.4 once the bounds guard exists.
 3. Apply the secret allowlist and telemetry-error sanitization (§5.6.3) before records reach the sink.
 4. Create `@tuvren/telemetry-otel` under `boundaries/framework/implementations/typescript/telemetry-otel/`, peer-depending on `@tuvren/core`; implement `createOtelTelemetrySink(options)` mapping records onto OpenTelemetry spans/events using the authored semconv attributes. Pin exact `@opentelemetry/*` versions in this epic's manifest change.
 5. Add the `framework-operational-telemetry.json` plan (check set `runtime-api-operational-telemetry`) asserting lineage-keyed emission for a deterministic aimock turn via an in-memory capture sink in the framework testkit, plus a targeted restart/recovery fixture for the recovery records. Record the OTel projection as a standing implementation-specific exception (alongside AG-UI) in the portability inventory.
@@ -3411,8 +3427,8 @@ Order:
 
 Order:
 1. Add `ExecutionBounds` and `ExecutionBoundExceededDetails` (§3.11) to `@tuvren/core/execution`; document the `execution_bound_exceeded` code in `@tuvren/core/errors`.
-2. Implement the bounds guard in `@tuvren/runtime`'s turn/run orchestration shell, evaluated at iteration and tool-batch boundaries above the driver `LoopPolicy`. Finalize a breached turn as a `failed` `ExecutionResult` with code `execution_bound_exceeded` and emit the matching `turn.end` event and bounded-execution telemetry event.
+2. Implement the bounds guard in `@tuvren/runtime`'s turn/run orchestration shell: enforce `maxIterations` and `maxToolCalls` at iteration and tool-batch boundaries, wrap the whole turn in a `maxWallClockMs` deadline that propagates cancellation into in-flight model/tool work, and enforce `maxConcurrentToolCalls` by throttling tool concurrency to the configured cap. Finalize a breached hard-stop bound as a `failed` `ExecutionResult` with code `execution_bound_exceeded` and emit the matching `turn.end` event and bounded-execution telemetry event.
 3. Add `bounds?: ExecutionBounds` to `CreateTuvrenOptions` and `RuntimeCoreOptions`; apply the safe defaults from §3.11.
-4. Add the `runtime-api-execution-bounds` check set to `runtime-api-callables-extended.json` using a runaway aimock driver fixture; assert each bound's breach result, rejection of invalid non-finite or non-positive bound configuration, and a within-bounds control case.
+4. Add the `runtime-api-execution-bounds` check set to `runtime-api-callables-extended.json` using a runaway aimock driver fixture; assert each hard-stop bound's breach result, enforcement of the `maxConcurrentToolCalls` throttle, rejection of invalid non-finite or non-positive bound configuration, and a within-bounds control case.
 5. Add a normative "Execution Bounds" section to `docs/KrakenFrameworkSpecification.md` (minor bump) so future drivers inherit the framework-owned guard.
 6. Run `bun run verify`.
