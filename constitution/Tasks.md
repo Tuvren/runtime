@@ -140,6 +140,7 @@ flowchart LR
   AW1 --> AV2
   AV2 --> AW6
   AV4 --> AW4
+  AV4 --> AW7
 ```
 
 ## 4. Ticket List
@@ -1461,7 +1462,7 @@ And typecheck passes
 - **Effort:** 8
 - **Dependencies:** `KRT-AW005`, `KRT-AV002`
 - **Capability / Contract Mapping:** PRD `CAP-P0-054`; TechSpec ADR-043, §4.19, §5.6.4
-- **Description:** Implement the framework bounds guard in `@tuvren/runtime`'s turn/run orchestration shell. Enforce `maxIterations` and `maxToolCalls` at iteration and tool-batch boundaries above the driver's `LoopPolicy`, clamp `AgentConfig.maxIterations` by `bounds.maxIterations`, enforce `maxWallClockMs` as an end-to-end deadline that propagates abort signals into in-flight model/tool work, update the owned provider bridge and owned tool paths to forward and honor those signals, and enforce `maxConcurrentToolCalls` by throttling tool concurrency to the configured cap. On breach of a hard-stop bound, stop the loop, checkpoint a safe terminal outcome, finalize the turn as a `failed` `ExecutionResult` with `TuvrenRuntimeError` code `execution_bound_exceeded` and `details: ExecutionBoundExceededDetails`, emit a fatal canonical `error` event carrying the same code/details, let the canonical `turn.end` event mark the failed terminal state, and emit a bounded-execution telemetry event when a sink is configured. Add `bounds?: ExecutionBounds` to `CreateTuvrenOptions` and `RuntimeCoreOptions` with the §3.11 safe defaults, and reject invalid non-finite or non-positive bound values at construction time. A driver cannot raise or disable a bound.
+- **Description:** Implement the framework bounds guard in `@tuvren/runtime`'s turn/run orchestration shell. Enforce `maxIterations` and `maxToolCalls` at iteration and tool-batch boundaries above the driver's `LoopPolicy`, clamp `AgentConfig.maxIterations` by `bounds.maxIterations`, enforce `maxWallClockMs` as an end-to-end deadline that propagates abort signals into in-flight model/tool work, update the owned provider bridge and owned tool paths to forward and honor those signals, and enforce `maxConcurrentToolCalls` by throttling tool concurrency to the configured cap. On breach of a hard-stop bound, stop the loop, checkpoint a safe terminal outcome, finalize the turn as a `failed` `ExecutionResult` with `TuvrenRuntimeError` code `execution_bound_exceeded` and `details: ExecutionBoundExceededDetails`, emit a fatal canonical `error` event carrying the same code/details, let the canonical `turn.end` event mark the failed terminal state, and emit a bounded-execution telemetry event when a sink is configured. Add `bounds?: ExecutionBounds` to `CreateTuvrenOptions` and `RuntimeCoreOptions` with the §3.11 safe defaults, and reject invalid non-integer, non-finite, or non-positive bound values at construction time. A driver cannot raise or disable a bound.
 - **Acceptance Criteria (Gherkin):**
 ```gherkin
 Given ExecutionBounds is defined and the runtime owns the turn loop
@@ -1478,7 +1479,7 @@ And AgentConfig.maxIterations is clamped by bounds.maxIterations rather than byp
 And parallel tool execution never exceeds maxConcurrentToolCalls because the framework throttles to the configured cap
 And when AgentConfig.maxParallelToolCalls or defaultMaxParallelToolCalls is present, the effective parallel-tool limit is clamped to maxConcurrentToolCalls
 And unset bound fields take the documented safe defaults
-And invalid non-finite or non-positive bound values are rejected at construction time
+And invalid non-integer, non-finite, or non-positive bound values are rejected at construction time
 And supplying both top-level bounds and runtimeOptions.bounds is rejected as invalid_createtuvren_options
 And a driver that always requests continue cannot exceed the framework bound
 ```
@@ -1488,7 +1489,7 @@ And a driver that always requests continue cannot exceed the framework bound
 - **Effort:** 5
 - **Dependencies:** `KRT-AW006`, `KRT-AV004`
 - **Capability / Contract Mapping:** PRD `CAP-P0-054`; TechSpec ADR-043, §5.6.4
-- **Description:** Add the `runtime-api-execution-bounds` check set to `runtime-api-callables-extended.json` using a runaway aimock driver fixture that always requests continue. Assert each hard-stop bound's breach yields a `failed` result with code `execution_bound_exceeded` and the correct `details`, that the canonical stream emits the matching fatal `error` event before the failed `turn.end`, that a configured capture sink observes the `execution.bounded` telemetry event, that `AgentConfig.maxIterations` is clamped by `bounds.maxIterations`, that `maxConcurrentToolCalls` is enforced by throttling parallel tool execution to the configured cap, that invalid non-finite or non-positive bound configuration is rejected, and that a within-bounds control turn completes normally.
+- **Description:** Add the `runtime-api-execution-bounds` check set to `runtime-api-callables-extended.json` using a runaway aimock driver fixture that always requests continue. Assert each hard-stop bound's breach yields a `failed` result with code `execution_bound_exceeded` and the correct `details`, that the canonical stream emits the matching fatal `error` event before the failed `turn.end`, that a configured capture sink observes the `execution.bounded` telemetry event, that `AgentConfig.maxIterations` is clamped by `bounds.maxIterations`, that `maxConcurrentToolCalls` is enforced by throttling parallel tool execution to the configured cap, that invalid non-integer, non-finite, or non-positive bound configuration is rejected, and that a within-bounds control turn completes normally.
 - **Acceptance Criteria (Gherkin):**
 ```gherkin
 Given the framework bounds guard is implemented
@@ -1499,7 +1500,7 @@ And a configured capture sink observes the execution.bounded telemetry event for
 And AgentConfig.maxIterations is clamped by bounds.maxIterations rather than bypassing it
 And maxConcurrentToolCalls is enforced by throttling parallel tool execution to the configured cap
 And AgentConfig.maxParallelToolCalls and defaultMaxParallelToolCalls are clamped by maxConcurrentToolCalls rather than bypassing it
-And invalid non-finite or non-positive bound configuration is rejected
+And invalid non-integer, non-finite, or non-positive bound configuration is rejected
 And owned provider/tool integrations are exercised so signal delivery and late-completion ignoring are verified rather than assumed
 And a within-bounds control turn completes normally
 And bun run conformance includes the new check set automatically
@@ -1525,13 +1526,14 @@ And fresh compatibility evidence reflects the execution-bounds lane
 - **Effort:** 3
 - **Dependencies:** None
 - **Capability / Contract Mapping:** PRD `CAP-P0-016`, `CAP-P0-017`, `CAP-P1-015`, Security NFR; TechSpec ADR-039, ADR-044
-- **Description:** Add a `trust-boundary` security check set to `boundaries/framework/conformance/plans/runtime-api-callables-extended.json` and `boundaries/providers/conformance/plans/providers-mcp-client.json`, asserting the existing trust-boundary guarantees the PRD elevated: approval-gated tool work cannot proceed without an explicit decision (non-bypassable), and untrusted MCP/tool inputs are validated against their declared schema before execution with failures surfaced as agent-visible results. This is an independent required close-condition lane for the block even though it does not unblock other implementation tickets; any gap the check set exposes is fixed under this ticket.
+- **Description:** Add a `trust-boundary` security check set to `boundaries/framework/conformance/plans/runtime-api-callables-extended.json` and `boundaries/providers/conformance/plans/providers-mcp-client.json`, asserting the existing trust-boundary guarantees the PRD elevated: approval-gated tool work cannot proceed without an explicit decision (non-bypassable), and untrusted MCP/tool inputs are validated against their declared schema before execution with canonical error results rather than implicit trust. Pin the result semantics the runner will assert: local tool-contract validation failures surface as `tool.result` with `isError: true` carrying `TuvrenValidationError` code `tool_input_validation_failed`, while MCP-advertised input validation failures surface as `tool.result` with `isError: true` carrying `TuvrenProviderError` code `mcp_tool_input_invalid`. This is an independent required close-condition lane for the block even though it does not unblock other implementation tickets; any gap the check set exposes is fixed under this ticket.
 - **Acceptance Criteria (Gherkin):**
 ```gherkin
 Given approval gating and tool-input validation already exist
 When the trust-boundary security check set is added to runtime-api-callables-extended.json and providers-mcp-client.json
 Then a tool call requiring approval cannot execute without an explicit approval decision
-And an MCP or tool input that violates its declared schema is rejected before execution and surfaced as an agent-visible result
+And a local tool input that violates its declared schema is rejected before execution and surfaced as tool.result with isError true carrying TuvrenValidationError code tool_input_validation_failed
+And an MCP-advertised tool input that violates its declared schema is rejected before transport invocation and surfaced as tool.result with isError true carrying TuvrenProviderError code mcp_tool_input_invalid
 And any gap the check set exposes in the existing behavior is fixed under this ticket
 And bun run conformance includes the new check set automatically
 ```

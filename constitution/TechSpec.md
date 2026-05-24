@@ -1054,7 +1054,7 @@ export interface TelemetrySpan {
 
 export type TelemetryEventKind =
   | "turn.start" | "turn.end" | "approval.requested" | "approval.resolved"
-  | "checkpoint.committed" | "recovery.resumed" | "recovery.failed"
+  | "state.checkpoint" | "recovery.resumed" | "recovery.failed"
   | "execution.bounded" | "error";
 
 export interface TelemetryEvent {
