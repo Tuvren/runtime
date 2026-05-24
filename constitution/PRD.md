@@ -2,9 +2,9 @@
 
 ## 0. Version History & Changelog
 
+- v0.8.0 - Promoted production-trust commitments to first-class product scope: durability and crash-recovery guarantees that are verified under fault injection (resume-or-fail-clean with no partial or corrupt lineage), a first-class operational observability and telemetry surface with optional vendor-neutral export, and explicit execution-safety and trust-boundary controls (untrusted MCP and tool inputs, non-bypassable approval enforcement, bounded execution against runaway loops and resource exhaustion, and credential isolation from durable state, telemetry, and transcripts). Recorded the near-term strategic direction (host adoption plus first-party dogfooding, with multi-language parity preserved but deprioritized) and a named post-trust-block roadmap as deferred planning.
 - v0.7.0 - Promoted host-developer ergonomics, single-tenant durable-read surface, kernel-level thread enumeration, unified handle terminal-value surface, schema-agnostic tool authoring, MCP client integration, headless reference-host mode, transcript persistence, and consolidated curated SDK package layout to in-scope product capabilities; retired the playground host and the split contract packages.
 - v0.6.0 - Tightened the portability promise to in-scope runtime features defined by the semantic docs so explanatory material and ecosystem-only adapters do not blur the portability gate.
-- v0.5.0 - Clarified that the first product-depth implementation line must prove the SDK through a serious REPL-style reference host, narrowed tolerated deferral of documented core runtime surfaces, and tightened the portability boundary to external-SDK-dependent integrations only.
 - ... [Older history truncated, refer to git logs]
 
 ## 1. Executive Summary & Target Archetype
@@ -28,6 +28,7 @@
 - Every in-scope runtime feature defined by the project’s semantic docs is intended to be portable across implementation lines unless it exists only as an adapter to an external SDK or ecosystem-specific protocol.
 - Host-developer ergonomics are a first-class product outcome on equal footing with semantic correctness. A curated host-facing SDK boundary, a batteries-included entrypoint, schema-agnostic tool authoring, and a first-party tool ecosystem surface are part of the product, not a courtesy facade.
 - Single-tenant durable state must be inspectable, enumerable, and replayable through the host-facing SDK rather than through private kernel access; the first-party reference host must not need any seam that downstream hosts cannot also use.
+- Production trustworthiness is a first-class product outcome on equal footing with semantic correctness and host-developer ergonomics: the durability and recovery promises must be demonstrably true under failure, the runtime must be observable enough to operate and debug in production, and untrusted edges must be governed rather than implicitly trusted.
 
 ### 1.2 Success Criteria
 
@@ -44,6 +45,9 @@
 - A test author or operations script can drive the reference host headlessly through stdin and capture an on-disk transcript that can later be replayed for postmortems or regressions.
 - A runtime maintainer can introduce a new implementation language against shared contracts and behavioral fixtures without redefining the product’s semantic model.
 - A runtime maintainer can build and judge a new implementation strictly from boundary-owned machine authority, generated artifacts, executable conformance evidence, and language-binding adapters, without reading another language's implementation, a generic runner's source code, or a Markdown document as the source of cross-language truth.
+- A builder can trust that when a process is interrupted mid-turn, the runtime either resumes the unfinished work from the last durable checkpoint or fails cleanly, and never leaves partial or corrupt lineage; this guarantee is backed by reproducible failure-injection evidence rather than asserted by design alone.
+- An operator can observe and reconstruct what a turn did — model interactions, tool calls, checkpoints, approvals, and recovery events — through a first-class telemetry surface, and can export that telemetry to standard tooling without coupling to runtime internals.
+- A host can connect untrusted external tool sources and run sensitive tool work while trusting that inputs are validated, approval gates cannot be bypassed, runaway loops and resource exhaustion are bounded, and provider credentials never leak into durable state, telemetry, or transcripts.
 
 ### 1.3 Scope Distinctions That Must Remain Stable
 
@@ -56,6 +60,15 @@
 - **Single-tenant durable reads vs. cross-tenant discovery:** Listing, reading, and replaying state for the runtime instance the host owns is a host-facing SDK capability; cross-tenant search, multi-tenant access control, and full-text indexed querying are deferred to a future hosted/server projection and are not part of the embeddable SDK.
 - **SDK ergonomics vs. semantic correctness:** A curated host-facing surface, batteries-included composition, type-inferring helpers, and re-exported primitives are product responsibilities; they are not a substitute for the underlying semantic contracts, and they must not silently weaken any guarantee the boundary contracts make.
 - **Authoring style vs. boundary contract:** Tool authoring may use Zod, Standard Schema, wrapped JSON Schema, or future schema adapters; the boundary contract still accepts raw JSON Schema and a `CustomSchema` interop shape. Authoring helpers add type inference and ergonomic defaults without narrowing what is legal at the contract seam.
+
+### 1.4 Strategic Direction (Near-Term)
+
+The documented v1 runtime surface is functionally complete in the first implementation line. The near-term product goal is therefore not new runtime surface area but **trustworthiness and adoption**: making Tuvren Runtime something both its own maintainers and external host developers will build real products on.
+
+- **Primary goal:** external host adoption combined with first-party dogfooding. Both audiences need the same thing first — a runtime whose durability, recovery, observability, and trust-boundary promises are demonstrably true.
+- **Deprioritized (not abandoned):** multi-language implementation parity as an architectural showcase. The language-neutral semantic posture and authority discipline remain non-negotiable, but a second full implementation line is explicitly below adoption and dogfooding in priority.
+- **Active scope:** the production-trust capabilities and constraints introduced in this revision (durability-under-failure verification, operational observability, and execution-safety / trust-boundary controls).
+- **Deferred post-trust roadmap themes (to be planned in a later session, recorded in `Tasks.md` deferred scope):** performance characterization with regression budgets; public SDK API-stability guarantees and package publication; documentation and onboarding for external adopters; and a first-party reference application that dogfoods the SDK end to end. These themes are captured so a future planning session inherits clear focus; they are intentionally not decomposed into tickets yet.
 
 ## 2. Ubiquitous Language (Glossary)
 
@@ -95,6 +108,9 @@
 | Conformance Plan    | An executable, data-owned description of the named semantic checks, fixtures, scenarios, assertions, and required evidence that an implementation must satisfy for a given authority packet.             | test suite, runner script              |
 | Implementation Adapter | The language-specific seam that exposes a particular implementation to a generic conformance runner over a neutral operation, event, cancellation, error, and state-inspection surface.                | bespoke test harness, fixture loader   |
 | Generic Runner      | An implementation-agnostic process that consumes a conformance plan plus an implementation adapter and produces evidence; never the home of product semantics itself.                                    | reference implementation, oracle test  |
+| Operational Telemetry | The first-class, structured, correlated record of what a turn did (model interactions, tool calls, checkpoints, approvals, recovery events, errors), keyed to runtime lineage concepts, used for operating and debugging the runtime in production and distinct from the real-time host event stream. | logs, metrics blob, the event stream |
+| Execution Bound     | A configured limit on a single turn's iterations, tool calls, or resource consumption that, when reached, makes the runtime stop safely and surface the outcome rather than looping or exhausting resources. | timeout hack, kill switch |
+| Secret Isolation    | The guarantee that sensitive credentials and provider secrets used transiently during execution never reach durable history, operational telemetry, or transcripts. | redaction afterthought, masking only |
 
 ## 3. Actors & Personas
 
@@ -434,6 +450,30 @@
 - **Capability:** The product must be explainable through a stable set of canonical concepts so builders can reason about behavior without reverse-engineering implementation details.
 - **Rationale:** A runtime this foundational only becomes adoptable if its conceptual model is teachable and inspectable.
 
+### Epic: Operational Observability and Telemetry
+
+- **Priority:** P0
+- **Capability ID:** CAP-P0-052
+- **Capability:** The product must expose a first-class operational telemetry surface that makes the lifecycle of a turn observable after the fact — model interactions, tool calls, checkpoints, approvals, recovery events, and errors — as structured, correlated records keyed to the runtime's own lineage concepts, distinct from the real-time host event stream and usable for operating and debugging the runtime in production.
+- **Rationale:** The real-time host event stream (CAP-P0-020) serves a UI consuming a live turn; operating Tuvren in production additionally requires durable, correlatable telemetry for postmortems, performance investigation, and incident response. Without it, the durability and recovery promises cannot be observed or trusted in a running system.
+
+- **Priority:** P1
+- **Capability ID:** CAP-P1-053
+- **Capability:** The product must allow operational telemetry to be exported to standard, vendor-neutral observability tooling without coupling the runtime's canonical telemetry vocabulary to any one observability vendor or wire format.
+- **Rationale:** Adopters operate Tuvren inside existing observability stacks; a vendor-neutral export path is the difference between telemetry that is usable in production and telemetry that is trapped inside the runtime.
+
+### Epic: Execution Safety and Trust Boundaries
+
+- **Priority:** P0
+- **Capability ID:** CAP-P0-054
+- **Capability:** The product must enforce bounded execution so that a single turn cannot run unbounded iterations, tool calls, or resource consumption; when a configured bound is reached, the runtime must stop safely and surface the outcome as a host-visible failed result plus a live runtime-stream failure signal rather than looping or exhausting resources silently.
+- **Rationale:** A runtime that hosts untrusted model output and external tools cannot be trusted in production if a misbehaving agent can loop forever or exhaust resources; bounded execution is the difference between a recoverable failure and an outage.
+
+- **Priority:** P0
+- **Capability ID:** CAP-P0-055
+- **Capability:** The product must isolate sensitive credentials and provider secrets from durable state, operational telemetry, and transcripts, so that persisted history, exported observability data, and replayable transcripts never carry secrets that were only needed transiently to reach a provider or tool.
+- **Rationale:** The runtime's durability, observability, and replay surfaces all persist or emit execution data; without explicit isolation, the very features that make Tuvren trustworthy would become the channel through which credentials leak.
+
 ### 4.1 Scope Notes
 
 - The PRD intentionally treats persistence, streaming, tool dispatch, approvals, context engineering, orchestration, host-developer ergonomics, single-tenant durable reads, and the curated SDK surface as product capabilities because they materially define the user-facing value of Tuvren Runtime as a runtime.
@@ -460,9 +500,9 @@
 ## 5. Non-Functional Constraints
 
 - **Performance:** The product must remain usable for long-lived agent sessions, and routine context-management decisions should rely on compact structural state rather than repeated full-history rescans whenever practical. Durable-read operations against a single thread or branch must scale to bounded host display windows without forcing the host to load entire history into memory at once.
-- **Reliability:** The product must make committed progress durable, distinguish incomplete work from committed work, and converge safely after interruptions without ambiguous replay. Headless reference-host mode and transcript replay must produce deterministic outputs for the same inputs whenever the underlying runtime is itself deterministic.
-- **Security & Privacy:** Sensitive actions must be governable through approval workflows; provider-specific continuity artifacts must be preserved only as required for correct operation; runtime state and event surfaces must remain inspectable enough for supervision and audit. External MCP servers must be treated as untrusted boundaries: tool inputs and outputs cross a process or network boundary and must be validated and surfaced as agent-visible results rather than implicitly trusted.
-- **Operability:** The product must be embeddable into different host surfaces, support real-time observation, and expose explicit control points for cancellation, steering, approval, and status inspection. The host-facing SDK must allow a host to inspect, list, and replay its own durable state without reaching around the SDK boundary.
+- **Reliability:** The product must make committed progress durable, distinguish incomplete work from committed work, and converge safely after interruptions without ambiguous replay. An interruption at any point must resolve to one of two outcomes — the unfinished work resumes from the last durable checkpoint, or the turn fails cleanly — with no partial, torn, or corrupt lineage left behind; checkpoint commits must be atomic and lineage must remain consistent under concurrent writers. These recovery and durability guarantees must be demonstrable through reproducible fault-injection and crash-recovery evidence across every supported persistent storage substrate, plus the applicable in-process atomicity and concurrency invariants for non-persistent backends, not asserted by design alone. Headless reference-host mode and transcript replay must produce deterministic outputs for the same inputs whenever the underlying runtime is itself deterministic.
+- **Security & Privacy:** Sensitive actions must be governable through approval workflows, and approval gates must be non-bypassable: work that requires approval cannot proceed without an explicit decision. Provider-specific continuity artifacts must be preserved only as required for correct operation, and sensitive credentials or secrets must be isolated from durable state, operational telemetry, and transcripts. Runtime state and event surfaces must remain inspectable enough for supervision and audit without becoming a channel for secret leakage. External MCP servers and tool inputs must be treated as untrusted boundaries: data crossing a process or network boundary must be validated and surfaced as agent-visible results rather than implicitly trusted. Execution must be bounded so that untrusted model output or tools cannot drive unbounded loops or resource exhaustion.
+- **Operability:** The product must be embeddable into different host surfaces, support real-time observation, and expose explicit control points for cancellation, steering, approval, and status inspection. The host-facing SDK must allow a host to inspect, list, and replay its own durable state without reaching around the SDK boundary. Beyond the real-time event stream, the runtime must expose a first-class operational telemetry surface — structured, correlated records of turns, model and tool interactions, checkpoints, approvals, and recovery events — that supports postmortems, performance investigation, and incident response, and that can be exported to standard vendor-neutral observability tooling.
 - **Domain-specific Constraints:** The product must preserve a clear separation between low-level runtime mechanism and higher-level agent policy; the canonical runtime language must remain provider-neutral; history-preserving correction must be preferred over destructive overwrite; active-context reshaping must never imply that prior committed history ceased to exist; future implementation languages must prove parity against shared semantic assets rather than reinterpret the product independently; and the first-party reference host must consume only the same host-facing SDK boundary that downstream hosts use.
 
 ### Prohibited Patterns
@@ -477,6 +517,9 @@
 - The product must not lock tool authoring into a single schema validator; the tool-authoring helper must accept multiple schema shapes without breaking the underlying boundary contract.
 - The product must not expose cross-tenant search, indexed querying, or multi-tenant access control through the embeddable SDK; those concerns belong to a separately-scoped future hosted/server projection.
 - The product must not let the curated SDK surface split shared primitives into multiple separately-versioned packages; primitives ship under one shared package so leaf packages can peer-depend on a single primitive instance.
+- The product must not claim crash-safe recovery or durability guarantees that are not backed by reproducible fault-injection and crash-recovery evidence; design-time assertion alone is not sufficient proof for a first-class durability promise.
+- The product must not allow a single turn to run unbounded iterations, tool calls, or resource consumption without enforced limits and a safe, observable stop.
+- The product must not allow approval gates to be bypassed, and must not let sensitive credentials or secrets reach durable history, operational telemetry, or transcripts.
 
 ## 6. Boundary Analysis
 
@@ -503,6 +546,10 @@
 - A first-class Model Context Protocol client integration that consumes external MCP servers over stdio and HTTP/SSE as tool sources
 - A language-neutral semantic foundation that can support more than one implementation line over time through shared contracts, conformance artifacts, and compatibility evidence
 - A boundary-owned machine authority surface where every cross-implementation semantic is anchored to authority packets, generated artifacts, conformance plans, and measured evidence rather than to any one language's implementation, runner code, or prose document
+- Reproducible fault-injection and crash-recovery verification that proves the durability and recovery guarantees across every supported storage substrate
+- A first-class operational telemetry surface covering turns, model and tool interactions, checkpoints, approvals, and recovery events, with an optional vendor-neutral export path
+- Execution-safety controls that bound iterations, tool calls, and resource usage and stop safely when a limit is reached
+- Credential and secret isolation that keeps sensitive values out of durable state, operational telemetry, and transcripts
 
 ### Out of Scope
 
@@ -540,6 +587,7 @@ System_Ext(host, "Host Application", "API, UI, CLI, editor, or service embedding
 System_Ext(modelProviders, "Model Providers", "Generate responses and tool-call intents")
 System_Ext(externalTools, "External Tools and Systems", "Operations invoked by the runtime")
 System_Ext(mcpServers, "External MCP Servers", "Advertise tools consumed by the runtime over stdio or HTTP/SSE")
+System_Ext(observability, "Observability Tooling", "Consumes exported operational telemetry for monitoring, postmortems, and incident response")
 
 Rel(builder, runtime, "Configures agents, tools, policies, and embeddings through the curated SDK")
 Rel(host, runtime, "Starts turns, awaits results, consumes events, lists threads and branches, replays history, injects steering, resolves approvals")
@@ -548,6 +596,7 @@ Rel(operator, host, "Drives reference host interactively or headlessly; captures
 Rel(runtime, modelProviders, "Sends prompts and receives model outputs")
 Rel(runtime, externalTools, "Executes tool actions and records results")
 Rel(runtime, mcpServers, "Connects as an MCP client, consumes advertised tools as runtime tool definitions")
+Rel(runtime, observability, "Exports operational telemetry in a vendor-neutral format")
 ```
 
 ### 7.2 Domain Model

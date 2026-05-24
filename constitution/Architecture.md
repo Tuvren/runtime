@@ -2,9 +2,9 @@
 
 ## 0. Version History & Changelog
 
+- v0.8.0 - Realized the production-trust block in the logical layer: added the Telemetry & Observability Boundary container (correlated operational-telemetry surface plus vendor-neutral export edge, distinct from the real-time host event stream) tracing to CAP-P0-052 / CAP-P1-053; added framework-owned Execution Bound enforcement (CAP-P0-054) and a cross-cutting Secret Isolation Model (CAP-P0-055); added a Recovery & Durability Verification Model with a verification-time fault-injection seam and crash-recovery conformance backing the sharpened Reliability guarantee; added matching architectural principles, trust relationships, failure classes, three critical flows (crash-recovery, telemetry capture/export, bounded-execution stop), and logical risks.
 - v0.7.1 - Clarified current Reference Host posture after Epics AM-AT landed: durable reads now remove the kernel-inspector seam, the MCP client is first-class, and the retired playground host has been consolidated into a REPL CLI with headless mode, streaming JSONL output, and transcript replay.
 - v0.7.0 - Added the Durable-Read Surface responsibility on Framework Shared Services, thread enumeration as a kernel structural primitive with backend-advertised capability, the Curated Host-Facing SDK container with shared-primitive plus slim-convenience split, the Schema Authoring Helper and MCP Tool Source responsibilities under the Tool Execution Gateway, and the headless plus transcript responsibilities on the Reference Host; promoted the SDK-only proving-host invariant from a risk-mitigation aspiration to a satisfied invariant; added new logical risks for the kernel-spec amendment cascade, schema-adapter detection ambiguity, MCP transport fragmentation, and durable-read pagination shape divergence.
-- v0.6.0 - Realigned the logical architecture around an SDK-first product line, a serious REPL-style proving host, portable canonical plus SSE stream surfaces, and a full documented orchestration scope for the first product-depth implementation line.
 - ... [Older history truncated, refer to git logs]
 
 ## 1. Architectural Strategy & Archetype Alignment
@@ -33,6 +33,10 @@
 - **Driver plurality without product sprawl:** The architecture must support multiple drivers conceptually, but only one driver needs to be implemented to production depth at a time.
 - **Portable stream spine:** The canonical event stream and SSE projection are core runtime surfaces; ecosystem-specific protocol adapters may exist above them, but they must not become the product’s semantic center.
 - **Structural reads stay in the kernel; composed reads stay in the framework:** Enumerating threads and branches and reading TurnNodes are kernel structural primitives. Composing those primitives into host-facing operations such as "read durable messages on this branch" or "walk turn history with a cursor" is a framework responsibility under the Durable-Read Surface. The host-facing SDK never reaches past the framework into the kernel for reads it cannot get through the framework.
+- **Operational observability is a first-class outbound surface:** Operating Tuvren in production requires more than the real-time host event stream. A dedicated Telemetry & Observability Boundary produces correlated operational telemetry (turns, model and tool interactions, checkpoints, approvals, recovery events, errors) keyed to runtime lineage, with a portable canonical telemetry vocabulary and a vendor-neutral export edge. The telemetry vocabulary is portable authority; the export projection is an ecosystem adapter, mirroring the canonical-stream-plus-SSE pattern.
+- **Execution is bounded by the framework, not the driver:** A driver may decide whether to continue a loop, but the framework enforces hard bounds on iterations, tool calls, and resource budget so that a misbehaving driver, model, or tool cannot loop forever or exhaust resources. When a bound is reached the framework forces a safe, observable terminal outcome rather than relying on driver discretion.
+- **Secrets live only at the integration edges:** Credentials needed to reach providers and external tools (provider keys, MCP server auth) are confined to the Provider Gateway and MCP Client Container edges. They must never enter durable lineage, operational telemetry, or transcripts; the surfaces that make Tuvren inspectable must not become the channel through which secrets leak.
+- **Durability and recovery guarantees are verification-backed:** The recovery and durability promises are not asserted by design alone. A verification-time fault-injection seam at the persistence boundary and crash-recovery conformance scenarios prove that an interruption at any point resolves to resume-from-checkpoint or clean failure with no torn or partial lineage.
 
 ### 1.3 Named Trust Relationships
 
@@ -44,6 +48,8 @@
 - **High-risk tool boundary:** External tool execution is where side effects happen and where approval, staging, and recovery protections matter most.
 - **Trusted semantic assets:** Boundary-owned contract and conformance assets are trusted to carry machine-readable meaning, while generated bindings and reports are evidence rather than primary authority.
 - **Untrusted semantic candidates:** Implementation language source trees, generic runner code, and human-prose documents are untrusted as cross-language semantic sources. They may project, validate, or describe authority, but they may not become it.
+- **Edge-confined credential boundary:** Provider keys and external MCP server credentials are held only at the Provider Gateway and MCP Client Container edges for the duration of a request. The Kernel Boundary, Durable State Boundary, Telemetry & Observability Boundary, and transcript surfaces are credential-free zones: they must never receive, persist, or emit secrets.
+- **Operator-facing telemetry consumer:** External observability tooling consumes exported operational telemetry. It is an outbound consumer of a vendor-neutral projection and never a source of runtime truth; the canonical telemetry vocabulary it consumes is boundary-owned authority, while the export format is an ecosystem-specific projection.
 
 ### 1.4 Failure Classes
 
@@ -59,6 +65,10 @@
 - **External tool-source boundary translation risk:** External MCP servers expose tools whose advertised schemas, input shapes, or output shapes do not match Tuvren tool conventions; the tool-source boundary must normalize advertisements into Tuvren tool definitions and validate inputs/outputs in both directions.
 - **Schema-authoring detection ambiguity risk:** The schema-agnostic tool-authoring helper must accept multiple schema kinds (Zod v3, Zod v4, Standard Schema, wrapped JSON Schema); ambiguous detection could route a schema to the wrong adapter and silently change validation behavior.
 - **Curated SDK version-skew risk:** If leaf integration containers do not peer-depend on the single shared-primitive container, consumers can end up with mismatched primitive instances (mismatched error classes, hash brands, schema brands) that fail referential checks at runtime.
+- **Runaway-loop / resource-exhaustion risk:** A driver, model, or tool drives unbounded iterations, tool calls, or resource consumption, turning a recoverable failure into an outage unless the framework enforces hard execution bounds with a safe stop.
+- **Torn-checkpoint-under-crash risk:** A process crash lands in the middle of a checkpoint commit, threatening partial or corrupt lineage unless commits are atomic and recovery distinguishes committed from incomplete work; this risk must be proven addressed by fault injection rather than assumed.
+- **Secret-leakage risk:** Credentials used transiently to reach a provider or tool leak into durable lineage, operational telemetry, or transcripts, so that the very surfaces that make Tuvren inspectable and replayable also expose secrets.
+- **Telemetry-vocabulary divergence risk:** The operational telemetry surface grows a second, parallel vocabulary that drifts from the canonical runtime event vocabulary, so operators and host UIs come to describe the same runtime activity in incompatible terms.
 
 ## 2. System Containers
 
@@ -81,8 +91,8 @@
 ### Framework Shared Services
 
 - **Logical Type:** Application service layer
-- **Responsibility:** Own the stable framework contracts and shared runtime services above the kernel, including execution-handle lifecycle, turn/run orchestration shell, context manifest maintenance, event publication, extension coordination, driver selection, terminal-value resolution on every execution handle (the unified `awaitResult` surface), and the Durable-Read Surface. The Durable-Read Surface composes existing kernel structural primitives (`branch.list`, `node.get`, `node.walkBack`, `tree.resolve`, `tree.manifest`, `store.get`) and the new kernel `thread.list` primitive into host-facing operations: list threads owned by the runtime instance (with cursor-based pagination and optional filters), list branches inside a thread, read structured runtime state at any TurnNode, walk turn history of a branch as an async iterator with a cursor (newest-first), and read durable conversational messages on a branch without requiring the host to reconstruct messages from TurnTree references and the content-addressed object store by hand.
-- **Inputs:** Host commands, execution state from durable history, extension contributions, driver-emitted control outcomes, provider and tool gateway results, durable-read queries from hosts.
+- **Responsibility:** Own the stable framework contracts and shared runtime services above the kernel, including execution-handle lifecycle, turn/run orchestration shell, context manifest maintenance, event publication, extension coordination, driver selection, terminal-value resolution on every execution handle (the unified `awaitResult` surface), and the Durable-Read Surface. The Durable-Read Surface composes existing kernel structural primitives (`branch.list`, `node.get`, `node.walkBack`, `tree.resolve`, `tree.manifest`, `store.get`) and the new kernel `thread.list` primitive into host-facing operations: list threads owned by the runtime instance (with cursor-based pagination and optional filters), list branches inside a thread, read structured runtime state at any TurnNode, walk turn history of a branch as an async iterator with a cursor (newest-first), and read durable conversational messages on a branch without requiring the host to reconstruct messages from TurnTree references and the content-addressed object store by hand. Framework Shared Services also owns Execution Bound enforcement: it caps per-turn iterations, tool calls, and resource budget above driver discretion, and when a configured bound is reached it forces a safe terminal outcome (a typed bounded-execution result) rather than allowing an unbounded loop. It emits canonical runtime activity to the Telemetry & Observability Boundary in the same vocabulary it publishes to the Event Stream Adapter Layer.
+- **Inputs:** Host commands, execution state from durable history, extension contributions, driver-emitted control outcomes, provider and tool gateway results, durable-read queries from hosts, execution-bound configuration.
 - **Outputs:** Driver invocation requests, kernel syscalls (read and write), runtime status transitions, event publication, approval state, steering incorporation, host-visible execution handles with terminal-value resolution, host-facing durable-read responses.
 - **Depends on:** Driver Runtime, Context Assembly and Engineering, Extension Runtime, Orchestration Runtime, Kernel Boundary, Event Stream Adapter Layer.
 
@@ -113,7 +123,7 @@
 ### Provider Gateway
 
 - **Logical Type:** External integration boundary
-- **Responsibility:** Translate canonical prompts to provider-facing requests and translate provider outputs and streams back into canonical Kraken representations while preserving provider continuity artifacts without promoting provider-specific ontology inward.
+- **Responsibility:** Translate canonical prompts to provider-facing requests and translate provider outputs and streams back into canonical Kraken representations while preserving provider continuity artifacts without promoting provider-specific ontology inward. Provider credentials are held only at this edge for the duration of a request and are excluded from durable lineage, operational telemetry, and transcripts; opaque provider continuity artifacts that must persist for correct multi-turn operation are not credentials and must not carry secret material.
 - **Inputs:** Canonical prompt, rendered tool definitions, structured-output requests, model configuration.
 - **Outputs:** Canonical model responses, normalized stream chunks, continuity artifacts, and provider failure signals.
 - **Depends on:** External Model Providers.
@@ -145,7 +155,7 @@
 ### MCP Client Container
 
 - **Logical Type:** External tool-ecosystem integration boundary
-- **Responsibility:** Implement the Model Context Protocol client side over both stdio and HTTP/SSE transports as one unified client interface. Establish and maintain the MCP session lifecycle (initialization handshake, tool list discovery, tool invocation, tool result reception, transport-level error handling, session shutdown). Translate MCP tool advertisements into Tuvren tool definitions (an MCP-flavored Tool Source Container). Treat the external MCP server as an untrusted boundary: validate tool inputs against the advertised schema before sending across the transport and validate tool outputs against the advertised result shape before surfacing them as agent-visible results. The MCP server-side projection (exposing Tuvren itself as an MCP server) is explicitly out of scope; only the client side is in this container.
+- **Responsibility:** Implement the Model Context Protocol client side over both stdio and HTTP/SSE transports as one unified client interface. Establish and maintain the MCP session lifecycle (initialization handshake, tool list discovery, tool invocation, tool result reception, transport-level error handling, session shutdown). Translate MCP tool advertisements into Tuvren tool definitions (an MCP-flavored Tool Source Container). Treat the external MCP server as an untrusted boundary: validate tool inputs against the advertised schema before sending across the transport and validate tool outputs against the advertised result shape before surfacing them as agent-visible results. The MCP server-side projection (exposing Tuvren itself as an MCP server) is explicitly out of scope; only the client side is in this container. External MCP server credentials (transport auth, headers, tokens) are held only at this edge and are excluded from durable lineage, operational telemetry, and transcripts.
 - **Inputs:** External MCP server endpoint specifications (transport choice, command or URL), MCP protocol messages from the server, tool invocations from the Tool Execution Gateway.
 - **Outputs:** Tuvren tool definitions for each MCP-advertised tool; canonical tool results from MCP tool invocations; MCP session lifecycle events translated into runtime events.
 - **Depends on:** External MCP Servers, Tool Source Container interface, Shared Primitive Container, Extension Runtime (for connection lifecycle hooks).
@@ -181,6 +191,14 @@
 - **Inputs:** Canonical runtime events, custom events, worker-forwarded events, and driver-attributed event metadata.
 - **Outputs:** Protocol-ready event streams for host consumers.
 - **Depends on:** Framework Shared Services, Extension Runtime, Orchestration Runtime.
+
+### Telemetry & Observability Boundary
+
+- **Logical Type:** Outbound operational-telemetry adaptation boundary
+- **Responsibility:** Observe canonical runtime activity and produce correlated operational telemetry — structured records of turns, runs, model interactions, tool calls, checkpoints, approvals, steering, recovery events, and errors — keyed to runtime lineage concepts (thread, branch, turn, run, TurnNode) so an operator can reconstruct what a turn did after the fact. This surface is distinct from the Event Stream Adapter Layer: the event stream serves a host UI consuming one live turn, while operational telemetry serves monitoring, postmortems, performance investigation, and incident response, and may correlate across turns and runs. The canonical telemetry vocabulary is boundary-owned portable authority; a vendor-neutral export edge projects that vocabulary into standard observability tooling without coupling the runtime to any one vendor or wire format. The boundary must never emit secrets (see the Secret Isolation Model in §5).
+- **Inputs:** Canonical runtime activity signals from Framework Shared Services, Driver Runtime, Tool Execution Gateway, and Orchestration Runtime, including checkpoint and recovery telemetry derived by framework/runtime observation of kernel outcomes rather than by direct kernel-owned emission; telemetry configuration (sampling, redaction, export target selection).
+- **Outputs:** Correlated operational telemetry records in the canonical telemetry vocabulary; vendor-neutral telemetry exports for external observability tooling.
+- **Depends on:** Framework Shared Services, Driver Runtime, Tool Execution Gateway, Orchestration Runtime.
 
 ### Reference Host
 
@@ -272,6 +290,8 @@
 - Orchestration Runtime <-> Framework Shared Services: in-process worker launch, handoff, and resume coordination
 - Kernel Boundary -> Durable State Boundary: atomic persistence transactions and structural enumeration (subject to backend capability)
 - Framework Shared Services / Orchestration Runtime / Extension Runtime -> Event Stream Adapter Layer: canonical event publication
+- Framework Shared Services / Driver Runtime / Tool Execution Gateway / Orchestration Runtime -> Telemetry & Observability Boundary: canonical operational-telemetry signal emission (including checkpoint and recovery events derived from kernel outcomes)
+- Telemetry & Observability Boundary -> External Observability Tooling: vendor-neutral operational-telemetry export
 - Framework Shared Services / Provider Gateway / Kernel Boundary -> Contract Authority Assets: consume boundary-owned machine-readable shapes for validation and generated support
 - Language-specific runners -> Behavioral Conformance Assets: execute shared suites without redefining semantics locally
 - Host Integration Boundary / Framework Shared Services <-> Interop Transport Boundary: use transport contracts when a runtime boundary spans processes or languages
@@ -298,6 +318,10 @@
 - The Curated Host-Facing SDK Surface is a logical boundary; its decomposition into a Shared Primitive Container plus a Slim Convenience Container is an architectural commitment rather than a packaging accident, and downstream artifacts (TechSpec) may bind those containers to concrete package identifiers.
 - The Schema Authoring Helper sits above the Tool Execution Gateway and below the host; it never narrows what is legal at the boundary CustomSchema contract, it only enriches the authoring side with type inference and ergonomic defaults.
 - The MCP Client Container is one instance of the Tool Source Container abstraction; built-in static tool registries are another instance; future tool sources slot into the same abstraction.
+- The Telemetry & Observability Boundary and the Event Stream Adapter Layer are distinct outbound surfaces on purpose: the event stream is a real-time, single-turn, host-UI projection, while operational telemetry is a correlated, cross-turn, operator/observability projection. They share one canonical runtime activity vocabulary so they cannot diverge into two incompatible descriptions of the same runtime.
+- Execution Bound enforcement is a Framework Shared Services responsibility, not a driver responsibility, precisely so that a misbehaving or adversarial driver cannot opt out of the runtime's safety limits; drivers still own loop-continuation policy strictly within those bounds.
+- Secret isolation is a cross-cutting boundary rule rather than a container: credentials are confined to the Provider Gateway and MCP Client Container edges, and the Kernel Boundary, Durable State Boundary, Telemetry & Observability Boundary, and transcript surfaces are credential-free zones.
+- The fault-injection seam used to verify durability and recovery is a verification-time capability at the persistence boundary, not a production control path; it exists to drive crash-recovery conformance and must not be reachable by hosts or drivers in normal operation.
 
 ## 3. Container Diagram (Mermaid)
 
@@ -320,6 +344,7 @@ System_Boundary(tuvren_runtime, "Tuvren Runtime") {
   Container(schemaHelper, "Schema Authoring Helper", "Authoring Boundary", "Multi-schema defineTool entrypoint normalizing Zod / Standard Schema / wrapped JSON Schema into the boundary CustomSchema contract")
   Container(orchestrationRuntime, "Orchestration Runtime", "Coordination Service", "Workers, handoffs, execution inheritance, descendant attribution, pipeline-level orchestration policy")
   Container(eventAdapter, "Event Stream Adapter Layer", "Outbound Adapter", "Canonical event translation for hosts")
+  Container(telemetry, "Telemetry & Observability Boundary", "Outbound Telemetry Adapter", "Correlated operational telemetry (turns, tools, checkpoints, approvals, recovery) with vendor-neutral export; distinct from the live event stream")
   Container(kernelBoundary, "Kernel Boundary", "Mechanism Core", "Durable objects, staging, trees, lineage, runs, branches; structural enumeration (branch.list + capability-advertised thread.list)")
   ContainerDb(stateBoundary, "Durable State Boundary", "Persistence Boundary", "Atomic durable storage substrate; advertises thread-enumeration capability")
   Container(contractAssets, "Contract Authority Assets", "Specification Surface", "Boundary-owned machine-readable shape contracts and reviewed generated artifacts")
@@ -334,6 +359,7 @@ System_Boundary(tuvren_runtime, "Tuvren Runtime") {
 System_Ext(modelProviders, "Model Providers", "External generation systems")
 System_Ext(externalTools, "External Tools and Systems", "External side-effecting capabilities")
 System_Ext(mcpServers, "External MCP Servers", "External tool-advertising MCP processes")
+System_Ext(observabilityTooling, "External Observability Tooling", "Consumes exported operational telemetry for monitoring, postmortems, and incident response")
 
 Rel(hostUser, hostBoundary, "Starts turns, sends control inputs, issues durable-read queries")
 Rel(hostUser, refHost, "Drives the first-party proving host interactively or headlessly")
@@ -359,6 +385,10 @@ Rel(frameworkServices, eventAdapter, "Canonical runtime events")
 Rel(orchestrationRuntime, eventAdapter, "Descendant-attributed orchestration events")
 Rel(extensionRuntime, eventAdapter, "Custom events")
 Rel(eventAdapter, hostBoundary, "Host-facing event streams")
+Rel(frameworkServices, telemetry, "Operational-telemetry signals (incl. checkpoint and recovery events)")
+Rel(driverRuntime, telemetry, "Driver execution telemetry")
+Rel(toolGateway, telemetry, "Tool execution telemetry")
+Rel(telemetry, observabilityTooling, "Vendor-neutral telemetry export")
 Rel(frameworkServices, contractAssets, "Consumes contract shapes")
 Rel(providerGateway, contractAssets, "Consumes provider/runtime shapes")
 Rel(kernelBoundary, contractAssets, "Consumes protocol grammars")
@@ -683,17 +713,98 @@ end
 Host-->>Stdin: structured replay report (pass/fail per record)
 ```
 
+### 4.11 Crash Mid-Checkpoint and Clean Recovery (Fault-Injection-Verified)
+
+- **Maps to PRD capability:** CAP-P0-005, CAP-P0-006 (and the sharpened Reliability NFR: resume-or-fail-clean under fault injection)
+
+```mermaid
+sequenceDiagram
+participant Verify as Recovery Verification Harness
+participant Framework as Framework Shared Services
+participant Kernel as Kernel Boundary
+participant Fault as Fault-Injection Seam
+participant State as Durable State Boundary
+participant NewProc as Recovered Runtime Instance
+
+Framework->>Kernel: checkpoint iteration (stage results + manifest + status)
+Kernel->>Fault: begin atomic checkpoint commit
+Verify->>Fault: inject crash mid-commit
+Fault--xState: commit interrupted before durable completion
+Note over Fault,State: atomic commit either fully lands or does not land; no torn TurnNode
+NewProc->>Kernel: restart and open the same branch
+Kernel->>State: read last durable committed TurnNode + recoverable staged work
+State-->>Kernel: committed head + any recoverable staged results
+Kernel-->>NewProc: distinguish committed progress from incomplete work
+NewProc->>Framework: resume only unfinished work, or fail the run cleanly
+Framework-->>Verify: recovered head is consistent; no partial or corrupt lineage
+Note over Verify,NewProc: conformance asserts resume-or-fail-clean across every supported backend capability
+```
+
+### 4.12 Operational Telemetry Capture and Vendor-Neutral Export
+
+- **Maps to PRD capability:** CAP-P0-052, CAP-P1-053
+
+```mermaid
+sequenceDiagram
+participant Framework as Framework Shared Services
+participant Driver as Driver Runtime
+participant Tooling as Tool Execution Gateway
+participant Kernel as Kernel Boundary
+participant Telemetry as Telemetry & Observability Boundary
+participant Export as Vendor-Neutral Export Edge
+participant Obs as External Observability Tooling
+
+Framework->>Telemetry: turn/run/iteration telemetry (keyed to thread, branch, turn, run)
+Driver->>Telemetry: model interaction telemetry
+Tooling->>Telemetry: tool call + approval telemetry
+Kernel->>Telemetry: checkpoint + recovery telemetry
+Telemetry->>Telemetry: correlate records by runtime lineage; apply redaction (no secrets)
+Telemetry->>Export: emit canonical telemetry vocabulary
+Export->>Obs: project into vendor-neutral telemetry without coupling to any one vendor
+Note over Telemetry,Obs: telemetry vocabulary is portable authority; export format is an ecosystem projection
+```
+
+### 4.13 Bounded Execution Stops a Runaway Turn Safely
+
+- **Maps to PRD capability:** CAP-P0-054 (and the Security / Reliability NFRs on bounded execution)
+
+```mermaid
+sequenceDiagram
+participant Framework as Framework Shared Services
+participant Driver as Driver Runtime
+participant Tooling as Tool Execution Gateway
+participant Kernel as Kernel Boundary
+participant Telemetry as Telemetry & Observability Boundary
+participant Host as Host Integration Boundary
+
+loop each iteration
+  Framework->>Framework: check iteration / tool-call / resource budget against configured bounds
+  Framework->>Driver: run iteration (within bounds)
+  Driver->>Tooling: tool batch
+  Tooling-->>Driver: tool results
+  Driver-->>Framework: loop decision (continue requested)
+end
+Framework->>Framework: configured execution bound reached
+Framework->>Kernel: checkpoint a safe terminal outcome (bounded-execution result)
+Kernel-->>Framework: durable terminal TurnNode
+Framework->>Telemetry: emit bounded-execution telemetry
+Framework-->>Host: terminal result = bounded-execution stop (host-visible + agent-visible), not a crash or infinite loop
+```
+
 ## 5. Resilience & Cross-Cutting Concerns
 
 - **Security / Identity Strategy:** Host applications authenticate and authorize their own callers before exposing Tuvren Runtime controls; the Kraken engine itself treats host commands, provider responses, tool outputs, and external MCP server messages as boundary inputs that require validation and normalization. External MCP servers are out-of-process or out-of-host: tool advertisements, inputs, and outputs cross a process or network boundary and are validated by the MCP Client Container in both directions before being surfaced.
 - **Failure Handling Strategy:** The kernel and durable state boundary preserve committed progress, staged tool results, and lineage so interruption, pause/resume, rollback, and replacement-run behavior can be realized without history corruption. MCP transport failures are translated into canonical tool-result failures so that an unreachable or misbehaving MCP server appears as an agent-visible tool error rather than a runtime crash. Backend capability advertisement means a host running on a non-enumerating backend receives a typed capability error from the Durable-Read Surface rather than a silent empty result.
-- **Observability Strategy:** Canonical runtime events are emitted from shared framework services and translated outward by stream adapters; driver attribution must remain visible so hosts can tell shared-runtime events from driver-specific behavior; durable-read responses do not emit lifecycle events but contribute to the same canonical observability vocabulary when emitted as part of a host-driven flow; and future cross-language execution must share one telemetry vocabulary plus compatibility-report evidence.
+- **Observability Strategy:** Two outbound surfaces share one canonical runtime activity vocabulary. The Event Stream Adapter Layer projects real-time events for a host UI consuming one live turn; the Telemetry & Observability Boundary produces correlated operational telemetry (turns, runs, model and tool interactions, checkpoints, approvals, steering, recovery events, errors) keyed to runtime lineage for monitoring, postmortems, performance investigation, and incident response, and exports it to external observability tooling through a vendor-neutral edge. Driver attribution must remain visible on both surfaces so operators can tell shared-runtime activity from driver-specific behavior; durable-read responses do not emit lifecycle events but contribute to the same canonical vocabulary when part of a host-driven flow; the canonical telemetry vocabulary is boundary-owned portable authority while the vendor-neutral export format is an ecosystem projection above it; and future cross-language execution must share that one telemetry vocabulary plus compatibility-report evidence. No secret material may appear on either outbound surface.
 - **Configuration Strategy:** Driver selection, provider choice, tool registry composition (built-in + extension + MCP), extension activation, schema-authoring helper choices, and backend configuration are runtime-selected concerns above the kernel; the kernel remains unaware of provider, host, and MCP semantics; and native toolchain configuration remains authoritative inside each implementation subtree. The Batteries-Included Composition in the Curated Host-Facing SDK Surface is the documented single entrypoint for assembling these choices.
 - **Data Integrity / Consistency Notes:** Kernel-visible semantics remain uniform across backends; drivers may differ in control flow but must still rely on the same durable object, staging, lineage, and checkpoint rules; machine-readable contract/conformance assets must stay aligned with the docs and constitution instead of drifting into a parallel truth system; the Durable-Read Surface composes existing kernel structural primitives and the new `thread.list` primitive without introducing a parallel state model.
 - **Backend Capability Advertisement Model:** Each concrete Durable State Boundary realization declares a capability descriptor that names which optional structural enumerations it supports efficiently. Thread enumeration is a capability bit: backends that can enumerate (relational, in-memory, document store with index) advertise support; substrates that cannot (pure object stores) advertise non-support and still satisfy every other Storage Contract guarantee. The Durable-Read Surface inspects the advertised capability and either fulfills the host's request or returns a typed capability error so hosts can adapt gracefully. Conformance plans for the kernel `thread.list` primitive evaluate per-capability rather than mandating support across all backends.
 - **MCP Server Boundary Trust Model:** Every external MCP server is untrusted. The MCP Client Container validates tool advertisements (rejecting malformed schemas), validates tool invocation inputs against the advertised schema before sending, validates tool results against the advertised result shape before surfacing, translates transport errors into canonical tool-result failures, and applies the same approval gating to MCP-sourced tools that built-in tools receive. MCP-sourced tools may carry explicit approval requirements that the Tool Execution Gateway honors uniformly with built-in approval policies.
 - **Transcript Determinism Contract:** Transcript replay produces identical structured output for the same recorded input sequence when the underlying runtime is deterministic for that flow (deterministic step declarations, deterministic provider outputs, deterministic tool implementations, no wall-clock dependencies in extensions). When the underlying flow includes non-deterministic elements (real model providers, real external tools), replay is best-effort and the transcript records what occurred rather than what must reoccur. Conformance plans for transcript replay evaluate the deterministic subset.
 - **Curated SDK Version-Skew Safety Model:** Every leaf integration container (backends, stream adapters, drivers, provider bridges, Schema Authoring Helper, MCP Client Container) peer-depends on the Shared Primitive Container rather than directly depending on it. The Slim Convenience Container also peer-depends on the Shared Primitive Container. This guarantees that for any host instance, all leaf containers and the convenience container share one Shared Primitive Container instance, which is load-bearing for runtime referential checks (error class identity, brand symbols on schema wrappers, identity hashes, event-source attribution). The packaging-level realization of "peer dependency" is a TechSpec concern; the architectural commitment is that one runtime instance always sees one primitive instance.
+- **Execution Safety / Bounded Execution Model:** Framework Shared Services enforces hard, configurable bounds on per-turn iterations, tool calls, and resource budget above driver discretion. Reaching a bound is not a crash: the framework checkpoints a safe terminal outcome (a typed bounded-execution result) and surfaces it as both host-visible and agent-visible, so a runaway loop becomes a recoverable, observable stop. Bounds default to safe limits and are configurable per runtime instance. Drivers retain loop-continuation policy strictly within these bounds and cannot disable them. Conformance plans assert that exceeding each bound produces the typed terminal outcome rather than unbounded execution.
+- **Secret Isolation Model:** Credentials needed to reach providers and external tools are confined to the Provider Gateway and MCP Client Container edges for the duration of a request. The Kernel Boundary, Durable State Boundary, Event Stream Adapter Layer, Telemetry & Observability Boundary, and transcript surfaces are credential-free zones. Persisted lineage, canonical stream events, exported telemetry, and replayable transcripts must never carry secrets; redaction at the event, telemetry, and transcript surfaces is a backstop, but the primary rule is that secrets never reach those surfaces in the first place. Provider continuity artifacts that must persist are non-secret opaque tokens, not credentials. Conformance and review assert the absence of secret material on durable, event-stream, telemetry, and transcript surfaces.
+- **Recovery & Durability Verification Model:** The reliability guarantee (resume-from-checkpoint or fail-clean, with atomic checkpoints and concurrency-safe lineage) is verification-backed, not design-asserted. A verification-time fault-injection seam at the persistence boundary lets verification interrupt commits at controlled points (before, during, and after checkpoint persistence) and under concurrent writers; crash-recovery conformance then asserts that recovery distinguishes committed from incomplete work and never observes torn or partial lineage. This verification runs per backend capability across every supported Durable State Boundary realization. The seam is a verification-time capability only and is not part of any production control path, is not reachable through the host-facing SDK or drivers, and exists solely to drive conformance.
 
 ## 6. Logical Risks & Technical Debt
 
@@ -748,3 +859,19 @@ Host-->>Stdin: structured replay report (pass/fail per record)
 - **Risk:** Durable-Read Surface pagination shape diverges (cursor for histories vs. limit-offset for collections vs. async iterator everywhere), and host developers receive inconsistent reading ergonomics that complicate downstream tooling.
 - **Why it matters:** A scrollback loop that works for turn history must not behave fundamentally differently from a scrollback loop for threads or branches; mismatched pagination forces every host to re-implement the same paging adapter.
 - **Mitigation or follow-up:** Adopt an architectural rule: **history surfaces use a runtime-internal cursor returned from the previous read plus an async iterator (newest-first), and collection surfaces use a runtime-internal cursor plus an optional limit (no offsets)**. Both shapes return an opaque cursor token the host does not have to interpret. Cursor opacity preserves backend freedom; the iterator-vs-page distinction tracks whether the read is over a lineage chain or over an unordered collection. The Durable-Read Surface conformance plan enforces both shapes.
+
+- **Risk:** The operational telemetry surface grows a second vocabulary that diverges from the canonical runtime event vocabulary.
+- **Why it matters:** Operators and host UIs would describe the same runtime activity in incompatible terms, and cross-language telemetry parity would collapse.
+- **Mitigation or follow-up:** The Telemetry & Observability Boundary derives from the same canonical runtime activity vocabulary as the Event Stream Adapter Layer; the telemetry vocabulary is boundary-owned authority with an Authority Packet Surface entry, and the vendor-neutral export is an ecosystem projection above it rather than a parallel source of meaning.
+
+- **Risk:** Credentials leak into durable lineage, operational telemetry, or transcripts.
+- **Why it matters:** The durability, observability, and replay surfaces that make Tuvren trustworthy would become the exact channel through which secrets escape, and replayable transcripts would be unsafe to share.
+- **Mitigation or follow-up:** Enforce the Secret Isolation Model: confine credentials to the Provider Gateway and MCP Client Container edges, treat the durable, telemetry, and transcript surfaces as credential-free zones, and assert their absence through conformance and review rather than relying on redaction alone.
+
+- **Risk:** Execution bounds are placed at driver discretion instead of framework enforcement.
+- **Why it matters:** A misbehaving, buggy, or adversarial driver could then opt out of the runtime's safety limits, reintroducing the runaway loops and resource exhaustion that bounded execution exists to prevent.
+- **Mitigation or follow-up:** Keep Execution Bound enforcement in Framework Shared Services above driver discretion; drivers may choose to continue only within the framework-enforced bounds, and conformance asserts that exceeding a bound yields the typed bounded-execution terminal outcome.
+
+- **Risk:** The fault-injection seam used for recovery verification leaks into production control paths.
+- **Why it matters:** A failure-injection capability reachable by hosts or drivers in normal operation would be both a reliability hazard and an attack surface.
+- **Mitigation or follow-up:** Scope the fault-injection seam to verification-time only at the persistence boundary; it must not be reachable through the host-facing SDK, drivers, or any production path, and its realization is a TechSpec-controlled test seam rather than a runtime feature.
