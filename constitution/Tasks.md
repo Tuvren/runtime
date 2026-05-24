@@ -1328,12 +1328,12 @@ And a unit test verifies the record-to-OTel mapping
 - **Effort:** 5
 - **Dependencies:** `KRT-AV002`
 - **Capability / Contract Mapping:** PRD `CAP-P0-052`; TechSpec ADR-042, ADR-030, §5.6.2
-- **Description:** Add `framework-operational-telemetry.json` (check set `runtime-api-operational-telemetry`) under `boundaries/framework/conformance/plans/`. Drive a deterministic aimock turn and assert the expected lineage-keyed spans/events for turn/iteration/model/tool/checkpoint through an in-memory capture sink added to `@tuvren/framework-testkit`, then drive a targeted restart/recovery fixture that asserts the recovery records. Record the new plan in `boundaries/shared/contracts/core/spec/authority-packet.json` so the framework runner discovers it. The OTel mapping stays out of the portable plan (covered by KRT-AV003's unit test).
+- **Description:** Add `framework-operational-telemetry.json` (check set `runtime-api-operational-telemetry`) under `boundaries/framework/conformance/plans/`. Drive a deterministic aimock turn and assert the expected lineage-keyed spans/events for turn/iteration/model/tool/checkpoint, approval transitions, and error paths through an in-memory capture sink added to `@tuvren/framework-testkit`, then drive a targeted restart/recovery fixture that asserts the recovery records. Record the new plan in `boundaries/shared/contracts/core/spec/authority-packet.json` so the framework runner discovers it. The OTel mapping stays out of the portable plan (covered by KRT-AV003's unit test).
 - **Acceptance Criteria (Gherkin):**
 ```gherkin
 Given framework emission is wired and an in-memory capture sink exists in the framework testkit
 When the framework-operational-telemetry.json plan is added
-Then a deterministic aimock turn emits the expected lineage-keyed spans and events for turn, iteration, model, tool, and checkpoint
+Then a deterministic aimock turn emits the expected lineage-keyed spans and events for turn, iteration, model, tool, checkpoint, approval transitions, and error paths
 And a targeted restart or recovery fixture emits the expected recovery records
 And the check set asserts those records through the in-memory capture sink, not the OTel projection
 And the merged core authority packet records framework-operational-telemetry.json so bun run conformance discovers it
@@ -1454,7 +1454,7 @@ Then exceeding maxIterations, maxToolCalls, or maxWallClockMs stops the loop abo
 And the turn finalizes as a failed ExecutionResult with code execution_bound_exceeded and correct details
 And the canonical turn.end event marks the failed terminal state while the bound metadata remains on the failed ExecutionResult and bounded-execution telemetry event
 And a bounded-execution telemetry event is emitted when a sink is configured
-And a hung model call or tool execution cannot outlive maxWallClockMs because deadline or cancellation is propagated into the in-flight work
+And a hung model call or tool execution cannot outlive maxWallClockMs because an abort signal is propagated through TuvrenPrompt.signal and ToolExecutionContext.signal into the in-flight work
 And parallel tool execution never exceeds maxConcurrentToolCalls because the framework throttles to the configured cap
 And when AgentConfig.maxParallelToolCalls or defaultMaxParallelToolCalls is present, the effective parallel-tool limit is clamped to maxConcurrentToolCalls
 And unset bound fields take the documented safe defaults
@@ -1468,12 +1468,13 @@ And a driver that always requests continue cannot exceed the framework bound
 - **Effort:** 5
 - **Dependencies:** `KRT-AW006`
 - **Capability / Contract Mapping:** PRD `CAP-P0-054`; TechSpec ADR-043, §5.6.4
-- **Description:** Add the `runtime-api-execution-bounds` check set to `runtime-api-callables-extended.json` using a runaway aimock driver fixture that always requests continue. Assert each hard-stop bound's breach yields a `failed` result with code `execution_bound_exceeded` and the correct `details`, that `maxConcurrentToolCalls` is enforced by throttling parallel tool execution to the configured cap, that invalid non-finite or non-positive bound configuration is rejected, and that a within-bounds control turn completes normally.
+- **Description:** Add the `runtime-api-execution-bounds` check set to `runtime-api-callables-extended.json` using a runaway aimock driver fixture that always requests continue. Assert each hard-stop bound's breach yields a `failed` result with code `execution_bound_exceeded` and the correct `details`, that a configured capture sink observes the `execution.bounded` telemetry event, that `maxConcurrentToolCalls` is enforced by throttling parallel tool execution to the configured cap, that invalid non-finite or non-positive bound configuration is rejected, and that a within-bounds control turn completes normally.
 - **Acceptance Criteria (Gherkin):**
 ```gherkin
 Given the framework bounds guard is implemented
 When the runtime-api-execution-bounds check set is added
 Then a runaway aimock driver breaching maxIterations, maxToolCalls, or maxWallClockMs yields a failed result with code execution_bound_exceeded and correct details
+And a configured capture sink observes the execution.bounded telemetry event for each hard-stop breach
 And maxConcurrentToolCalls is enforced by throttling parallel tool execution to the configured cap
 And AgentConfig.maxParallelToolCalls and defaultMaxParallelToolCalls are clamped by maxConcurrentToolCalls rather than bypassing it
 And invalid non-finite or non-positive bound configuration is rejected
