@@ -2,10 +2,9 @@
 
 ## 0. Version History & Changelog
 
+- v0.28.0 - Specified the production-trust block (PRD v0.8.0 / Architecture v0.8.0): ADR-042 first-class operational telemetry surface plus vendor-neutral OpenTelemetry export (CAP-P0-052 / CAP-P1-053); ADR-043 framework-enforced execution bounds with a typed `execution_bound_exceeded` terminal result (CAP-P0-054); ADR-044 secret isolation across durable, telemetry, and transcript surfaces (CAP-P0-055); ADR-045 recovery-and-durability verification via a test-only fault-injection seam plus a strengthened crash-recovery conformance plan (CAP-P0-005 / CAP-P0-006). Added §3.10–§3.12 data shapes, §4.18–§4.20 interface contracts, §5.6 migration plans, and §2.1 compatibility entries.
 - v0.27.3 - Recorded Epic AS implementation verification: `@tuvren/mcp-client` uses the SDK's non-deprecated Streamable HTTP transport behind Tuvren's public `transport: "http-sse"` compatibility name, adds `@modelcontextprotocol/server-everything@2026.1.26` as the official provider-testkit fixture for stdio/Streamable HTTP parity, and promotes the MCP translation packet into the portability inventory as the ninth expected packet.
 - v0.27.2 - Clarified post-Epic AR repository reality: AQ and AR are closed, AS-AT remain active; corrected the MCP SDK v1.29 dependency posture so `@tuvren/mcp-client` handles the upstream `zod` peer without exposing `zod` as a public Tuvren peer.
-- v0.27.1 - Clarified repository reality after Epics AM-AP landed: `thread.list`, base-handle `awaitResult`, the durable-read surface, and the `@tuvren/core` / `@tuvren/runtime` source-bearing consolidation were implemented; AQ-AT were active follow-on scope at that revision; the old contract handles and `@tuvren/runtime-core` were one-cycle compatibility shims, while `@tuvren/playground-host` was an Epic AT retirement target.
-- v0.27.0 - Defined the PRD v0.7.0 / Architecture v0.7.0 implementation target: `thread.list`, base-handle `awaitResult`, durable reads, `@tuvren/core` consolidation, Schema Authoring Helper, MCP Client Container, `createTuvren({...})`, reference-host consolidation, headless mode, transcript replay, and locked dependency versions (`@modelcontextprotocol/sdk@1.29.0`, `zod@4.4.3` as optional peer, `@standard-schema/spec@1.1.0` as optional peer).
 - ... [Older history truncated, refer to git logs]
 
 ## 1. Stack Specification (Bill of Materials)
@@ -461,6 +460,44 @@
   - **Add transcript replay** via a `--replay <path>` CLI flag. Replay reads the JSONL file, replays each recorded input against a fresh runtime instance (composed via `createTuvren({...})` with the backend choice recorded in the transcript header), and asserts equality between recorded outputs and live outputs for deterministic record types (commands; freeform turns with deterministic providers like `aimock-*`). For non-deterministic record types (real providers), replay records both the original and live outputs but does not fail on inequality; the report distinguishes deterministic-asserted from non-deterministic-recorded records.
 - **Consequences:** The `boundaries/hosts/implementations/typescript/playground/` directory and `@tuvren/playground-host` workspace package are deleted in this epic. The Nx project graph loses `@tuvren/playground-host` as a dependency; all `bun run` scripts referencing `playground:*` targets are deleted or migrated to `proving-host:*` (already partially complete from Epic AJ). The REPL test suite picks up any scenario tests that were unique to the playground. The new `repl-headless-mode.ts` and `repl-transcript.ts` modules implement the headless dispatch loop and the JSONL transcript writer/reader. The CLI surface in `cli.ts` adds flag parsing for `--headless`, `--record <path>`, and `--replay <path>`. A new conformance check set `proving-host-headless-transcript-replay` in `runtime-api-callables-extended.json` exercises a deterministic record-and-replay cycle as evidence of the headless mode and transcript determinism contract from Architecture §5.
 
+### ADR-042 First-Class Operational Telemetry Surface With Vendor-Neutral Export
+
+- **Status:** accepted
+- **Context:** PRD v0.8.0 CAP-P0-052 and CAP-P1-053 promote operational observability to a first-class product outcome: an operator must be able to reconstruct what a turn did (model interactions, tool calls, checkpoints, approvals, recovery events, errors) after the fact, and export that telemetry to standard tooling. Architecture v0.8.0 adds the Telemetry & Observability Boundary as a distinct outbound surface that shares one canonical runtime activity vocabulary with the Event Stream Adapter Layer. The repository already owns the telemetry vocabulary as authored authority: `telemetry/semconv/tuvren-runtime.yaml` (OpenTelemetry semantic-convention source via Weaver), the derived `telemetry/semantic-conventions.md` / `telemetry/otel-attributes.json`, generated per-language telemetry constants, and OTel attribute conventions for run/turn/branch/driver/tool-call/checkpoint/parent-checkpoint/resumed-from/backend/provider ids (§5.2). What is missing is a wired emission surface and an export path: today the vocabulary exists but the runtime does not emit through a first-class sink, and the REPL relies on event-stream draining for visibility.
+- **Decision:** Introduce a first-class operational telemetry surface anchored on the existing semconv vocabulary, in three parts:
+  1. **Sink contract in `@tuvren/core`.** Add a `TuvrenTelemetrySink` interface to a new `@tuvren/core/telemetry` subpath (the ninth `@tuvren/core` subpath; the export map and the merged core authority packet grow by one binding section). The sink receives canonical `TelemetrySpan` and `TelemetryEvent` records (§3.10) keyed by runtime lineage (threadId, branchId, turnId, runId, turnNodeHash) plus the semconv attributes already defined in `telemetry/semconv/tuvren-runtime.yaml`. The sink is a pure consumer; it never feeds runtime truth back in. A `NoopTelemetrySink` is the default.
+  2. **Framework emission.** Framework Shared Services (`@tuvren/runtime`), the ReAct driver, the Tool Execution Gateway, and the kernel checkpoint/recovery path emit to the configured sink at defined points (turn/run start and end, iteration boundaries, model request/response, tool call start/end and approval transitions, checkpoint commit, recovery resume-or-fail, bounded-execution stop per ADR-043, and errors). Emission reuses the canonical event vocabulary so the telemetry surface and the event stream cannot diverge (Architecture §2.2). Emission is fire-and-forget into the sink; a throwing sink is isolated and never breaks execution (a sink failure logs one internal warning and is dropped).
+  3. **Vendor-neutral export leaf package.** Add `@tuvren/telemetry-otel` under `boundaries/framework/implementations/typescript/telemetry-otel/` (sibling of the stream adapters; peer-depends on `@tuvren/core`). It implements `TuvrenTelemetrySink` by mapping `TelemetrySpan` / `TelemetryEvent` onto OpenTelemetry spans and events using the authored semconv attributes, and emits through the standard OpenTelemetry SDK so any OTLP-compatible backend can consume it. The OTel export is an ecosystem-specific projection — like AG-UI and the SSE adapter, it is NOT a required cross-language portable surface; the canonical telemetry vocabulary (the semconv source) is the portable authority, and `@tuvren/telemetry-otel` is one projection above it. Exact `@opentelemetry/*` package versions are pinned in the activation epic per the §1 "pin on activation" rule.
+  `createTuvren({...})` gains an optional `telemetry?: TuvrenTelemetrySink` field; when omitted the runtime uses `NoopTelemetrySink`. The structured-logger hook in §5.2 remains separate: logging is operator-facing text, telemetry is structured spans/events.
+- **Consequences:** `@tuvren/core` adds a `./telemetry` subpath (10 tsup entries; the merged core authority packet adds one binding section; `tools/scripts/portability-gate.ts` recognizes it). `@tuvren/runtime` wires the sink through `createTuvren` and the internal runtime and re-exports `NoopTelemetrySink`. New leaf package `@tuvren/telemetry-otel` is added to the workspace and to §5.1. A new conformance plan `framework-operational-telemetry.json` (check set `runtime-api-operational-telemetry`) asserts that a deterministic turn (aimock provider) emits the expected lineage-keyed spans/events for turn/iteration/model/tool/checkpoint/recovery, evaluated against an in-memory capture sink in the framework testkit; the OTel mapping is covered by an implementation-specific `@tuvren/telemetry-otel` unit test, not by the portable plan. The telemetry vocabulary remains a portability-inventory authoritative source; the OTel projection is recorded as a standing implementation-specific exception alongside AG-UI. Secret material must never be placed on telemetry records (ADR-044).
+
+### ADR-043 Framework-Enforced Execution Bounds
+
+- **Status:** accepted
+- **Context:** PRD v0.8.0 CAP-P0-054 requires bounded execution so a single turn cannot run unbounded iterations, tool calls, or resource consumption, stopping safely and surfacing the outcome. Architecture v0.8.0 §1.2 and §5 place Execution Bound enforcement on Framework Shared Services above driver discretion precisely so a misbehaving or adversarial driver cannot opt out. Today the ReAct driver owns its `LoopPolicy` (continue/stop) but there is no framework-level hard cap that holds regardless of driver behavior; a driver that always returns "continue" loops until cancellation.
+- **Decision:** Add a framework-enforced `ExecutionBounds` guard, evaluated by `@tuvren/runtime` at every iteration and tool-batch boundary, above the driver's own loop policy. Shape (§3.11): `maxIterations` (default 64), `maxToolCalls` (default 256, cumulative per turn), `maxWallClockMs` (default 600_000), `maxConcurrentToolCalls` (default 16). Bounds are configured per runtime instance via `createTuvren({ bounds?: ExecutionBounds })` and `RuntimeCoreOptions.bounds`; unset fields take the safe defaults; an explicit `Infinity` disables a specific bound (advanced, discouraged). When a bound is reached, the framework — not the driver — stops the loop, checkpoints a safe terminal outcome, and finalizes the turn as a `failed` `ExecutionResult` (ADR-035) carrying `TuvrenRuntimeError` with code `execution_bound_exceeded` and `details: ExecutionBoundExceededDetails` (`{ bound; limit; observed }`). A `turn.end` event with the same bound metadata is emitted so the stop is host-visible and agent-visible, and a bounded-execution telemetry event (ADR-042) is emitted. Reusing the existing `failed` discriminant (rather than adding a new `ExecutionResult` variant) keeps ADR-035's union stable and the change semver-minor. The driver retains loop-continuation policy strictly within these bounds and cannot raise or disable them.
+- **Consequences:** `@tuvren/core/errors` documents the new stable `TuvrenRuntimeError` code `execution_bound_exceeded`. `@tuvren/core/execution` exports the `ExecutionBounds` and `ExecutionBoundExceededDetails` types. `@tuvren/runtime` implements the guard in the turn/run orchestration shell and threads `bounds` through `createTuvren` and `RuntimeCoreOptions`. A new check set `runtime-api-execution-bounds` in `runtime-api-callables-extended.json` asserts that exceeding each bound yields a `failed` result with code `execution_bound_exceeded` and the correct `details`, and that a within-bounds turn is unaffected, using a runaway aimock driver fixture. `docs/KrakenFrameworkSpecification.md` gains a normative "Execution Bounds" section (minor bump) describing the framework-owned guard so future drivers inherit it rather than re-implement it.
+
+### ADR-044 Secret Isolation Across Durable, Telemetry, and Transcript Surfaces
+
+- **Status:** accepted
+- **Context:** PRD v0.8.0 CAP-P0-055 requires that sensitive credentials and provider secrets never reach durable state, operational telemetry, or transcripts. Architecture v0.8.0 establishes the Secret Isolation Model and the edge-confined credential trust relationship: credentials live only at the Provider Gateway and MCP Client Container edges; the Kernel Boundary, Durable State Boundary, Telemetry & Observability Boundary, and transcript surfaces are credential-free zones. Two concrete leak channels exist today: (1) MCP transport auth (`McpAuth` bearer tokens / header values in `McpTransportConfig`) and provider API keys, and (2) the transcript header `config.backend.options` (ADR-041, §3.9), which for the PostgreSQL backend can carry a connection string with an embedded password.
+- **Decision:** Make secret isolation an explicit, enforced contract:
+  1. **Edge confinement.** Provider credentials are accepted only by the provider bridge at request time and are never written to kernel records, never placed on `TelemetrySpan` / `TelemetryEvent` attributes, and never serialized into transcripts. `McpAuth` values are held only inside the MCP Client Container's transport and are excluded from the same surfaces. Provider continuity artifacts (ADR-005; opaque continuation tokens) are non-secret by contract and must not carry credential material.
+  2. **Transcript redaction.** The transcript header's `config.backend.options` is serialized through a backend-specific redactor that strips or masks secret-bearing fields (PostgreSQL `connectionString` / `password` → `"***"`), replaced by a non-secret backend identity descriptor sufficient for replay topology but not for authentication. Replay reconstructs the backend from non-secret options plus environment-supplied credentials, never from transcript-embedded secrets. This is a §3.9 transcript-format constraint addition (format `v: 1` compatible; redaction is additive).
+  3. **Telemetry attribute allowlist.** The telemetry sink (ADR-042) receives only the semconv-defined attribute set (lineage ids, durations, counts, hashes, statuses). Free-form attribute injection is not permitted on the canonical telemetry surface; any host-supplied attributes pass through an allowlist that excludes credential-shaped keys.
+  4. **Verification.** The absence of secret material on durable, telemetry, and transcript surfaces is asserted by conformance and review, not by redaction alone. A `secret-isolation` check set added to the relevant plans drives a fixture that configures a provider key and an MCP bearer token, runs a turn, and asserts none of the configured secret values appear in persisted kernel records, captured telemetry, or a recorded transcript.
+- **Consequences:** `@tuvren/mcp-client` and `@tuvren/provider-bridge-ai-sdk` document the edge-confinement rule and add it to their package READMEs and conformance fixtures. `@tuvren/repl-host`'s `repl-transcript.ts` gains the backend-options redactor and a non-secret backend identity descriptor in the transcript header path (§3.9 constraint). The telemetry sink path in `@tuvren/runtime` applies the attribute allowlist. The `secret-isolation` check set is added to `providers-mcp-client.json` (MCP auth path), `framework-operational-telemetry.json` (telemetry attributes), and `runtime-api-callables-extended.json` (transcript redaction). No new runtime error code is introduced; a detected leak in verification fails the relevant conformance check rather than throwing at runtime.
+
+### ADR-045 Recovery and Durability Verification Via a Test-Only Fault-Injection Seam
+
+- **Status:** accepted
+- **Context:** PRD v0.8.0 sharpens the Reliability NFR: an interruption at any point must resolve to resume-from-checkpoint or clean failure with no torn or partial lineage, with atomic checkpoints and concurrency-safe lineage, and these guarantees must be demonstrable through reproducible fault-injection and crash-recovery evidence rather than asserted by design. Architecture v0.8.0 adds the Recovery & Durability Verification Model with a verification-time fault-injection seam at the persistence boundary, scoped strictly out of production paths. The repository already owns a `kernel-restart-recovery.json` conformance plan and recovery/checkpoint scenario tests (§5.2), but they exercise clean restarts, not commits interrupted mid-flight or concurrent writers.
+- **Decision:** Add a test-only fault-injection seam and strengthen crash-recovery conformance:
+  1. **Fault-injection backend decorator.** Add `createFaultInjectingBackend(inner: RuntimeBackend, plan: FaultPlan): RuntimeBackend` to `@tuvren/kernel-testkit` (NOT to any production package). It wraps an inner backend's `transact` and can fail or abort a transaction at controlled points relative to the durable commit — `before-commit`, `mid-commit` (after partial writes where the backend exposes them, else equivalent to before-commit for atomic substrates), and `after-commit-before-ack` — and can simulate a concurrent writer racing the same branch head. `FaultPlan` (§3.12) names the injection point, a match predicate (which syscall / which branch), and a one-shot-or-repeat policy. The seam is reachable only by constructing this testkit decorator; it is not exposed through `@tuvren/core`, `@tuvren/runtime`, any backend, the host-facing SDK, or any driver. There is no production code path that can reach it (Architecture §6 risk).
+  2. **Strengthened crash-recovery conformance.** Extend `kernel-restart-recovery.json` with a `kernel-crash-recovery` check set that, per backend capability, drives a turn to a known checkpoint, injects each fault point, opens a fresh kernel against the same durable state, and asserts the recovery invariant: the recovered branch head is a committed TurnNode, no torn/partial TurnNode is observable, staged-but-uncommitted work is either fully recovered or fully absent, and the runtime resumes only unfinished work or fails the run cleanly with `TuvrenRecoveryError`. A concurrency check asserts that two writers racing the same branch head do not corrupt lineage (one wins; the other observes a typed lineage conflict). The memory backend, lacking durable restart, is `not_applicable` for the durable-restart subset (per ADR-031) but `applicable` for the in-process atomicity and concurrency subset.
+- **Consequences:** `@tuvren/kernel-testkit` adds `createFaultInjectingBackend` and `FaultPlan`. `boundaries/kernel/conformance/plans/kernel-restart-recovery.json` gains the `kernel-crash-recovery` check set; the kernel authority packet at `boundaries/kernel/contracts/protocol/spec/authority-packet.json` records the new check set and bumps its packet version. The SQLite and PostgreSQL backends must pass the durable crash-recovery subset; any gap discovered (e.g. a non-atomic multi-statement commit) is a bug fixed under the AU epic, not a relaxation of the plan. No production package gains a new dependency or surface; the seam is testkit-only. `docs/KrakenKernelSpecification.md` gains a normative "Crash Recovery Invariant" note (minor bump) stating the resume-or-fail-clean guarantee that the conformance plan verifies.
+
 ### 2.1 Compatibility Record
 
 - **Kernel identity compatibility:** Changes to deterministic CBOR profile, SHA-256 usage, hash string representation, or durable record shapes are semver-major.
@@ -482,6 +519,10 @@
 - **MCP client compatibility:** Per ADR-039, `@tuvren/mcp-client` follows semver. Bumping the upstream `@modelcontextprotocol/sdk` to a new minor that maintains MCP protocol compatibility is internal; bumping to a new MCP protocol major requires a `@tuvren/mcp-client` major.
 - **Batteries-included composition compatibility:** Per ADR-040, adding a new `BackendKind` or `DriverKind` is semver-minor; changing the default `driver` is semver-major; renaming `CreateTuvrenOptions` fields is semver-major.
 - **Reference host transcript compatibility:** Per ADR-041 and §3.9, transcript file format versioning is independent of `@tuvren/repl-host` package version. Format version `v: 1` is forward-compatible across runtime minor versions. Format major bumps require an explicit transcript-replay version negotiation.
+- **Operational telemetry compatibility:** Per ADR-042, adding the `@tuvren/core/telemetry` subpath and the `TuvrenTelemetrySink` interface is semver-minor. The canonical telemetry vocabulary (`telemetry/semconv/tuvren-runtime.yaml`) versions independently as boundary-owned authority; adding semconv attributes is minor, removing or renaming one is major. `@tuvren/telemetry-otel` is an implementation-specific projection that follows its own semver and is not part of the portable cross-language surface.
+- **Execution bounds compatibility:** Per ADR-043, adding the `ExecutionBounds` type and the `bounds` option is semver-minor, and the new `execution_bound_exceeded` code is additive. Changing a default bound value is semver-minor but must be called out in release notes because it changes observable stop behavior. Reusing the existing `failed` `ExecutionResult` discriminant keeps ADR-035's union semver-stable.
+- **Secret isolation compatibility:** Per ADR-044, the transcript-header redaction and the telemetry attribute allowlist are additive and semver-minor; transcripts recorded before redaction remain replayable because replay never depended on transcript-embedded secrets. Tightening the redaction set later is semver-minor.
+- **Recovery verification compatibility:** Per ADR-045, the fault-injection seam is testkit-only and carries no public-runtime compatibility surface. Strengthening `kernel-restart-recovery.json` with the `kernel-crash-recovery` check set follows conformance-suite compatibility rules; a backend that newly fails the strengthened plan is treated as a bug, not a contract relaxation.
 
 ## 3. State & Data Modeling
 
@@ -966,6 +1007,109 @@ type TranscriptEntry =
   | TranscriptDurableReadRecord;
 
 type TranscriptFile = [TranscriptHeader, ...TranscriptEntry[]];
+```
+
+### 3.10 Operational Telemetry Record Model
+
+- **Purpose:** Per ADR-042, the operational telemetry surface emits structured, lineage-correlated records an operator can use to reconstruct what a turn did. The vocabulary is the authored OpenTelemetry semantic convention at `telemetry/semconv/tuvren-runtime.yaml`; this section defines the TypeScript record shape the sink receives.
+- **Storage Shape:** Not persisted by the runtime; handed to the configured `TuvrenTelemetrySink` (§4.18) for the sink to export, buffer, or drop. Records are plain serializable objects keyed by runtime lineage.
+- **Constraints / Invariants:**
+  - Every record carries the lineage correlation keys it can know: `threadId`, `branchId`, `turnId`, `runId`, and where relevant `turnNodeHash`. Attribute keys come from the semconv source (run id, turn id, branch id, driver id, tool call id, checkpoint hash, parent checkpoint hash, resumed-from hash, backend id, provider id).
+  - Records carry no secret material (ADR-044); attributes pass through the allowlist before reaching the sink.
+  - Timestamps are `EpochMs`; durations are integer milliseconds.
+  - A telemetry record is informative, never authoritative: dropping all telemetry must not change durable execution outcomes.
+- **Record shape:**
+
+```ts
+export type TelemetryLineage = {
+  threadId: string;
+  branchId: string;
+  turnId: string;
+  runId?: string;
+  turnNodeHash?: HashString;
+};
+
+export type TelemetrySpanKind =
+  | "turn" | "run" | "iteration" | "model_call" | "tool_call" | "checkpoint" | "recovery";
+
+export interface TelemetrySpan {
+  kind: TelemetrySpanKind;
+  name: string;                 // semconv span name
+  lineage: TelemetryLineage;
+  startMs: EpochMs;
+  endMs: EpochMs;
+  status: "ok" | "error";
+  attributes: Record<string, string | number | boolean>; // semconv-allowlisted
+  error?: { code: TuvrenErrorCode; message: string };
+}
+
+export type TelemetryEventKind =
+  | "turn.start" | "turn.end" | "approval.requested" | "approval.resolved"
+  | "checkpoint.committed" | "recovery.resumed" | "recovery.failed"
+  | "execution.bounded" | "error";
+
+export interface TelemetryEvent {
+  kind: TelemetryEventKind;
+  lineage: TelemetryLineage;
+  atMs: EpochMs;
+  attributes: Record<string, string | number | boolean>;
+}
+```
+
+### 3.11 Execution Bounds and Bounded-Execution Result
+
+- **Purpose:** Per ADR-043, the framework enforces hard per-turn bounds above driver discretion and surfaces a typed terminal outcome when a bound is reached.
+- **Storage Shape:** `ExecutionBounds` is runtime configuration (not persisted as kernel record state); the bounded-execution outcome is surfaced as a `failed` `ExecutionResult` (ADR-035) and as a `turn.end` event with bound metadata, both of which are durable through the normal checkpoint path.
+- **Constraints / Invariants:**
+  - Unset bound fields take the documented safe defaults; the guard is always active (there is no "no bounds" mode short of explicitly setting a field to `Infinity`).
+  - Bounds are evaluated by the framework at iteration and tool-batch boundaries, never delegated to the driver.
+  - Reaching a bound produces a `failed` result with code `execution_bound_exceeded`; it is not a crash and not a silent stop.
+- **Shapes:**
+
+```ts
+export interface ExecutionBounds {
+  maxIterations?: number;          // default 64
+  maxToolCalls?: number;           // default 256, cumulative per turn
+  maxWallClockMs?: number;         // default 600_000 (10 minutes per turn)
+  maxConcurrentToolCalls?: number; // default 16
+}
+
+// Surfaced via TuvrenRuntimeError.details when a bound is hit:
+export interface ExecutionBoundExceededDetails {
+  bound: "maxIterations" | "maxToolCalls" | "maxWallClockMs" | "maxConcurrentToolCalls";
+  limit: number;
+  observed: number;
+}
+```
+
+### 3.12 Fault-Injection Plan (Test-Only)
+
+- **Purpose:** Per ADR-045, a test-only seam interrupts persistence at controlled points so crash-recovery and concurrency invariants can be verified. This shape lives in `@tuvren/kernel-testkit` and is never reachable from production packages.
+- **Storage Shape:** In-memory test configuration consumed by `createFaultInjectingBackend`; never persisted.
+- **Constraints / Invariants:**
+  - The seam is testkit-only: no production package, backend, runtime, host, or driver may import or expose it.
+  - Injection points are defined relative to the durable commit so atomicity can be probed on both atomic and non-atomic substrates.
+  - A fault is reproducible: the same `FaultPlan` against the same scenario produces the same interruption.
+- **Shape:**
+
+```ts
+export type FaultPoint = "before-commit" | "mid-commit" | "after-commit-before-ack";
+
+export interface FaultPlan {
+  point: FaultPoint;
+  // Restrict injection to matching transactions (by syscall name and/or branch).
+  match?: { syscall?: string; branchId?: string };
+  // "once" injects on first match then passes through; "always" repeats.
+  policy: "once" | "always";
+  // Optionally simulate a concurrent writer racing the same branch head
+  // immediately before the matched commit.
+  concurrentWriter?: { branchId: string };
+}
+
+export declare function createFaultInjectingBackend(
+  inner: RuntimeBackend,
+  plan: FaultPlan,
+): RuntimeBackend;
 ```
 
 ## 4. Interface Contract
@@ -2767,6 +2911,48 @@ NO_COLOR / FORCE_COLOR            ANSI color control (interactive mode only)
 - Recording limitation: `--record` is only supported when the backend is specified by `BackendKind` string or kind-tagged object (`{ kind, options }`), because the transcript header encodes `config.backend` as `{ kind: BackendKind; options?: unknown }`. Starting the REPL with a pre-built `RuntimeBackend` instance is unsupported for recording; the host process must reject `--record` at startup if a raw `RuntimeBackend` was passed to `createTuvren`.
 - Replay: reads the transcript file, validates the header, constructs a fresh runtime via `createTuvren({ backend: header.config.backend })`, and replays each `TranscriptInputRecord` in order. For deterministic record types (any input that produced only `TranscriptOutputRecord`/`TranscriptStreamEventRecord`/`TranscriptDurableReadRecord` from a deterministic provider mode like `aimock-*` or `fixture`, plus deterministic REPL commands such as `.status`, `.thread new`, `.thread show`, and `.messages show` regardless of provider mode), the replay asserts equality between recorded and live outputs and fails on mismatch. For non-deterministic record types (real provider/freeform responses identified by `header.config.providerMode` being one of `ai-sdk-google`, `ai-sdk-openai`, `ai-sdk-anthropic`, or equivalent non-deterministic provider modes), the replay captures the live output but does not assert equality; the final replay report distinguishes deterministic-asserted from non-deterministic-recorded records.
 
+### 4.18 Operational Telemetry Surface
+
+- **Style:** library API (sink interface) plus an implementation-specific export adapter
+- **Ownership:** `@tuvren/core/telemetry` owns the `TuvrenTelemetrySink` interface and the `TelemetrySpan` / `TelemetryEvent` / `TelemetryLineage` record types (§3.10). `@tuvren/runtime` owns emission wiring and `NoopTelemetrySink`. `@tuvren/telemetry-otel` owns the OpenTelemetry projection.
+- **Compatibility Strategy:** The sink interface and record shapes are semver-governed (§2.1 operational telemetry compatibility). The canonical telemetry vocabulary is the authored semconv source and versions independently. The OTel projection is an ecosystem-specific surface and is not part of the portable cross-language contract.
+- **Error model:** A sink that throws is isolated by the runtime: the failure is caught, one internal warning is logged, and execution proceeds. Telemetry never fails a turn.
+
+```ts
+export interface TuvrenTelemetrySink {
+  span(span: TelemetrySpan): void;
+  event(event: TelemetryEvent): void;
+}
+
+export declare const NoopTelemetrySink: TuvrenTelemetrySink;
+```
+
+- The runtime emits to the configured sink at: turn/run start and end, iteration boundaries, model request/response, tool call start/end and approval transitions, checkpoint commit, recovery resume-or-fail, bounded-execution stop (ADR-043), and errors. Emission reuses the canonical event vocabulary so the telemetry surface and the event stream cannot diverge.
+- `createTuvren({ telemetry })` accepts a sink; when omitted the runtime uses `NoopTelemetrySink`. The structured-logger hook (§5.2) is separate: logs are operator-facing text, telemetry is structured spans/events.
+- `@tuvren/telemetry-otel` exports `createOtelTelemetrySink(options): TuvrenTelemetrySink`, mapping records onto OpenTelemetry spans/events with the authored semconv attributes and emitting through the OpenTelemetry SDK. Exact `@opentelemetry/*` versions are pinned in the activation epic.
+- No telemetry record may carry secret material (ADR-044); host-supplied attributes pass through a semconv allowlist.
+
+### 4.19 Execution Bounds Contract
+
+- **Style:** library configuration plus terminal-result semantics
+- **Ownership:** `@tuvren/core/execution` owns the `ExecutionBounds` and `ExecutionBoundExceededDetails` types (§3.11); `@tuvren/core/errors` owns the `execution_bound_exceeded` code; `@tuvren/runtime` owns the guard.
+- **Compatibility Strategy:** §2.1 execution bounds compatibility. Reuses the `failed` `ExecutionResult` discriminant from ADR-035; no new union variant.
+- **Error model:** Reaching a bound finalizes the turn as a `failed` `ExecutionResult` whose `error` is a `TuvrenRuntimeError` with code `execution_bound_exceeded` and `details: ExecutionBoundExceededDetails`. A matching `turn.end` event carries the same bound metadata.
+
+- Bounds are configured via `createTuvren({ bounds?: ExecutionBounds })` and `RuntimeCoreOptions.bounds`. Unset fields take the documented safe defaults (§3.11). The framework evaluates bounds at every iteration and tool-batch boundary, above the driver's `LoopPolicy`. A driver cannot raise or disable a framework bound.
+- `maxConcurrentToolCalls` bounds parallel tool execution within one batch; the framework caps concurrency rather than rejecting the batch, and only converts to a bounded-execution stop if a hard structural limit would otherwise be violated.
+
+### 4.20 Fault-Injection and Recovery Verification Seam (Test-Only)
+
+- **Style:** testkit library API (no production surface)
+- **Ownership:** `@tuvren/kernel-testkit` owns `createFaultInjectingBackend` and `FaultPlan` (§3.12).
+- **Compatibility Strategy:** §2.1 recovery verification compatibility. Testkit-only; not part of any public-runtime contract.
+- **Error model:** Injected faults surface as the same `TuvrenPersistenceError` / `TuvrenRecoveryError` types the runtime already raises on real persistence failure, so recovery code under test cannot tell an injected fault from a real one.
+
+- `createFaultInjectingBackend(inner, plan)` wraps a real backend and interrupts `transact` at the `FaultPlan.point` relative to the durable commit, optionally racing a concurrent writer (§3.12).
+- The seam is consumed only by the `kernel-crash-recovery` check set in `kernel-restart-recovery.json` and by recovery scenario tests; it must not be imported by `@tuvren/core`, `@tuvren/runtime`, any backend, the host-facing SDK, any driver, or the reference host.
+- Recovery invariant asserted by the plan: a recovered branch head is always a committed TurnNode; no torn or partial TurnNode is observable; staged-but-uncommitted work is fully recovered or fully absent; the runtime resumes only unfinished work or fails the run cleanly with `TuvrenRecoveryError`; and two writers racing one branch head never corrupt lineage (one wins; the other observes a typed lineage conflict).
+
 ## 5. Implementation Guidelines
 
 ### 5.1 Project Structure
@@ -2821,6 +3007,7 @@ the multi-language transition foundation:
 │   │   │   │   ├── stream-core/              # peerDep @tuvren/core
 │   │   │   │   ├── stream-sse/               # peerDep @tuvren/core
 │   │   │   │   ├── stream-agui/              # peerDep @tuvren/core
+│   │   │   │   ├── telemetry-otel/           # @tuvren/telemetry-otel (ADR-042); peerDep @tuvren/core
 │   │   │   │   ├── conformance-adapter/
 │   │   │   │   └── testkit/
 │   │   │   └── rust/
@@ -2832,8 +3019,11 @@ the multi-language transition foundation:
 │   │   │   │                                 # tool-contracts-extended, plus the new
 │   │   │   │                                 # runtime-api-durable-reads, runtime-api-handle-
 │   │   │   │                                 # terminal-value, runtime-api-schema-authoring,
-│   │   │   │                                 # runtime-api-batteries-included, and
-│   │   │   │                                 # proving-host-headless-transcript-replay sets
+│   │   │   │                                 # runtime-api-batteries-included,
+│   │   │   │                                 # proving-host-headless-transcript-replay, and the
+│   │   │   │                                 # production-trust sets (framework-operational-
+│   │   │   │                                 # telemetry, runtime-api-execution-bounds,
+│   │   │   │                                 # secret-isolation)
 │   │   │   └── scenarios/
 │   │   └── interop/
 │   │       └── rust-kernel/
@@ -2856,7 +3046,7 @@ the multi-language transition foundation:
 │   │   │   │   ├── backend-postgres/
 │   │   │   │   ├── conformance-runner/
 │   │   │   │   ├── conformance-runner-postgres/
-│   │   │   │   └── testkit/                  # kernel testkit moved here from boundary root
+│   │   │   │   └── testkit/                  # kernel testkit; owns createFaultInjectingBackend (ADR-045)
 │   │   │   └── rust/
 │   │   │       ├── kernel/
 │   │   │       ├── grpc-service/
@@ -2914,8 +3104,9 @@ the multi-language transition foundation:
 │   │                   │   │                 # five TuvrenRuntime durable-read methods
 │   │                   │   ├── driver/
 │   │                   │   ├── provider/
-│   │                   │   └── extensions/
-│   │                   ├── tsup.config.ts    # 9 entries: index + 8 subpaths
+│   │                   │   ├── extensions/
+│   │                   │   └── telemetry/    # ADR-042: TuvrenTelemetrySink + telemetry record types
+│   │                   ├── tsup.config.ts    # 10 entries: index + 9 subpaths
 │   │                   └── package.json      # peerDeps: zod (optional), @standard-schema/spec (optional)
 │   └── hosts/
 │       └── implementations/
@@ -3001,6 +3192,10 @@ conformance-plan JSON Schemas live under `tools/schemas/`.
   - a shared semantic conformance runner that consumes boundary-owned plans and drives implementation-language adapter hosts without redefining semantics locally
   - compatibility-matrix generation from actual conformance and interop-smoke results
   - runtime portability tests for core packages on Bun and Node; Deno compatibility tests for core non-native packages as soon as package surfaces stabilize
+  - per ADR-042, operational-telemetry tests that drive a deterministic turn and assert the expected lineage-keyed spans/events through an in-memory capture sink, plus an implementation-specific `@tuvren/telemetry-otel` mapping test
+  - per ADR-043, execution-bounds tests asserting that exceeding each bound yields a `failed` result with code `execution_bound_exceeded` and correct `details`, and that within-bounds turns are unaffected, using a runaway aimock driver fixture
+  - per ADR-044, secret-isolation tests asserting that a configured provider key and MCP bearer token never appear in persisted kernel records, captured telemetry, or a recorded transcript
+  - per ADR-045, crash-recovery tests using `createFaultInjectingBackend` that inject faults at each commit point and under a concurrent writer, asserting resume-or-fail-clean with no torn or partial lineage across the SQLite and PostgreSQL backends
 - **Observability Hooks:**
   - structured logger interface injected at runtime boundaries
   - event tee support for tests and host adapters
@@ -3009,6 +3204,8 @@ conformance-plan JSON Schemas live under `tools/schemas/`.
   - reviewed outputs such as `telemetry/semantic-conventions.md` and `telemetry/otel-attributes.json` are derived from that source
   - generated TypeScript and Rust constants or helpers derived from the telemetry semantic-convention source belong under the consuming implementation trees, not under a shared root generated directory
   - OpenTelemetry attribute conventions cover run id, turn id, branch id, driver id, tool call id, checkpoint hash, parent checkpoint hash, resumed-from hash, backend id, and provider id
+  - per ADR-042, the runtime emits to a first-class `TuvrenTelemetrySink` (`@tuvren/core/telemetry`) at turn/run/iteration/model/tool/checkpoint/recovery/bounded-execution/error points, reusing the canonical event vocabulary so telemetry and the event stream cannot diverge; the default sink is `NoopTelemetrySink` and the OpenTelemetry projection lives in the implementation-specific `@tuvren/telemetry-otel`
+  - per ADR-044, no secret material may reach the telemetry sink, durable kernel records, or transcripts; host-supplied telemetry attributes pass through a semconv allowlist, and transcript headers redact backend credential fields
 - **Migration / Deployment Notes:**
   - `kernel/implementations/typescript/backend-memory` has no persisted migration surface
   - `kernel/implementations/typescript/backend-sqlite` ships forward-only SQL migrations
@@ -3053,8 +3250,9 @@ conformance-plan JSON Schemas live under `tools/schemas/`.
 
 - Historical epic closure detail from Epics A-AG remains useful audit context, but it no longer belongs in the live forward-execution path once archive migration is complete.
 - The active forward path through TypeScript product proof, TypeScript platform completion, and portability-gate closure landed across Epics AI-AL.
-- The next active forward path is the v0.7.0 constitutional revision realized through ADR-034 through ADR-041; the corresponding execution plan is sequenced in `Tasks.md` (v0.7.x revision).
-- Rust framework/product work, future provider-family expansion beyond MCP-as-tool-source, future host protocols, additional official backends, and future driver families remain blocked until a new epic explicitly reopens that scope and re-satisfies the staged gates in `5.4` under fresh evidence.
+- The v0.7.0 constitutional revision realized through ADR-034 through ADR-041 (Epics AM-AT) is closed in repository reality.
+- The next active forward path is the v0.8.0 production-trust revision realized through ADR-042 through ADR-045 (operational telemetry, framework-enforced execution bounds, secret isolation, and fault-injection-verified crash recovery); the corresponding execution plan is sequenced in `Tasks.md` as Epics AU, AV, and AW.
+- Rust framework/product work, future provider-family expansion beyond MCP-as-tool-source, future host protocols, additional official backends, and future driver families remain blocked until a new epic explicitly reopens that scope and re-satisfies the staged gates in `5.4` under fresh evidence. The production-trust block does not reopen any of those lines; it hardens the existing TypeScript line.
 
 ### 5.5 Migration Plans for the v0.27.0 Revision
 
@@ -3171,3 +3369,46 @@ Order within one epic (must follow §5.5.3 to remove the kernel inspector, §5.5
 6. Update `cli.ts` to parse `--headless`, `--record <path>`, `--replay <path>` flags.
 7. Add the `proving-host-headless-transcript-replay` check set to `runtime-api-callables-extended.json` exercising a deterministic record-and-replay cycle.
 8. Update `proving-host:scenario-*` Nx targets to exercise both interactive and headless modes against the same scenarios.
+
+### 5.6 Migration Plans for the v0.28.0 Production-Trust Revision
+
+This section consolidates the bounded migration actions implied by ADR-042 through ADR-045. Each migration is in scope for one of the execution epics specified in `Tasks.md` (AU, AV, AW); this section names what must be done and in what order, not who does it or when. AU (recovery verification) and AW (execution bounds + secret isolation) touch the framework/kernel runtime; AV (telemetry) adds the sink surface and the export leaf. The three may be sequenced independently, but secret isolation (§5.6.3) must land in or before the epic that ships the telemetry sink (§5.6.2), because the telemetry attribute allowlist is part of the secret-isolation contract.
+
+#### 5.6.1 Recovery and Durability Verification (ADR-045, Epic AU)
+
+Order within the epic:
+1. Add `createFaultInjectingBackend(inner, plan)` and the `FaultPlan` type (§3.12) to `@tuvren/kernel-testkit`. Confirm no production package imports it (lint/dependency check).
+2. Add the `kernel-crash-recovery` check set to `boundaries/kernel/conformance/plans/kernel-restart-recovery.json` with per-capability applicability: durable-restart subset for SQLite/PostgreSQL, in-process atomicity + concurrency subset for memory.
+3. Record the new check set in the kernel authority packet at `boundaries/kernel/contracts/protocol/spec/authority-packet.json` and bump its packet version.
+4. Run the strengthened plan against memory, SQLite, and PostgreSQL. Fix any atomicity or concurrency defect discovered (e.g. a non-atomic multi-statement commit) under this epic; do not relax the plan.
+5. Add a normative "Crash Recovery Invariant" note to `docs/KrakenKernelSpecification.md` (minor bump) stating the resume-or-fail-clean guarantee the plan verifies.
+6. Run `bun run verify` from a clean checkout; capture fresh compatibility evidence.
+
+#### 5.6.2 Operational Telemetry Surface (ADR-042, Epic AV)
+
+Order within the epic (must include §5.6.3's allowlist):
+1. Add the `./telemetry` subpath to `@tuvren/core`: `TuvrenTelemetrySink`, `TelemetrySpan`, `TelemetryEvent`, `TelemetryLineage`, and `NoopTelemetrySink` (§3.10, §4.18). Update the export map (10 entries), `tsup.config.ts` (10 entries), and the merged core authority packet (one new binding section). Update `tools/scripts/portability-gate.ts` for the new subpath.
+2. Wire emission in `@tuvren/runtime` at the points named in §4.18, reusing the canonical event vocabulary. Isolate a throwing sink. Add `telemetry?: TuvrenTelemetrySink` to `CreateTuvrenOptions` and `RuntimeCoreOptions`; default `NoopTelemetrySink`.
+3. Apply the secret allowlist (§5.6.3) on the attribute path before records reach the sink.
+4. Create `@tuvren/telemetry-otel` under `boundaries/framework/implementations/typescript/telemetry-otel/`, peer-depending on `@tuvren/core`; implement `createOtelTelemetrySink(options)` mapping records onto OpenTelemetry spans/events using the authored semconv attributes. Pin exact `@opentelemetry/*` versions in this epic's manifest change.
+5. Add the `framework-operational-telemetry.json` plan (check set `runtime-api-operational-telemetry`) asserting lineage-keyed emission for a deterministic aimock turn via an in-memory capture sink in the framework testkit. Record the OTel projection as a standing implementation-specific exception (alongside AG-UI) in the portability inventory.
+6. Re-export `NoopTelemetrySink` from `@tuvren/runtime`. Run `bun run verify`.
+
+#### 5.6.3 Secret Isolation (ADR-044, Epic AW; allowlist consumed by AV)
+
+Order:
+1. Add the telemetry attribute allowlist helper (semconv keys only; reject credential-shaped keys) consumed by §5.6.2 step 3.
+2. Add the backend-options redactor and non-secret backend identity descriptor to `@tuvren/repl-host`'s `repl-transcript.ts`; mask PostgreSQL `connectionString` / `password` in the transcript header (§3.9 constraint). Confirm replay reconstructs from non-secret options plus environment credentials.
+3. Document edge-confinement in `@tuvren/mcp-client` and `@tuvren/provider-bridge-ai-sdk` READMEs and fixtures.
+4. Add the `secret-isolation` check set to `providers-mcp-client.json`, `framework-operational-telemetry.json`, and `runtime-api-callables-extended.json`: configure a provider key and MCP bearer token, run a turn, and assert none of the configured secret values appear in persisted records, captured telemetry, or a recorded transcript.
+5. Run `bun run verify`.
+
+#### 5.6.4 Framework-Enforced Execution Bounds (ADR-043, Epic AW)
+
+Order:
+1. Add `ExecutionBounds` and `ExecutionBoundExceededDetails` (§3.11) to `@tuvren/core/execution`; document the `execution_bound_exceeded` code in `@tuvren/core/errors`.
+2. Implement the bounds guard in `@tuvren/runtime`'s turn/run orchestration shell, evaluated at iteration and tool-batch boundaries above the driver `LoopPolicy`. Finalize a breached turn as a `failed` `ExecutionResult` with code `execution_bound_exceeded` and emit the matching `turn.end` event and bounded-execution telemetry event.
+3. Add `bounds?: ExecutionBounds` to `CreateTuvrenOptions` and `RuntimeCoreOptions`; apply the safe defaults from §3.11.
+4. Add the `runtime-api-execution-bounds` check set to `runtime-api-callables-extended.json` using a runaway aimock driver fixture; assert each bound's breach result and a within-bounds control case.
+5. Add a normative "Execution Bounds" section to `docs/KrakenFrameworkSpecification.md` (minor bump) so future drivers inherit the framework-owned guard.
+6. Run `bun run verify`.
