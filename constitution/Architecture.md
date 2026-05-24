@@ -290,7 +290,7 @@
 - Orchestration Runtime <-> Framework Shared Services: in-process worker launch, handoff, and resume coordination
 - Kernel Boundary -> Durable State Boundary: atomic persistence transactions and structural enumeration (subject to backend capability)
 - Framework Shared Services / Orchestration Runtime / Extension Runtime -> Event Stream Adapter Layer: canonical event publication
-- Framework Shared Services / Driver Runtime / Tool Execution Gateway / Orchestration Runtime / Kernel Boundary -> Telemetry & Observability Boundary: canonical operational-telemetry signal emission (including checkpoint and recovery events)
+- Framework Shared Services / Driver Runtime / Tool Execution Gateway / Orchestration Runtime -> Telemetry & Observability Boundary: canonical operational-telemetry signal emission (including checkpoint and recovery events derived from kernel outcomes)
 - Telemetry & Observability Boundary -> External Observability Tooling: vendor-neutral operational-telemetry export
 - Framework Shared Services / Provider Gateway / Kernel Boundary -> Contract Authority Assets: consume boundary-owned machine-readable shapes for validation and generated support
 - Language-specific runners -> Behavioral Conformance Assets: execute shared suites without redefining semantics locally
