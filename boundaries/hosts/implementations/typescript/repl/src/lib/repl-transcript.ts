@@ -149,6 +149,7 @@ export async function createReplTranscriptFileWriter(input: {
     encoding: "utf8",
     flags: "w",
   });
+  await waitForWriteStreamOpen(stream);
   const writer = await createReplTranscriptWriter({
     header: input.header,
     write(line) {
@@ -165,6 +166,21 @@ export async function createReplTranscriptFileWriter(input: {
       await writer.writeEntry(entry);
     },
   };
+}
+
+async function waitForWriteStreamOpen(
+  stream: ReturnType<typeof createWriteStream>
+): Promise<void> {
+  if (stream.pending === false) {
+    return;
+  }
+
+  await new Promise<void>((resolve, reject) => {
+    stream.once("open", () => {
+      resolve();
+    });
+    stream.once("error", reject);
+  });
 }
 
 export async function readReplTranscriptFromLines(

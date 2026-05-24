@@ -17,7 +17,10 @@
 import { createInterface } from "node:readline/promises";
 import type { TuvrenStreamEvent } from "@tuvren/runtime";
 import { type ReplShell, runReplInput } from "./repl-shell.js";
-import type { ReplTranscriptWriter } from "./repl-transcript.js";
+import type {
+  ReplTranscriptDurableReadRecord,
+  ReplTranscriptWriter,
+} from "./repl-transcript.js";
 
 export interface ReplHeadlessOutputRecord {
   error?: {
@@ -112,6 +115,17 @@ export async function runReplHeadlessMode(
         });
         await Promise.all(transcriptWrites);
         const output = result.output ?? readHeadlessStreamText(canonicalEvents);
+        const durableRead = readHeadlessDurableReadRecord(
+          input,
+          currentOrdinal,
+          output,
+          now()
+        );
+
+        if (durableRead !== undefined) {
+          await options.transcriptWriter?.writeEntry(durableRead);
+        }
+
         await options.transcriptWriter?.writeEntry({
           ...(result.exit === true ? { exit: true } : {}),
           ordinal: currentOrdinal,
@@ -155,6 +169,26 @@ export async function runReplHeadlessMode(
   } finally {
     rl.close();
   }
+}
+
+function readHeadlessDurableReadRecord(
+  input: string,
+  ordinal: number,
+  output: string | undefined,
+  recordedAtMs: number
+): ReplTranscriptDurableReadRecord | undefined {
+  if (input !== ".messages show" || output === undefined) {
+    return undefined;
+  }
+
+  return {
+    operation: "readBranchMessages",
+    ordinal,
+    recordKind: "durable-read",
+    recordedAtMs,
+    result: JSON.parse(output) as unknown,
+    v: 1,
+  };
 }
 
 function readHeadlessStreamText(

@@ -37,6 +37,7 @@ import {
   TUVREN_RUNTIME_TELEMETRY_SCHEMA_URL,
   type TuvrenPrompt,
   type TuvrenProvider,
+  type TuvrenStreamEvent,
   type TuvrenToolDefinition,
 } from "@tuvren/runtime";
 import {
@@ -2113,6 +2114,44 @@ describe("repl host scenarios", () => {
     });
   });
 
+  test("CLI records durable reads in headless transcripts", async () => {
+    const transcriptPath = join(
+      tmpdir(),
+      `tuvren-repl-durable-read-${Date.now()}.jsonl`
+    );
+    const result = await runCliProcess({
+      argv: [
+        "--backend",
+        "memory",
+        "--provider",
+        "fixture",
+        "--headless",
+        "--record",
+        transcriptPath,
+      ],
+      stdin: "Hello before durable read\n.messages show\n",
+    });
+
+    expect(result.exitCode).toBe(0);
+
+    const transcript = await readReplTranscriptFile(transcriptPath);
+    const entries: ReplTranscriptEntry[] = [];
+
+    for await (const entry of transcript.entries()) {
+      entries.push(entry);
+    }
+
+    expect(entries.map((entry) => entry.recordKind)).toContain("durable-read");
+    expect(
+      entries.some(
+        (entry) =>
+          entry.recordKind === "durable-read" &&
+          entry.operation === "readBranchMessages" &&
+          Array.isArray(entry.result)
+      )
+    ).toBe(true);
+  });
+
   test("CLI replays deterministic transcripts and emits a JSON report", async () => {
     const transcriptPath = join(
       tmpdir(),
@@ -2144,6 +2183,52 @@ describe("repl host scenarios", () => {
       providerMode: "fixture",
       status: "passed",
     });
+  });
+
+  test("CLI emits JSONL errors for headless startup failures", async () => {
+    const result = await runCliProcess({
+      argv: [
+        "--backend",
+        "memory",
+        "--provider",
+        "ai-sdk-google",
+        "--headless",
+      ],
+      envOverrides: {
+        GEMINI_API_KEY: undefined,
+        GOOGLE_GENERATIVE_AI_API_KEY: undefined,
+      },
+      stdin: "Hello\n",
+    });
+    const records = parseHeadlessOutputRecords(result.stdout);
+
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr).toBe("");
+    expect(records).toHaveLength(1);
+    expect(records[0]?.error?.message).toContain(
+      "ai-sdk-google repl provider requires"
+    );
+  });
+
+  test("CLI reports record path failures without unhandled stream errors", async () => {
+    const result = await runCliProcess({
+      argv: [
+        "--backend",
+        "memory",
+        "--provider",
+        "fixture",
+        "--headless",
+        "--record",
+        join(tmpdir(), `missing-${Date.now()}`, "session.jsonl"),
+      ],
+      stdin: ".status\n",
+    });
+    const records = parseHeadlessOutputRecords(result.stdout);
+
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr).toBe("");
+    expect(records).toHaveLength(1);
+    expect(records[0]?.error?.message).toContain("ENOENT");
   });
 
   test("CLI help documents headless, streaming JSONL, record, and replay controls", async () => {
@@ -2307,6 +2392,40 @@ describe("repl host scenarios", () => {
     expect(failingReport.mismatches[0]?.recordKind).toBe("output");
   });
 
+  test("deterministic replay fails when stream-event evidence is missing", async () => {
+    const transcript = await createFreeformReplayTranscript({
+      includeStreamEvents: false,
+    });
+    const report = await replayReplTranscript(transcript);
+
+    expect(report.status).toBe("failed");
+    expect(
+      report.mismatches.some((entry) => entry.recordKind === "stream-event")
+    ).toBe(true);
+  });
+
+  test("deterministic replay fails when durable-read evidence is tampered", async () => {
+    const transcript = await createFreeformReplayTranscript({
+      durableReads: [
+        {
+          operation: "readBranchMessages",
+          ordinal: 0,
+          recordedAtMs: 2010,
+          recordKind: "durable-read",
+          result: [{ role: "assistant", text: "tampered" }],
+          v: 1,
+        },
+      ],
+      includeStreamEvents: true,
+    });
+    const report = await replayReplTranscript(transcript);
+
+    expect(report.status).toBe("failed");
+    expect(
+      report.mismatches.some((entry) => entry.recordKind === "durable-read")
+    ).toBe(true);
+  });
+
   test("records non-deterministic replay output without asserting equality", async () => {
     const transcript = await createStatusReplayTranscript({
       outputOverride: "{}",
@@ -2456,6 +2575,66 @@ async function createStatusReplayTranscript(input: {
       ordinal: 0,
       output,
       recordedAtMs: 2002,
+      recordKind: "output",
+      v: 1,
+    })}\n`,
+  ];
+
+  return await readReplTranscriptFromLines(lines.map((line) => line.trimEnd()));
+}
+
+async function createFreeformReplayTranscript(input: {
+  durableReads?: ReplTranscriptEntry[];
+  includeStreamEvents: boolean;
+}) {
+  const header = {
+    ...createTranscriptHeaderFixture(),
+    config: {
+      backend: {
+        kind: "memory",
+      },
+      providerMode: "fixture",
+    },
+  } satisfies ReplTranscriptHeader;
+  const shell = createReplShell({
+    backend: "memory",
+    providerMode: "fixture",
+    scenario: "streaming",
+  });
+  const events: TuvrenStreamEvent[] = [];
+  await runReplInput(shell, "Hello freeform replay", {
+    onCanonicalEvent(event) {
+      events.push(event);
+    },
+  });
+  const lines = [
+    `${serializeReplTranscriptRecord(header)}\n`,
+    `${serializeReplTranscriptRecord({
+      input: "Hello freeform replay",
+      ordinal: 0,
+      recordedAtMs: 2001,
+      recordKind: "input",
+      v: 1,
+    })}\n`,
+    ...(input.includeStreamEvents
+      ? events.map(
+          (event, index) =>
+            `${serializeReplTranscriptRecord({
+              event,
+              ordinal: 0,
+              recordedAtMs: 2002 + index,
+              recordKind: "stream-event",
+              v: 1,
+            })}\n`
+        )
+      : []),
+    ...(input.durableReads ?? []).map(
+      (entry) => `${serializeReplTranscriptRecord(entry)}\n`
+    ),
+    `${serializeReplTranscriptRecord({
+      ordinal: 0,
+      output: "REPL streaming complete.",
+      recordedAtMs: 2100,
       recordKind: "output",
       v: 1,
     })}\n`,

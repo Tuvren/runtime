@@ -24,6 +24,7 @@ import {
   runReplInput,
 } from "./repl-shell.js";
 import {
+  type ReplTranscriptDurableReadRecord,
   type ReplTranscriptEntry,
   type ReplTranscriptHeader,
   type ReplTranscriptInputRecord,
@@ -38,7 +39,7 @@ export interface ReplReplayMismatch {
   actual: string;
   expected: string;
   ordinal: number;
-  recordKind: "output" | "stream-event";
+  recordKind: "durable-read" | "output" | "stream-event";
 }
 
 export interface ReplReplayReport {
@@ -80,6 +81,7 @@ export async function replayReplTranscript(
       if (deterministic) {
         compareRecordedOutput(group, liveOutput, mismatches);
         compareRecordedStreamEvents(group, liveEvents, mismatches);
+        compareRecordedDurableReads(group, result.output, mismatches);
       }
     }
   } finally {
@@ -110,6 +112,7 @@ async function runReplayInput(
 }
 
 interface ReplayGroup {
+  durableReads: ReplTranscriptDurableReadRecord[];
   input: ReplTranscriptInputRecord;
   output?: ReplTranscriptOutputRecord;
   streamEvents: ReplTranscriptStreamEventRecord[];
@@ -126,7 +129,11 @@ async function collectReplayGroups(
         throw new Error(`duplicate transcript input ordinal ${entry.ordinal}`);
       }
 
-      groups.set(entry.ordinal, { input: entry, streamEvents: [] });
+      groups.set(entry.ordinal, {
+        durableReads: [],
+        input: entry,
+        streamEvents: [],
+      });
       continue;
     }
 
@@ -140,6 +147,8 @@ async function collectReplayGroups(
 
     if (entry.recordKind === "output") {
       group.output = entry;
+    } else if (entry.recordKind === "durable-read") {
+      group.durableReads.push(entry);
     } else if (entry.recordKind === "stream-event") {
       group.streamEvents.push(entry);
     }
@@ -189,10 +198,6 @@ function compareRecordedStreamEvents(
   liveEvents: readonly TuvrenStreamEvent[],
   mismatches: ReplReplayMismatch[]
 ): void {
-  if (group.streamEvents.length === 0) {
-    return;
-  }
-
   const recordedEvents = group.streamEvents.map((record) =>
     serializeReplayComparableStreamEvent(record.event)
   );
@@ -210,6 +215,56 @@ function compareRecordedStreamEvents(
       recordKind: "stream-event",
     });
   }
+}
+
+function compareRecordedDurableReads(
+  group: ReplayGroup,
+  output: string | undefined,
+  mismatches: ReplReplayMismatch[]
+): void {
+  const recordedReads = group.durableReads.map((record) =>
+    serializeReplTranscriptRecord({
+      ...record,
+      recordedAtMs: 0,
+    })
+  );
+  const actualReads = readReplayDurableReads(group, output).map((record) =>
+    serializeReplTranscriptRecord({
+      ...record,
+      recordedAtMs: 0,
+    })
+  );
+  const expected = JSON.stringify(recordedReads);
+  const actual = JSON.stringify(actualReads);
+
+  if (expected !== actual) {
+    mismatches.push({
+      actual,
+      expected,
+      ordinal: group.input.ordinal,
+      recordKind: "durable-read",
+    });
+  }
+}
+
+function readReplayDurableReads(
+  group: ReplayGroup,
+  output: string | undefined
+): ReplTranscriptDurableReadRecord[] {
+  if (group.input.input !== ".messages show" || output === undefined) {
+    return [];
+  }
+
+  return [
+    {
+      operation: "readBranchMessages",
+      ordinal: group.input.ordinal,
+      recordKind: "durable-read",
+      recordedAtMs: 0,
+      result: JSON.parse(output) as unknown,
+      v: 1,
+    },
+  ];
 }
 
 function createReplayConfig(header: ReplTranscriptHeader): ReplConfig {

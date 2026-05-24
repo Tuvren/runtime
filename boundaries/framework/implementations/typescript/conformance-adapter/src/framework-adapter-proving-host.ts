@@ -106,11 +106,27 @@ function readProvingHostInput(input: unknown): ProvingHostInput {
   }
 
   return {
-    backend: checkInput.backend === "memory" ? "memory" : "memory",
-    providerMode: checkInput.providerMode === "fixture" ? "fixture" : "fixture",
+    backend: readLiteral(checkInput.backend, "memory", "backend"),
+    providerMode: readLiteral(
+      checkInput.providerMode,
+      "fixture",
+      "providerMode"
+    ),
     stdin:
       typeof checkInput.stdin === "string" ? checkInput.stdin : ".status\n",
   };
+}
+
+function readLiteral<T extends string>(
+  value: unknown,
+  expected: T,
+  label: string
+): T {
+  if (value === undefined || value === expected) {
+    return expected;
+  }
+
+  throw new Error(`unsupported proving-host ${label} "${String(value)}"`);
 }
 
 async function runCli(

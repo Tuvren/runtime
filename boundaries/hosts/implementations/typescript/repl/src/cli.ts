@@ -31,6 +31,7 @@ import { replayReplTranscript } from "./lib/repl-replay.js";
 import {
   createReplTranscriptFileWriter,
   type ReplTranscriptBackendConfig,
+  type ReplTranscriptDurableReadRecord,
   type ReplTranscriptHeader,
   type ReplTranscriptWriter,
   readReplTranscriptFile,
@@ -98,7 +99,23 @@ async function main(argv: readonly string[]): Promise<void> {
       await transcriptWriter?.close();
     }
   } catch (error: unknown) {
-    process.stderr.write(`${renderError(error)}\n`);
+    if (isHeadlessFailureJsonl(argv, process.env)) {
+      process.stdout.write(
+        `${JSON.stringify({
+          error: {
+            message: renderError(error),
+          },
+          ordinal: 0,
+          output: null,
+          recordKind: "output",
+          recordedAtMs: Date.now(),
+          v: 1,
+        })}\n`
+      );
+    } else {
+      process.stderr.write(`${renderError(error)}\n`);
+    }
+
     process.exitCode = 1;
   }
 }
@@ -306,6 +323,17 @@ async function writeTranscriptOutput(
     return false;
   }
 
+  const durableRead = readTranscriptDurableReadRecord(
+    input,
+    ordinal,
+    result.output,
+    Date.now()
+  );
+
+  if (durableRead !== undefined) {
+    await transcriptWriter?.writeEntry(durableRead);
+  }
+
   await transcriptWriter?.writeEntry({
     ...(result.exit === true ? { exit: true } : {}),
     ordinal,
@@ -316,6 +344,26 @@ async function writeTranscriptOutput(
   });
 
   return true;
+}
+
+function readTranscriptDurableReadRecord(
+  input: string,
+  ordinal: number,
+  output: string | undefined,
+  recordedAtMs: number
+): ReplTranscriptDurableReadRecord | undefined {
+  if (input !== ".messages show" || output === undefined) {
+    return undefined;
+  }
+
+  return {
+    operation: "readBranchMessages",
+    ordinal,
+    recordKind: "durable-read",
+    recordedAtMs,
+    result: JSON.parse(output) as unknown,
+    v: 1,
+  };
 }
 
 async function writeTranscriptErrorOutput(
@@ -410,6 +458,13 @@ function readRequiredCliValue(
 
 function isHeadlessMode(env: Record<string, string | undefined>): boolean {
   return env.TUVREN_REPL_MODE?.trim().toLowerCase() === "headless";
+}
+
+function isHeadlessFailureJsonl(
+  argv: readonly string[],
+  env: Record<string, string | undefined>
+): boolean {
+  return argv.includes("--headless") || isHeadlessMode(env);
 }
 
 function shouldUseAnsiColors(
