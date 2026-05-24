@@ -1285,7 +1285,7 @@ When the @tuvren/core/telemetry subpath is added
 Then TuvrenTelemetrySink, TelemetrySpan, TelemetryEvent, TelemetryLineage, and NoopTelemetrySink are exported from @tuvren/core/telemetry
 And TelemetrySpanKind and TelemetryEventKind are exported from @tuvren/core/telemetry
 And the package exports map and tsup config carry 10 entries
-And the merged core authority packet declares the telemetry binding section
+And the merged core authority packet declares the telemetry binding section and bumps its version
 And the shared core machine-readable sources and generated artifacts define the telemetry record shapes and kind unions
 And the portability gate recognizes the new subpath
 And typecheck and build pass
@@ -1339,7 +1339,7 @@ When the framework-operational-telemetry.json plan is added
 Then a deterministic aimock turn emits the expected lineage-keyed spans and events for turn, iteration, model, tool, checkpoint, approval transitions, and error paths
 And a targeted restart or recovery fixture emits the expected recovery records
 And the check set asserts those records through the in-memory capture sink, not the OTel projection
-And the merged core authority packet records framework-operational-telemetry.json so bun run conformance discovers it
+And the merged core authority packet records framework-operational-telemetry.json, bumps its version, and makes bun run conformance discover it
 And bun run conformance includes the new check set automatically
 ```
 
@@ -1442,7 +1442,7 @@ Given the §3.11 bounds shapes and §4.19 contract
 When ExecutionBounds and ExecutionBoundExceededDetails are added to @tuvren/core/execution
 Then both types are exported from @tuvren/core/execution
 And the execution_bound_exceeded code is documented in @tuvren/core/errors
-And the shared core machine-readable sources, generated artifacts, and merged core authority packet are updated for the new execution contract
+And the shared core machine-readable sources, generated artifacts, and merged core authority packet are updated for the new execution contract and the packet version is bumped
 And typecheck passes
 ```
 
