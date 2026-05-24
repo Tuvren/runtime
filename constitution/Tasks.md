@@ -1207,13 +1207,14 @@ And the findings name the scenarios the kernel-crash-recovery check set must cov
 - **Effort:** 5
 - **Dependencies:** `KRT-AU001`
 - **Capability / Contract Mapping:** PRD `CAP-P0-005`, `CAP-P0-006`; TechSpec ADR-045, §3.12, §4.20
-- **Description:** Implement `createFaultInjectingBackend(inner, plan)` and the `FaultPlan` type in `@tuvren/kernel-testkit` per §3.12 / §4.20. Wrap `transact` for transaction selection and branch scoping, and for supported durable backends consume backend-specific test-only persistence hooks so the seam can interrupt at `before-commit`, `mid-commit`, and `after-commit-before-ack`; support a `concurrentWriter` racing a branch head; honor `once` / `always` policy and the logical `match` predicate. `mid-commit` must be available only when the inner backend exposes the required test hooks; it must not be faked by pretending `RuntimeBackend.transact` alone can observe partial durable writes. Injected faults surface as the same `TuvrenPersistenceError` / `TuvrenRecoveryError` types real failures use. Add a dependency-direction check asserting no production package imports the seam.
+- **Description:** Implement `createFaultInjectingBackend(inner, plan)` and the `FaultPlan` type in `@tuvren/kernel-testkit` per §3.12 / §4.20. Wrap `transact` for transaction selection and branch scoping, and for supported durable backends add and consume backend-specific test-only persistence hooks so the seam can interrupt at `before-commit`, `mid-commit`, and `after-commit-before-ack`; support a `concurrentWriter` racing a branch head; honor `once` / `always` policy and the logical `match` predicate. `mid-commit` must be available only when the inner backend exposes the required test hooks; it must not be faked by pretending `RuntimeBackend.transact` alone can observe partial durable writes. Injected faults surface as the same `TuvrenPersistenceError` / `TuvrenRecoveryError` types real failures use. Add a dependency-direction check asserting no production package imports the seam.
 - **Acceptance Criteria (Gherkin):**
 ```gherkin
 Given the §3.12 FaultPlan shape and §4.20 seam contract
 When createFaultInjectingBackend is implemented in @tuvren/kernel-testkit
 Then a test can wrap any supported RuntimeBackend and inject a fault at before-commit or after-commit-before-ack
 And mid-commit injection is available only when the inner backend exposes the required test-only commit hooks
+And SQLite and PostgreSQL expose those test-only commit hooks through the testkit seam rather than through production APIs
 And the seam can simulate a concurrent writer racing the same branch head
 And injected faults surface as the same TuvrenPersistenceError or TuvrenRecoveryError types real failures use
 And a dependency check confirms no production package imports the seam
@@ -1276,7 +1277,7 @@ And fresh compatibility evidence reflects the kernel-crash-recovery results
 - **Effort:** 5
 - **Dependencies:** None
 - **Capability / Contract Mapping:** PRD `CAP-P0-052`; TechSpec ADR-042, §3.10, §4.18
-- **Description:** Add the `./telemetry` subpath to `@tuvren/core`: `TuvrenTelemetrySink`, `TelemetrySpan`, `TelemetryEvent`, `TelemetryLineage`, `TelemetrySpanKind`, `TelemetryEventKind`, and `NoopTelemetrySink` (§3.10, §4.18). Update the package `exports` map (10 entries), `tsup.config.ts` (10 entries), the merged core authority packet (one new binding section), and `tools/scripts/portability-gate.ts` for the new subpath.
+- **Description:** Add the `./telemetry` subpath to `@tuvren/core`: `TuvrenTelemetrySink`, `TelemetrySpan`, `TelemetryEvent`, `TelemetryLineage`, `TelemetrySpanKind`, `TelemetryEventKind`, and `NoopTelemetrySink` (§3.10, §4.18). Update the package `exports` map (10 entries), `tsup.config.ts` (10 entries), the merged core authority packet (one new binding section plus authoritative source entries), the shared core machine-readable sources and generated artifacts for the new telemetry shapes, and `tools/scripts/portability-gate.ts` for the new subpath.
 - **Acceptance Criteria (Gherkin):**
 ```gherkin
 Given the §3.10 record shapes and §4.18 sink contract
@@ -1285,6 +1286,7 @@ Then TuvrenTelemetrySink, TelemetrySpan, TelemetryEvent, TelemetryLineage, and N
 And TelemetrySpanKind and TelemetryEventKind are exported from @tuvren/core/telemetry
 And the package exports map and tsup config carry 10 entries
 And the merged core authority packet declares the telemetry binding section
+And the shared core machine-readable sources and generated artifacts define the telemetry record shapes and kind unions
 And the portability gate recognizes the new subpath
 And typecheck and build pass
 ```
@@ -1313,14 +1315,14 @@ And the telemetry surface reuses the same canonical event vocabulary as the even
 - **Effort:** 5
 - **Dependencies:** `KRT-AV001`
 - **Capability / Contract Mapping:** PRD `CAP-P1-053`; TechSpec ADR-042, §4.18, §5.6.2
-- **Description:** Create `@tuvren/telemetry-otel` under `boundaries/framework/implementations/typescript/telemetry-otel/`, peer-depending on `@tuvren/core`. Implement `createOtelTelemetrySink(options): TuvrenTelemetrySink` mapping `TelemetrySpan` / `TelemetryEvent` onto OpenTelemetry spans/events using the authored semconv attributes from `telemetry/semconv/tuvren-runtime.yaml`. Pin exact `@opentelemetry/*` versions in this epic's manifest change. Record the OTel projection as a standing implementation-specific portability exception alongside AG-UI.
+- **Description:** Create `@tuvren/telemetry-otel` under `boundaries/framework/implementations/typescript/telemetry-otel/`, peer-depending on `@tuvren/core`. Implement `createOtelTelemetrySink(options): TuvrenTelemetrySink` mapping `TelemetrySpan` / `TelemetryEvent` onto OpenTelemetry spans/events using the authored semconv attributes from `telemetry/semconv/tuvren-runtime.yaml`. Pin exact `@opentelemetry/*` versions in this epic's manifest change. Record the OTel projection as a standing implementation-specific portability exception in both the live portability inventory JSON and its paired Markdown inventory, preserving the existing standing exceptions already recorded there.
 - **Acceptance Criteria (Gherkin):**
 ```gherkin
 Given the telemetry sink contract and the authored semconv vocabulary
 When @tuvren/telemetry-otel is implemented
 Then createOtelTelemetrySink returns a TuvrenTelemetrySink that maps records onto OpenTelemetry spans and events using the semconv attributes
 And the package peer-depends on @tuvren/core and pins exact @opentelemetry/* versions
-And the OTel projection is recorded as a standing implementation-specific portability exception alongside AG-UI
+And the OTel projection is recorded in the live portability inventory JSON and Markdown without dropping any existing standing exceptions
 And a unit test verifies the record-to-OTel mapping
 ```
 
@@ -1433,13 +1435,14 @@ And bun run conformance includes the new check set automatically
 - **Effort:** 3
 - **Dependencies:** None
 - **Capability / Contract Mapping:** PRD `CAP-P0-054`; TechSpec ADR-043, §3.11, §4.19
-- **Description:** Add `ExecutionBounds` and `ExecutionBoundExceededDetails` to `@tuvren/core/execution` (§3.11) and document the stable `execution_bound_exceeded` `TuvrenRuntimeError` code in `@tuvren/core/errors`.
+- **Description:** Add `ExecutionBounds` and `ExecutionBoundExceededDetails` to `@tuvren/core/execution` (§3.11) and document the stable `execution_bound_exceeded` `TuvrenRuntimeError` code in `@tuvren/core/errors`. Update the shared core machine-readable sources, generated artifacts, and merged core authority packet for the new execution contract.
 - **Acceptance Criteria (Gherkin):**
 ```gherkin
 Given the §3.11 bounds shapes and §4.19 contract
 When ExecutionBounds and ExecutionBoundExceededDetails are added to @tuvren/core/execution
 Then both types are exported from @tuvren/core/execution
 And the execution_bound_exceeded code is documented in @tuvren/core/errors
+And the shared core machine-readable sources, generated artifacts, and merged core authority packet are updated for the new execution contract
 And typecheck passes
 ```
 
@@ -1472,7 +1475,7 @@ And a driver that always requests continue cannot exceed the framework bound
 **KRT-AW007 `runtime-api-execution-bounds` Check Set**
 - **Type:** Feature
 - **Effort:** 5
-- **Dependencies:** `KRT-AW006`
+- **Dependencies:** `KRT-AW006`, `KRT-AV004`
 - **Capability / Contract Mapping:** PRD `CAP-P0-054`; TechSpec ADR-043, §5.6.4
 - **Description:** Add the `runtime-api-execution-bounds` check set to `runtime-api-callables-extended.json` using a runaway aimock driver fixture that always requests continue. Assert each hard-stop bound's breach yields a `failed` result with code `execution_bound_exceeded` and the correct `details`, that a configured capture sink observes the `execution.bounded` telemetry event, that `AgentConfig.maxIterations` is clamped by `bounds.maxIterations`, that `maxConcurrentToolCalls` is enforced by throttling parallel tool execution to the configured cap, that invalid non-finite or non-positive bound configuration is rejected, and that a within-bounds control turn completes normally.
 - **Acceptance Criteria (Gherkin):**
