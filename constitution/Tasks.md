@@ -1373,13 +1373,14 @@ And fresh compatibility evidence reflects the operational-telemetry lane
 - **Effort:** 3
 - **Dependencies:** None
 - **Capability / Contract Mapping:** PRD `CAP-P0-055`; TechSpec ADR-044, §5.6.3
-- **Description:** Implement the telemetry secret-screening helpers consumed by `KRT-AV002`'s emission path: an attribute allowlist keyed only to `telemetry/semconv/tuvren-runtime.yaml` (reject or drop credential-shaped keys such as `authorization`, `token`, `password`, `api-key`, `secret`) plus a telemetry-error-summary sanitizer that strips raw provider, MCP, backend, and transport error text down to a runtime-safe summary with no secret-bearing values. If operational telemetry needs a new canonical attribute (for example bounded-execution `bound`, `limit`, or `observed`), update the semconv source in the same change before the allowlist admits it.
+- **Description:** Implement the telemetry secret-screening helpers consumed by `KRT-AV002`'s emission path: an attribute allowlist keyed only to `telemetry/semconv/tuvren-runtime.yaml` (reject or drop credential-shaped keys such as `authorization`, `token`, `password`, `api-key`, `secret`, and drop or sanitize secret-like values on otherwise allowed keys) plus a telemetry-error-summary sanitizer that strips raw provider, MCP, backend, and transport error text down to a runtime-safe summary with no secret-bearing values. If operational telemetry needs a new canonical attribute (for example bounded-execution `bound`, `limit`, or `observed`), update the semconv source in the same change before the allowlist admits it.
 - **Acceptance Criteria (Gherkin):**
 ```gherkin
 Given the authored semconv attribute vocabulary in telemetry/semconv/tuvren-runtime.yaml
 When the telemetry secret-screening helpers are implemented
 Then only keys declared in telemetry/semconv/tuvren-runtime.yaml pass through to a telemetry record
 And credential-shaped keys such as authorization, token, password, api-key, and secret are rejected or dropped
+And secret-like values on otherwise allowed telemetry keys are dropped or sanitized before emission
 And any newly required canonical runtime telemetry attribute is added to the semconv source in the same change before the helper allows it
 And telemetry error summaries exclude raw headers, tokens, connection strings, credential-bearing URLs, and other secret-bearing text
 And the helpers are exported for consumption by the framework emission path
@@ -1442,15 +1443,16 @@ And bun run conformance includes the new check set automatically
 - **Effort:** 3
 - **Dependencies:** None
 - **Capability / Contract Mapping:** PRD `CAP-P0-054`; TechSpec ADR-043, §3.11, §4.19
-- **Description:** Add `ExecutionBounds`, `ExecutionBoundExceededDetails`, and the cooperative provider-cancellation surface needed by `maxWallClockMs` (including `TuvrenPrompt.signal`) to the shared core contracts, and document the stable `execution_bound_exceeded` `TuvrenRuntimeError` code in `@tuvren/core/errors`. Update the shared core machine-readable sources, generated artifacts, and merged core authority packet for the new execution and provider contract.
+- **Description:** Add `ExecutionBounds` and `ExecutionBoundExceededDetails` to the shared core execution contracts, and add the cooperative provider-cancellation surface needed by `maxWallClockMs` (including `TuvrenPrompt.signal`) to the provider contract authority owned by `boundaries/providers/contracts/provider-api/` as well as the host-facing `@tuvren/core/provider` export surface. Document the stable `execution_bound_exceeded` `TuvrenRuntimeError` code in `@tuvren/core/errors`. Update the shared core execution machine-readable sources, generated artifacts, and merged core authority packet, plus the provider-api machine-readable sources, generated artifacts, and authority packet, for the new cancellation-aware contract.
 - **Acceptance Criteria (Gherkin):**
 ```gherkin
 Given the §3.11 bounds shapes and §4.19 contract
 When ExecutionBounds and ExecutionBoundExceededDetails are added to @tuvren/core/execution
 Then ExecutionBounds and ExecutionBoundExceededDetails are exported from @tuvren/core/execution
 And the shared provider contract includes the cooperative TuvrenPrompt.signal cancellation field
+And the provider-api machine-readable sources, generated artifacts, and authority packet are updated for that cancellation field and bumped as required
 And the execution_bound_exceeded code is documented in @tuvren/core/errors
-And the shared core machine-readable sources, generated artifacts, and merged core authority packet are updated for the new execution contract and the packet version is bumped
+And the shared core execution machine-readable sources, generated artifacts, and merged core authority packet are updated for the new execution contract and bumped as required
 And typecheck passes
 ```
 

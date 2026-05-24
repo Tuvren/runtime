@@ -196,9 +196,9 @@
 
 - **Logical Type:** Outbound operational-telemetry adaptation boundary
 - **Responsibility:** Observe canonical runtime activity and produce correlated operational telemetry — structured records of turns, runs, model interactions, tool calls, checkpoints, approvals, steering, recovery events, and errors — keyed to runtime lineage concepts (thread, branch, turn, run, TurnNode) so an operator can reconstruct what a turn did after the fact. This surface is distinct from the Event Stream Adapter Layer: the event stream serves a host UI consuming one live turn, while operational telemetry serves monitoring, postmortems, performance investigation, and incident response, and may correlate across turns and runs. The canonical telemetry vocabulary is boundary-owned portable authority; a vendor-neutral export edge projects that vocabulary into standard observability tooling without coupling the runtime to any one vendor or wire format. The boundary must never emit secrets (see the Secret Isolation Model in §5).
-- **Inputs:** Canonical runtime activity signals from Framework Shared Services, Driver Runtime, Tool Execution Gateway, Orchestration Runtime, and Kernel Boundary (including checkpoint and recovery events); telemetry configuration (sampling, redaction, export target selection).
+- **Inputs:** Canonical runtime activity signals from Framework Shared Services, Driver Runtime, Tool Execution Gateway, and Orchestration Runtime, including checkpoint and recovery telemetry derived by framework/runtime observation of kernel outcomes rather than by direct kernel-owned emission; telemetry configuration (sampling, redaction, export target selection).
 - **Outputs:** Correlated operational telemetry records in the canonical telemetry vocabulary; vendor-neutral telemetry exports for external observability tooling.
-- **Depends on:** Framework Shared Services, Driver Runtime, Tool Execution Gateway, Orchestration Runtime, Kernel Boundary.
+- **Depends on:** Framework Shared Services, Driver Runtime, Tool Execution Gateway, Orchestration Runtime.
 
 ### Reference Host
 
