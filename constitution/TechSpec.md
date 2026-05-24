@@ -3111,7 +3111,7 @@ the multi-language transition foundation:
 │   │           │   │                         # grow to cover events, execution, driver, provider,
 │   │           │   │                         # extensions subpaths as their TypeSpec sources are
 │   │           │   │                         # authored
-│   │           │   └── authority-packet.json # one merged packet declaring all 8 subpath surfaces
+│   │           │   └── authority-packet.json # one merged packet declaring all 9 subpath surfaces
 │   │           ├── artifacts/
 │   │           │   ├── json-schema/
 │   │           │   └── openapi/
@@ -3417,7 +3417,7 @@ Order within the epic (must include §5.6.3's telemetry secret-screening rules):
 3. Apply the secret allowlist and telemetry-error sanitization (§5.6.3) before records reach the sink.
 4. Create `@tuvren/telemetry-otel` under `boundaries/framework/implementations/typescript/telemetry-otel/`, peer-depending on `@tuvren/core`; implement `createOtelTelemetrySink(options)` mapping records onto OpenTelemetry spans/events using the authored semconv attributes. Pin exact `@opentelemetry/*` versions in this epic's manifest change.
 5. Add the `framework-operational-telemetry.json` plan (check set `runtime-api-operational-telemetry`) asserting lineage-keyed emission for a deterministic aimock turn via an in-memory capture sink in the framework testkit, plus a targeted restart/recovery fixture for the recovery records. Record the plan in `boundaries/shared/contracts/core/spec/authority-packet.json` so the framework runner discovers it, and record the OTel projection as a standing implementation-specific exception (alongside AG-UI) in the portability inventory.
-6. Re-export `NoopTelemetrySink` from `@tuvren/runtime`. Run `bun run verify`.
+6. Re-export `NoopTelemetrySink` plus the telemetry record types from `@tuvren/runtime`. Run `bun run verify`.
 
 #### 5.6.3 Secret Isolation (ADR-044, Epic AW; allowlist consumed by AV)
 

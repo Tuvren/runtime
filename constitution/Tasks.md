@@ -10,7 +10,7 @@
 ## 1. Executive Summary & Active Critical Path
 
 - **Total Active Story Points:** 83 across the production-trust block — Epic AU (23), Epic AV (24), and Epic AW (36). Epics AM (32), AN (13), AO (26), AP (37), AQ (15), AR (15), AS (31), and AT (34) are closed and remain in this live plan as recently completed context for audit.
-- **Critical Path:** `KRT-AW001 → KRT-AV001 → KRT-AV002`, then the branch splits: `KRT-AV004 → KRT-AW004` for telemetry-secret isolation, while `KRT-AW005` converges with `KRT-AV002` into `KRT-AW006 → KRT-AW007 → KRT-AW008` for execution bounds. The durability-proof track `KRT-AU001 → KRT-AU002 → KRT-AU003 → KRT-AU004 → KRT-AU005` remains fully independent and may start immediately.
+- **Critical Path:** `KRT-AV001 → KRT-AV002`, with `KRT-AW001` feeding `KRT-AV002`; then the branch splits: `KRT-AV004 → KRT-AW004` for telemetry-secret isolation, while `KRT-AW005` converges with `KRT-AV002` into `KRT-AW006 → KRT-AW007 → KRT-AW008` for execution bounds. The durability-proof track `KRT-AU001 → KRT-AU002 → KRT-AU003 → KRT-AU004 → KRT-AU005` remains fully independent and may start immediately.
 - **Planning Assumptions:** PRD v0.8.0, Architecture v0.8.0, and TechSpec v0.28.0 (ADR-042 through ADR-045) are approved upstream and govern this block; the prior chain (PRD v0.7.0 / Architecture v0.7.0 / TechSpec v0.27.x, ADR-034 through ADR-041, Epics AM-AT) is closed. The production-trust block hardens the existing TypeScript line and does NOT reopen Rust framework/product work, additional drivers, additional host protocols, additional backends, or broader provider families. The `product proof gate`, `platform gate`, and `portability gate` from Epic AL remain the staged-gate baseline. The locked external dependency versions per TechSpec §1 still apply; `@tuvren/telemetry-otel` pins its `@opentelemetry/*` versions in Epic AV per the §1 pin-on-activation rule. The new `@tuvren/core/telemetry` subpath raises the curated core surface from 8 to 9 subpaths; `@tuvren/telemetry-otel` is an implementation-specific projection (a standing portability exception alongside AG-UI) while the canonical telemetry vocabulary (`telemetry/semconv/tuvren-runtime.yaml`) remains portable authority.
 
 ### Brownfield Continuity Note
@@ -1281,6 +1281,7 @@ And fresh compatibility evidence reflects the kernel-crash-recovery results
 Given the §3.10 record shapes and §4.18 sink contract
 When the @tuvren/core/telemetry subpath is added
 Then TuvrenTelemetrySink, TelemetrySpan, TelemetryEvent, TelemetryLineage, and NoopTelemetrySink are exported from @tuvren/core/telemetry
+And TelemetrySpanKind and TelemetryEventKind are exported from @tuvren/core/telemetry
 And the package exports map and tsup config carry 10 entries
 And the merged core authority packet declares the telemetry binding section
 And the portability gate recognizes the new subpath
@@ -1417,10 +1418,10 @@ And the cross-surface absence assertions remain the responsibility of KRT-AW004
 Given the telemetry secret-screening helpers, transcript redactor, and edge-confinement fixtures exist
 When the secret-isolation check set is added to the MCP, telemetry, and runtime-api plans
 Then a fixture configures a provider key plus MCP bearer-auth and header-auth secrets and runs a turn
-And the check set asserts neither secret value appears in any persisted kernel record
-And the check set asserts neither secret value appears in captured canonical stream events
-And the check set asserts neither secret value appears in captured telemetry attributes or error summaries
-And the check set asserts neither secret value appears in the recorded transcript
+And the check set asserts none of the configured secret values appear in any persisted kernel record
+And the check set asserts none of the configured secret values appear in captured canonical stream events
+And the check set asserts none of the configured secret values appear in captured telemetry attributes or error summaries
+And the check set asserts none of the configured secret values appear in the recorded transcript
 And bun run conformance includes the new check set automatically
 ```
 
