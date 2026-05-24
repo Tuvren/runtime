@@ -30,6 +30,7 @@ export interface ReplTranscriptHeader {
     backend: ReplTranscriptBackendConfig;
     modelId?: string;
     providerMode: string;
+    scenario?: string;
     systemPrompt?: string;
   };
   recordedAtMs: number;
@@ -310,6 +311,7 @@ function validateTranscriptHeader(
 
   requireString(value.config.providerMode, "header.config.providerMode");
   requireOptionalString(value.config.modelId, "header.config.modelId");
+  requireOptionalString(value.config.scenario, "header.config.scenario");
   requireOptionalString(
     value.config.systemPrompt,
     "header.config.systemPrompt"

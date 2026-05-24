@@ -33,7 +33,11 @@ import {
   type ReplTranscriptStreamEventRecord,
   serializeReplTranscriptRecord,
 } from "./repl-transcript.js";
-import type { ReplConfig, ReplProviderMode } from "./repl-types.js";
+import type {
+  ReplConfig,
+  ReplProviderMode,
+  ReplScenarioName,
+} from "./repl-types.js";
 
 export interface ReplReplayMismatch {
   actual: string;
@@ -90,6 +94,7 @@ export async function replayReplTranscript(
         compareRecordedDurableReads(group, result.output, mismatches);
       } else {
         nonDeterministicRecorded = true;
+        compareRecordedOutputPresence(group, liveOutput, mismatches);
       }
     }
   } finally {
@@ -275,6 +280,23 @@ function compareRecordedOutput(
   }
 }
 
+function compareRecordedOutputPresence(
+  group: ReplayGroup,
+  liveOutput: ReplTranscriptOutputRecord,
+  mismatches: ReplReplayMismatch[]
+): void {
+  if (group.output !== undefined) {
+    return;
+  }
+
+  mismatches.push({
+    actual: serializeReplTranscriptRecord(liveOutput),
+    expected: "<missing output record>",
+    ordinal: group.input.ordinal,
+    recordKind: "output",
+  });
+}
+
 function serializeReplayComparableOutput(
   output: ReplTranscriptOutputRecord
 ): string {
@@ -397,7 +419,7 @@ function createReplayConfig(header: ReplTranscriptHeader): ReplConfig {
     backend: backend.kind,
     modelId: header.config.modelId,
     providerMode: readProviderMode(header.config.providerMode),
-    scenario: "streaming",
+    scenario: readScenarioName(header.config.scenario),
     sqlitePath: readSqlitePath(backend.options),
     systemPrompt: header.config.systemPrompt,
     ...readPostgresOptions(backend.options),
@@ -481,6 +503,19 @@ function isVolatileReplayEventKey(key: string): boolean {
 function readReplayStreamText(
   events: readonly TuvrenStreamEvent[]
 ): string | undefined {
+  const structuredDone = [...events]
+    .reverse()
+    .find(
+      (
+        event
+      ): event is Extract<TuvrenStreamEvent, { type: "structured.done" }> =>
+        event.type === "structured.done"
+    );
+
+  if (structuredDone !== undefined) {
+    return JSON.stringify(structuredDone.data);
+  }
+
   const textDone = [...events]
     .reverse()
     .find(
@@ -542,6 +577,27 @@ function readProviderMode(value: string): ReplProviderMode {
       return value;
     default:
       throw new Error(`unsupported transcript provider mode "${value}"`);
+  }
+}
+
+function readScenarioName(value: string | undefined): ReplScenarioName {
+  const scenario = value ?? "streaming";
+
+  switch (scenario) {
+    case "approval":
+    case "branching":
+    case "cancel":
+    case "extension":
+    case "metadata":
+    case "orchestration":
+    case "reload":
+    case "steering":
+    case "streaming":
+    case "structured":
+    case "tools":
+      return scenario;
+    default:
+      throw new Error(`unsupported transcript scenario "${value}"`);
   }
 }
 

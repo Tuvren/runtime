@@ -899,7 +899,7 @@ interface BranchMessagesCursorPayload {
   - Field ordering within each record is alphabetical to support deterministic textual comparison across recordings.
   - Timestamps use `EpochMs` (signed safe-integer Unix epoch milliseconds).
   - Streaming event payloads are captured as canonical `TuvrenStreamEvent` records, not protocol-projected (SSE or AG-UI) forms.
-  - The header records the backend kind plus required options so replay can construct a matching fresh runtime. Provider mode is captured as well, but a transcript recorded against a real provider may produce non-deterministic replay output; the replay report distinguishes deterministic-asserted from non-deterministic-recorded records.
+  - The header records the backend kind plus required options so replay can construct a matching fresh runtime. Provider mode and scenario are captured as well, but a transcript recorded against a real provider may produce non-deterministic replay output; the replay report distinguishes deterministic-asserted from non-deterministic-recorded records.
   - A transcript file is forward-compatible across runtime minor versions: header `runtimeVersion` is informational; replay does not fail on version mismatch but emits a warning.
 - **File format:**
 
@@ -912,6 +912,7 @@ type TranscriptHeader = {
   config: {
     backend: { kind: BackendKind; options?: unknown };
     providerMode: string;             // e.g. "aimock-openai" | "ai-sdk-google"
+    scenario?: string;                // defaults to "streaming" for older transcripts
     modelId?: string;
     systemPrompt?: string;
   };

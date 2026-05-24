@@ -116,7 +116,8 @@ export async function runReplHeadlessMode(
           },
         });
         await Promise.all(transcriptWrites);
-        const output = result.output ?? readHeadlessStreamText(canonicalEvents);
+        const output =
+          result.output ?? readHeadlessStreamOutput(canonicalEvents);
         await options.transcriptWriter?.writeEntry({
           ...(result.exit === true ? { exit: true } : {}),
           ordinal: currentOrdinal,
@@ -213,9 +214,22 @@ function parseHeadlessDurableReadOutput(output: string): unknown | undefined {
   }
 }
 
-function readHeadlessStreamText(
+function readHeadlessStreamOutput(
   events: readonly TuvrenStreamEvent[]
 ): string | undefined {
+  const structuredDone = [...events]
+    .reverse()
+    .find(
+      (
+        event
+      ): event is Extract<TuvrenStreamEvent, { type: "structured.done" }> =>
+        event.type === "structured.done"
+    );
+
+  if (structuredDone !== undefined) {
+    return JSON.stringify(structuredDone.data);
+  }
+
   const textDone = [...events]
     .reverse()
     .find(

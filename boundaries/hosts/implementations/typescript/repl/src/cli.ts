@@ -237,7 +237,7 @@ async function runInteractiveShell(
 
         liveOutput.finish();
 
-        const output = result.output ?? readStreamText(canonicalEvents);
+        const output = result.output ?? readStreamOutput(canonicalEvents);
 
         if (
           await writeTranscriptOutput(
@@ -401,9 +401,22 @@ function isMessagesShowInput(input: string): boolean {
   );
 }
 
-function readStreamText(
+function readStreamOutput(
   events: readonly TuvrenStreamEvent[]
 ): string | undefined {
+  const structuredDone = [...events]
+    .reverse()
+    .find(
+      (
+        event
+      ): event is Extract<TuvrenStreamEvent, { type: "structured.done" }> =>
+        event.type === "structured.done"
+    );
+
+  if (structuredDone !== undefined) {
+    return JSON.stringify(structuredDone.data);
+  }
+
   const textDone = [...events]
     .reverse()
     .find(
@@ -452,6 +465,7 @@ function createTranscriptHeader(config: ReplConfig): ReplTranscriptHeader {
       backend: createTranscriptBackendConfig(config),
       modelId: config.modelId,
       providerMode: config.providerMode,
+      scenario: config.scenario,
       systemPrompt: config.systemPrompt,
     },
     recordedAtMs: Date.now(),

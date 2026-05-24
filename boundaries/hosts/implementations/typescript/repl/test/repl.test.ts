@@ -2260,6 +2260,52 @@ describe("repl host scenarios", () => {
     });
   });
 
+  test("CLI replays deterministic structured transcripts with recorded scenario", async () => {
+    const transcriptPath = join(
+      tmpdir(),
+      `tuvren-repl-structured-replay-${Date.now()}.jsonl`
+    );
+    const recordResult = await runCliProcess({
+      argv: [
+        "--backend",
+        "memory",
+        "--provider",
+        "fixture",
+        "--scenario",
+        "structured",
+        "--headless",
+        "--record",
+        transcriptPath,
+      ],
+      stdin: "Hello structured replay\n",
+    });
+    const replayResult = await runCliProcess({
+      argv: ["--replay", transcriptPath],
+    });
+    const records = parseHeadlessOutputRecords(recordResult.stdout);
+
+    expect(recordResult.exitCode).toBe(0);
+    expect(records[0]?.output).toBe(
+      '{"scenario":"structured","status":"ready"}'
+    );
+    expect(replayResult.exitCode).toBe(0);
+    expect(replayResult.stderr).toBe("");
+    expect(JSON.parse(replayResult.stdout)).toMatchObject({
+      deterministicAsserted: true,
+      inputCount: 1,
+      mismatches: [],
+      providerMode: "fixture",
+      status: "passed",
+    });
+
+    const transcript = await readReplTranscriptFile(transcriptPath);
+
+    expect(transcript.header.config).toMatchObject({
+      providerMode: "fixture",
+      scenario: "structured",
+    });
+  });
+
   test("CLI records interactive streamed sessions as replayable transcripts", async () => {
     const transcriptPath = join(
       tmpdir(),
@@ -2626,6 +2672,39 @@ describe("repl host scenarios", () => {
       status: "passed",
     });
   });
+
+  test("non-deterministic replay fails when output evidence is missing", async () => {
+    const header = {
+      ...createTranscriptHeaderFixture(),
+      config: {
+        backend: {
+          kind: "memory",
+        },
+        providerMode: "ai-sdk-mock",
+        scenario: "streaming",
+      },
+    } satisfies ReplTranscriptHeader;
+    const transcript = await readReplTranscriptFromLines([
+      serializeReplTranscriptRecord(header),
+      serializeReplTranscriptRecord({
+        input: "Hello without output evidence",
+        ordinal: 0,
+        recordedAtMs: 2001,
+        recordKind: "input",
+        v: 1,
+      }),
+    ]);
+    const report = await replayReplTranscript(transcript);
+
+    expect(report.status).toBe("failed");
+    expect(report).toMatchObject({
+      deterministicAsserted: false,
+      inputCount: 1,
+      nonDeterministicRecorded: true,
+      providerMode: "ai-sdk-mock",
+    });
+    expect(report.mismatches[0]?.recordKind).toBe("output");
+  });
 });
 
 function readCommandArray(
@@ -2672,6 +2751,7 @@ function createTranscriptHeaderFixture(): ReplTranscriptHeader {
       },
       modelId: "fixture-model",
       providerMode: "fixture",
+      scenario: "streaming",
       systemPrompt: "Be concise.",
     },
     recordedAtMs: 1000,
