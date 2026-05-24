@@ -72,6 +72,7 @@ export function createFrameworkAdapterProvingHost(): {
           result: {
             provingHost: {
               headlessRecordKinds: parseJsonlKinds(record.stdout),
+              headlessOutputs: parseJsonlOutputs(record.stdout),
               replay: JSON.parse(replay.stdout) as unknown,
               transcriptRecordKinds: parseJsonlKinds(
                 await readFile(transcriptPath, "utf8")
@@ -93,7 +94,10 @@ interface ProvingHostInput {
 }
 
 function readProvingHostInput(input: unknown): ProvingHostInput {
-  if (!isRecord(input)) {
+  const checkInput =
+    isRecord(input) && isRecord(input.checkInput) ? input.checkInput : input;
+
+  if (!isRecord(checkInput)) {
     return {
       backend: "memory",
       providerMode: "fixture",
@@ -102,9 +106,10 @@ function readProvingHostInput(input: unknown): ProvingHostInput {
   }
 
   return {
-    backend: input.backend === "memory" ? "memory" : "memory",
-    providerMode: input.providerMode === "fixture" ? "fixture" : "fixture",
-    stdin: typeof input.stdin === "string" ? input.stdin : ".status\n",
+    backend: checkInput.backend === "memory" ? "memory" : "memory",
+    providerMode: checkInput.providerMode === "fixture" ? "fixture" : "fixture",
+    stdin:
+      typeof checkInput.stdin === "string" ? checkInput.stdin : ".status\n",
   };
 }
 
@@ -151,6 +156,18 @@ function parseJsonlKinds(text: string): string[] {
     .split("\n")
     .filter((line) => line.trim().length > 0)
     .map((line) => readRecordKind(JSON.parse(line) as unknown));
+}
+
+function parseJsonlOutputs(text: string): string[] {
+  return text
+    .split("\n")
+    .filter((line) => line.trim().length > 0)
+    .map((line) => JSON.parse(line) as unknown)
+    .filter(
+      (record): record is { output: string } =>
+        isRecord(record) && typeof record.output === "string"
+    )
+    .map((record) => record.output);
 }
 
 function readRecordKind(value: unknown): string {

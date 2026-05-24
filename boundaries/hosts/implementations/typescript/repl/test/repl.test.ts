@@ -1962,13 +1962,46 @@ describe("repl host scenarios", () => {
     );
     expect(outputRecords).toHaveLength(2);
     expect(outputRecords[0]?.ordinal).toBe(0);
+    expect(outputRecords[0]?.output).toBe("REPL streaming complete.");
     expect(outputRecords[1]?.exit).toBe(true);
+  });
+
+  test("headless mode emits final assistant text without stream JSONL", async () => {
+    const shell = createReplShell({
+      backend: "memory",
+      providerMode: "fixture",
+      scenario: "streaming",
+    });
+    const chunks: string[] = [];
+
+    await runReplHeadlessMode({
+      input: Readable.from(["Hello from non-streaming headless mode\n.exit\n"]),
+      now: () => 6789,
+      output: {
+        write(chunk: string | Uint8Array): boolean {
+          chunks.push(String(chunk));
+          return true;
+        },
+      },
+      shell,
+    });
+
+    const records = parseHeadlessOutputRecords(chunks.join(""));
+
+    expect(records).toHaveLength(2);
+    expect(records[0]).toMatchObject({
+      ordinal: 0,
+      output: "REPL streaming complete.",
+      recordKind: "output",
+      recordedAtMs: 6789,
+    });
+    expect(records[1]?.exit).toBe(true);
   });
 
   test("CLI --headless emits one JSON output record per stdin input", async () => {
     const result = await runCliProcess({
       argv: ["--backend", "memory", "--provider", "fixture", "--headless"],
-      stdin: ".status\n.exit\n",
+      stdin: "Hello from headless CLI\n.exit\n",
     });
     const records = parseHeadlessOutputRecords(result.stdout);
 
@@ -1978,7 +2011,7 @@ describe("repl host scenarios", () => {
     expect(records).toHaveLength(2);
     expect(records[0]?.recordKind).toBe("output");
     expect(records[0]?.ordinal).toBe(0);
-    expect(String(records[0]?.output)).toContain('"providerMode": "fixture"');
+    expect(records[0]?.output).toBe("REPL streaming complete.");
     expect(records[1]?.exit).toBe(true);
   });
 
@@ -2095,7 +2128,7 @@ describe("repl host scenarios", () => {
         "--record",
         transcriptPath,
       ],
-      stdin: ".status\n",
+      stdin: "Hello from replay\n",
     });
     const replayResult = await runCliProcess({
       argv: ["--replay", transcriptPath],
@@ -2277,7 +2310,7 @@ describe("repl host scenarios", () => {
   test("records non-deterministic replay output without asserting equality", async () => {
     const transcript = await createStatusReplayTranscript({
       outputOverride: "{}",
-      providerMode: "ai-sdk-google",
+      providerMode: "ai-sdk-mock",
     });
     const report = await replayReplTranscript(transcript);
 
@@ -2286,7 +2319,7 @@ describe("repl host scenarios", () => {
       inputCount: 1,
       mismatches: [],
       nonDeterministicRecorded: true,
-      providerMode: "ai-sdk-google",
+      providerMode: "ai-sdk-mock",
       status: "passed",
     });
   });

@@ -14,7 +14,9 @@
  * limitations under the License.
  */
 
+import process from "node:process";
 import type { TuvrenStreamEvent } from "@tuvren/runtime";
+import { readReplEnv } from "./repl-config.js";
 import { createReplHostUsingCreateTuvren } from "./repl-host.js";
 import {
   createReplShellFromHost,
@@ -65,10 +67,11 @@ export async function replayReplTranscript(
     for (const group of groups) {
       const liveEvents: TuvrenStreamEvent[] = [];
       const result = await runReplayInput(shell, group.input.input, liveEvents);
+      const output = result.output ?? readReplayStreamText(liveEvents);
       const liveOutput = {
         ...(result.exit === true ? { exit: true } : {}),
         ordinal: group.input.ordinal,
-        output: result.output ?? null,
+        output: output ?? null,
         recordKind: "output",
         recordedAtMs: group.output?.recordedAtMs ?? group.input.recordedAtMs,
         v: 1,
@@ -191,19 +194,10 @@ function compareRecordedStreamEvents(
   }
 
   const recordedEvents = group.streamEvents.map((record) =>
-    serializeReplTranscriptRecord({
-      ...record,
-      recordedAtMs: 0,
-    })
+    serializeReplayComparableStreamEvent(record.event)
   );
   const actualEvents = liveEvents.map((event) =>
-    serializeReplTranscriptRecord({
-      event,
-      ordinal: group.input.ordinal,
-      recordedAtMs: 0,
-      recordKind: "stream-event",
-      v: 1,
-    })
+    serializeReplayComparableStreamEvent(event)
   );
   const expected = JSON.stringify(recordedEvents);
   const actual = JSON.stringify(actualEvents);
@@ -222,6 +216,9 @@ function createReplayConfig(header: ReplTranscriptHeader): ReplConfig {
   const backend = header.config.backend;
 
   return {
+    aimockBaseUrl: header.config.providerMode.startsWith("aimock-")
+      ? readReplEnv(process.env, "AIMOCK_BASE_URL")
+      : undefined,
     backend: backend.kind,
     modelId: header.config.modelId,
     providerMode: readProviderMode(header.config.providerMode),
@@ -230,6 +227,71 @@ function createReplayConfig(header: ReplTranscriptHeader): ReplConfig {
     systemPrompt: header.config.systemPrompt,
     ...readPostgresOptions(backend.options),
   };
+}
+
+function serializeReplayComparableStreamEvent(
+  event: TuvrenStreamEvent
+): string {
+  return JSON.stringify(normalizeReplayEvent(event));
+}
+
+function normalizeReplayEvent(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map((entry) => normalizeReplayEvent(entry));
+  }
+
+  if (!isRecord(value)) {
+    return value;
+  }
+
+  const normalized: Record<string, unknown> = {};
+
+  for (const [key, entry] of Object.entries(value).sort(([left], [right]) =>
+    left.localeCompare(right)
+  )) {
+    if (isVolatileReplayEventKey(key)) {
+      continue;
+    }
+
+    normalized[key] = normalizeReplayEvent(entry);
+  }
+
+  return normalized;
+}
+
+function isVolatileReplayEventKey(key: string): boolean {
+  return (
+    key === "messageId" ||
+    key === "threadId" ||
+    key === "timestamp" ||
+    key === "turnId" ||
+    key === "turnNodeHash"
+  );
+}
+
+function readReplayStreamText(
+  events: readonly TuvrenStreamEvent[]
+): string | undefined {
+  const textDone = [...events]
+    .reverse()
+    .find(
+      (event): event is Extract<TuvrenStreamEvent, { type: "text.done" }> =>
+        event.type === "text.done"
+    );
+
+  if (typeof textDone?.text === "string") {
+    return textDone.text;
+  }
+
+  const text = events
+    .filter(
+      (event): event is Extract<TuvrenStreamEvent, { type: "text.delta" }> =>
+        event.type === "text.delta"
+    )
+    .map((event) => event.delta)
+    .join("");
+
+  return text.length > 0 ? text : undefined;
 }
 
 function readSqlitePath(options: unknown): string | undefined {

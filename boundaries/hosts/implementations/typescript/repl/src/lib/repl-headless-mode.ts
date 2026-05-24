@@ -82,8 +82,11 @@ export async function runReplHeadlessMode(
         });
 
         const transcriptWrites: Promise<void>[] = [];
+        const canonicalEvents: TuvrenStreamEvent[] = [];
         const result = await runReplInput(options.shell, input, {
           onCanonicalEvent: (event) => {
+            canonicalEvents.push(event);
+
             if (options.streamEvents === true) {
               writeHeadlessOutput(options.output, {
                 event,
@@ -108,10 +111,11 @@ export async function runReplHeadlessMode(
           },
         });
         await Promise.all(transcriptWrites);
+        const output = result.output ?? readHeadlessStreamText(canonicalEvents);
         await options.transcriptWriter?.writeEntry({
           ...(result.exit === true ? { exit: true } : {}),
           ordinal: currentOrdinal,
-          output: result.output ?? null,
+          output: output ?? null,
           recordKind: "output",
           recordedAtMs: now(),
           v: 1,
@@ -119,7 +123,7 @@ export async function runReplHeadlessMode(
         writeHeadlessOutput(options.output, {
           ...(result.exit === true ? { exit: true } : {}),
           ordinal: currentOrdinal,
-          output: result.output ?? null,
+          output: output ?? null,
           recordKind: "output",
           recordedAtMs: now(),
           v: 1,
@@ -151,6 +155,31 @@ export async function runReplHeadlessMode(
   } finally {
     rl.close();
   }
+}
+
+function readHeadlessStreamText(
+  events: readonly TuvrenStreamEvent[]
+): string | undefined {
+  const textDone = [...events]
+    .reverse()
+    .find(
+      (event): event is Extract<TuvrenStreamEvent, { type: "text.done" }> =>
+        event.type === "text.done"
+    );
+
+  if (typeof textDone?.text === "string") {
+    return textDone.text;
+  }
+
+  const text = events
+    .filter(
+      (event): event is Extract<TuvrenStreamEvent, { type: "text.delta" }> =>
+        event.type === "text.delta"
+    )
+    .map((event) => event.delta)
+    .join("");
+
+  return text.length > 0 ? text : undefined;
 }
 
 function writeHeadlessOutput(
