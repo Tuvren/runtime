@@ -37,6 +37,8 @@ import { createAdapterErrorEnvelope } from "../../../../../../tools/conformance/
 import { serveStdioAdapter } from "../../../../../../tools/conformance/adapter-protocol/stdio-host.js";
 import { createAiSdkProviderBridge } from "../../bridge-ai-sdk/src/index.ts";
 import { createMcpToolSource } from "../../mcp-client/src/index.ts";
+import type { MCPClient } from "../../mcp-client/src/lib/mcp-sdk-client.ts";
+import { createMcpToolSourceInternal } from "../../mcp-client/src/lib/mcp-tool-source.ts";
 import {
   createOfficialMcpEverythingStdioCommand,
   startMockMcpHttpServer,
@@ -584,18 +586,16 @@ async function mcpClientAuthHeaders(): Promise<Record<string, unknown>> {
 
 async function mcpClientValidationErrors(): Promise<Record<string, unknown>> {
   const command = createOfficialMcpEverythingStdioCommand();
-  const invalidServer = await startMockMcpHttpServer({
-    returnInvalidEchoOutput: true,
-  });
   const source = await createMcpToolSource({
     ...command,
     name: "validating",
     transport: "stdio",
   });
-  const invalidSource = await createMcpToolSource({
-    endpoint: invalidServer.endpoint,
+  const invalidSource = await createMcpToolSourceInternal({
+    client: createInvalidStructuredOutputMcpClient(),
+    command: "unused",
     name: "invalid",
-    transport: "http-sse",
+    transport: "stdio",
   });
 
   try {
@@ -627,7 +627,6 @@ async function mcpClientValidationErrors(): Promise<Record<string, unknown>> {
   } finally {
     await source.close();
     await invalidSource.close();
-    await invalidServer.close();
   }
 }
 
@@ -773,6 +772,45 @@ function readMcpOriginalName(metadata: unknown): string | undefined {
   return typeof metadata.mcp.originalName === "string"
     ? metadata.mcp.originalName
     : undefined;
+}
+
+function createInvalidStructuredOutputMcpClient(): MCPClient {
+  return {
+    close() {
+      return Promise.resolve();
+    },
+    initialize() {
+      return Promise.resolve({ serverName: "invalid-output" });
+    },
+    invokeTool() {
+      return Promise.resolve({
+        content: [{ text: "bad structured output", type: "text" }],
+        structuredContent: { echoed: 123 },
+      });
+    },
+    listTools() {
+      return Promise.resolve([
+        {
+          description: "Returns invalid structured output.",
+          inputSchema: {
+            properties: {
+              message: { type: "string" },
+            },
+            required: ["message"],
+            type: "object",
+          },
+          name: "echo",
+          outputSchema: {
+            properties: {
+              echoed: { type: "string" },
+            },
+            required: ["echoed"],
+            type: "object",
+          },
+        },
+      ]);
+    },
+  };
 }
 
 function result(value: Record<string, unknown>): OperationOutcome {

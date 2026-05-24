@@ -24,6 +24,7 @@ import type { McpTransportConfig } from "./mcp-tool-source.js";
 export type McpSdkTool = Awaited<
   ReturnType<Client["listTools"]>
 >["tools"][number];
+type McpSdkListToolsResult = Awaited<ReturnType<Client["listTools"]>>;
 export type McpSdkToolResult = Awaited<ReturnType<Client["callTool"]>>;
 
 export interface MCPClient {
@@ -71,8 +72,18 @@ class SdkMcpClient implements MCPClient {
 
   async listTools(): Promise<McpSdkTool[]> {
     try {
-      const result = await this.client.listTools();
-      return result.tools;
+      const tools: McpSdkTool[] = [];
+      let cursor: string | undefined;
+
+      do {
+        const result: McpSdkListToolsResult = await this.client.listTools(
+          cursor === undefined ? undefined : { cursor }
+        );
+        tools.push(...result.tools);
+        cursor = result.nextCursor;
+      } while (cursor !== undefined);
+
+      return tools;
     } catch (error: unknown) {
       throw createProviderError(
         "mcp_tool_list_failed",
@@ -84,16 +95,10 @@ class SdkMcpClient implements MCPClient {
 
   async invokeTool(name: string, input: unknown): Promise<McpSdkToolResult> {
     try {
-      return await this.client.callTool(
-        {
-          arguments: normalizeToolArguments(input),
-          name,
-        },
-        undefined,
-        {
-          timeout: 1000,
-        }
-      );
+      return await this.client.callTool({
+        arguments: normalizeToolArguments(input),
+        name,
+      });
     } catch (error: unknown) {
       throw createProviderError(
         "mcp_transport_failure",

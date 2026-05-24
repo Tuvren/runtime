@@ -400,7 +400,7 @@
   1. MCP `tool.name` → `TuvrenToolDefinition.name`; an optional `name` prefix from `CreateMcpToolSourceOptions.name` is prepended as `<prefix>.<toolname>` to disambiguate when multiple servers register
   2. MCP `tool.description` → `TuvrenToolDefinition.description`
   3. MCP `tool.inputSchema` (JSON Schema) → wrapped via `jsonSchema<unknown>()` from `@tuvren/core/tools`; inputs are validated by Ajv before being sent across the transport
-  4. MCP tool outputs are wrapped as `TuvrenToolDefinition.execute`'s return value; if the advertised `outputSchema` is present, outputs are validated against it before surfacing as `ToolResultPart`; validation failures are surfaced as `ToolResultPart` with `isError: true` and a `TuvrenProviderError` payload using code `mcp_tool_output_invalid`
+  4. MCP tool outputs are wrapped as `TuvrenToolDefinition.execute`'s return value; if the advertised `outputSchema` is present, outputs are validated against it before surfacing as `ToolResultPart`; validation failures are surfaced as `ToolResultPart` with `isError: true` and a `TuvrenProviderError` payload using code `mcp_tool_output_invalid`. MCP `CallToolResult.isError` responses bypass output-schema validation and surface as `ToolResultPart` with `isError: true` and code `mcp_tool_error`.
   5. MCP `tool.annotations` (if present) are preserved under `TuvrenToolDefinition.metadata.mcp`
   6. Transport errors (connection lost, request timeout, protocol error) are translated to `ToolResultPart` with `isError: true` and a `TuvrenProviderError` with code `mcp_transport_failure`; the runtime does not retry automatically
   7. Provider-level initialization and tool-list failures are raised as `TuvrenProviderError` instead of being hidden in tool results
@@ -2592,7 +2592,7 @@ export declare function defineTool<INPUT, OUTPUT>(options: {
 - **Style:** library API plus external protocol client
 - **Authentication / Authorization:** Carried in the `McpAuth` discriminated union: bearer tokens or arbitrary header pairs. The external MCP server boundary is untrusted (Architecture §1.3); the host is responsible for authentication choices.
 - **Compatibility Strategy:** The `createMcpToolSource` signature and the `McpToolSource` interface follow semver. Bumping the upstream `@modelcontextprotocol/sdk` to a new minor that maintains protocol compatibility is internal and does not require a `@tuvren/mcp-client` major. Bumping the SDK to a new MCP protocol major requires a `@tuvren/mcp-client` major.
-- **Error model:** `TuvrenProviderError` codes `mcp_connection_failed`, `mcp_initialize_failed`, `mcp_tool_list_failed`, `mcp_tool_input_invalid`, `mcp_tool_output_invalid`, `mcp_transport_failure`. Tool-level failures are surfaced as `ToolResultPart` with `isError: true` carrying the typed error in `output`.
+- **Error model:** `TuvrenProviderError` codes `mcp_connection_failed`, `mcp_initialize_failed`, `mcp_tool_list_failed`, `mcp_tool_input_invalid`, `mcp_tool_output_invalid`, `mcp_tool_error`, `mcp_transport_failure`. Tool-level failures are surfaced as `ToolResultPart` with `isError: true` carrying the typed error in `output`.
 - **Dependency note:** `@modelcontextprotocol/sdk@1.29.0` declares `zod` as a non-optional peer. `@tuvren/mcp-client` satisfies that upstream requirement with a direct `zod@4.4.3` dependency and keeps the public Tuvren peer surface limited to `@tuvren/core`.
 
 ```ts

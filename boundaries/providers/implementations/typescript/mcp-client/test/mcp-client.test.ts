@@ -130,7 +130,7 @@ describe("@tuvren/mcp-client", () => {
     }
   });
 
-  test("validates input and output schemas before surfacing results", async () => {
+  test("validates input schemas before invoking MCP tools", async () => {
     const command = createMockMcpStdioCommand({
       returnInvalidEchoOutput: true,
     });
@@ -153,7 +153,21 @@ describe("@tuvren/mcp-client", () => {
           name: "TuvrenProviderError",
         }),
       });
+    } finally {
+      await source.close();
+    }
+  });
 
+  test("validates successful MCP structured output against advertised output schemas", async () => {
+    const source = await createMcpToolSourceInternal({
+      client: createInvalidStructuredOutputMcpClient(),
+      command: "unused",
+      name: "invalid",
+      transport: "stdio",
+    });
+    const echo = requireTool(source.tools, "invalid.echo");
+
+    try {
       const outputError = await echo.execute(
         { message: "bad-output" },
         createToolContext("call-output", "invalid.echo")
@@ -208,6 +222,85 @@ describe("@tuvren/mcp-client", () => {
     } finally {
       await source.close();
     }
+  });
+
+  test("surfaces MCP tool error results as top-level tool errors", async () => {
+    const source = await createMcpToolSourceInternal({
+      client: createToolErrorMcpClient({ outputSchema: false }),
+      command: "unused",
+      name: "server",
+      transport: "stdio",
+    });
+    const failing = requireTool(source.tools, "server.failing");
+
+    try {
+      const result = asToolResultPart(
+        await failing.execute(
+          { message: "fail" },
+          createToolContext("call-tool-error", "server.failing")
+        )
+      );
+
+      expect(result).toEqual({
+        callId: "call-tool-error",
+        isError: true,
+        name: "server.failing",
+        output: {
+          error: expect.objectContaining({
+            code: "mcp_tool_error",
+            message: expect.stringContaining("tool said no"),
+            name: "TuvrenProviderError",
+          }),
+        },
+        type: "tool_result",
+      });
+    } finally {
+      await source.close();
+    }
+  });
+
+  test("does not mask MCP tool error results as output-schema validation failures", async () => {
+    const source = await createMcpToolSourceInternal({
+      client: createToolErrorMcpClient({ outputSchema: true }),
+      command: "unused",
+      name: "server",
+      transport: "stdio",
+    });
+    const failing = requireTool(source.tools, "server.failing");
+
+    try {
+      const result = asToolResultPart(
+        await failing.execute(
+          { message: "fail" },
+          createToolContext("call-schema-error", "server.failing")
+        )
+      );
+
+      expect(result.output).toEqual({
+        error: expect.objectContaining({
+          code: "mcp_tool_error",
+          name: "TuvrenProviderError",
+        }),
+      });
+    } finally {
+      await source.close();
+    }
+  });
+
+  test("closes the MCP client when initial refresh fails", async () => {
+    const client = createInvalidToolSchemaMcpClient();
+
+    await expect(
+      createMcpToolSourceInternal({
+        client,
+        command: "unused",
+        transport: "stdio",
+      })
+    ).rejects.toMatchObject({
+      code: "mcp_tool_list_failed",
+      name: "TuvrenProviderError",
+    });
+    expect(client.closed).toBe(true);
   });
 });
 
@@ -275,6 +368,122 @@ function createFailingMcpClient(): MCPClient {
             type: "object",
           },
           name: "echo",
+        },
+      ]);
+    },
+  };
+}
+
+function createToolErrorMcpClient(options: {
+  outputSchema: boolean;
+}): MCPClient {
+  return {
+    close() {
+      return Promise.resolve();
+    },
+    initialize() {
+      return Promise.resolve({ serverName: "tool-error" });
+    },
+    invokeTool() {
+      return Promise.resolve({
+        content: [{ text: "tool said no", type: "text" }],
+        isError: true,
+      });
+    },
+    listTools() {
+      return Promise.resolve([
+        {
+          description: "Returns an MCP tool error.",
+          inputSchema: {
+            properties: {
+              message: { type: "string" },
+            },
+            required: ["message"],
+            type: "object",
+          },
+          name: "failing",
+          ...(options.outputSchema
+            ? {
+                outputSchema: {
+                  properties: {
+                    ok: { type: "boolean" },
+                  },
+                  required: ["ok"],
+                  type: "object",
+                },
+              }
+            : {}),
+        },
+      ]);
+    },
+  };
+}
+
+function createInvalidStructuredOutputMcpClient(): MCPClient {
+  return {
+    close() {
+      return Promise.resolve();
+    },
+    initialize() {
+      return Promise.resolve({ serverName: "invalid-output" });
+    },
+    invokeTool() {
+      return Promise.resolve({
+        content: [{ text: "bad structured output", type: "text" }],
+        structuredContent: { echoed: 123 },
+      });
+    },
+    listTools() {
+      return Promise.resolve([
+        {
+          description: "Returns invalid structured output.",
+          inputSchema: {
+            properties: {
+              message: { type: "string" },
+            },
+            required: ["message"],
+            type: "object",
+          },
+          name: "echo",
+          outputSchema: {
+            properties: {
+              echoed: { type: "string" },
+            },
+            required: ["echoed"],
+            type: "object",
+          },
+        },
+      ]);
+    },
+  };
+}
+
+function createInvalidToolSchemaMcpClient(): MCPClient & { closed: boolean } {
+  return {
+    closed: false,
+    close() {
+      this.closed = true;
+      return Promise.resolve();
+    },
+    initialize() {
+      return Promise.resolve({ serverName: "invalid-schema" });
+    },
+    invokeTool() {
+      return Promise.resolve({
+        content: [],
+      });
+    },
+    listTools() {
+      return Promise.resolve([
+        {
+          description: "Invalid schema.",
+          inputSchema: {
+            properties: {
+              message: { type: "not-a-json-schema-type" },
+            },
+            type: "object",
+          },
+          name: "invalid",
         },
       ]);
     },

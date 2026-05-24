@@ -111,7 +111,12 @@ export async function createMcpToolSourceInternal(
   const initialized = await client.initialize();
   const serverName = options.name ?? initialized.serverName;
   const source = new DefaultMcpToolSource(client, serverName, options);
-  await source.refresh();
+  try {
+    await source.refresh();
+  } catch (error: unknown) {
+    await client.close();
+    throw error;
+  }
   return source;
 }
 
@@ -142,10 +147,20 @@ class DefaultMcpToolSource implements McpToolSource {
   }
 
   async refresh(): Promise<{ tools: TuvrenToolDefinition[] }> {
-    const advertisedTools = await this.client.listTools();
-    const translated = advertisedTools.map((tool) => this.translateTool(tool));
-    this.currentTools = translated.map((binding) => binding.tool);
-    return { tools: this.tools };
+    try {
+      const advertisedTools = await this.client.listTools();
+      const translated = advertisedTools.map((tool) =>
+        this.translateTool(tool)
+      );
+      this.currentTools = translated.map((binding) => binding.tool);
+      return { tools: this.tools };
+    } catch (error: unknown) {
+      throw createProviderError(
+        "mcp_tool_list_failed",
+        "MCP tool listing failed.",
+        error
+      );
+    }
   }
 
   async close(): Promise<void> {
@@ -245,6 +260,19 @@ class DefaultMcpToolSource implements McpToolSource {
       );
     }
 
+    if ("isError" in result && result.isError === true) {
+      return createErrorResult(
+        params.context,
+        params.publicName,
+        createProviderError(
+          "mcp_tool_error",
+          createMcpToolErrorMessage(params.publicName, result),
+          undefined,
+          normalizeMcpToolFailure(result)
+        )
+      );
+    }
+
     const output = normalizeToolOutput(result);
 
     if (params.outputValidator !== undefined) {
@@ -284,6 +312,48 @@ class DefaultMcpToolSource implements McpToolSource {
   private compileValidator(schema: TuvrenJsonSchema): ValidateFunction {
     return this.ajv.compile(schema);
   }
+}
+
+function createMcpToolErrorMessage(
+  toolName: string,
+  result: McpSdkToolResult
+): string {
+  const text = readFirstTextContent(result);
+
+  return text === undefined
+    ? `MCP tool "${toolName}" returned an error result.`
+    : `MCP tool "${toolName}" returned an error result: ${text}`;
+}
+
+function readFirstTextContent(result: McpSdkToolResult): string | undefined {
+  if (!("content" in result && Array.isArray(result.content))) {
+    return undefined;
+  }
+
+  const textContent = result.content.find(
+    (part): part is { text: string; type: "text" } =>
+      typeof part === "object" &&
+      part !== null &&
+      "type" in part &&
+      part.type === "text" &&
+      "text" in part &&
+      typeof part.text === "string"
+  );
+
+  return textContent?.text;
+}
+
+function normalizeMcpToolFailure(
+  result: McpSdkToolResult
+): Record<string, unknown> {
+  if (!("content" in result && Array.isArray(result.content))) {
+    return { isError: true };
+  }
+
+  return {
+    content: result.content,
+    isError: true,
+  };
 }
 
 function validateSchemaValue(
