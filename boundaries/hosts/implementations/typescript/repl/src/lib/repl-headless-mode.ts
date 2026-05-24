@@ -22,6 +22,8 @@ import type {
   ReplTranscriptWriter,
 } from "./repl-transcript.js";
 
+const SHELL_WHITESPACE_PATTERN = /\s+/u;
+
 export interface ReplHeadlessOutputRecord {
   error?: {
     message: string;
@@ -177,7 +179,7 @@ function readHeadlessDurableReadRecord(
   output: string | undefined,
   recordedAtMs: number
 ): ReplTranscriptDurableReadRecord | undefined {
-  if (input !== ".messages show" || output === undefined) {
+  if (!isMessagesShowInput(input) || output === undefined) {
     return undefined;
   }
 
@@ -195,6 +197,12 @@ function readHeadlessDurableReadRecord(
     result,
     v: 1,
   };
+}
+
+function isMessagesShowInput(input: string): boolean {
+  return (
+    input.trim().split(SHELL_WHITESPACE_PATTERN).join(" ") === ".messages show"
+  );
 }
 
 function parseHeadlessDurableReadOutput(output: string): unknown | undefined {

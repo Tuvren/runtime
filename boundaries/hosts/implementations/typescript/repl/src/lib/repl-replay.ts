@@ -127,6 +127,8 @@ interface ReplayGroup {
   streamEvents: ReplTranscriptStreamEventRecord[];
 }
 
+const SHELL_WHITESPACE_PATTERN = /\s+/u;
+
 async function collectReplayGroups(
   entries: AsyncIterable<ReplTranscriptEntry>
 ): Promise<ReplayGroup[]> {
@@ -357,7 +359,7 @@ function readReplayDurableReads(
   group: ReplayGroup,
   output: string | undefined
 ): ReplTranscriptDurableReadRecord[] {
-  if (group.input.input !== ".messages show" || output === undefined) {
+  if (!isMessagesShowInput(group.input.input) || output === undefined) {
     return [];
   }
 
@@ -403,15 +405,25 @@ function createReplayConfig(header: ReplTranscriptHeader): ReplConfig {
 }
 
 function isDeterministicReplayInput(input: string): boolean {
+  const normalizedInput = normalizeReplayInput(input);
+
   return (
-    input === ".events show" ||
-    input === ".help" ||
-    input === ".messages show" ||
-    input === ".status" ||
-    input === ".thread new" ||
-    input === ".thread show" ||
-    input === ".exit"
+    normalizedInput === ".events show" ||
+    normalizedInput === ".help" ||
+    normalizedInput === ".messages show" ||
+    normalizedInput === ".status" ||
+    normalizedInput === ".thread new" ||
+    normalizedInput === ".thread show" ||
+    normalizedInput === ".exit"
   );
+}
+
+function isMessagesShowInput(input: string): boolean {
+  return normalizeReplayInput(input) === ".messages show";
+}
+
+function normalizeReplayInput(input: string): string {
+  return input.trim().split(SHELL_WHITESPACE_PATTERN).join(" ");
 }
 
 function readReplayWarnings(header: ReplTranscriptHeader): string[] {

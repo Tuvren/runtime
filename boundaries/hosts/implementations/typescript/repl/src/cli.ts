@@ -39,6 +39,8 @@ import {
 import type { ReplConfig } from "./lib/repl-types.js";
 
 const argv = process.argv.slice(2);
+const SHELL_WHITESPACE_PATTERN = /\s+/u;
+
 await main(argv);
 
 async function main(argv: readonly string[]): Promise<void> {
@@ -223,8 +225,10 @@ async function runInteractiveShell(
           ordinal,
           transcriptWriter
         );
+        const canonicalEvents: TuvrenStreamEvent[] = [];
         const result = await runReplInput(shell, input, {
           onCanonicalEvent: (event) => {
+            canonicalEvents.push(event);
             liveOutput.observe(event);
             transcriptEventRecorder.observe(event);
           },
@@ -233,8 +237,16 @@ async function runInteractiveShell(
 
         liveOutput.finish();
 
+        const output = result.output ?? readStreamText(canonicalEvents);
+
         if (
-          await writeTranscriptOutput(input, ordinal, result, transcriptWriter)
+          await writeTranscriptOutput(
+            input,
+            ordinal,
+            output,
+            result.exit === true,
+            transcriptWriter
+          )
         ) {
           ordinal += 1;
         }
@@ -319,7 +331,8 @@ function createTranscriptEventRecorder(
 async function writeTranscriptOutput(
   input: string,
   ordinal: number,
-  result: Awaited<ReturnType<typeof runReplInput>>,
+  output: string | undefined,
+  exit: boolean,
   transcriptWriter: ReplTranscriptWriter | undefined
 ): Promise<boolean> {
   if (input.length === 0) {
@@ -327,9 +340,9 @@ async function writeTranscriptOutput(
   }
 
   await transcriptWriter?.writeEntry({
-    ...(result.exit === true ? { exit: true } : {}),
+    ...(exit ? { exit: true } : {}),
     ordinal,
-    output: result.output ?? null,
+    output: output ?? null,
     recordKind: "output",
     recordedAtMs: Date.now(),
     v: 1,
@@ -337,7 +350,7 @@ async function writeTranscriptOutput(
   const durableRead = readTranscriptDurableReadRecord(
     input,
     ordinal,
-    result.output,
+    output,
     Date.now()
   );
 
@@ -354,7 +367,7 @@ function readTranscriptDurableReadRecord(
   output: string | undefined,
   recordedAtMs: number
 ): ReplTranscriptDurableReadRecord | undefined {
-  if (input !== ".messages show" || output === undefined) {
+  if (!isMessagesShowInput(input) || output === undefined) {
     return undefined;
   }
 
@@ -380,6 +393,37 @@ function parseDurableReadOutput(output: string): unknown | undefined {
   } catch {
     return undefined;
   }
+}
+
+function isMessagesShowInput(input: string): boolean {
+  return (
+    input.trim().split(SHELL_WHITESPACE_PATTERN).join(" ") === ".messages show"
+  );
+}
+
+function readStreamText(
+  events: readonly TuvrenStreamEvent[]
+): string | undefined {
+  const textDone = [...events]
+    .reverse()
+    .find(
+      (event): event is Extract<TuvrenStreamEvent, { type: "text.done" }> =>
+        event.type === "text.done"
+    );
+
+  if (typeof textDone?.text === "string") {
+    return textDone.text;
+  }
+
+  const text = events
+    .filter(
+      (event): event is Extract<TuvrenStreamEvent, { type: "text.delta" }> =>
+        event.type === "text.delta"
+    )
+    .map((event) => event.delta)
+    .join("");
+
+  return text.length > 0 ? text : undefined;
 }
 
 async function writeTranscriptErrorOutput(

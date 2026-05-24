@@ -2185,7 +2185,7 @@ describe("repl host scenarios", () => {
         "--record",
         transcriptPath,
       ],
-      stdin: "Hello before durable read\n.messages show\n",
+      stdin: "Hello before durable read\n.messages   show\n",
     });
 
     expect(result.exitCode).toBe(0);
@@ -2258,6 +2258,54 @@ describe("repl host scenarios", () => {
       providerMode: "fixture",
       status: "passed",
     });
+  });
+
+  test("CLI records interactive streamed sessions as replayable transcripts", async () => {
+    const transcriptPath = join(
+      tmpdir(),
+      `tuvren-repl-interactive-replay-${Date.now()}.jsonl`
+    );
+    const recordResult = await runCliProcess({
+      argv: [
+        "--backend",
+        "memory",
+        "--provider",
+        "fixture",
+        "--record",
+        transcriptPath,
+      ],
+      stdin: "Hello from interactive replay\n.exit\n",
+    });
+    const replayResult = await runCliProcess({
+      argv: ["--replay", transcriptPath],
+    });
+
+    expect(recordResult.exitCode).toBe(0);
+    expect(replayResult.exitCode).toBe(0);
+    expect(replayResult.stderr).toBe("");
+    expect(JSON.parse(replayResult.stdout)).toMatchObject({
+      deterministicAsserted: true,
+      inputCount: 2,
+      mismatches: [],
+      providerMode: "fixture",
+      status: "passed",
+    });
+
+    const transcript = await readReplTranscriptFile(transcriptPath);
+    const entries: ReplTranscriptEntry[] = [];
+
+    for await (const entry of transcript.entries()) {
+      entries.push(entry);
+    }
+
+    expect(
+      entries.some(
+        (entry) =>
+          entry.recordKind === "output" &&
+          entry.ordinal === 0 &&
+          entry.output === "REPL streaming complete."
+      )
+    ).toBe(true);
   });
 
   test("CLI replays deterministic command transcripts with volatile JSON ids", async () => {
