@@ -54,6 +54,9 @@ async function readDefaultTypecheckConfigs(
     await access(defaultConfigPath);
     return [DEFAULT_CONFIG];
   } catch {
+    // Declaration configs in this repo validate package output during build:
+    // many of them intentionally resolve dependencies through built dist
+    // declarations, so the read-only typecheck lane stays on source configs.
     return ["tsconfig.lib.json"];
   }
 }

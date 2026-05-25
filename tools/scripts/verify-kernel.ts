@@ -114,7 +114,7 @@ function createKernelVerificationSteps(options: {
     },
     {
       command: ["bun", "run", "compatibility:check"],
-      id: "kernel-owned compatibility evidence check",
+      id: "workspace compatibility evidence check",
     },
   ];
 }

@@ -33,6 +33,7 @@ Use native tools as ecosystem truth and Nx as a wrapper.
 - Make generators leave checked-in artifacts formatter-clean; do not rely on a one-off manual format after regeneration.
 - Encode generated-artifact prerequisites in Nx targets when source imports gitignored or derived files.
 - Use Nx cache deliberately: keep generated outputs such as `dist/`, `.tmp*`, coverage, and `*.tsbuildinfo` out of target inputs, declare real outputs on cacheable targets, and do not add broad `^build` prerequisites to read-only checks like `typecheck` unless the command actually imports generated files.
+- Keep TypeScript `typecheck` targets source-only; declaration config validation (`tsconfig.dts.json`) belongs to `build` because it may depend on generated `dist/*.d.ts` from package dependencies.
 - Prefer cached iteration commands first (`bun run typecheck`, `bun run verify:kernel`); use explicit fresh lanes such as `bun run verify:kernel:fresh` only when proving uncached behavior or refreshing evidence.
 - When an Nx lane feels slow, inspect the task graph and cache hits before changing semantics: compare repeated runs, check whether generated files are poisoning inputs, and keep shared command logic in scripts rather than duplicating long shell snippets across `project.json` files.
 
