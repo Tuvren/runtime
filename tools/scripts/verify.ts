@@ -16,6 +16,10 @@
 
 import { spawn } from "node:child_process";
 import process from "node:process";
+import {
+  assertWorktreeUnchanged,
+  readWorktreeSnapshot,
+} from "./lib/worktree-guard.js";
 
 export interface VerificationStep {
   command: readonly string[];
@@ -338,8 +342,14 @@ export async function runVerification(
   const results: VerificationResult[] = [];
 
   for (const step of steps) {
+    const before = await readWorktreeSnapshot(process.cwd());
     const result = await runVerificationStep(step);
     results.push(result);
+
+    await assertWorktreeUnchanged(before, {
+      cwd: process.cwd(),
+      label: `verification step "${step.id}"`,
+    });
 
     if (result.code !== 0) {
       return results;

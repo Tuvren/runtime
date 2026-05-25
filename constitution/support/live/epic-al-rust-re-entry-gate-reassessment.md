@@ -142,7 +142,7 @@ gates or for blockers of the existing staged gates:
 - **Proving-host interop-smoke E2BIG environmental sensitivity (resolved)**
   — Prior to AL003, `tools/scripts/repl-host-interop-smoke.ts` rebuilt
   sixteen workspace packages by chaining `bunx --bun tsup` subprocesses
-  inline. On Nix/devenv shells, Bun's accumulated `posix_spawn` state hit
+  inline. In the Nix-provisioned repository environment, Bun's accumulated `posix_spawn` state hit
   `E2BIG` at the host-repl tsup invocation, causing the smoke to exit
   without a parseable scenario report and leaving the codegen step unable
   to produce fresh compatibility evidence. AL003 reroutes the smoke's

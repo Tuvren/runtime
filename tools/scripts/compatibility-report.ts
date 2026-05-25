@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, relative, resolve } from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
@@ -196,6 +196,7 @@ const COMPATIBILITY_METADATA = {
 // Evidence refresh can intentionally record known red lanes, but the default
 // compatibility codegen path remains a pass/fail gate for verification.
 const ALLOW_FAILING_EVIDENCE_FLAG = "--allow-failing-evidence";
+const CHECK_FLAG = "--check";
 
 const CONFORMANCE_RUNNERS: readonly ConformanceRunner[] = [
   {
@@ -245,10 +246,9 @@ const CONFORMANCE_RUNNERS: readonly ConformanceRunner[] = [
     // the compatibility matrix needs to record it alongside the memory and
     // SQLite tiers — otherwise the PR's "memory + SQLite + PostgreSQL"
     // platform-gate claim is not actually proved in checked-in evidence.
-    // This lane runs through Nx because the runner depends on devenv to spin
-    // up the local Postgres process; the Nx target encapsulates that
-    // start/stop wiring (`devenv up -d postgres` → run → `devenv processes
-    // down`).
+    // This lane runs through Nx so it shares the canonical Postgres runner
+    // target. The caller is responsible for starting the direnv-provisioned
+    // Postgres service before refreshing measured evidence.
     adapterManifestPath:
       "boundaries/kernel/implementations/typescript/conformance-adapter/adapter-postgres.json",
     implementationId: "typescript-kernel-postgres",
@@ -317,6 +317,12 @@ async function main(): Promise<void> {
   const allowFailingEvidence = process.argv.includes(
     ALLOW_FAILING_EVIDENCE_FLAG
   );
+
+  if (process.argv.includes(CHECK_FLAG)) {
+    await checkCompatibilityEvidence();
+    return;
+  }
+
   // Compatibility evidence must prove the SQLite lane can rebuild from a clean
   // checkout instead of inheriting prior local dist residue.
   await resetHermeticBuildBoundary();
@@ -439,6 +445,96 @@ async function main(): Promise<void> {
 
   if (hasFailure && !allowFailingEvidence) {
     throw new Error("one or more conformance targets failed");
+  }
+}
+
+async function checkCompatibilityEvidence(): Promise<void> {
+  const matrix = JSON.parse(
+    await readFile(COMPATIBILITY_MATRIX_PATH, "utf8")
+  ) as CompatibilityMatrix;
+  assertCompatibilityMatrix(matrix);
+  await assertCompatibilityMatrixSchema(matrix);
+
+  const matrixEvidencePaths = new Set<string>();
+  const failures: string[] = [];
+
+  for (const implementation of matrix.implementations) {
+    for (const result of implementation.results) {
+      matrixEvidencePaths.add(result.evidencePath);
+
+      if (
+        result.status === "fail" ||
+        result.reportStatus === "unexpected_fail"
+      ) {
+        failures.push(
+          `${implementation.implementationId} ${result.suiteId} records ${result.reportStatus}`
+        );
+      }
+
+      await checkEvidenceFile(result.evidencePath, failures);
+    }
+  }
+
+  for (const result of matrix.interop) {
+    matrixEvidencePaths.add(result.evidencePath);
+
+    if (result.status === "fail" || result.reportStatus === "unexpected_fail") {
+      failures.push(
+        `${result.pairId} ${result.suiteId} records ${result.reportStatus}`
+      );
+    }
+
+    await checkEvidenceFile(result.evidencePath, failures);
+  }
+
+  const evidenceEntries = await readdir(EVIDENCE_DIRECTORY);
+
+  for (const entry of evidenceEntries) {
+    if (!entry.endsWith(".json")) {
+      continue;
+    }
+
+    const evidencePath = relative(
+      REPO_ROOT,
+      resolve(EVIDENCE_DIRECTORY, entry)
+    );
+
+    if (!matrixEvidencePaths.has(evidencePath)) {
+      failures.push(
+        `${evidencePath} is not referenced by the compatibility matrix`
+      );
+    }
+  }
+
+  if (failures.length > 0) {
+    throw new Error(
+      [
+        "compatibility evidence check failed:",
+        ...failures.map((failure) => `- ${failure}`),
+      ].join("\n")
+    );
+  }
+
+  console.log("compatibility evidence check passed");
+}
+
+async function checkEvidenceFile(
+  evidencePath: string,
+  failures: string[]
+): Promise<void> {
+  const absolutePath = resolve(REPO_ROOT, evidencePath);
+  const evidence = JSON.parse(await readFile(absolutePath, "utf8")) as {
+    reportStatus?: unknown;
+    status?: unknown;
+  };
+
+  if (
+    evidence.status === "fail" ||
+    evidence.reportStatus === "unexpected_fail"
+  ) {
+    failures.push(
+      `${evidencePath} records ${String(evidence.reportStatus ?? evidence.status)}`
+    );
   }
 }
 
