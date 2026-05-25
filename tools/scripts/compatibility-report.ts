@@ -585,8 +585,22 @@ async function checkCompatibilityEvidence(): Promise<void> {
   await checkConformanceRunnerInventory(matrix.implementations, failures);
   checkInteropRunnerInventory(matrix.interop, failures);
 
+  const liveInteropEntries = await readLiveInteropRunners();
+
   for (const result of matrix.interop) {
+    const liveEntry = liveInteropEntries.find(
+      (entry) => entry.runner.pairId === result.pairId
+    );
+
+    if (liveEntry === undefined) {
+      failures.push(
+        `compatibility matrix interop pair ${result.pairId} is not present in live runner topology`
+      );
+      continue;
+    }
+
     matrixEvidencePaths.add(result.evidencePath);
+    compareLiveInteropResult(liveEntry.liveRunner, result, failures);
 
     if (result.status === "fail" || result.reportStatus === "unexpected_fail") {
       failures.push(
@@ -594,7 +608,12 @@ async function checkCompatibilityEvidence(): Promise<void> {
       );
     }
 
-    await checkInteropEvidenceFile(result.evidencePath, result, failures);
+    await checkInteropEvidenceFile(
+      result.evidencePath,
+      result,
+      liveEntry.liveRunner,
+      failures
+    );
   }
 
   const evidenceEntries = await readdir(EVIDENCE_DIRECTORY);
@@ -864,6 +883,20 @@ async function checkImplementationEvidenceFile(
     liveRunner.nonApplicableCheckIds,
     failures
   );
+  compareStringSet(
+    evidencePath,
+    "capabilities",
+    evidence.capabilities,
+    result.declaredCapabilities ?? [],
+    failures
+  );
+  compareStringSet(
+    `compatibility matrix ${implementation.implementationId}`,
+    "declaredCapabilities",
+    result.declaredCapabilities ?? [],
+    liveRunner.capabilities,
+    failures
+  );
 }
 
 async function readLiveCompatibilitySuites(): Promise<CompatibilitySuite[]> {
@@ -896,6 +929,7 @@ async function readLiveCompatibilitySuites(): Promise<CompatibilitySuite[]> {
 
 interface LiveConformanceRunner {
   applicableCheckIds: readonly string[];
+  capabilities: readonly string[];
   nonApplicableCheckIds: readonly string[];
   suite: CompatibilitySuite;
 }
@@ -909,6 +943,7 @@ async function readLiveConformanceRunner(
   const packetPaths = readStringArray(manifest.authorityPackets);
   const applicableCheckIds: string[] = [];
   const allCheckIds: string[] = [];
+  const seenPlanPaths = new Set<string>();
 
   for (const packetPath of packetPaths) {
     const packetManifest = JSON.parse(
@@ -922,7 +957,15 @@ async function readLiveConformanceRunner(
         continue;
       }
 
-      const planJson = await readFile(resolve(REPO_ROOT, plan.path), "utf8");
+      const planPath = resolve(REPO_ROOT, plan.path);
+
+      if (seenPlanPaths.has(planPath)) {
+        continue;
+      }
+
+      seenPlanPaths.add(planPath);
+
+      const planJson = await readFile(planPath, "utf8");
       const planChecks = readLivePlanChecks(planJson, capabilities);
       applicableCheckIds.push(...planChecks.applicableCheckIds);
       allCheckIds.push(...planChecks.allCheckIds);
@@ -933,10 +976,44 @@ async function readLiveConformanceRunner(
 
   return {
     applicableCheckIds,
+    capabilities: [...capabilities],
     nonApplicableCheckIds: allCheckIds.filter(
       (checkId) => !applicableCheckIdSet.has(checkId)
     ),
     suite,
+  };
+}
+
+interface LiveInteropRunner {
+  checkIds: readonly string[];
+  suite: CompatibilitySuite;
+}
+
+async function readLiveInteropRunners(): Promise<
+  Array<{ liveRunner: LiveInteropRunner; runner: InteropRunner }>
+> {
+  return await Promise.all(
+    INTEROP_RUNNERS.map(async (runner) => ({
+      liveRunner: await readLiveInteropRunner(runner),
+      runner,
+    }))
+  );
+}
+
+async function readLiveInteropRunner(
+  runner: InteropRunner
+): Promise<LiveInteropRunner> {
+  const suiteManifest = await readSuiteManifest(runner.manifestPath);
+
+  return {
+    checkIds: suiteManifest.checks
+      .filter((check) => check.interopPairs?.includes(runner.pairId))
+      .map((check) => check.checkId),
+    suite: {
+      boundary: suiteManifest.boundary,
+      suiteId: suiteManifest.suiteId,
+      suiteVersion: suiteManifest.suiteVersion,
+    },
   };
 }
 
@@ -1048,6 +1125,33 @@ function compareLiveConformanceResult(
   }
 }
 
+function compareLiveInteropResult(
+  liveRunner: LiveInteropRunner,
+  result: CompatibilityInteropResult,
+  failures: string[]
+): void {
+  compareEvidenceField(
+    `compatibility matrix ${result.pairId}`,
+    "suiteId",
+    result.suiteId,
+    liveRunner.suite.suiteId,
+    failures
+  );
+  compareEvidenceField(
+    `compatibility matrix ${result.pairId}`,
+    "suiteVersion",
+    result.suiteVersion,
+    liveRunner.suite.suiteVersion,
+    failures
+  );
+
+  if (!hasSameStringSet(result.checkIds, liveRunner.checkIds)) {
+    failures.push(
+      `compatibility matrix ${result.pairId} checkIds do not match live interop suite topology`
+    );
+  }
+}
+
 function createSuiteKey(
   boundary: string,
   suiteId: string,
@@ -1084,6 +1188,7 @@ function hasSameStringSet(
 async function checkInteropEvidenceFile(
   evidencePath: string,
   result: CompatibilityInteropResult,
+  liveRunner: LiveInteropRunner,
   failures: string[]
 ): Promise<void> {
   const absolutePath = resolve(REPO_ROOT, evidencePath);
@@ -1108,6 +1213,13 @@ async function checkInteropEvidenceFile(
     "pairId",
     evidence.pairId,
     result.pairId,
+    failures
+  );
+  compareEvidenceField(
+    evidencePath,
+    "boundary",
+    evidence.boundary,
+    liveRunner.suite.boundary,
     failures
   );
   compareEvidenceField(
@@ -1148,6 +1260,19 @@ async function checkInteropEvidenceFile(
     evidencePath,
     evidence.summary,
     result.checkSummary,
+    failures
+  );
+  compareStringSet(
+    evidencePath,
+    "checkResults",
+    Array.isArray(evidence.checkResults)
+      ? evidence.checkResults
+          .map((checkResult) =>
+            isRecord(checkResult) ? checkResult.checkId : undefined
+          )
+          .filter((checkId): checkId is string => typeof checkId === "string")
+      : [],
+    liveRunner.checkIds,
     failures
   );
 }
@@ -1224,6 +1349,22 @@ function compareNonApplicableCheckIds(
   if (!hasSameStringSet(actualCheckIds, expectedCheckIds)) {
     failures.push(
       `${evidencePath} nonApplicableCheckIds do not match live conformance plan topology`
+    );
+  }
+}
+
+function compareStringSet(
+  evidencePath: string,
+  fieldName: string,
+  actualValue: unknown,
+  expectedValues: readonly string[],
+  failures: string[]
+): void {
+  const actualValues = readStringArray(actualValue);
+
+  if (!hasSameStringSet(actualValues, expectedValues)) {
+    failures.push(
+      `${evidencePath} ${fieldName} does not match expected values`
     );
   }
 }
