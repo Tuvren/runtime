@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tuvren.dev/schemas/shared/core-types/TelemetryEvent.json",
+  "type": "object",
+  "properties": {
+    "kind": {
+      "$ref": "https://tuvren.dev/schemas/shared/core-types/TelemetryEventKind.json"
+    },
+    "lineage": {
+      "$ref": "https://tuvren.dev/schemas/shared/core-types/TelemetryLineage.json"
+    },
+    "atMs": {
+      "$ref": "https://tuvren.dev/schemas/shared/core-types/EpochMs.json"
+    },
+    "attributes": {
+      "$ref": "RecordTelemetryAttributeValue.json"
+    }
+  },
+  "required": ["kind", "lineage", "atMs", "attributes"],
+  "unevaluatedProperties": {
+    "not": {}
+  }
+}

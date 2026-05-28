@@ -278,6 +278,8 @@ export class TypeScriptFrameworkAdapter implements ImplementationAdapter {
         return runtimeScenarios.runCancelledRuntimeTurn(controls);
       case "runtime.approval-resolve":
         return runtimeScenarios.runApprovalResume(input);
+      case "runtime.operational-telemetry":
+        return runtimeScenarios.runOperationalTelemetry(input);
       case "runtime.branch-create":
         return runtimeScenarios.runBranchCreate();
       case "runtime.durable-read.list-threads":

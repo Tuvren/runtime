@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tuvren.dev/schemas/shared/core-types/TelemetrySpanStatus.json",
+  "anyOf": [
+    {
+      "type": "string",
+      "const": "ok"
+    },
+    {
+      "type": "string",
+      "const": "error"
+    }
+  ]
+}

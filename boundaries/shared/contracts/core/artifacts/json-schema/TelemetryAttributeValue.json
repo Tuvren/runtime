@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tuvren.dev/schemas/shared/core-types/TelemetryAttributeValue.json",
+  "anyOf": [
+    {
+      "type": "string"
+    },
+    {
+      "type": "number"
+    },
+    {
+      "type": "boolean"
+    }
+  ]
+}

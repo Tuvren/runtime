@@ -520,6 +520,9 @@
     "runtime-lifecycle-ext.stale-recovery.handoff-context-active-agent",
     "runtime-lifecycle-ext.stale-recovery.same-signal-iterate",
     "runtime-lifecycle-ext.stale-recovery.signal-mismatch-fresh-turn",
+    "runtime-api-operational-telemetry.completed-turn-events",
+    "runtime-api-operational-telemetry.completed-turn-spans",
+    "runtime-api-operational-telemetry.error-path",
     "runtime-orchestration-af.handoff-last-output-only-builder",
     "runtime-orchestration-af.handoff-rejects-multiple-intents",
     "runtime-orchestration-af.handoff-resolution-not-history-entry",
@@ -566,9 +569,9 @@
   "summary": {
     "failedChecks": 0,
     "passedChecks": 12,
-    "totalChecks": 341,
+    "totalChecks": 344,
     "applicableChecks": 12,
-    "nonApplicableChecks": 329
+    "nonApplicableChecks": 332
   },
   "suiteId": "tuvren.framework.runtime-api.batteries-included",
   "suiteVersion": "0.1.0"

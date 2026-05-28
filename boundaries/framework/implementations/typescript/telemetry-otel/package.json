@@ -1,0 +1,29 @@
+{
+  "name": "@tuvren/telemetry-otel",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "peerDependencies": {
+    "@tuvren/core": "workspace:*"
+  },
+  "peerDependenciesMeta": {
+    "@tuvren/core": {
+      "optional": false
+    }
+  },
+  "dependencies": {
+    "@opentelemetry/api": "1.9.1"
+  },
+  "devDependencies": {
+    "@opentelemetry/sdk-trace-base": "2.7.1"
+  }
+}

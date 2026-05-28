@@ -2,6 +2,7 @@
 
 ## 0. Version History & Changelog
 
+- v0.29.2 - Closed Epic AV operational telemetry: added `@tuvren/core/telemetry`, framework sink wiring with secret-screening, `@tuvren/telemetry-otel`, the `framework-operational-telemetry` conformance plan, curated runtime re-exports, portability-inventory updates, and verification coverage. Narrowed the active production-trust scope to Epic AW only (36 points), with AW001 complete as AV's prerequisite.
 - v0.29.1 - Maintenance alignment after Epic AU closure: compacted completed Epics AM-AU into the closed-work ledger, marked AU closed with `kernel-crash-recovery` evidence, narrowed the active production-trust scope to Epics AV and AW only (14 tickets, 60 points), and updated the active graph/DoD accordingly.
 - v0.29.0 - Opened the v0.8.0 production-trust block (PRD v0.8.0 / Architecture v0.8.0 / TechSpec v0.28.0, ADR-042 through ADR-045): added Epics AU (durability & recovery proof under fault injection), AV (operational telemetry surface + vendor-neutral export), and AW (trust-boundary security hardening — framework-enforced execution bounds, secret isolation, and approval/input trust-boundary verification) as the active critical path (19 tickets, 83 points). Recorded the post-trust-block roadmap (Epics AX–BB: performance budgets, public API freeze, publication, docs/onboarding, reference application) as named, un-ticketed deferred scope to anchor a future planning session.
 - v0.28.4 - Maintenance alignment: reflected TechSpec v0.27.2, closed the stale AQ status marker, narrowed active scope language to AS-AT, and corrected Epic AS planning around `@modelcontextprotocol/sdk@1.29.0`'s inherited `zod` peer requirement.
@@ -9,9 +10,9 @@
 
 ## 1. Executive Summary & Active Critical Path
 
-- **Total Active Story Points:** 60 across the remaining production-trust block — Epic AV (24) and Epic AW (36). Epics AM (32), AN (13), AO (26), AP (37), AQ (15), AR (15), AS (31), AT (34), and AU (23) are closed and retained as a compact audit ledger below.
-- **Critical Path:** `KRT-AV001 → KRT-AV002`, with `KRT-AW001` feeding `KRT-AV002`; then the branch splits: `KRT-AV004 → KRT-AW004` for telemetry-secret isolation, while `KRT-AW005` converges with `KRT-AV002` into `KRT-AW006 → KRT-AW007 → KRT-AW008` for execution bounds. `KRT-AW009` is an independent required close-condition security lane and must complete before the final block closure/verify point.
-- **Planning Assumptions:** PRD v0.8.0, Architecture v0.8.0, and TechSpec v0.28.x (ADR-042 through ADR-045) govern this block; Epic AU is closed in repository reality and Epics AV/AW remain active. The prior chain (PRD v0.7.0 / Architecture v0.7.0 / TechSpec v0.27.x, ADR-034 through ADR-041, Epics AM-AT) is closed. The production-trust block hardens the existing TypeScript line and does NOT reopen Rust framework/product work, additional drivers, additional host protocols, additional backends, or broader provider families. The `product proof gate`, `platform gate`, and `portability gate` from Epic AL remain the staged-gate baseline. The locked external dependency versions per TechSpec §1 still apply; `@tuvren/telemetry-otel` pins its `@opentelemetry/*` versions in Epic AV per the §1 pin-on-activation rule. The new `@tuvren/core/telemetry` subpath raises the curated core surface from 8 to 9 subpaths; `@tuvren/telemetry-otel` is an implementation-specific projection (a standing portability exception alongside AG-UI) while the canonical telemetry vocabulary (`telemetry/semconv/tuvren-runtime.yaml`) remains portable authority.
+- **Total Active Story Points:** 36 across the remaining production-trust block — Epic AW only. Epics AM (32), AN (13), AO (26), AP (37), AQ (15), AR (15), AS (31), AT (34), AU (23), and AV (24) are closed and retained as a compact audit ledger below.
+- **Critical Path:** `KRT-AW002 → KRT-AW004` and `KRT-AW005 → KRT-AW006 → KRT-AW007 → KRT-AW008`, with `KRT-AW009` as an independent required close-condition security lane. `KRT-AW001` is complete because Epic AV consumed it for telemetry secret screening.
+- **Planning Assumptions:** PRD v0.8.0, Architecture v0.8.0, and TechSpec v0.28.x (ADR-042 through ADR-045) govern this block; Epics AU and AV are closed in repository reality and Epic AW remains active. The prior chain (PRD v0.7.0 / Architecture v0.7.0 / TechSpec v0.27.x, ADR-034 through ADR-041, Epics AM-AT) is closed. The production-trust block hardens the existing TypeScript line and does NOT reopen Rust framework/product work, additional drivers, additional host protocols, additional backends, or broader provider families. The `product proof gate`, `platform gate`, and `portability gate` from Epic AL remain the staged-gate baseline. The locked external dependency versions per TechSpec §1 still apply.
 
 ### Brownfield Continuity Note
 
@@ -26,7 +27,7 @@
 - No AG-UI portability work is active in this plan beyond preserving correct TypeScript projection behavior.
 - No additional host protocols beyond the canonical stream and SSE surfaces are active in this plan. The headless REPL mode (Epic AT) is a CLI surface, not a wire protocol.
 - Public package publication remains deferred. The consolidated SDK layout (`@tuvren/core` + `@tuvren/runtime`) defines the curated v1 surface; the publication act itself is out of scope for this chain and is recorded as a named post-trust-block roadmap item (Epic AZ) in §2.
-- The remaining production-trust block (AV, AW) hardens the existing TypeScript line only. Epic AU's fault-injection seam is closed, testkit-only, and never reachable from production paths; the telemetry surface (Epic AV) adds an outbound observability surface plus an implementation-specific OTel projection without changing runtime truth; execution bounds and secret isolation (Epic AW) add framework-owned guards and credential-edge confinement without altering kernel semantics.
+- The remaining production-trust block (AW) hardens the existing TypeScript line only. Epic AU's fault-injection seam is closed, testkit-only, and never reachable from production paths; Epic AV's telemetry surface is closed; execution bounds and secret isolation (Epic AW) add framework-owned guards and credential-edge confinement without altering kernel semantics.
 
 ### Planning Heuristic
 
@@ -37,7 +38,7 @@
 
 ### Current Active Scope
 
-- **Block 4 — Production trust remainder (Epics AV, AW): ACTIVE.** Epic AU is closed. The remaining critical path adds the first-class operational telemetry surface (`@tuvren/core/telemetry` sink) with framework emission and a vendor-neutral `@tuvren/telemetry-otel` export, then hardens trust boundaries through framework-enforced execution bounds with a typed `execution_bound_exceeded` terminal result, secret isolation across durable, telemetry, and transcript surfaces, and verification that approval gates are non-bypassable and untrusted MCP/tool inputs are validated.
+- **Block 4 — Production trust remainder (Epic AW): ACTIVE.** Epics AU and AV are closed. The remaining critical path hardens trust boundaries through framework-enforced execution bounds with a typed `execution_bound_exceeded` terminal result, secret isolation across durable, telemetry, and transcript surfaces, and verification that approval gates are non-bypassable and untrusted MCP/tool inputs are validated.
 - **Block 1 — Boundary correctness gate (Epics AM, AN, AO):** closed. The kernel now exposes `thread.list` with the corrected 30-operation narrative, `ExecutionHandle` exposes base-handle `awaitResult`, and `TuvrenRuntime` exposes the five-method durable-read surface (`listThreads`, `listBranches`, `getTurnState`, `getTurnHistory`, `readBranchMessages`).
 - **Block 2 — Curated surface + ergonomics (Epics AP, AQ, AR):** closed. Epic AP landed `@tuvren/core` and folded the source-bearing runtime implementation into `@tuvren/runtime`. Epic AQ added the schema-agnostic `defineTool` helper (Zod / Standard Schema / wrapped JSON Schema with type inference). Epic AR added the `createTuvren({...})` batteries-included factory with full lifecycle conformance across memory, SQLite, and PostgreSQL backends.
 - **Block 3 — Capability spikes (Epics AS, AT):** closed. Epic AS added `@tuvren/mcp-client` as a first-class tool source over stdio + Streamable HTTP-backed public `http-sse` transports. Epic AT retired `@tuvren/playground-host`, renamed internal REPL host modules to drop the playground naming, added headless stdin mode for the reference host, added streaming JSONL output, and added JSONL transcript capture/replay.
@@ -78,34 +79,23 @@ These epics are the agreed direction after the production-trust block, toward th
 - Epic AL closed the portability gate by promoting tool contracts, kernel CDDL registration, SSE projection, kernel and framework interop packets, and telemetry semantic conventions into packet/plan/runner-owned authority, by landing `tools/scripts/portability-gate.ts` as the canonical portability proxy in the verify lane, and by recording the staged-gate re-entry verdict in `constitution/support/live/epic-al-rust-re-entry-gate-reassessment.md`.
 - Epics R-AG established the multi-language transition foundation, shared conformance architecture, kernel interop, and the AG hardening subset that remains historical evidence for promoted surfaces.
 - Epics AM through AP closed the kernel enumeration, base-handle terminal-value, durable-read, and package-consolidation portions of the v0.27.0 constitutional revision chain.
-- Epics AM-AU are summarized in the completed-work ledger in §4.
-- That work remains valuable audit context. The active forward path is the remaining production-trust block (Epics AV and AW); see Current Active Scope.
+- Epics AM-AV are summarized in the completed-work ledger in §4.
+- That work remains valuable audit context. The active forward path is the remaining production-trust block (Epic AW); see Current Active Scope.
 
 ## 3. Build Order (Mermaid)
 
 ```mermaid
 flowchart LR
-  closed["Blocks 1-3 + Epic AU (Epics AM-AU) — closed"]
+  closed["Blocks 1-3 + Epics AU-AV (Epics AM-AV) — closed"]
 
   subgraph block4["Block 4 — Production trust (ACTIVE)"]
     subgraph aw_sec["Epic AW — Secret isolation + trust boundary"]
-      AW1["AW001 Telemetry secret-screening helpers"]
       AW2["AW002 Transcript redactor"]
       AW3["AW003 Edge-confinement docs/fixtures"]
       AW4["AW004 secret-isolation check set"]
       AW9["AW009 Approval/input trust-boundary verify"]
-      AW1 --> AW4
       AW2 --> AW4
       AW3 --> AW4
-    end
-    subgraph av["Epic AV — Operational telemetry"]
-      AV1["AV001 @tuvren/core/telemetry sink types"]
-      AV2["AV002 Framework emission + sink wiring"]
-      AV3["AV003 @tuvren/telemetry-otel export"]
-      AV4["AV004 framework-operational-telemetry plan"]
-      AV5["AV005 Re-export + verify"]
-      AV1 --> AV2 --> AV4 --> AV5
-      AV1 --> AV3 --> AV5
     end
     subgraph aw_bounds["Epic AW — Execution bounds"]
       AW5["AW005 ExecutionBounds types + code"]
@@ -115,22 +105,18 @@ flowchart LR
       AW5 --> AW6 --> AW7 --> AW8
     end
     trust_close["Block 4 close + verify"]
-    AV5 --> trust_close
     AW4 --> trust_close
     AW8 --> trust_close
     AW9 --> trust_close
   end
 
-  closed --> AV1
-  closed --> AW1
   closed --> AW2
   closed --> AW3
   closed --> AW5
   closed --> AW9
-  AW1 --> AV2
-  AV2 --> AW6
-  AV4 --> AW4
-  AV4 --> AW7
+  closed --> AW4
+  closed --> AW6
+  closed --> AW7
 ```
 
 ## 4. Ticket List
@@ -150,106 +136,18 @@ Completed ticket detail is removed from the active execution plan and retained t
 | AS | 31 | Added `@tuvren/mcp-client` as a first-class tool source over stdio and Streamable HTTP-backed public `http-sse` transport. | `providers-mcp-client`; MCP authority packet; portability inventory |
 | AT | 34 | Consolidated the reference host on the REPL CLI, added headless stdin mode, streaming JSONL, transcript capture/replay, and retired `@tuvren/playground-host`. | `proving-host-headless-transcript-replay`; `proving-host:*` lanes; compatibility evidence |
 | AU | 23 | Proved durability and recovery under failure with a testkit-only fault-injection seam, strengthened crash-recovery conformance, and the Crash Recovery Invariant. | `kernel.crash-recovery.*`; `createFaultInjectingBackend`; kernel restart-recovery evidence |
-
-### Epic AV — Operational Telemetry Surface (KRT)
-
-**Status:** Not started — active. Realizes ADR-042. `KRT-AV002` consumes the telemetry secret-screening helpers from `KRT-AW001`.
-
-**KRT-AV001 `@tuvren/core/telemetry` Subpath: Sink + Record Types**
-- **Type:** Feature
-- **Effort:** 5
-- **Dependencies:** None
-- **Capability / Contract Mapping:** PRD `CAP-P0-052`; TechSpec ADR-042, §3.10, §4.18
-- **Description:** Add the `./telemetry` subpath to `@tuvren/core`: `TuvrenTelemetrySink`, `TelemetrySpan`, `TelemetryEvent`, `TelemetryLineage`, `TelemetrySpanKind`, `TelemetryEventKind`, and `NoopTelemetrySink` (§3.10, §4.18). Update the package `exports` map (10 entries), `tsup.config.ts` (10 entries), the merged core authority packet (one new binding section plus authoritative source entries, with a packet-version bump), the shared core machine-readable sources and generated artifacts for the new telemetry shapes, and `tools/scripts/portability-gate.ts` for the new subpath.
-- **Acceptance Criteria (Gherkin):**
-```gherkin
-Given the §3.10 record shapes and §4.18 sink contract
-When the @tuvren/core/telemetry subpath is added
-Then TuvrenTelemetrySink, TelemetrySpan, TelemetryEvent, TelemetryLineage, and NoopTelemetrySink are exported from @tuvren/core/telemetry
-And TelemetrySpanKind and TelemetryEventKind are exported from @tuvren/core/telemetry
-And the package exports map and tsup config carry 10 entries
-And the merged core authority packet declares the telemetry binding section and bumps its version
-And the shared core machine-readable sources and generated artifacts define the telemetry record shapes and kind unions
-And the portability gate recognizes the new subpath
-And typecheck and build pass
-```
-
-**KRT-AV002 Framework Emission + Sink Wiring + `createTuvren` Telemetry Option**
-- **Type:** Feature
-- **Effort:** 8
-- **Dependencies:** `KRT-AV001`, `KRT-AW001`
-- **Capability / Contract Mapping:** PRD `CAP-P0-052`; TechSpec ADR-042, §4.18, §5.6.2; ADR-044 (telemetry secret-screening)
-- **Description:** Wire emission in `@tuvren/runtime` at the §4.18 points that already have producers in the runtime (turn/run start-end, iteration boundaries, model request/response, tool call start/end + approval transitions, checkpoint commit, recovery resume-or-fail, errors), reusing the canonical event vocabulary. Isolate a throwing sink (catch, log one warning, drop). Add `telemetry?: TuvrenTelemetrySink` to `CreateTuvrenOptions` and `RuntimeCoreOptions`, defaulting to `NoopTelemetrySink`. Apply the telemetry secret-screening helpers from `KRT-AW001` before records reach the sink. The bounded-execution telemetry producer lands with `KRT-AW006` once the bounds guard exists.
-- **Acceptance Criteria (Gherkin):**
-```gherkin
-Given the telemetry sink contract and the telemetry secret-screening helpers exist
-When framework emission is wired in @tuvren/runtime
-Then a configured sink receives lineage-keyed spans and events at turn, run, iteration, model, tool, checkpoint, recovery, and error points
-And a throwing sink is isolated and never fails the turn
-And createTuvren and RuntimeCoreOptions accept an optional telemetry sink defaulting to NoopTelemetrySink
-And host-supplied attributes pass through the semconv allowlist before reaching the sink
-And telemetry error summaries are sanitized before reaching the sink
-And supplying both top-level telemetry and runtimeOptions.telemetry is rejected as invalid_createtuvren_options
-And the telemetry surface reuses the same canonical event vocabulary as the event stream
-```
-
-**KRT-AV003 `@tuvren/telemetry-otel` Vendor-Neutral Export Package**
-- **Type:** Feature
-- **Effort:** 5
-- **Dependencies:** `KRT-AV001`
-- **Capability / Contract Mapping:** PRD `CAP-P1-053`; TechSpec ADR-042, §4.18, §5.6.2
-- **Description:** Create `@tuvren/telemetry-otel` under `boundaries/framework/implementations/typescript/telemetry-otel/`, peer-depending on `@tuvren/core`. Implement `createOtelTelemetrySink(options): TuvrenTelemetrySink` mapping `TelemetrySpan` / `TelemetryEvent` onto OpenTelemetry spans/events using the authored semconv attributes from `telemetry/semconv/tuvren-runtime.yaml`. Pin exact `@opentelemetry/*` versions in this epic's manifest change. Record the OTel projection as a standing implementation-specific portability exception in both the live portability inventory JSON and its paired Markdown inventory, preserving the existing standing exceptions already recorded there.
-- **Acceptance Criteria (Gherkin):**
-```gherkin
-Given the telemetry sink contract and the authored semconv vocabulary
-When @tuvren/telemetry-otel is implemented
-Then createOtelTelemetrySink returns a TuvrenTelemetrySink that maps records onto OpenTelemetry spans and events using the semconv attributes
-And the package peer-depends on @tuvren/core and pins exact @opentelemetry/* versions
-And the OTel projection is recorded in the live portability inventory JSON and Markdown without dropping any existing standing exceptions
-And a unit test verifies the record-to-OTel mapping
-```
-
-**KRT-AV004 `framework-operational-telemetry.json` Conformance Plan**
-- **Type:** Feature
-- **Effort:** 5
-- **Dependencies:** `KRT-AV002`
-- **Capability / Contract Mapping:** PRD `CAP-P0-052`; TechSpec ADR-042, ADR-030, §5.6.2
-- **Description:** Add `framework-operational-telemetry.json` (check set `runtime-api-operational-telemetry`) under `boundaries/framework/conformance/plans/`. Drive a deterministic aimock turn and assert the expected lineage-keyed spans/events for turn/iteration/model/tool/checkpoint, approval transitions, and error paths through an in-memory capture sink added to `@tuvren/framework-testkit`, then drive a targeted restart/recovery fixture that asserts the recovery records. Record the new plan in `boundaries/shared/contracts/core/spec/authority-packet.json` so the framework runner discovers it. The OTel mapping stays out of the portable plan (covered by KRT-AV003's unit test).
-- **Acceptance Criteria (Gherkin):**
-```gherkin
-Given framework emission is wired and an in-memory capture sink exists in the framework testkit
-When the framework-operational-telemetry.json plan is added
-Then a deterministic aimock turn emits the expected lineage-keyed spans and events for turn, run, iteration, model, tool, checkpoint, approval transitions, and error paths
-And a targeted restart or recovery fixture emits the expected recovery records
-And the check set asserts those records through the in-memory capture sink, not the OTel projection
-And the merged core authority packet records framework-operational-telemetry.json, bumps its version, and makes bun run conformance discover it
-And bun run conformance includes the new check set automatically
-```
-
-**KRT-AV005 Re-export Curated Telemetry Surface + `verify`**
-- **Type:** Chore
-- **Effort:** 1
-- **Dependencies:** `KRT-AV004`, `KRT-AV003`
-- **Capability / Contract Mapping:** TechSpec ADR-042, §5.6.2
-- **Description:** Re-export `NoopTelemetrySink` and the telemetry record types from `@tuvren/runtime`'s curated re-exports. Run `bun run verify` from a clean checkout; capture fresh compatibility evidence reflecting the operational-telemetry lane.
-- **Acceptance Criteria (Gherkin):**
-```gherkin
-Given the telemetry surface, emission, export package, and conformance plan exist
-When @tuvren/runtime re-exports the curated telemetry surface and bun run verify runs
-Then NoopTelemetrySink and the telemetry record types are reachable from @tuvren/runtime
-And bun run verify exits zero from a clean checkout
-And fresh compatibility evidence reflects the operational-telemetry lane
-```
+| AV | 24 | Added first-class operational telemetry with `@tuvren/core/telemetry`, framework emission and secret screening, `@tuvren/telemetry-otel`, portable telemetry conformance, and curated runtime re-exports. | `framework-operational-telemetry`; `@tuvren/telemetry-otel` tests; portability inventory |
 
 ### Epic AW — Trust-Boundary Security Hardening (KRT)
 
-**Status:** Not started — active. Realizes ADR-043 (execution bounds) and ADR-044 (secret isolation), plus verification of the approval/input trust boundaries the PRD elevated. `KRT-AW001` is an early cross-epic prerequisite consumed by `KRT-AV002`.
+**Status:** Active. Realizes ADR-043 (execution bounds) and ADR-044 (secret isolation), plus verification of the approval/input trust boundaries the PRD elevated. `KRT-AW001` is complete as the telemetry secret-screening prerequisite consumed by closed Epic AV.
 
 **KRT-AW001 Telemetry Secret-Screening Helpers**
 - **Type:** Security
 - **Effort:** 3
 - **Dependencies:** None
 - **Capability / Contract Mapping:** PRD `CAP-P0-055`; TechSpec ADR-044, §5.6.3
+- **Status:** Complete — closed with Epic AV because AV002 consumes the helpers.
 - **Description:** Implement the telemetry secret-screening helpers consumed by `KRT-AV002`'s emission path: an attribute allowlist keyed only to `telemetry/semconv/tuvren-runtime.yaml` (reject or drop credential-shaped keys such as `authorization`, `token`, `password`, `api-key`, `secret`, and drop or sanitize secret-like values on otherwise allowed keys) plus a telemetry-error-summary sanitizer that strips raw provider, MCP, backend, and transport error text down to a runtime-safe summary with no secret-bearing values. If operational telemetry needs a new canonical attribute (for example bounded-execution `bound`, `limit`, or `observed`), update the semconv source in the same change before the allowlist admits it.
 - **Acceptance Criteria (Gherkin):**
 ```gherkin

@@ -1,9 +1,9 @@
 {
   "packetId": "tuvren.shared.core",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "boundary": "framework",
   "surface": "core",
-  "description": "Merged shared-primitive authority packet for @tuvren/core. Absorbs tuvren.shared.core-types, tuvren.framework.runtime-api, tuvren.framework.event-stream, tuvren.framework.tool-contracts, and tuvren.framework.driver-api into a single packet with 8 binding sections per ADR-037 (Epic AP).",
+  "description": "Merged shared-primitive authority packet for @tuvren/core. Absorbs tuvren.shared.core-types, tuvren.framework.runtime-api, tuvren.framework.event-stream, tuvren.framework.tool-contracts, and tuvren.framework.driver-api into a single packet with 9 binding sections per ADR-037 (Epic AP) and ADR-042 (Epic AV).",
   "humanAuthorityRefs": [
     "docs/KrakenKernelSpecification.md",
     "docs/KrakenFrameworkSpecification.md",
@@ -13,7 +13,7 @@
     {
       "path": "boundaries/shared/contracts/core/spec/typespec/main.tsp",
       "format": "typespec",
-      "bindingSection": "errors,messages,events,execution,tools,provider,extensions,driver"
+      "bindingSection": "errors,messages,events,execution,tools,provider,extensions,driver,telemetry"
     },
     {
       "path": "boundaries/shared/contracts/core-types/spec/typespec/main.tsp",
@@ -83,6 +83,10 @@
     {
       "path": "boundaries/framework/conformance/plans/runtime-api-batteries-included.json",
       "format": "conformance-plan"
+    },
+    {
+      "path": "boundaries/framework/conformance/plans/framework-operational-telemetry.json",
+      "format": "conformance-plan"
     }
   ],
   "generatedArtifacts": [
@@ -148,6 +152,11 @@
       "planId": "tuvren.framework.runtime-api.batteries-included",
       "planVersion": "0.1.0",
       "path": "boundaries/framework/conformance/plans/runtime-api-batteries-included.json"
+    },
+    {
+      "planId": "tuvren.framework.runtime-api.operational-telemetry",
+      "planVersion": "0.1.0",
+      "path": "boundaries/framework/conformance/plans/framework-operational-telemetry.json"
     }
   ],
   "bindingSections": {
@@ -177,6 +186,9 @@
     },
     "extensions": {
       "description": "TuvrenExtension, ExtensionContext, lifecycle handler types"
+    },
+    "telemetry": {
+      "description": "TuvrenTelemetrySink, telemetry lineage, span, event, and kind record types"
     }
   },
   "bindingProjections": {
@@ -252,6 +264,10 @@
     {
       "kind": "conformance-plan",
       "target": "boundaries/framework/conformance/plans/runtime-api-batteries-included.json"
+    },
+    {
+      "kind": "conformance-plan",
+      "target": "boundaries/framework/conformance/plans/framework-operational-telemetry.json"
     },
     {
       "kind": "freshness-check",

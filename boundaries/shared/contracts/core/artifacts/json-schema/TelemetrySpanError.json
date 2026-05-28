@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tuvren.dev/schemas/shared/core-types/TelemetrySpanError.json",
+  "type": "object",
+  "properties": {
+    "code": {
+      "$ref": "https://tuvren.dev/schemas/shared/core-types/NonEmptyString.json"
+    },
+    "message": {
+      "type": "string"
+    }
+  },
+  "required": ["code", "message"],
+  "unevaluatedProperties": {
+    "not": {}
+  }
+}

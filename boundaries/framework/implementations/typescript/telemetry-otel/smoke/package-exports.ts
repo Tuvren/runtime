@@ -14,26 +14,13 @@
  * limitations under the License.
  */
 
-import { defineConfig } from "tsup";
+import { describe, expect, test } from "bun:test";
+import { createOtelTelemetrySink } from "@tuvren/telemetry-otel";
 
-export default defineConfig({
-  clean: true,
-  dts: false,
-  entry: [
-    "src/index.ts",
-    "src/errors/index.ts",
-    "src/messages/index.ts",
-    "src/events/index.ts",
-    "src/execution/index.ts",
-    "src/tools/index.ts",
-    "src/driver/index.ts",
-    "src/provider/index.ts",
-    "src/extensions/index.ts",
-    "src/telemetry/index.ts",
-  ],
-  format: ["esm"],
-  outDir: "dist",
-  sourcemap: false,
-  tsconfig: "tsconfig.tsup.json",
-  target: "esnext",
+describe("telemetry-otel package exports", () => {
+  test("exports the telemetry sink factory", () => {
+    const sink = createOtelTelemetrySink();
+    expect(typeof sink.event).toBe("function");
+    expect(typeof sink.span).toBe("function");
+  });
 });

@@ -73,6 +73,11 @@
         "provider-ai-sdk"
       ],
       "inventorySection": "§4.2"
+    },
+    {
+      "label": "OpenTelemetry projection (@tuvren/telemetry-otel)",
+      "forbiddenSurfaceNames": ["telemetry-otel", "otel", "opentelemetry"],
+      "inventorySection": "§4.3"
     }
   ],
   "requiredAuthoritativeSources": [

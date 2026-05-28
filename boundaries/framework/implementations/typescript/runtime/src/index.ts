@@ -93,6 +93,15 @@ export type {
 } from "@tuvren/core/provider";
 export { assertTuvrenModelResponse } from "@tuvren/core/provider";
 export type {
+  TelemetryEvent,
+  TelemetryEventKind,
+  TelemetryLineage,
+  TelemetrySpan,
+  TelemetrySpanKind,
+  TuvrenTelemetrySink,
+} from "@tuvren/core/telemetry";
+export { NoopTelemetrySink } from "@tuvren/core/telemetry";
+export type {
   ApprovalRequest,
   ApprovalResponse,
   FlexibleSchema,

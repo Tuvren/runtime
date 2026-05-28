@@ -1,0 +1,96 @@
+{
+  "planId": "tuvren.framework.runtime-api.operational-telemetry",
+  "planVersion": "0.1.0",
+  "packetId": "tuvren.shared.core",
+  "applicability": {
+    "capabilities": ["framework.runtime-api"]
+  },
+  "scenarios": {
+    "operational-telemetry-scenarios": "../scenarios/operational-telemetry-scenarios.json"
+  },
+  "checks": [
+    {
+      "checkId": "runtime-api-operational-telemetry.completed-turn-events",
+      "operation": "runtime.operational-telemetry",
+      "scenario": "operational-telemetry-scenarios",
+      "input": { "scenarioPath": "$.completed-turn" },
+      "assertions": [
+        {
+          "kind": "resultField",
+          "field": "$.telemetry.eventKinds",
+          "contains": "turn.start"
+        },
+        {
+          "kind": "resultField",
+          "field": "$.telemetry.eventKinds",
+          "contains": "turn.end"
+        },
+        {
+          "kind": "resultField",
+          "field": "$.telemetry.eventKinds",
+          "contains": "state.checkpoint"
+        },
+        {
+          "kind": "resultField",
+          "field": "$.telemetry.eventsHaveLineage",
+          "equals": true
+        }
+      ],
+      "evidence": [
+        "result.telemetry.eventKinds",
+        "result.telemetry.eventsHaveLineage"
+      ]
+    },
+    {
+      "checkId": "runtime-api-operational-telemetry.completed-turn-spans",
+      "operation": "runtime.operational-telemetry",
+      "scenario": "operational-telemetry-scenarios",
+      "input": { "scenarioPath": "$.completed-turn" },
+      "assertions": [
+        {
+          "kind": "resultField",
+          "field": "$.telemetry.spanKinds",
+          "contains": "turn"
+        },
+        {
+          "kind": "resultField",
+          "field": "$.telemetry.spanKinds",
+          "contains": "iteration"
+        },
+        {
+          "kind": "resultField",
+          "field": "$.telemetry.spanKinds",
+          "contains": "model_call"
+        },
+        {
+          "kind": "resultField",
+          "field": "$.telemetry.spansHaveLineage",
+          "equals": true
+        }
+      ],
+      "evidence": [
+        "result.telemetry.spanKinds",
+        "result.telemetry.spansHaveLineage"
+      ]
+    },
+    {
+      "checkId": "runtime-api-operational-telemetry.error-path",
+      "operation": "runtime.operational-telemetry",
+      "scenario": "operational-telemetry-scenarios",
+      "input": { "scenarioPath": "$.error-turn" },
+      "assertions": [
+        {
+          "kind": "resultField",
+          "field": "$.telemetry.eventKinds",
+          "contains": "error"
+        },
+        {
+          "kind": "resultField",
+          "field": "$.telemetry.spanKinds",
+          "contains": "model_call"
+        }
+      ],
+      "evidence": ["result.telemetry.eventKinds", "result.telemetry.spanKinds"]
+    }
+  ]
+}

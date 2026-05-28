@@ -6377,6 +6377,100 @@
     {
       "assertionResults": [
         {
+          "assertionId": "runtime-api-operational-telemetry.completed-turn-events.1.resultField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "runtime-api-operational-telemetry.completed-turn-events.2.resultField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "runtime-api-operational-telemetry.completed-turn-events.3.resultField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "runtime-api-operational-telemetry.completed-turn-events.4.resultField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "runtime-api-operational-telemetry.completed-turn-events.requiredEvidence.result.telemetry.eventKinds",
+          "status": "pass"
+        },
+        {
+          "assertionId": "runtime-api-operational-telemetry.completed-turn-events.requiredEvidence.result.telemetry.eventsHaveLineage",
+          "status": "pass"
+        }
+      ],
+      "checkId": "runtime-api-operational-telemetry.completed-turn-events",
+      "details": {
+        "adapterId": "typescript-framework",
+        "planId": "tuvren.framework.runtime-api.operational-telemetry"
+      },
+      "status": "pass"
+    },
+    {
+      "assertionResults": [
+        {
+          "assertionId": "runtime-api-operational-telemetry.completed-turn-spans.1.resultField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "runtime-api-operational-telemetry.completed-turn-spans.2.resultField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "runtime-api-operational-telemetry.completed-turn-spans.3.resultField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "runtime-api-operational-telemetry.completed-turn-spans.4.resultField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "runtime-api-operational-telemetry.completed-turn-spans.requiredEvidence.result.telemetry.spanKinds",
+          "status": "pass"
+        },
+        {
+          "assertionId": "runtime-api-operational-telemetry.completed-turn-spans.requiredEvidence.result.telemetry.spansHaveLineage",
+          "status": "pass"
+        }
+      ],
+      "checkId": "runtime-api-operational-telemetry.completed-turn-spans",
+      "details": {
+        "adapterId": "typescript-framework",
+        "planId": "tuvren.framework.runtime-api.operational-telemetry"
+      },
+      "status": "pass"
+    },
+    {
+      "assertionResults": [
+        {
+          "assertionId": "runtime-api-operational-telemetry.error-path.1.resultField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "runtime-api-operational-telemetry.error-path.2.resultField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "runtime-api-operational-telemetry.error-path.requiredEvidence.result.telemetry.eventKinds",
+          "status": "pass"
+        },
+        {
+          "assertionId": "runtime-api-operational-telemetry.error-path.requiredEvidence.result.telemetry.spanKinds",
+          "status": "pass"
+        }
+      ],
+      "checkId": "runtime-api-operational-telemetry.error-path",
+      "details": {
+        "adapterId": "typescript-framework",
+        "planId": "tuvren.framework.runtime-api.operational-telemetry"
+      },
+      "status": "pass"
+    },
+    {
+      "assertionResults": [
+        {
           "assertionId": "runtime-orchestration-af.handoff-last-output-only-builder.1.resultField",
           "status": "pass"
         },
@@ -7199,9 +7293,9 @@
   "status": "pass",
   "summary": {
     "failedChecks": 0,
-    "passedChecks": 329,
-    "totalChecks": 341,
-    "applicableChecks": 329,
+    "passedChecks": 332,
+    "totalChecks": 344,
+    "applicableChecks": 332,
     "nonApplicableChecks": 12
   },
   "suiteId": "tuvren.framework.promoted-authority",

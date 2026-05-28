@@ -1,0 +1,10 @@
+{
+  "completed-turn": {
+    "operation": "runtime.operational-telemetry",
+    "case": "completed"
+  },
+  "error-turn": {
+    "operation": "runtime.operational-telemetry",
+    "case": "error"
+  }
+}

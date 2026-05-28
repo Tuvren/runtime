@@ -31,6 +31,9 @@
       "@tuvren/core/extensions": [
         "./boundaries/shared/contracts/core/implementations/typescript/src/extensions/index.ts"
       ],
+      "@tuvren/core/telemetry": [
+        "./boundaries/shared/contracts/core/implementations/typescript/src/telemetry/index.ts"
+      ],
       "@tuvren/core-types": [
         "./boundaries/shared/contracts/core-types/implementations/typescript/src/index.ts"
       ],
@@ -84,6 +87,9 @@
       ],
       "@tuvren/stream-agui": [
         "./boundaries/framework/implementations/typescript/stream-agui/src/index.ts"
+      ],
+      "@tuvren/telemetry-otel": [
+        "./boundaries/framework/implementations/typescript/telemetry-otel/src/index.ts"
       ],
       "@tuvren/backend-memory": [
         "./boundaries/kernel/implementations/typescript/backend-memory/src/index.ts"

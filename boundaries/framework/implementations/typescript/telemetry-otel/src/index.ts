@@ -14,26 +14,7 @@
  * limitations under the License.
  */
 
-import { defineConfig } from "tsup";
+// biome-ignore-all lint/performance/noBarrelFile: This package entrypoint is the intentional public export surface.
 
-export default defineConfig({
-  clean: true,
-  dts: false,
-  entry: [
-    "src/index.ts",
-    "src/errors/index.ts",
-    "src/messages/index.ts",
-    "src/events/index.ts",
-    "src/execution/index.ts",
-    "src/tools/index.ts",
-    "src/driver/index.ts",
-    "src/provider/index.ts",
-    "src/extensions/index.ts",
-    "src/telemetry/index.ts",
-  ],
-  format: ["esm"],
-  outDir: "dist",
-  sourcemap: false,
-  tsconfig: "tsconfig.tsup.json",
-  target: "esnext",
-});
+export type { CreateOtelTelemetrySinkOptions } from "./lib/otel-telemetry-sink.js";
+export { createOtelTelemetrySink } from "./lib/otel-telemetry-sink.js";

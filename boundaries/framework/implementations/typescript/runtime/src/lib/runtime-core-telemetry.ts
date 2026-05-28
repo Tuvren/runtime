@@ -1,0 +1,396 @@
+/**
+ * Copyright 2026 Oscar Yáñez Cisterna (@SkrOYC)
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+import type { EpochMs, HashString } from "@tuvren/core";
+import type { TuvrenStreamEvent } from "@tuvren/core/events";
+import {
+  NoopTelemetrySink,
+  type TelemetryAttributeValue,
+  type TelemetryEvent,
+  type TelemetryEventKind,
+  type TelemetryLineage,
+  type TelemetrySpan,
+  type TelemetrySpanError,
+  type TelemetrySpanKind,
+  type TuvrenTelemetrySink,
+} from "@tuvren/core/telemetry";
+import type { LoopState } from "./runtime-core-loop.js";
+import { projectError } from "./runtime-core-shared.js";
+import type { RuntimeExecutionHandle } from "./runtime-execution-handle.js";
+import {
+  filterTelemetryAttributes,
+  sanitizeTelemetryErrorSummary,
+} from "./telemetry-secret-screening.js";
+
+interface TimedSpanStart {
+  atMs: EpochMs;
+  lineage: TelemetryLineage;
+}
+
+export interface RuntimeTelemetryEmitter {
+  eventFromStream(
+    handle: RuntimeExecutionHandle,
+    event: TuvrenStreamEvent,
+    loopState: LoopState
+  ): void;
+  span(input: {
+    attributes?: Record<string, TelemetryAttributeValue>;
+    error?: unknown;
+    handle: RuntimeExecutionHandle;
+    kind: TelemetrySpanKind;
+    loopState: LoopState;
+    name: string;
+    runId?: string;
+    startMs: EpochMs;
+    status: "error" | "ok";
+    turnNodeHash?: HashString;
+  }): void;
+}
+
+export function createRuntimeTelemetryEmitter(input: {
+  now(): EpochMs;
+  sink?: TuvrenTelemetrySink;
+}): RuntimeTelemetryEmitter {
+  const sink = input.sink ?? NoopTelemetrySink;
+  let sinkWarningEmitted = false;
+  const turnStarts = new WeakMap<RuntimeExecutionHandle, TimedSpanStart>();
+  const iterationStarts = new WeakMap<RuntimeExecutionHandle, TimedSpanStart>();
+  const toolStarts = new WeakMap<
+    RuntimeExecutionHandle,
+    Map<string, TimedSpanStart>
+  >();
+
+  const emitSinkWarning = () => {
+    if (sinkWarningEmitted) {
+      return;
+    }
+
+    sinkWarningEmitted = true;
+    console.warn("Tuvren telemetry sink threw; dropping telemetry record");
+  };
+
+  const safeEvent = (event: TelemetryEvent) => {
+    try {
+      sink.event(event);
+    } catch {
+      emitSinkWarning();
+    }
+  };
+
+  const safeSpan = (span: TelemetrySpan) => {
+    try {
+      sink.span(span);
+    } catch {
+      emitSinkWarning();
+    }
+  };
+
+  const emitEvent = (
+    kind: TelemetryEventKind,
+    handle: RuntimeExecutionHandle,
+    atMs: EpochMs,
+    attributes: Record<string, TelemetryAttributeValue> = {},
+    turnNodeHash?: HashString
+  ) => {
+    safeEvent({
+      atMs,
+      attributes: filterTelemetryAttributes(attributes),
+      kind,
+      lineage: createLineage(handle, turnNodeHash),
+    });
+  };
+
+  const handleTurnStart = (
+    handle: RuntimeExecutionHandle,
+    atMs: EpochMs,
+    loopState: LoopState,
+    turnNodeHash?: HashString
+  ) => {
+    const lineage = createLineage(handle, turnNodeHash);
+    turnStarts.set(handle, { atMs, lineage });
+    emitEvent(
+      "turn.start",
+      handle,
+      atMs,
+      baseAttributes(handle, loopState),
+      turnNodeHash
+    );
+  };
+
+  const handleTurnEnd = (
+    handle: RuntimeExecutionHandle,
+    atMs: EpochMs,
+    loopState: LoopState,
+    status: "completed" | "failed" | "paused"
+  ) => {
+    emitEvent("turn.end", handle, atMs, baseAttributes(handle, loopState));
+    const started = turnStarts.get(handle);
+
+    if (started !== undefined) {
+      emitSpan({
+        attributes: baseAttributes(handle, loopState),
+        endMs: atMs,
+        kind: "turn",
+        lineage: started.lineage,
+        name: "tuvren.runtime.turn",
+        startMs: started.atMs,
+        status: status === "failed" ? "error" : "ok",
+      });
+    }
+
+    turnStarts.delete(handle);
+  };
+
+  const handleIterationEnd = (
+    handle: RuntimeExecutionHandle,
+    atMs: EpochMs,
+    loopState: LoopState
+  ) => {
+    const started = iterationStarts.get(handle);
+
+    if (started !== undefined) {
+      emitSpan({
+        attributes: baseAttributes(handle, loopState),
+        endMs: atMs,
+        kind: "iteration",
+        lineage: started.lineage,
+        name: "tuvren.runtime.iteration",
+        startMs: started.atMs,
+        status: "ok",
+      });
+    }
+
+    iterationStarts.delete(handle);
+  };
+
+  const handleToolStart = (
+    handle: RuntimeExecutionHandle,
+    atMs: EpochMs,
+    callId: string
+  ) => {
+    let starts = toolStarts.get(handle);
+
+    if (starts === undefined) {
+      starts = new Map<string, TimedSpanStart>();
+      toolStarts.set(handle, starts);
+    }
+
+    starts.set(callId, {
+      atMs,
+      lineage: createLineage(handle),
+    });
+  };
+
+  const handleToolResult = (
+    handle: RuntimeExecutionHandle,
+    atMs: EpochMs,
+    loopState: LoopState,
+    event: Extract<TuvrenStreamEvent, { type: "tool.result" }>
+  ) => {
+    const started = toolStarts.get(handle)?.get(event.callId);
+
+    if (started !== undefined) {
+      emitSpan({
+        attributes: {
+          ...baseAttributes(handle, loopState),
+          "tuvren.runtime.tool_call.id": event.callId,
+        },
+        endMs: atMs,
+        kind: "tool_call",
+        lineage: started.lineage,
+        name: `tuvren.runtime.tool.${event.name}`,
+        startMs: started.atMs,
+        status: event.isError === true ? "error" : "ok",
+      });
+    }
+
+    toolStarts.get(handle)?.delete(event.callId);
+  };
+
+  const handleCheckpoint = (
+    handle: RuntimeExecutionHandle,
+    atMs: EpochMs,
+    loopState: LoopState,
+    turnNodeHash: HashString
+  ) => {
+    const attributes = {
+      ...baseAttributes(handle, loopState),
+      "tuvren.runtime.checkpoint.hash": turnNodeHash,
+    };
+
+    emitEvent("state.checkpoint", handle, atMs, attributes, turnNodeHash);
+    emitSpan({
+      attributes,
+      endMs: atMs,
+      kind: "checkpoint",
+      lineage: createLineage(handle, turnNodeHash),
+      name: "tuvren.runtime.checkpoint",
+      startMs: atMs,
+      status: "ok",
+    });
+  };
+
+  const handleRuntimeError = (
+    handle: RuntimeExecutionHandle,
+    atMs: EpochMs,
+    loopState: LoopState,
+    error: Extract<TuvrenStreamEvent, { type: "error" }>["error"]
+  ) => {
+    emitEvent("error", handle, atMs, baseAttributes(handle, loopState));
+    emitSpan({
+      attributes: baseAttributes(handle, loopState),
+      endMs: atMs,
+      error: {
+        code: error.code ?? "runtime_error",
+        message: error.message,
+      },
+      kind: "run",
+      lineage: createLineage(handle),
+      name: "tuvren.runtime.error",
+      startMs: atMs,
+      status: "error",
+    });
+  };
+
+  const emitSpan = (span: TelemetrySpan) => {
+    safeSpan({
+      ...span,
+      attributes: filterTelemetryAttributes(span.attributes),
+      error:
+        span.error === undefined
+          ? undefined
+          : {
+              code: span.error.code,
+              message: sanitizeTelemetryErrorSummary(span.error.message),
+            },
+    });
+  };
+
+  return {
+    eventFromStream: (handle, event, loopState) => {
+      const atMs = event.timestamp as EpochMs;
+
+      switch (event.type) {
+        case "turn.start":
+          handleTurnStart(handle, atMs, loopState, event.resumedFrom);
+          return;
+        case "turn.end":
+          handleTurnEnd(handle, atMs, loopState, event.status);
+          return;
+        case "iteration.start": {
+          iterationStarts.set(handle, {
+            atMs,
+            lineage: createLineage(handle),
+          });
+          return;
+        }
+        case "iteration.end":
+          handleIterationEnd(handle, atMs, loopState);
+          return;
+        case "tool.start":
+          handleToolStart(handle, atMs, event.callId);
+          return;
+        case "tool.result":
+          handleToolResult(handle, atMs, loopState, event);
+          return;
+        case "approval.requested":
+          emitEvent(
+            "approval.requested",
+            handle,
+            atMs,
+            baseAttributes(handle, loopState)
+          );
+          return;
+        case "approval.resolved":
+          emitEvent(
+            "approval.resolved",
+            handle,
+            atMs,
+            baseAttributes(handle, loopState)
+          );
+          return;
+        case "state.checkpoint":
+          handleCheckpoint(handle, atMs, loopState, event.turnNodeHash);
+          return;
+        case "error":
+          handleRuntimeError(handle, atMs, loopState, event.error);
+          return;
+        default:
+          return;
+      }
+    },
+    span: (spanInput) => {
+      emitSpan({
+        attributes:
+          spanInput.attributes ??
+          baseAttributes(spanInput.handle, spanInput.loopState),
+        endMs: input.now(),
+        error: createSpanError(spanInput.error),
+        kind: spanInput.kind,
+        lineage: createLineage(
+          spanInput.handle,
+          spanInput.turnNodeHash,
+          spanInput.runId ?? spanInput.handle.getActiveRunId()
+        ),
+        name: spanInput.name,
+        startMs: spanInput.startMs,
+        status: spanInput.status,
+      });
+    },
+  };
+}
+
+function createLineage(
+  handle: RuntimeExecutionHandle,
+  turnNodeHash?: HashString,
+  runId = handle.getActiveRunId()
+): TelemetryLineage {
+  return {
+    branchId: handle.request.branchId,
+    ...(runId === undefined ? {} : { runId }),
+    threadId: handle.request.threadId,
+    turnId: handle.turnId,
+    ...(turnNodeHash === undefined ? {} : { turnNodeHash }),
+  };
+}
+
+function baseAttributes(
+  handle: RuntimeExecutionHandle,
+  loopState: LoopState
+): Record<string, TelemetryAttributeValue> {
+  return {
+    "tuvren.runtime.branch.id": handle.request.branchId,
+    "tuvren.runtime.driver.id": loopState.activeDriverId,
+    ...(handle.getActiveRunId() === undefined
+      ? {}
+      : { "tuvren.runtime.run.id": handle.getActiveRunId() as string }),
+    "tuvren.runtime.turn.id": handle.turnId,
+  };
+}
+
+function createSpanError(error: unknown): TelemetrySpanError | undefined {
+  if (error === undefined) {
+    return undefined;
+  }
+
+  const projection = projectError(
+    error instanceof Error ? error : new Error(String(error))
+  );
+  return {
+    code: projection.code ?? "runtime_error",
+    message: projection.message,
+  };
+}

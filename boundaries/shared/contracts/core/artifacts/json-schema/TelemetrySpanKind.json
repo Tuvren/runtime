@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tuvren.dev/schemas/shared/core-types/TelemetrySpanKind.json",
+  "anyOf": [
+    {
+      "type": "string",
+      "const": "turn"
+    },
+    {
+      "type": "string",
+      "const": "run"
+    },
+    {
+      "type": "string",
+      "const": "iteration"
+    },
+    {
+      "type": "string",
+      "const": "model_call"
+    },
+    {
+      "type": "string",
+      "const": "tool_call"
+    },
+    {
+      "type": "string",
+      "const": "checkpoint"
+    },
+    {
+      "type": "string",
+      "const": "recovery"
+    }
+  ]
+}

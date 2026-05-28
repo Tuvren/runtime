@@ -23,6 +23,11 @@ import type {
 } from "@tuvren/core/execution";
 import type { TuvrenMessage } from "@tuvren/core/messages";
 import type {
+  TelemetryEvent,
+  TelemetrySpan,
+  TuvrenTelemetrySink,
+} from "@tuvren/core/telemetry";
+import type {
   ApprovalDecision,
   TuvrenToolDefinition,
 } from "@tuvren/core/tools";
@@ -151,6 +156,7 @@ export function createFrameworkAdapterRuntimeScenarios(
   runProviderStream(input: unknown): Promise<AdapterProjection>;
   runRecoverResult(input: unknown): Promise<AdapterProjection>;
   runRecoverStaleRun(input: unknown): Promise<AdapterProjection>;
+  runOperationalTelemetry(input: unknown): Promise<AdapterProjection>;
   runStructuredValidationFailure(input: unknown): Promise<AdapterProjection>;
   runToolExecution(input: unknown): Promise<AdapterProjection>;
 } {
@@ -225,6 +231,54 @@ export function createFrameworkAdapterRuntimeScenarios(
           phase: handle.status().phase,
         },
       },
+    };
+  }
+
+  async function runOperationalTelemetry(
+    input: unknown
+  ): Promise<AdapterProjection> {
+    const scenario = dependencies.readOperationScenario(
+      input,
+      "runtime.operational-telemetry"
+    );
+    const capture = createTelemetryCapture();
+    const harness = createConformanceKernelHarness();
+    const driver = createStaticDriver(() => {
+      if (scenario.case === "error") {
+        throw new Error("telemetry conformance failure");
+      }
+
+      return {
+        messages: [assistantText("completed")],
+        resolution: {
+          reason: "done",
+          type: "end_turn",
+        },
+      };
+    });
+    const runtime = createTuvrenRuntimeCore({
+      createId: createConformanceIdFactory(),
+      defaultDriverId: DRIVER_ID,
+      driverRegistry: createDriverRegistry([driver]),
+      kernel: harness.kernel,
+      now: createDeterministicClock(),
+      telemetry: capture.sink,
+    });
+    const thread = await runtime.createThread({});
+    const handle = runtime.executeTurn({
+      branchId: thread.branchId,
+      config: { name: AGENT_NAME },
+      signal: textSignal("run"),
+      threadId: thread.threadId,
+    });
+
+    await collectValues(handle.events());
+
+    const telemetry = summarizeTelemetry(capture);
+
+    return {
+      evidence: { telemetry },
+      result: { telemetry },
     };
   }
 
@@ -1204,6 +1258,7 @@ export function createFrameworkAdapterRuntimeScenarios(
     runProviderStream: providerScenarios.runProviderStream,
     runRecoverResult: recoveryScenarios.runRecoverResult,
     runRecoverStaleRun: recoveryScenarios.runRecoverStaleRun,
+    runOperationalTelemetry,
     runStructuredValidationFailure:
       providerScenarios.runStructuredValidationFailure,
     runToolExecution: providerScenarios.runToolExecution,
@@ -1474,4 +1529,57 @@ export function createFrameworkAdapterRuntimeScenarios(
       firstTurnIds[0] === secondTurnIds[0]
     );
   }
+}
+
+function createTelemetryCapture(): {
+  events: TelemetryEvent[];
+  sink: TuvrenTelemetrySink;
+  spans: TelemetrySpan[];
+} {
+  const events: TelemetryEvent[] = [];
+  const spans: TelemetrySpan[] = [];
+
+  return {
+    events,
+    sink: {
+      event: (event) => {
+        events.push(event);
+      },
+      span: (span) => {
+        spans.push(span);
+      },
+    },
+    spans,
+  };
+}
+
+function summarizeTelemetry(capture: {
+  events: readonly TelemetryEvent[];
+  spans: readonly TelemetrySpan[];
+}): Record<string, unknown> {
+  return {
+    eventKinds: capture.events.map((event) => event.kind),
+    eventsHaveLineage: capture.events.every(
+      (event) =>
+        event.lineage.threadId.length > 0 &&
+        event.lineage.branchId.length > 0 &&
+        event.lineage.turnId.length > 0
+    ),
+    spanKinds: capture.spans.map((span) => span.kind),
+    spansHaveLineage: capture.spans.every(
+      (span) =>
+        span.lineage.threadId.length > 0 &&
+        span.lineage.branchId.length > 0 &&
+        span.lineage.turnId.length > 0
+    ),
+  };
+}
+
+function createDeterministicClock(): () => number {
+  let now = 10_000;
+
+  return () => {
+    now += 10;
+    return now;
+  };
 }

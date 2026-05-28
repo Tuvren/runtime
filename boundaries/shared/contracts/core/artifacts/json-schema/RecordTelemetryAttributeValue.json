@@ -1,0 +1,9 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "RecordTelemetryAttributeValue.json",
+  "type": "object",
+  "properties": {},
+  "unevaluatedProperties": {
+    "$ref": "https://tuvren.dev/schemas/shared/core-types/TelemetryAttributeValue.json"
+  }
+}

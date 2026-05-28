@@ -144,3 +144,67 @@ model TuvrenModelResponse {
   providerMetadata?: Metadata;
   usage?: ProviderUsage;
 }
+
+model TelemetryLineage {
+  threadId: NonEmptyString;
+  branchId: NonEmptyString;
+  turnId: NonEmptyString;
+  runId?: NonEmptyString;
+  turnNodeHash?: HashString;
+}
+
+union TelemetryAttributeValue {
+  string: string,
+  number: float64,
+  boolean: boolean,
+}
+
+union TelemetrySpanKind {
+  turn: "turn",
+  run: "run",
+  iteration: "iteration",
+  modelCall: "model_call",
+  toolCall: "tool_call",
+  checkpoint: "checkpoint",
+  recovery: "recovery",
+}
+
+union TelemetrySpanStatus {
+  ok: "ok",
+  error: "error",
+}
+
+model TelemetrySpanError {
+  code: NonEmptyString;
+  message: string;
+}
+
+model TelemetrySpan {
+  kind: TelemetrySpanKind;
+  name: NonEmptyString;
+  lineage: TelemetryLineage;
+  startMs: EpochMs;
+  endMs: EpochMs;
+  status: TelemetrySpanStatus;
+  attributes: Record<TelemetryAttributeValue>;
+  error?: TelemetrySpanError;
+}
+
+union TelemetryEventKind {
+  turnStart: "turn.start",
+  turnEnd: "turn.end",
+  approvalRequested: "approval.requested",
+  approvalResolved: "approval.resolved",
+  stateCheckpoint: "state.checkpoint",
+  recoveryResumed: "recovery.resumed",
+  recoveryFailed: "recovery.failed",
+  executionBounded: "execution.bounded",
+  error: "error",
+}
+
+model TelemetryEvent {
+  kind: TelemetryEventKind;
+  lineage: TelemetryLineage;
+  atMs: EpochMs;
+  attributes: Record<TelemetryAttributeValue>;
+}

@@ -298,6 +298,9 @@
             "runtime-lifecycle-ext.stale-recovery.handoff-context-active-agent",
             "runtime-lifecycle-ext.stale-recovery.same-signal-iterate",
             "runtime-lifecycle-ext.stale-recovery.signal-mismatch-fresh-turn",
+            "runtime-api-operational-telemetry.completed-turn-events",
+            "runtime-api-operational-telemetry.completed-turn-spans",
+            "runtime-api-operational-telemetry.error-path",
             "runtime-orchestration-af.handoff-last-output-only-builder",
             "runtime-orchestration-af.handoff-rejects-multiple-intents",
             "runtime-orchestration-af.handoff-resolution-not-history-entry",
@@ -339,9 +342,9 @@
           ],
           "checkSummary": {
             "failedChecks": 0,
-            "passedChecks": 329,
-            "totalChecks": 341,
-            "applicableChecks": 329,
+            "passedChecks": 332,
+            "totalChecks": 344,
+            "applicableChecks": 332,
             "nonApplicableChecks": 12
           },
           "declaredCapabilities": [
@@ -382,9 +385,9 @@
           "checkSummary": {
             "failedChecks": 0,
             "passedChecks": 12,
-            "totalChecks": 341,
+            "totalChecks": 344,
             "applicableChecks": 12,
-            "nonApplicableChecks": 329
+            "nonApplicableChecks": 332
           },
           "declaredCapabilities": ["framework.batteries-included"],
           "evidencePath": "reports/compatibility/evidence/shared-conformance-runner.framework-batteries-included-conformance-runner.json",
@@ -813,9 +816,9 @@
           "checkSummary": {
             "failedChecks": 0,
             "passedChecks": 0,
-            "totalChecks": 341,
+            "totalChecks": 344,
             "applicableChecks": 0,
-            "nonApplicableChecks": 341
+            "nonApplicableChecks": 344
           },
           "declaredCapabilities": [],
           "evidencePath": "reports/compatibility/evidence/shared-conformance-runner.framework-rust-conformance-runner.json",

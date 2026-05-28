@@ -19,6 +19,11 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { TuvrenStreamEvent } from "@tuvren/core/events";
 import { assertTuvrenStreamEvent } from "@tuvren/core/events";
+import type {
+  TelemetryEvent,
+  TelemetrySpan,
+  TuvrenTelemetrySink,
+} from "@tuvren/core/telemetry";
 
 export interface EventLike {
   type: string;
@@ -38,6 +43,13 @@ export interface FrameworkStreamFixtureSet {
   completedTurn: readonly TuvrenStreamEvent[];
   failedTurn: readonly TuvrenStreamEvent[];
   pausedTurn: readonly TuvrenStreamEvent[];
+}
+
+export interface TelemetryCapture {
+  clear(): void;
+  readonly events: TelemetryEvent[];
+  readonly sink: TuvrenTelemetrySink;
+  readonly spans: TelemetrySpan[];
 }
 
 const FRAMEWORK_TESTKIT_ROOT = dirname(fileURLToPath(import.meta.url));
@@ -139,6 +151,28 @@ export function startAsyncCapture<T>(
   return {
     done,
     events,
+  };
+}
+
+export function createTelemetryCaptureSink(): TelemetryCapture {
+  const events: TelemetryEvent[] = [];
+  const spans: TelemetrySpan[] = [];
+
+  return {
+    clear: () => {
+      events.length = 0;
+      spans.length = 0;
+    },
+    events,
+    sink: {
+      event: (event) => {
+        events.push(structuredClone(event));
+      },
+      span: (span) => {
+        spans.push(structuredClone(span));
+      },
+    },
+    spans,
   };
 }
 

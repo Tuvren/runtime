@@ -34,6 +34,9 @@
       "@tuvren/core/extensions": [
         "../../../../shared/contracts/core/implementations/typescript/dist/extensions/index.d.ts"
       ],
+      "@tuvren/core/telemetry": [
+        "../../../../shared/contracts/core/implementations/typescript/dist/telemetry/index.d.ts"
+      ],
       "@tuvren/event-stream": [
         "../../../contracts/event-stream/implementations/typescript/dist/index.d.ts"
       ]

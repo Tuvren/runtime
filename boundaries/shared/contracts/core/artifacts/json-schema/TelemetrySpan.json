@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tuvren.dev/schemas/shared/core-types/TelemetrySpan.json",
+  "type": "object",
+  "properties": {
+    "kind": {
+      "$ref": "https://tuvren.dev/schemas/shared/core-types/TelemetrySpanKind.json"
+    },
+    "name": {
+      "$ref": "https://tuvren.dev/schemas/shared/core-types/NonEmptyString.json"
+    },
+    "lineage": {
+      "$ref": "https://tuvren.dev/schemas/shared/core-types/TelemetryLineage.json"
+    },
+    "startMs": {
+      "$ref": "https://tuvren.dev/schemas/shared/core-types/EpochMs.json"
+    },
+    "endMs": {
+      "$ref": "https://tuvren.dev/schemas/shared/core-types/EpochMs.json"
+    },
+    "status": {
+      "$ref": "https://tuvren.dev/schemas/shared/core-types/TelemetrySpanStatus.json"
+    },
+    "attributes": {
+      "$ref": "RecordTelemetryAttributeValue.json"
+    },
+    "error": {
+      "$ref": "https://tuvren.dev/schemas/shared/core-types/TelemetrySpanError.json"
+    }
+  },
+  "required": [
+    "kind",
+    "name",
+    "lineage",
+    "startMs",
+    "endMs",
+    "status",
+    "attributes"
+  ],
+  "unevaluatedProperties": {
+    "not": {}
+  }
+}

@@ -20,6 +20,7 @@ export type {
   EventLike,
   FrameworkStreamFixtureSet,
   SseFrameLike,
+  TelemetryCapture,
 } from "./lib/framework-testkit.js";
 export {
   assertAgUiEventTypes,
@@ -28,6 +29,7 @@ export {
   collectStreamValues,
   collectTuvrenStreamEvents,
   createFixtureEventStream,
+  createTelemetryCaptureSink,
   readFrameworkStreamFixtures,
   startAsyncCapture,
   waitForAsyncTurn,

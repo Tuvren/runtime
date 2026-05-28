@@ -20,6 +20,7 @@ import {
   createGrpcRuntimeKernel,
   createOrchestrationRuntime,
   createRuntimeKernel,
+  NoopTelemetrySink,
   TUVREN_RUNTIME_TELEMETRY_ATTRIBUTE_KEYS,
   TUVREN_RUNTIME_TELEMETRY_SCHEMA_URL,
   TuvrenRuntimeError,
@@ -31,6 +32,7 @@ describe("runtime package exports", () => {
     expect(typeof createGrpcRuntimeKernel).toBe("function");
     expect(typeof createOrchestrationRuntime).toBe("function");
     expect(typeof createRuntimeKernel).toBe("function");
+    expect(typeof NoopTelemetrySink.event).toBe("function");
     expect(TUVREN_RUNTIME_TELEMETRY_ATTRIBUTE_KEYS).toContain(
       "tuvren.runtime.turn.id"
     );
