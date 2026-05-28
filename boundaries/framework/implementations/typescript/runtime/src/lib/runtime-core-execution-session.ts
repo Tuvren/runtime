@@ -58,6 +58,16 @@ interface RuntimeExecutionStartDependencies {
     branchHeadHash: HashString,
     reuseRecoveredTurn: boolean
   ): Promise<void>;
+  emitRecoveryFailed(
+    handle: RuntimeExecutionHandle,
+    loopState: LoopState,
+    error: unknown
+  ): void;
+  emitRecoveryResumed(
+    handle: RuntimeExecutionHandle,
+    loopState: LoopState,
+    recoveredExecution: ExpiredExecutionRecovery
+  ): void;
   emitStateObservability(
     handle: RuntimeExecutionHandle,
     loopState: LoopState,
@@ -217,14 +227,31 @@ export async function startRuntimeExecutionSession(
     handle.setSchemaId(schemaId);
     const initialBranchHeadHash =
       await dependencies.resolveExecutionBranchHead(handle);
-    const recoveredExecution =
-      await dependencies.recoverExpiredExecutionBranchIfNeeded(
-        handle.request.branchId,
-        handle.request.signal
+    let recoveredExecution: ExpiredExecutionRecovery | undefined;
+
+    try {
+      recoveredExecution =
+        await dependencies.recoverExpiredExecutionBranchIfNeeded(
+          handle.request.branchId,
+          handle.request.signal
+        );
+    } catch (error: unknown) {
+      dependencies.emitRecoveryFailed(
+        handle,
+        dependencies.createExecutionLoopState(handle),
+        error
       );
+      throw error;
+    }
 
     if (recoveredExecution?.recoveryContended === true) {
-      throw createStaleRecoveryContendedError();
+      const error = createStaleRecoveryContendedError();
+      dependencies.emitRecoveryFailed(
+        handle,
+        dependencies.createExecutionLoopState(handle, recoveredExecution),
+        error
+      );
+      throw error;
     }
 
     if (recoveredExecution?.turnId !== undefined) {
@@ -244,6 +271,10 @@ export async function startRuntimeExecutionSession(
       handle,
       recoveredExecution
     );
+
+    if (recoveredExecution?.preempted === true) {
+      dependencies.emitRecoveryResumed(handle, loopState, recoveredExecution);
+    }
 
     const resumedStart = await dependencies.prepareResumedExecutionStartPrelude(
       handle,

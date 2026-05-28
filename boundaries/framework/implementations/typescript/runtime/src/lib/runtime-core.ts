@@ -752,6 +752,19 @@ class RuntimeCore implements TuvrenRuntime {
             iterationCount,
             manifest
           ),
+        emitRecoveryFailed: (activeHandle, activeLoopState, error) =>
+          this.telemetry.recovery({
+            error,
+            handle: activeHandle,
+            loopState: activeLoopState,
+            status: "error",
+          }),
+        emitRecoveryResumed: (activeHandle, activeLoopState) =>
+          this.telemetry.recovery({
+            handle: activeHandle,
+            loopState: activeLoopState,
+            status: "ok",
+          }),
         finishResumedExecutionStart: (...args) =>
           finishRuntimeCoreResumedExecutionStart(this.hosts, ...args),
         handleExecutionFailure: (...args) =>

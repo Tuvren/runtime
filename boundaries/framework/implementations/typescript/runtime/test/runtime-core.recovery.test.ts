@@ -23,6 +23,11 @@ import type {
   RuntimeDriverFactory as KrakenDriverFactory,
 } from "@tuvren/core/driver";
 import type {
+  TelemetryEvent,
+  TelemetrySpan,
+  TuvrenTelemetrySink,
+} from "@tuvren/core/telemetry";
+import type {
   RuntimeKernel as KrakenKernel,
   RuntimeKernelRunLiveness,
 } from "@tuvren/kernel-protocol";
@@ -184,6 +189,7 @@ describe("framework-runtime-core", () => {
   });
 
   test("preempts an expired leased branch run before starting replacement execution", async () => {
+    const telemetry = createTelemetryCapture();
     const harness = createFakeKernelHarness();
     const livenessHarness = createFakeRunLivenessKernelHarness(harness);
     const driver = {
@@ -212,6 +218,7 @@ describe("framework-runtime-core", () => {
         executionOwnerId: "worker-1",
         leaseDurationMs: 50,
       },
+      telemetry: telemetry.sink,
     });
     const thread = await runtime.createThread({});
     const staleTurn = await livenessHarness.kernel.turn.create(
@@ -266,6 +273,10 @@ describe("framework-runtime-core", () => {
         (run) => run.runId === "run_stale_leased_execution"
       )?.status
     ).toBe("failed");
+    expect(telemetry.events.map((event) => event.kind)).toContain(
+      "recovery.resumed"
+    );
+    expect(telemetry.spans.map((span) => span.kind)).toContain("recovery");
   });
 
   test("re-incorporates the original signal on the same turn when incorporate_input crashed before a durable user message", async () => {
@@ -878,6 +889,28 @@ function createDriverRegistry(
   drivers: Array<KrakenDriver | KrakenDriverFactory> = []
 ) {
   return createBaseDriverRegistry(drivers.map(wrapDriverEntry));
+}
+
+function createTelemetryCapture(): {
+  events: TelemetryEvent[];
+  sink: TuvrenTelemetrySink;
+  spans: TelemetrySpan[];
+} {
+  const events: TelemetryEvent[] = [];
+  const spans: TelemetrySpan[] = [];
+
+  return {
+    events,
+    sink: {
+      event: (event) => {
+        events.push(event);
+      },
+      span: (span) => {
+        spans.push(span);
+      },
+    },
+    spans,
+  };
 }
 
 function wrapDriverEntry(

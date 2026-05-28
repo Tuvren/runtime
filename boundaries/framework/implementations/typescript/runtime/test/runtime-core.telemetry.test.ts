@@ -68,8 +68,18 @@ describe("runtime operational telemetry", () => {
       "state.checkpoint"
     );
     expect(capture.spans.map((span) => span.kind)).toContain("turn");
+    expect(capture.spans.map((span) => span.kind)).toContain("run");
     expect(capture.spans.map((span) => span.kind)).toContain("iteration");
     expect(capture.spans.map((span) => span.kind)).toContain("model_call");
+    expect(
+      capture.events
+        .filter((event) => event.kind === "state.checkpoint")
+        .every(
+          (event) =>
+            typeof event.attributes["tuvren.runtime.checkpoint.hash"] ===
+            "string"
+        )
+    ).toBe(true);
     expect(capture.spans.every((span) => span.lineage.threadId)).toBe(true);
     expect(capture.spans.every((span) => span.lineage.branchId)).toBe(true);
     expect(

@@ -25,7 +25,13 @@ const CONNECTION_STRING_PATTERN =
 const AUTH_HEADER_PATTERN = /\b(?:authorization|x-api-key)\s*[:=]\s*\S+/iu;
 const JWT_PATTERN = /\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b/u;
 const LONG_SECRETISH_PATTERN = /\b[A-Za-z0-9_~+/.-]{32,}={0,2}\b/u;
+const CANONICAL_HASH_PATTERN = /^[a-f0-9]{64}$/iu;
 const REDACTED = "[redacted]";
+const HASH_ATTRIBUTE_KEYS: ReadonlySet<string> = new Set([
+  "tuvren.runtime.checkpoint.hash",
+  "tuvren.runtime.parent_checkpoint.hash",
+  "tuvren.runtime.resumed_from.hash",
+]);
 
 const ALLOWED_ATTRIBUTE_KEYS: ReadonlySet<string> = new Set(
   TUVREN_RUNTIME_TELEMETRY_ATTRIBUTE_KEYS
@@ -41,7 +47,7 @@ export function filterTelemetryAttributes(
       continue;
     }
 
-    const screened = sanitizeTelemetryAttributeValue(value);
+    const screened = sanitizeTelemetryAttributeValue(key, value);
 
     if (screened !== undefined) {
       filtered[key] = screened;
@@ -66,9 +72,14 @@ export function sanitizeTelemetryErrorSummary(message: string): string {
 }
 
 function sanitizeTelemetryAttributeValue(
+  key: string,
   value: TelemetryAttributeValue
 ): TelemetryAttributeValue | undefined {
   if (typeof value !== "string") {
+    return value;
+  }
+
+  if (HASH_ATTRIBUTE_KEYS.has(key) && CANONICAL_HASH_PATTERN.test(value)) {
     return value;
   }
 

@@ -46,6 +46,12 @@ export interface RuntimeTelemetryEmitter {
     event: TuvrenStreamEvent,
     loopState: LoopState
   ): void;
+  recovery(input: {
+    error?: unknown;
+    handle: RuntimeExecutionHandle;
+    loopState: LoopState;
+    status: "error" | "ok";
+  }): void;
   span(input: {
     attributes?: Record<string, TelemetryAttributeValue>;
     error?: unknown;
@@ -117,17 +123,18 @@ export function createRuntimeTelemetryEmitter(input: {
     handle: RuntimeExecutionHandle,
     atMs: EpochMs,
     loopState: LoopState,
-    turnNodeHash?: HashString
+    resumedFrom?: HashString
   ) => {
-    const lineage = createLineage(handle, turnNodeHash);
+    const lineage = createLineage(handle);
+    const attributes = {
+      ...baseAttributes(handle, loopState),
+      ...(resumedFrom === undefined
+        ? {}
+        : { "tuvren.runtime.resumed_from.hash": resumedFrom }),
+    };
+
     turnStarts.set(handle, { atMs, lineage });
-    emitEvent(
-      "turn.start",
-      handle,
-      atMs,
-      baseAttributes(handle, loopState),
-      turnNodeHash
-    );
+    emitEvent("turn.start", handle, atMs, attributes);
   };
 
   const handleTurnEnd = (
@@ -140,6 +147,8 @@ export function createRuntimeTelemetryEmitter(input: {
     const started = turnStarts.get(handle);
 
     if (started !== undefined) {
+      const spanStatus = status === "failed" ? "error" : "ok";
+
       emitSpan({
         attributes: baseAttributes(handle, loopState),
         endMs: atMs,
@@ -147,7 +156,16 @@ export function createRuntimeTelemetryEmitter(input: {
         lineage: started.lineage,
         name: "tuvren.runtime.turn",
         startMs: started.atMs,
-        status: status === "failed" ? "error" : "ok",
+        status: spanStatus,
+      });
+      emitSpan({
+        attributes: baseAttributes(handle, loopState),
+        endMs: atMs,
+        kind: "run",
+        lineage: started.lineage,
+        name: "tuvren.runtime.run",
+        startMs: started.atMs,
+        status: spanStatus,
       });
     }
 
@@ -331,6 +349,32 @@ export function createRuntimeTelemetryEmitter(input: {
         default:
           return;
       }
+    },
+    recovery: (recoveryInput) => {
+      const atMs = input.now();
+      const error = createSpanError(recoveryInput.error);
+
+      emitEvent(
+        recoveryInput.status === "error"
+          ? "recovery.failed"
+          : "recovery.resumed",
+        recoveryInput.handle,
+        atMs,
+        baseAttributes(recoveryInput.handle, recoveryInput.loopState)
+      );
+      emitSpan({
+        attributes: baseAttributes(
+          recoveryInput.handle,
+          recoveryInput.loopState
+        ),
+        endMs: atMs,
+        error,
+        kind: "recovery",
+        lineage: createLineage(recoveryInput.handle),
+        name: "tuvren.runtime.recovery",
+        startMs: atMs,
+        status: recoveryInput.status,
+      });
     },
     span: (spanInput) => {
       emitSpan({
