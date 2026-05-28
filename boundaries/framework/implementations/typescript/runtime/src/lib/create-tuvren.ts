@@ -29,6 +29,7 @@ import type {
 } from "@tuvren/core/execution";
 import type { TuvrenExtension } from "@tuvren/core/extensions";
 import type { TuvrenProvider } from "@tuvren/core/provider";
+import type { TuvrenTelemetrySink } from "@tuvren/core/telemetry";
 import type { TuvrenToolDefinition } from "@tuvren/core/tools";
 import type { ReActDriverOptions } from "@tuvren/driver-react";
 import { createReActDriver } from "@tuvren/driver-react";
@@ -85,6 +86,7 @@ export interface CreateTuvrenOptions {
     RuntimeCoreOptions,
     "defaultDriverId" | "driverRegistry" | "kernel"
   >;
+  telemetry?: TuvrenTelemetrySink;
   tools?: Array<McpToolSource | TuvrenToolDefinition>;
 }
 
@@ -101,6 +103,16 @@ export interface TuvrenInstance {
 export function createTuvren(
   options: CreateTuvrenOptions
 ): Promise<TuvrenInstance> {
+  if (
+    options.telemetry !== undefined &&
+    options.runtimeOptions?.telemetry !== undefined
+  ) {
+    throw new TuvrenValidationError(
+      "createTuvren: telemetry must be supplied either at top level or runtimeOptions, not both",
+      { code: "invalid_createtuvren_options" }
+    );
+  }
+
   // When a pre-built kernel is supplied, skip backend construction entirely.
   // The kernel already owns its backend; constructing a second one would open
   // an idle connection pool / file handle that is immediately discarded.
@@ -126,6 +138,7 @@ export function createTuvren(
     defaultDriverId: driver.id,
     driverRegistry,
     kernel,
+    telemetry: options.telemetry ?? options.runtimeOptions?.telemetry,
   });
 
   const orchestration = createOrchestrationRuntime({

@@ -187,6 +187,10 @@ function createTelemetryEvidence(input: {
     (event): event is Extract<TuvrenStreamEvent, { type: "tool_call.start" }> =>
       event.type === "tool_call.start"
   );
+  const errors = input.projection.canonical.filter(
+    (event): event is Extract<TuvrenStreamEvent, { type: "error" }> =>
+      event.type === "error"
+  );
   const driverId =
     turnStarts[0]?.source?.driver ??
     input.projection.canonical.find(
@@ -214,6 +218,17 @@ function createTelemetryEvidence(input: {
       checkpoints.map((event) => event.turnNodeHash)
     ),
     "tuvren.runtime.driver.id": driverId,
+    "tuvren.runtime.error.code": collapseTelemetryValues(
+      errors.flatMap((event) => {
+        const { error } = event;
+        return typeof error === "object" &&
+          error !== null &&
+          "code" in error &&
+          typeof error.code === "string"
+          ? [error.code]
+          : [];
+      })
+    ),
     "tuvren.runtime.parent_checkpoint.hash": collapseTelemetryValues(
       checkpoints.slice(0, -1).map((event) => event.turnNodeHash)
     ),
@@ -224,6 +239,7 @@ function createTelemetryEvidence(input: {
       )
     ),
     "tuvren.runtime.run.id": collapseTelemetryValues(runIds),
+    "tuvren.runtime.thread.id": input.thread.threadId,
     "tuvren.runtime.tool_call.id": collapseTelemetryValues(
       toolCallStarts.map((event) => event.callId)
     ),

@@ -30,6 +30,7 @@ import type {
   AgentConfig,
   BranchMessagesCursor,
   BranchSummary,
+  ContextManifest,
   ExecutionHandle,
   HandoffContextBuilder,
   ListThreadsCursor,
@@ -45,6 +46,7 @@ import type {
   TuvrenMessage,
 } from "@tuvren/core/messages";
 import type { TuvrenModelResponse } from "@tuvren/core/provider";
+import type { TuvrenTelemetrySink } from "@tuvren/core/telemetry";
 import type { ApprovalResponse } from "@tuvren/core/tools";
 import type {
   RuntimeKernel as KrakenKernel,
@@ -160,9 +162,14 @@ import {
   createFrozenSnapshot,
   detachPromise,
   normalizeInputSignal,
+  projectError,
 } from "./runtime-core-shared.js";
 import { prepareResumedExecutionStartPrelude as prepareRuntimeResumedExecutionStartPrelude } from "./runtime-core-startup.js";
 import { finalizeTurnStatus as finalizeRuntimeTurnStatus } from "./runtime-core-status.js";
+import {
+  createRuntimeTelemetryEmitter,
+  type RuntimeTelemetryEmitter,
+} from "./runtime-core-telemetry.js";
 import { finalizeRejectedPausedToolCancellation as finalizeRejectedRuntimePausedToolCancellation } from "./runtime-core-tool-resume.js";
 import {
   applyRuntimeCoreTerminalAgentTransitionIfNeeded,
@@ -218,6 +225,7 @@ export interface RuntimeCoreOptions {
     branchId: string
   ) => Promise<string | null> | string | null;
   runLiveness?: RuntimeRunLivenessOptions;
+  telemetry?: TuvrenTelemetrySink;
 }
 
 interface ResolvedRuntimeCoreOptions {
@@ -237,6 +245,7 @@ interface ResolvedRuntimeCoreOptions {
     branchId: string
   ) => Promise<string | null> | string | null;
   runLiveness?: ResolvedRuntimeRunLivenessOptions;
+  telemetry?: TuvrenTelemetrySink;
 }
 
 interface ResolvedRuntimeRunLivenessOptions {
@@ -289,6 +298,7 @@ class RuntimeCore implements TuvrenRuntime {
   >();
   private readonly hosts: RuntimeCoreFacadeHosts;
   private readonly options: ResolvedRuntimeCoreOptions;
+  private readonly telemetry: RuntimeTelemetryEmitter;
 
   constructor(options: RuntimeCoreOptions) {
     this.options = {
@@ -316,7 +326,12 @@ class RuntimeCore implements TuvrenRuntime {
         options.runLiveness === undefined
           ? undefined
           : normalizeRunLivenessOptions(options.runLiveness),
+      telemetry: options.telemetry,
     };
+    this.telemetry = createRuntimeTelemetryEmitter({
+      now: () => this.now(),
+      sink: this.options.telemetry,
+    });
 
     if (
       this.options.runLiveness !== undefined &&
@@ -390,8 +405,7 @@ class RuntimeCore implements TuvrenRuntime {
         iterationCount,
         manifest
       ) =>
-        emitRuntimeCheckpointEvents(
-          this.hosts.events,
+        this.emitRuntimeStateObservability(
           handle,
           loopState,
           turnNodeHash,
@@ -439,17 +453,11 @@ class RuntimeCore implements TuvrenRuntime {
           loopState
         ),
       publishEvent: (handle, event, loopState) =>
-        publishRuntimeStreamEvent(this.hosts.events, handle, event, loopState),
+        this.publishRuntimeEvent(handle, event, loopState),
       publishPauseOutcome: (...args) =>
         publishRuntimeCorePauseOutcome(this.hosts, ...args),
       publishProjectedError: (handle, error, fatal, loopState) =>
-        publishRuntimeProjectedErrorEvent(
-          this.hosts.events,
-          handle,
-          error,
-          fatal,
-          loopState
-        ),
+        this.publishRuntimeProjectedError(handle, error, fatal, loopState),
       readRecoveredActiveAgentName: (turnTreeHash) =>
         readRecoveredActiveAgentNameFacade(this.options.kernel, turnTreeHash),
       readRecoveredRuntimeStatus: (turnTreeHash) =>
@@ -737,14 +745,26 @@ class RuntimeCore implements TuvrenRuntime {
           iterationCount,
           manifest
         ) =>
-          emitRuntimeCheckpointEvents(
-            this.hosts.events,
+          this.emitRuntimeStateObservability(
             handle,
             loopState,
             turnNodeHash,
             iterationCount,
             manifest
           ),
+        emitRecoveryFailed: (activeHandle, activeLoopState, error) =>
+          this.telemetry.recovery({
+            error,
+            handle: activeHandle,
+            loopState: activeLoopState,
+            status: "error",
+          }),
+        emitRecoveryResumed: (activeHandle, activeLoopState) =>
+          this.telemetry.recovery({
+            handle: activeHandle,
+            loopState: activeLoopState,
+            status: "ok",
+          }),
         finishResumedExecutionStart: (...args) =>
           finishRuntimeCoreResumedExecutionStart(this.hosts, ...args),
         handleExecutionFailure: (...args) =>
@@ -835,20 +855,9 @@ class RuntimeCore implements TuvrenRuntime {
             loopState
           ),
         publishEvent: (handle, event, loopState) =>
-          publishRuntimeStreamEvent(
-            this.hosts.events,
-            handle,
-            event,
-            loopState
-          ),
+          this.publishRuntimeEvent(handle, event, loopState),
         publishProjectedError: (handle, error, fatal, loopState) =>
-          publishRuntimeProjectedErrorEvent(
-            this.hosts.events,
-            handle,
-            error,
-            fatal,
-            loopState
-          ),
+          this.publishRuntimeProjectedError(handle, error, fatal, loopState),
       },
       handle,
       schemaId,
@@ -910,7 +919,33 @@ class RuntimeCore implements TuvrenRuntime {
             emittedEvents,
             loopState
           ),
-        executeDriver: (...args) => executeRuntimeCoreDriverCall(...args),
+        executeDriver: async (...args) => {
+          const startMs = this.now();
+
+          try {
+            const result = await executeRuntimeCoreDriverCall(...args);
+            this.telemetry.span({
+              handle,
+              kind: "model_call",
+              loopState,
+              name: "tuvren.runtime.model_call",
+              startMs,
+              status: "ok",
+            });
+            return result;
+          } catch (error: unknown) {
+            this.telemetry.span({
+              error,
+              handle,
+              kind: "model_call",
+              loopState,
+              name: "tuvren.runtime.model_call",
+              startMs,
+              status: "error",
+            });
+            throw error;
+          }
+        },
         failInvalidPauseResolutionIfNeeded: (...args) =>
           failRuntimeCoreInvalidPauseResolutionIfNeeded(this.hosts, ...args),
         failTrackedRunWithoutBranchAdvance: (...args) =>
@@ -971,6 +1006,67 @@ class RuntimeCore implements TuvrenRuntime {
 
   private now(): EpochMs {
     return this.options.now();
+  }
+
+  private publishRuntimeEvent(
+    handle: RuntimeExecutionHandle,
+    event: TuvrenStreamEvent,
+    loopState: LoopState
+  ): void {
+    publishRuntimeStreamEvent(this.hosts.events, handle, event, loopState);
+    this.telemetry.eventFromStream(handle, event, loopState);
+  }
+
+  private publishRuntimeProjectedError(
+    handle: RuntimeExecutionHandle,
+    error: Error,
+    fatal: boolean,
+    loopState: LoopState
+  ): void {
+    publishRuntimeProjectedErrorEvent(
+      this.hosts.events,
+      handle,
+      error,
+      fatal,
+      loopState
+    );
+    this.telemetry.eventFromStream(
+      handle,
+      {
+        error: projectError(error),
+        fatal,
+        timestamp: this.now(),
+        type: "error",
+      },
+      loopState
+    );
+  }
+
+  private emitRuntimeStateObservability(
+    handle: RuntimeExecutionHandle,
+    loopState: LoopState,
+    turnNodeHash: HashString,
+    iterationCount: number,
+    manifest?: ContextManifest
+  ): void {
+    emitRuntimeCheckpointEvents(
+      this.hosts.events,
+      handle,
+      loopState,
+      turnNodeHash,
+      iterationCount,
+      manifest
+    );
+    this.telemetry.eventFromStream(
+      handle,
+      {
+        iterationCount,
+        timestamp: this.now(),
+        turnNodeHash,
+        type: "state.checkpoint",
+      },
+      loopState
+    );
   }
 }
 

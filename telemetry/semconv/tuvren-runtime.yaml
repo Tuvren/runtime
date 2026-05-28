@@ -22,6 +22,12 @@ groups:
         examples: ["branch_main"]
         stability: development
         requirement_level: recommended
+      - id: tuvren.runtime.thread.id
+        type: string
+        brief: The Tuvren runtime thread identifier.
+        examples: ["thread_main"]
+        stability: development
+        requirement_level: recommended
       - id: tuvren.runtime.driver.id
         type: string
         brief: The active driver identifier for the runtime execution.
@@ -73,3 +79,9 @@ groups:
         examples: ["ai-sdk-openai"]
         stability: development
         requirement_level: recommended
+      - id: tuvren.runtime.error.code
+        type: string
+        brief: The stable Tuvren runtime error code associated with a failed telemetry span.
+        examples: ["runtime_error"]
+        stability: development
+        requirement_level: opt_in

@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tuvren.dev/schemas/shared/core-types/TelemetryEventKind.json",
+  "anyOf": [
+    {
+      "type": "string",
+      "const": "turn.start"
+    },
+    {
+      "type": "string",
+      "const": "turn.end"
+    },
+    {
+      "type": "string",
+      "const": "approval.requested"
+    },
+    {
+      "type": "string",
+      "const": "approval.resolved"
+    },
+    {
+      "type": "string",
+      "const": "state.checkpoint"
+    },
+    {
+      "type": "string",
+      "const": "recovery.resumed"
+    },
+    {
+      "type": "string",
+      "const": "recovery.failed"
+    },
+    {
+      "type": "string",
+      "const": "execution.bounded"
+    },
+    {
+      "type": "string",
+      "const": "error"
+    }
+  ]
+}

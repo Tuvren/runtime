@@ -160,6 +160,25 @@ describe("createTuvren", () => {
   // ── kernel option ──────────────────────────────────────────────────────────
 
   describe("kernel option", () => {
+    test("rejects duplicate top-level and runtimeOptions telemetry sinks", () => {
+      const telemetry = {
+        event() {
+          return undefined;
+        },
+        span() {
+          return undefined;
+        },
+      };
+
+      expect(() =>
+        createTuvren({
+          backend: "memory",
+          runtimeOptions: { telemetry },
+          telemetry,
+        })
+      ).toThrow(TuvrenValidationError);
+    });
+
     test("pre-built kernel is used — threads created via the runtime appear in the kernel", async () => {
       const backend = createMemoryBackend();
       const kernel = createRuntimeKernel({ backend });

@@ -55,6 +55,13 @@ pub const TUVREN_RUNTIME_TELEMETRY_ATTRIBUTES: &[TuvrenRuntimeTelemetryAttribute
         r#type: "string",
     },
     TuvrenRuntimeTelemetryAttributeDefinition {
+        key: "tuvren.runtime.error.code",
+        brief: "The stable Tuvren runtime error code associated with a failed telemetry span.",
+        examples: &["runtime_error"],
+        stability: "development",
+        r#type: "string",
+    },
+    TuvrenRuntimeTelemetryAttributeDefinition {
         key: "tuvren.runtime.parent_checkpoint.hash",
         brief: "The parent checkpoint hash that the current checkpoint extends from.",
         examples: &["bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"],
@@ -83,6 +90,13 @@ pub const TUVREN_RUNTIME_TELEMETRY_ATTRIBUTES: &[TuvrenRuntimeTelemetryAttribute
         r#type: "string",
     },
     TuvrenRuntimeTelemetryAttributeDefinition {
+        key: "tuvren.runtime.thread.id",
+        brief: "The Tuvren runtime thread identifier.",
+        examples: &["thread_main"],
+        stability: "development",
+        r#type: "string",
+    },
+    TuvrenRuntimeTelemetryAttributeDefinition {
         key: "tuvren.runtime.tool_call.id",
         brief: "The current tool call identifier when the execution is inside tool work.",
         examples: &["tool_call_1"],
@@ -103,10 +117,12 @@ pub const TUVREN_RUNTIME_TELEMETRY_ATTRIBUTE_KEYS: &[&str] = &[
     "tuvren.runtime.branch.id",
     "tuvren.runtime.checkpoint.hash",
     "tuvren.runtime.driver.id",
+    "tuvren.runtime.error.code",
     "tuvren.runtime.parent_checkpoint.hash",
     "tuvren.runtime.provider.id",
     "tuvren.runtime.resumed_from.hash",
     "tuvren.runtime.run.id",
+    "tuvren.runtime.thread.id",
     "tuvren.runtime.tool_call.id",
     "tuvren.runtime.turn.id",
 ];

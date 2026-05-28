@@ -23,12 +23,19 @@ import type {
 } from "@tuvren/core/execution";
 import type { TuvrenMessage } from "@tuvren/core/messages";
 import type {
+  TelemetryEvent,
+  TelemetrySpan,
+  TuvrenTelemetrySink,
+} from "@tuvren/core/telemetry";
+import type {
   ApprovalDecision,
   TuvrenToolDefinition,
 } from "@tuvren/core/tools";
+import { encodeDeterministicKernelRecord } from "@tuvren/kernel-protocol";
 import {
   createDriverRegistry,
   createTuvrenRuntime as createTuvrenRuntimeCore,
+  DEFAULT_AGENT_SCHEMA,
 } from "@tuvren/runtime";
 import { createFrameworkAdapterProviderScenarios } from "./framework-adapter-provider-scenarios.ts";
 import { createFrameworkAdapterRecoveryScenarios } from "./framework-adapter-recovery-scenarios.ts";
@@ -40,6 +47,7 @@ import {
   collectValues,
   createConformanceIdFactory,
   createConformanceKernelHarness,
+  createConformanceRunLivenessKernelHarness,
   createStaticDriver,
   DRIVER_ID,
   textSignal,
@@ -151,6 +159,7 @@ export function createFrameworkAdapterRuntimeScenarios(
   runProviderStream(input: unknown): Promise<AdapterProjection>;
   runRecoverResult(input: unknown): Promise<AdapterProjection>;
   runRecoverStaleRun(input: unknown): Promise<AdapterProjection>;
+  runOperationalTelemetry(input: unknown): Promise<AdapterProjection>;
   runStructuredValidationFailure(input: unknown): Promise<AdapterProjection>;
   runToolExecution(input: unknown): Promise<AdapterProjection>;
 } {
@@ -225,6 +234,218 @@ export function createFrameworkAdapterRuntimeScenarios(
           phase: handle.status().phase,
         },
       },
+    };
+  }
+
+  async function runOperationalTelemetry(
+    input: unknown
+  ): Promise<AdapterProjection> {
+    const scenario = dependencies.readOperationScenario(
+      input,
+      "runtime.operational-telemetry"
+    );
+    const capture = createTelemetryCapture();
+    const harness = createConformanceKernelHarness();
+    const scenarioCase = dependencies.readRecordString(scenario, "case");
+    const driver = createOperationalTelemetryDriver(scenarioCase);
+    const runtime = createTuvrenRuntimeCore({
+      createId: createConformanceIdFactory(),
+      defaultDriverId: DRIVER_ID,
+      driverRegistry: createDriverRegistry([driver]),
+      kernel: harness.kernel,
+      now: createDeterministicClock(),
+      telemetry: capture.sink,
+    });
+    const thread = await runtime.createThread({});
+    const tools = createOperationalTelemetryTools(scenarioCase);
+    const handle = runtime.executeTurn({
+      branchId: thread.branchId,
+      config: { name: AGENT_NAME, tools },
+      signal: textSignal("run"),
+      threadId: thread.threadId,
+    });
+
+    if (scenarioCase === "approval") {
+      await collectValues(handle.events());
+      const resumedHandle = handle.resolveApproval({
+        decisions: [{ callId: "call-email", type: "approve" }],
+      });
+      await collectValues(resumedHandle.events());
+    } else if (scenarioCase === "recovery") {
+      return await runOperationalTelemetryRecovery(capture);
+    } else {
+      await collectValues(handle.events());
+    }
+
+    const telemetry = summarizeTelemetry(capture);
+
+    return {
+      evidence: { telemetry },
+      result: { telemetry },
+    };
+  }
+
+  function createOperationalTelemetryDriver(
+    scenarioCase: string | undefined
+  ): RuntimeDriver {
+    let executeCount = 0;
+
+    return {
+      async execute(context) {
+        await Promise.resolve();
+        executeCount += 1;
+
+        if (scenarioCase === "error") {
+          throw new Error("telemetry conformance failure");
+        }
+
+        if (scenarioCase === "tool" && !hasToolMessage(context.messages)) {
+          return {
+            messages: [
+              assistantToolCalls([
+                {
+                  callId: "call-search",
+                  input: {},
+                  name: "search",
+                  output: { ok: true },
+                },
+              ]),
+            ],
+            resolution: { type: "continue_iteration" },
+            toolExecutionMode: "parallel",
+          };
+        }
+
+        if (scenarioCase === "approval" && executeCount === 1) {
+          return {
+            messages: [
+              assistantToolCalls([
+                {
+                  callId: "call-email",
+                  input: {},
+                  name: "send_email",
+                  output: { sent: true },
+                  requiresApproval: true,
+                },
+              ]),
+            ],
+            resolution: { type: "continue_iteration" },
+            toolExecutionMode: "parallel",
+          };
+        }
+
+        return {
+          messages: [assistantText("completed")],
+          resolution: {
+            reason: "done",
+            type: "end_turn",
+          },
+        };
+      },
+      id: DRIVER_ID,
+    };
+  }
+
+  function createOperationalTelemetryTools(
+    scenarioCase: string | undefined
+  ): TuvrenToolDefinition[] {
+    if (scenarioCase === "tool") {
+      return [
+        {
+          description: "Shared conformance telemetry tool",
+          execute() {
+            return { ok: true };
+          },
+          inputSchema: { type: "object" },
+          name: "search",
+        },
+      ];
+    }
+
+    if (scenarioCase === "approval") {
+      return [
+        {
+          approval: true,
+          description: "Shared conformance approval telemetry tool",
+          execute() {
+            return { sent: true };
+          },
+          inputSchema: { type: "object" },
+          name: "send_email",
+        },
+      ];
+    }
+
+    return [];
+  }
+
+  async function runOperationalTelemetryRecovery(
+    capture: ReturnType<typeof createTelemetryCapture>
+  ): Promise<AdapterProjection> {
+    const harness = createConformanceKernelHarness();
+    const livenessHarness = createConformanceRunLivenessKernelHarness(harness);
+    const driver = createStaticDriver(() => ({
+      messages: [assistantText("recovered")],
+      resolution: {
+        reason: "done",
+        type: "end_turn",
+      },
+    }));
+    const runtime = createTuvrenRuntimeCore({
+      createId: createConformanceIdFactory(),
+      defaultDriverId: DRIVER_ID,
+      driverRegistry: createDriverRegistry([driver]),
+      kernel: livenessHarness.kernel,
+      now: createDeterministicClock(),
+      runLiveness: {
+        executionOwnerId: "worker-1",
+        leaseDurationMs: 50,
+      },
+      telemetry: capture.sink,
+    });
+    const thread = await runtime.createThread({});
+    const staleTurn = await livenessHarness.kernel.turn.create(
+      "turn_operational_telemetry_recovery",
+      thread.threadId,
+      thread.branchId,
+      null,
+      thread.rootTurnNodeHash
+    );
+    await livenessHarness.kernel.runLiveness.createLeasedRun({
+      branchId: thread.branchId,
+      executionOwnerId: "worker-stale",
+      leaseExpiresAtMs: 1,
+      runId: "run_operational_telemetry_recovery",
+      schemaId: DEFAULT_AGENT_SCHEMA.schemaId,
+      startTurnNodeHash: thread.rootTurnNodeHash,
+      steps: [
+        { deterministic: false, id: "incorporate_input", sideEffects: true },
+      ],
+      turnId: staleTurn.turnId,
+    });
+    await livenessHarness.kernel.staging.stage(
+      "run_operational_telemetry_recovery",
+      encodeDeterministicKernelRecord({
+        parts: [{ text: "run", type: "text" }],
+        role: "user",
+      }),
+      "telemetry_recovery_user_message",
+      "message",
+      "completed"
+    );
+
+    const handle = runtime.executeTurn({
+      branchId: thread.branchId,
+      config: { name: AGENT_NAME },
+      signal: textSignal("run"),
+      threadId: thread.threadId,
+    });
+    await collectValues(handle.events());
+    const telemetry = summarizeTelemetry(capture);
+
+    return {
+      evidence: { telemetry },
+      result: { telemetry },
     };
   }
 
@@ -1204,6 +1425,7 @@ export function createFrameworkAdapterRuntimeScenarios(
     runProviderStream: providerScenarios.runProviderStream,
     runRecoverResult: recoveryScenarios.runRecoverResult,
     runRecoverStaleRun: recoveryScenarios.runRecoverStaleRun,
+    runOperationalTelemetry,
     runStructuredValidationFailure:
       providerScenarios.runStructuredValidationFailure,
     runToolExecution: providerScenarios.runToolExecution,
@@ -1474,4 +1696,57 @@ export function createFrameworkAdapterRuntimeScenarios(
       firstTurnIds[0] === secondTurnIds[0]
     );
   }
+}
+
+function createTelemetryCapture(): {
+  events: TelemetryEvent[];
+  sink: TuvrenTelemetrySink;
+  spans: TelemetrySpan[];
+} {
+  const events: TelemetryEvent[] = [];
+  const spans: TelemetrySpan[] = [];
+
+  return {
+    events,
+    sink: {
+      event: (event) => {
+        events.push(event);
+      },
+      span: (span) => {
+        spans.push(span);
+      },
+    },
+    spans,
+  };
+}
+
+function summarizeTelemetry(capture: {
+  events: readonly TelemetryEvent[];
+  spans: readonly TelemetrySpan[];
+}): Record<string, unknown> {
+  return {
+    eventKinds: capture.events.map((event) => event.kind),
+    eventsHaveLineage: capture.events.every(
+      (event) =>
+        event.lineage.threadId.length > 0 &&
+        event.lineage.branchId.length > 0 &&
+        event.lineage.turnId.length > 0
+    ),
+    spanKinds: capture.spans.map((span) => span.kind),
+    spansHaveLineage: capture.spans.every(
+      (span) =>
+        span.lineage.threadId.length > 0 &&
+        span.lineage.branchId.length > 0 &&
+        span.lineage.turnId.length > 0
+    ),
+  };
+}
+
+function createDeterministicClock(): () => number {
+  let now = 10_000;
+
+  return () => {
+    now += 10;
+    return now;
+  };
 }

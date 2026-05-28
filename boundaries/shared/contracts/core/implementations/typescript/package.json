@@ -48,6 +48,11 @@
       "types": "./dist/extensions/index.d.ts",
       "import": "./dist/extensions/index.js",
       "default": "./dist/extensions/index.js"
+    },
+    "./telemetry": {
+      "types": "./dist/telemetry/index.d.ts",
+      "import": "./dist/telemetry/index.js",
+      "default": "./dist/telemetry/index.js"
     }
   },
   "main": "./dist/index.js",

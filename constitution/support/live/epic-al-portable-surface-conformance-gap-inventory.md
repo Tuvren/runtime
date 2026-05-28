@@ -2,7 +2,7 @@
 
 This inventory is the KRT-AL001 spike output. It classifies every cross-implementation
 semantic surface in the active TypeScript product scope as one of `portable`,
-`exception:ag-ui`, `exception:ai-sdk-bridge`, `memory-proof-obligation`,
+`exception:ag-ui`, `exception:ai-sdk-bridge`, `exception:telemetry-otel`, `memory-proof-obligation`,
 `ts-ai-sdk-bridge-product-obligation`, or `gap`, and lists the concrete artifacts
 KRT-AL002 added or revised to close the portability gate.
 
@@ -51,7 +51,7 @@ authoritative behavioral specs are not authority for any cross-language semantic
   - framework: `runtime-api-lifecycle`, `runtime-api-lifecycle-extended`, `runtime-api-callables`, `runtime-api-callables-extended`, `runtime-api-orchestration`, `runtime-api-batteries-included`, `event-stream-core`, `event-stream-extended`, `event-stream-sse`, `driver-api-core`, `driver-api-extended`, `react-driver-callables`, `react-driver-extended`, `tool-contracts-extended`
   - providers: `provider-api-bridge`, `provider-api-bridge-extended`, `providers-mcp-client`
 - Canonical verification path entries relevant to portability today:
-  - `tools/scripts/verify.ts` step `Epic AL portability gate` (`bun run portability:check`) — the current portability proxy over the nine-packet inventory, two standing exceptions, and eleven required authoritative sources
+  - `tools/scripts/verify.ts` step `Epic AL portability gate` (`bun run portability:check`) — the current portability proxy over the nine-packet inventory, three standing exceptions, and eleven required authoritative sources
   - `tools/scripts/verify.ts` step `docs:authority-freeze:check` — the docs-to-authority freeze gate from Epic AD
   - `tools/scripts/verify.ts` step `docs:af-gap-plan:check` — historical AF gap plan freshness evidence; retained in `verify` and `codegen`, but no longer the portability proxy
   - `tools/scripts/portability-check.ts` — verifies that 18 `@tuvren/*` packages can be `import()`-ed from both Bun and Node; package-publish health, not semantic conformance
@@ -68,6 +68,7 @@ authoritative behavioral specs are not authority for any cross-language semantic
 | `portable` | Surface owns an Authority Packet manifest, at least one referenced Conformance Plan, and at least one runner-observed decisive assertion per ADR-030. Adapter evidence is diagnostic only. |
 | `exception:ag-ui` | Standing implementation-specific projection. Allowed by Tasks.md §1 and §4. TypeScript-only by intent until a new explicit decision changes that rule. |
 | `exception:ai-sdk-bridge` | Standing implementation-specific provider bridge. TypeScript-only by intent until a new explicit decision changes that rule. |
+| `exception:telemetry-otel` | Standing implementation-specific observability projection. The canonical telemetry sink and semantic vocabulary remain portable authority; OTel export is TypeScript implementation scope unless later promoted. |
 | `memory-proof-obligation` | Not a cross-language portability target. Tested only through TypeScript proving-host lanes so the `memory` mode does not silently regress. |
 | `ts-ai-sdk-bridge-product-obligation` | Not a cross-language portability target. Tested only through TypeScript proving-host lanes that drive AI-SDK-bridge provider scenarios. |
 | `gap` | Should be portable under Epic AL's intent but is missing one or more of: authority packet, conformance plan, runner-observed decisive assertion, registered authoritative source, registered binding projection, or freshness check. |
@@ -88,7 +89,7 @@ the surface's current decisive-assertion coverage.
 
 ## 4. Standing implementation-specific exceptions
 
-Per Tasks.md and ADR-033, exactly two surfaces are allowed to remain
+Per Tasks.md and ADR-033/ADR-042, exactly three surfaces are allowed to remain
 implementation-specific. Each exception is named, scoped, and documented so it does
 not silently grow into a portability obligation.
 
@@ -124,6 +125,18 @@ not silently grow into a portability obligation.
   implementation lands that exercises the same `provider-api-bridge*` plans without
   the AI SDK as the semantic oracle; or the AI SDK itself becomes a registered
   cross-language authority (it does not today).
+
+### 4.3 OpenTelemetry projection (`@tuvren/telemetry-otel`)
+
+- Classification: `exception:telemetry-otel`
+- Implementation root: `boundaries/framework/implementations/typescript/telemetry-otel`
+- Why allowed: the portable surface is the `@tuvren/core/telemetry` sink contract
+  and the authored semantic convention vocabulary. The OTel package projects that
+  canonical surface onto the TypeScript OpenTelemetry API and is implementation-
+  specific by ADR-042.
+- What still covers it: `@tuvren/telemetry-otel` unit tests and export smoke tests,
+  plus the portable `framework-operational-telemetry.json` conformance plan over
+  the canonical sink records.
 
 ## 5. Proving-only obligations
 

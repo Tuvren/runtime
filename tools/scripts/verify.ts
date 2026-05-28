@@ -64,6 +64,7 @@ export const WORKSPACE_TEST_PROJECTS: readonly string[] = [
   "framework-stream-core",
   "framework-stream-sse",
   "framework-stream-agui",
+  "framework-telemetry-otel",
   "framework-runtime-core",
   "framework-runtime",
   "framework-driver-react",
@@ -91,6 +92,7 @@ export const WORKSPACE_BUILD_PROJECTS: readonly string[] = [
   "framework-stream-core",
   "framework-stream-sse",
   "framework-stream-agui",
+  "framework-telemetry-otel",
   "host-repl",
 ];
 
@@ -109,6 +111,7 @@ export const WORKSPACE_EXPORT_SMOKE_PROJECTS: readonly string[] = [
   "framework-stream-core",
   "framework-stream-sse",
   "framework-stream-agui",
+  "framework-telemetry-otel",
   "host-repl",
 ];
 

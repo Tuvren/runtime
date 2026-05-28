@@ -124,6 +124,12 @@ const PORTABLE_PACKAGE_SURFACES: readonly PortablePackageSurface[] = [
   },
   {
     classification: "Bun-and-Node validated",
+    packageName: "@tuvren/telemetry-otel",
+    packageRoot:
+      "boundaries/framework/implementations/typescript/telemetry-otel",
+  },
+  {
+    classification: "Bun-and-Node validated",
     packageName: "@tuvren/provider-bridge-ai-sdk",
     packageRoot:
       "boundaries/providers/implementations/typescript/bridge-ai-sdk",

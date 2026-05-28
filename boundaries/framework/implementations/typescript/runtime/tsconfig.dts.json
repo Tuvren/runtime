@@ -37,6 +37,9 @@
       "@tuvren/core/extensions": [
         "../../../../shared/contracts/core/implementations/typescript/dist/extensions/index.d.ts"
       ],
+      "@tuvren/core/telemetry": [
+        "../../../../shared/contracts/core/implementations/typescript/dist/telemetry/index.d.ts"
+      ],
       "@tuvren/driver-react": ["../drivers/react/dist/index.d.ts"],
       "@tuvren/kernel-protocol": [
         "../../../../kernel/contracts/protocol/implementations/typescript/dist/index.d.ts"

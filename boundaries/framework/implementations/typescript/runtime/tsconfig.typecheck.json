@@ -36,6 +36,9 @@
       "@tuvren/core/extensions": [
         "../../../../shared/contracts/core/implementations/typescript/src/extensions/index.ts"
       ],
+      "@tuvren/core/telemetry": [
+        "../../../../shared/contracts/core/implementations/typescript/src/telemetry/index.ts"
+      ],
       "@tuvren/core/messages": [
         "../../../../shared/contracts/core/implementations/typescript/src/messages/index.ts"
       ],

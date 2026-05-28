@@ -29,6 +29,7 @@ export default defineConfig({
     "src/driver/index.ts",
     "src/provider/index.ts",
     "src/extensions/index.ts",
+    "src/telemetry/index.ts",
   ],
   format: ["esm"],
   outDir: "dist",

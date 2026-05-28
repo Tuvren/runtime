@@ -31,6 +31,13 @@
       "type": "string"
     },
     {
+      "brief": "The stable Tuvren runtime error code associated with a failed telemetry span.",
+      "examples": ["runtime_error"],
+      "key": "tuvren.runtime.error.code",
+      "stability": "development",
+      "type": "string"
+    },
+    {
       "brief": "The parent checkpoint hash that the current checkpoint extends from.",
       "examples": [
         "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
@@ -59,6 +66,13 @@
       "brief": "The Tuvren runtime run identifier.",
       "examples": ["run_main"],
       "key": "tuvren.runtime.run.id",
+      "stability": "development",
+      "type": "string"
+    },
+    {
+      "brief": "The Tuvren runtime thread identifier.",
+      "examples": ["thread_main"],
+      "key": "tuvren.runtime.thread.id",
       "stability": "development",
       "type": "string"
     },
