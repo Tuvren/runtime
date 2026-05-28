@@ -55,6 +55,11 @@
         {
           "kind": "resultField",
           "field": "$.telemetry.spanKinds",
+          "contains": "run"
+        },
+        {
+          "kind": "resultField",
+          "field": "$.telemetry.spanKinds",
           "contains": "iteration"
         },
         {
@@ -88,6 +93,58 @@
           "kind": "resultField",
           "field": "$.telemetry.spanKinds",
           "contains": "model_call"
+        }
+      ],
+      "evidence": ["result.telemetry.eventKinds", "result.telemetry.spanKinds"]
+    },
+    {
+      "checkId": "runtime-api-operational-telemetry.tool-spans",
+      "operation": "runtime.operational-telemetry",
+      "scenario": "operational-telemetry-scenarios",
+      "input": { "scenarioPath": "$.tool-turn" },
+      "assertions": [
+        {
+          "kind": "resultField",
+          "field": "$.telemetry.spanKinds",
+          "contains": "tool_call"
+        }
+      ],
+      "evidence": ["result.telemetry.spanKinds"]
+    },
+    {
+      "checkId": "runtime-api-operational-telemetry.approval-events",
+      "operation": "runtime.operational-telemetry",
+      "scenario": "operational-telemetry-scenarios",
+      "input": { "scenarioPath": "$.approval-turn" },
+      "assertions": [
+        {
+          "kind": "resultField",
+          "field": "$.telemetry.eventKinds",
+          "contains": "approval.requested"
+        },
+        {
+          "kind": "resultField",
+          "field": "$.telemetry.eventKinds",
+          "contains": "approval.resolved"
+        }
+      ],
+      "evidence": ["result.telemetry.eventKinds"]
+    },
+    {
+      "checkId": "runtime-api-operational-telemetry.recovery-records",
+      "operation": "runtime.operational-telemetry",
+      "scenario": "operational-telemetry-scenarios",
+      "input": { "scenarioPath": "$.recovery-turn" },
+      "assertions": [
+        {
+          "kind": "resultField",
+          "field": "$.telemetry.eventKinds",
+          "contains": "recovery.resumed"
+        },
+        {
+          "kind": "resultField",
+          "field": "$.telemetry.spanKinds",
+          "contains": "recovery"
         }
       ],
       "evidence": ["result.telemetry.eventKinds", "result.telemetry.spanKinds"]

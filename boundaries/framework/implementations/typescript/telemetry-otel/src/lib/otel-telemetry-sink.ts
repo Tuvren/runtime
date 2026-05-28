@@ -58,6 +58,7 @@ function emitTelemetrySpan(tracer: Tracer, telemetrySpan: TelemetrySpan): void {
       ...telemetrySpan.attributes,
       "tuvren.runtime.branch.id": telemetrySpan.lineage.branchId,
       "tuvren.runtime.run.id": telemetrySpan.lineage.runId,
+      "tuvren.runtime.thread.id": telemetrySpan.lineage.threadId,
       "tuvren.runtime.turn.id": telemetrySpan.lineage.turnId,
       "tuvren.runtime.checkpoint.hash": telemetrySpan.lineage.turnNodeHash,
     }),
@@ -75,6 +76,7 @@ function emitTelemetryEvent(tracer: Tracer, event: TelemetryEvent): void {
     ...event.attributes,
     "tuvren.runtime.branch.id": event.lineage.branchId,
     "tuvren.runtime.run.id": event.lineage.runId,
+    "tuvren.runtime.thread.id": event.lineage.threadId,
     "tuvren.runtime.turn.id": event.lineage.turnId,
     "tuvren.runtime.checkpoint.hash": event.lineage.turnNodeHash,
   });

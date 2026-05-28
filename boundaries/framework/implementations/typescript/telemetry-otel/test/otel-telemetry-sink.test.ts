@@ -51,6 +51,9 @@ describe("createOtelTelemetrySink", () => {
     expect(spans).toHaveLength(1);
     expect(spans[0]?.name).toBe("tuvren.runtime.model_call");
     expect(spans[0]?.attributes["tuvren.runtime.driver.id"]).toBe("react");
+    expect(spans[0]?.attributes["tuvren.runtime.thread.id"]).toBe(
+      "thread-main"
+    );
     expect(spans[0]?.attributes["tuvren.runtime.turn.id"]).toBe("turn-main");
   });
 
@@ -78,5 +81,41 @@ describe("createOtelTelemetrySink", () => {
     expect(spans).toHaveLength(1);
     expect(spans[0]?.name).toBe("tuvren.runtime.turn.start");
     expect(spans[0]?.events[0]?.name).toBe("turn.start");
+    expect(spans[0]?.attributes["tuvren.runtime.thread.id"]).toBe(
+      "thread-main"
+    );
+  });
+
+  test("projects telemetry errors through authored semconv attributes", () => {
+    const exporter = new InMemorySpanExporter();
+    const provider = new BasicTracerProvider({
+      spanProcessors: [new SimpleSpanProcessor(exporter)],
+    });
+    const sink = createOtelTelemetrySink({
+      tracer: provider.getTracer("test"),
+    });
+
+    sink.span({
+      attributes: {},
+      endMs: 2000,
+      error: {
+        code: "runtime_error",
+        message: "failed",
+      },
+      kind: "run",
+      lineage: {
+        branchId: "branch-main",
+        threadId: "thread-main",
+        turnId: "turn-main",
+      },
+      name: "tuvren.runtime.run",
+      startMs: 1000,
+      status: "error",
+    });
+
+    const spans = exporter.getFinishedSpans();
+    expect(spans[0]?.events[0]?.attributes?.["tuvren.runtime.error.code"]).toBe(
+      "runtime_error"
+    );
   });
 });
