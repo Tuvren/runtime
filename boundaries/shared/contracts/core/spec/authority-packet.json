@@ -1,13 +1,14 @@
 {
   "packetId": "tuvren.shared.core",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "boundary": "framework",
   "surface": "core",
-  "description": "Merged shared-primitive authority packet for @tuvren/core. Absorbs tuvren.shared.core-types, tuvren.framework.runtime-api, tuvren.framework.event-stream, tuvren.framework.tool-contracts, and tuvren.framework.driver-api into a single packet with 9 binding sections per ADR-037 (Epic AP) and ADR-042 (Epic AV).",
+  "description": "Merged shared-primitive authority packet for @tuvren/core. Absorbs tuvren.shared.core-types, tuvren.framework.runtime-api, tuvren.framework.event-stream, tuvren.framework.tool-contracts, and tuvren.framework.driver-api into a single packet with 10 binding sections per ADR-037 (Epic AP), ADR-042 (Epic AV), and ADR-046 (Epic AW — capabilities binding section added).",
   "humanAuthorityRefs": [
     "docs/KrakenKernelSpecification.md",
     "docs/KrakenFrameworkSpecification.md",
-    "constitution/TechSpec.md#adr-037"
+    "constitution/TechSpec.md#adr-037",
+    "constitution/TechSpec.md#adr-046"
   ],
   "authoritativeSources": [
     {
@@ -39,6 +40,12 @@
       "path": "boundaries/framework/contracts/driver-api/spec/typespec/main.tsp",
       "format": "typespec",
       "bindingSection": "driver"
+    },
+    {
+      "path": "boundaries/shared/contracts/core/implementations/typescript/src/lib/capability-shapes.ts",
+      "format": "typescript-source",
+      "bindingSection": "capabilities",
+      "note": "Canonical ADR-046 §3.13 capability-orchestration shapes authored directly in TypeScript until a TypeSpec source is promoted. The TypeScript source is the authority for the capabilities binding section only."
     },
     {
       "path": "boundaries/framework/conformance/plans/runtime-api-lifecycle.json",
@@ -87,6 +94,11 @@
     {
       "path": "boundaries/framework/conformance/plans/framework-operational-telemetry.json",
       "format": "conformance-plan"
+    },
+    {
+      "path": "boundaries/framework/conformance/plans/runtime-api-callables-extended.json",
+      "format": "conformance-plan",
+      "note": "AW007 capability-orchestration-foundation check set is appended to this plan."
     }
   ],
   "generatedArtifacts": [
@@ -94,7 +106,7 @@
       "path": "boundaries/shared/contracts/core/artifacts/json-schema",
       "generatedFrom": "boundaries/shared/contracts/core/spec/typespec",
       "generator": "@typespec/json-schema",
-      "note": "Generated from the consolidated core TypeSpec at boundaries/shared/contracts/core/spec/typespec/main.tsp (Epic AP)."
+      "note": "Generated from the consolidated core TypeSpec at boundaries/shared/contracts/core/spec/typespec/main.tsp (Epic AP). Capability JSON schemas (Capability.json, ToolSurface.json, Binding.json, Endpoint.json, ExecutionClass.json, EndpointKind.json, CapabilityObservation.json, ExposureDecision.json, InvocationDecision.json, CapabilityInvocationAttribution.json) are authored directly per ADR-046 §3.13 and maintained alongside the TypeScript source until TypeSpec coverage is promoted."
     }
   ],
   "conformancePlans": [
@@ -110,7 +122,7 @@
     },
     {
       "planId": "tuvren.framework.runtime-api.callables-extended",
-      "planVersion": "0.3.0",
+      "planVersion": "0.4.0",
       "path": "boundaries/framework/conformance/plans/runtime-api-callables-extended.json"
     },
     {
@@ -189,6 +201,9 @@
     },
     "telemetry": {
       "description": "TuvrenTelemetrySink, telemetry lineage, span, event, and kind record types"
+    },
+    "capabilities": {
+      "description": "ExecutionClass, EndpointKind, Capability, ToolSurface, Endpoint, Binding, CapabilityObservation, ExposureDecision, InvocationDecision, InvocationOwner, CapabilityInvocationAttribution — ADR-046 §3.13 capability-orchestration shapes"
     }
   },
   "bindingProjections": {
