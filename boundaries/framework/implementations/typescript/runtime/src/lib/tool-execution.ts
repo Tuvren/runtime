@@ -445,9 +445,12 @@ async function resolveExecutableToolCall(
   if (environment.capabilityPolicyEngine !== undefined) {
     const resolver = createBindingResolver();
     const binding = resolver.resolveFromToolDefinition(tool);
+    // Context dimensions (modelId, providerId, permissions) are populated in
+    // Epic BB. The baseline engine is context-insensitive; a context-sensitive
+    // engine wired before Epic BB would receive empty values here.
     const policyContext = {
       modelId: "",
-      permissions: [],
+      permissions: [] as string[],
       providerId: "",
     };
     const decision = environment.capabilityPolicyEngine.evaluateInvocation(

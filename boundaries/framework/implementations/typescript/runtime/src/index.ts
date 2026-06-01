@@ -141,6 +141,8 @@ export type { RuntimeKernelOptions } from "@tuvren/kernel-runtime";
 export { createRuntimeKernel } from "@tuvren/kernel-runtime";
 export type { McpToolSource } from "@tuvren/mcp-client";
 export { createMcpToolSource } from "@tuvren/mcp-client";
+export type { CapabilityPolicyEngineOptions } from "./lib/capability-policy-engine.js";
+export { createCapabilityPolicyEngine } from "./lib/capability-policy-engine.js";
 export {
   createContextManifest,
   createEmptyContextManifest,
