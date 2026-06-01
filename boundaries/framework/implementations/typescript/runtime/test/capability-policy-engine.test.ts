@@ -21,7 +21,19 @@ import type {
   CapabilityPolicyContext,
   ToolSurface,
 } from "@tuvren/core/capabilities";
-import { createCapabilityPolicyEngine } from "../src/lib/capability-policy-engine.ts";
+import type { RuntimeDriver } from "@tuvren/core/driver";
+import {
+  createDriverRegistry as createBaseDriverRegistry,
+  createCapabilityPolicyEngine,
+  createTuvrenRuntime,
+} from "../src/index.ts";
+import { createFakeKernelHarness } from "./fake-kernel.ts";
+import {
+  assistantText,
+  assistantToolCalls,
+  collectEvents,
+  textSignal,
+} from "./runtime-core-test-helpers.ts";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -240,5 +252,154 @@ describe("CapabilityPolicyEngine — framework ownership", () => {
     // Both decision points independently deny the same capability
     expect(exposureDecisions[0]?.exposed).toBe(false);
     expect(invocationDecision.admitted).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Wired invocation-time denial: AgentConfig.capabilityPolicyEngine integration
+// ---------------------------------------------------------------------------
+
+describe("CapabilityPolicyEngine — wired invocation-time denial", () => {
+  const deniedToolName = "denied-op";
+
+  function makeDenialDriver(): RuntimeDriver {
+    return {
+      id: "denial-driver",
+      async execute(context) {
+        if (!context.messages.some((m) => m.role === "tool")) {
+          return {
+            messages: [
+              assistantToolCalls([
+                { callId: "deny-call-1", input: {}, name: deniedToolName },
+              ]),
+            ],
+            resolution: { type: "continue_iteration" },
+            toolExecutionMode: "parallel",
+          };
+        }
+        return {
+          messages: [assistantText("wired denial done")],
+          resolution: { reason: "done", type: "end_turn" },
+        };
+      },
+      async resume() {
+        throw new Error("resume not expected");
+      },
+    };
+  }
+
+  async function runDeniedTurn(toolExecuted: { value: boolean }) {
+    const harness = createFakeKernelHarness();
+    const engine = createCapabilityPolicyEngine({
+      deniedCapabilityIds: new Set([deniedToolName]),
+    });
+    const runtime = createTuvrenRuntime({
+      defaultDriverId: "denial-driver",
+      driverRegistry: createBaseDriverRegistry([makeDenialDriver()]),
+      kernel: harness.kernel,
+    });
+    const thread = await runtime.createThread({});
+    const handle = runtime.executeTurn({
+      branchId: thread.branchId,
+      config: {
+        capabilityPolicyEngine: engine,
+        name: "primary",
+        tools: [
+          {
+            description: "denied tool",
+            execute() {
+              toolExecuted.value = true;
+              return { ok: true };
+            },
+            inputSchema: { type: "object" },
+            name: deniedToolName,
+          },
+        ],
+      },
+      signal: textSignal("wired denial test"),
+      threadId: thread.threadId,
+    });
+    return collectEvents(handle.events());
+  }
+
+  test("denied capability surfaces as tool.result with isError true", async () => {
+    const toolExecuted = { value: false };
+    const events = await runDeniedTurn(toolExecuted);
+    const toolResult = events.find((e) => e.type === "tool.result");
+
+    expect(toolResult).toBeDefined();
+    expect((toolResult as Record<string, unknown> | undefined)?.isError).toBe(
+      true
+    );
+  });
+
+  test("denied capability tool body is never executed", async () => {
+    const toolExecuted = { value: false };
+    await runDeniedTurn(toolExecuted);
+
+    expect(toolExecuted.value).toBe(false);
+  });
+
+  test("a permitted capability in the same turn executes normally", async () => {
+    const permittedName = "permitted-op";
+    const harness = createFakeKernelHarness();
+    const engine = createCapabilityPolicyEngine({
+      deniedCapabilityIds: new Set([deniedToolName]),
+    });
+    const permittedExecuted = { value: false };
+
+    const driver: RuntimeDriver = {
+      id: "mixed-driver",
+      async execute(context) {
+        if (!context.messages.some((m) => m.role === "tool")) {
+          return {
+            messages: [
+              assistantToolCalls([
+                { callId: "permitted-call-1", input: {}, name: permittedName },
+              ]),
+            ],
+            resolution: { type: "continue_iteration" },
+            toolExecutionMode: "parallel",
+          };
+        }
+        return {
+          messages: [assistantText("permitted done")],
+          resolution: { reason: "done", type: "end_turn" },
+        };
+      },
+      async resume() {
+        throw new Error("resume not expected");
+      },
+    };
+
+    const runtime = createTuvrenRuntime({
+      defaultDriverId: "mixed-driver",
+      driverRegistry: createBaseDriverRegistry([driver]),
+      kernel: harness.kernel,
+    });
+    const thread = await runtime.createThread({});
+    const handle = runtime.executeTurn({
+      branchId: thread.branchId,
+      config: {
+        capabilityPolicyEngine: engine,
+        name: "primary",
+        tools: [
+          {
+            description: "permitted tool",
+            execute() {
+              permittedExecuted.value = true;
+              return { ok: true };
+            },
+            inputSchema: { type: "object" },
+            name: permittedName,
+          },
+        ],
+      },
+      signal: textSignal("permitted tool test"),
+      threadId: thread.threadId,
+    });
+    await collectEvents(handle.events());
+
+    expect(permittedExecuted.value).toBe(true);
   });
 });
