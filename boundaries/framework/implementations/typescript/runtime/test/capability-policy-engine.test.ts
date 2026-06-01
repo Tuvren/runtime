@@ -1,0 +1,238 @@
+/**
+ * Copyright 2026 Oscar Yáñez Cisterna (@SkrOYC)
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+// biome-ignore-all lint/suspicious/useAwait: test drivers intentionally match async contracts
+import { describe, expect, test } from "bun:test";
+import type { Binding, ToolSurface } from "@tuvren/core/capabilities";
+import {
+  type CapabilityPolicyContext,
+  createCapabilityPolicyEngine,
+} from "../src/lib/capability-policy-engine.ts";
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+function makeSurface(name: string, capabilityId: string): ToolSurface {
+  return {
+    name,
+    description: `surface for ${capabilityId}`,
+    inputSchema: { type: "object" },
+    capabilityId,
+  };
+}
+
+function makeBinding(
+  capabilityId: string,
+  endpointKind: Binding["endpoint"]["kind"] = "tuvren-in-process"
+): Binding {
+  return {
+    capabilityId,
+    executionClass: "tuvren-server",
+    endpoint: { kind: endpointKind, id: "local" },
+  };
+}
+
+const defaultContext: CapabilityPolicyContext = {
+  providerId: "test-provider",
+  modelId: "test-model",
+  permissions: [],
+};
+
+// ---------------------------------------------------------------------------
+// Exposure-time: denied surfaces not in model-visible set
+// ---------------------------------------------------------------------------
+
+describe("CapabilityPolicyEngine — exposure-time decision point", () => {
+  test("all surfaces pass exposure by default with no restrictions", () => {
+    const engine = createCapabilityPolicyEngine();
+    const surfaces = [
+      makeSurface("search", "web.search"),
+      makeSurface("exec", "code.execute"),
+    ];
+
+    const decisions = engine.evaluateExposure(surfaces, defaultContext);
+
+    expect(decisions.filter((d) => d.exposed)).toHaveLength(2);
+  });
+
+  test("denied surfaces are excluded from the model-visible set", () => {
+    const engine = createCapabilityPolicyEngine({
+      deniedSurfaceNames: new Set(["exec"]),
+    });
+    const surfaces = [
+      makeSurface("search", "web.search"),
+      makeSurface("exec", "code.execute"),
+    ];
+
+    const decisions = engine.evaluateExposure(surfaces, defaultContext);
+
+    const exposed = decisions
+      .filter((d) => d.exposed)
+      .map((d) => d.surfaceName);
+    const denied = decisions
+      .filter((d) => !d.exposed)
+      .map((d) => d.surfaceName);
+    expect(exposed).toEqual(["search"]);
+    expect(denied).toEqual(["exec"]);
+  });
+
+  test("a denied surface gets a non-empty reason", () => {
+    const engine = createCapabilityPolicyEngine({
+      deniedSurfaceNames: new Set(["risky"]),
+    });
+    const surfaces = [makeSurface("risky", "risky.cap")];
+
+    const decisions = engine.evaluateExposure(surfaces, defaultContext);
+
+    const denied = decisions.find((d) => d.surfaceName === "risky");
+    expect(denied?.exposed).toBe(false);
+    expect(typeof denied?.reason).toBe("string");
+    expect((denied?.reason ?? "").length).toBeGreaterThan(0);
+  });
+
+  test("an empty surface list yields an empty decision set", () => {
+    const engine = createCapabilityPolicyEngine();
+    const decisions = engine.evaluateExposure([], defaultContext);
+    expect(decisions).toHaveLength(0);
+  });
+
+  test("exposure decisions are returned for every surface (one per surface)", () => {
+    const engine = createCapabilityPolicyEngine();
+    const surfaces = [
+      makeSurface("a", "cap-a"),
+      makeSurface("b", "cap-b"),
+      makeSurface("c", "cap-c"),
+    ];
+
+    const decisions = engine.evaluateExposure(surfaces, defaultContext);
+
+    expect(decisions).toHaveLength(3);
+    const names = decisions.map((d) => d.surfaceName);
+    expect(names).toContain("a");
+    expect(names).toContain("b");
+    expect(names).toContain("c");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Invocation-time: denied invocations as tool.result isError
+// ---------------------------------------------------------------------------
+
+describe("CapabilityPolicyEngine — invocation-time decision point", () => {
+  test("a non-denied binding is admitted", () => {
+    const engine = createCapabilityPolicyEngine();
+    const binding = makeBinding("web.search");
+
+    const decision = engine.evaluateInvocation(binding, defaultContext);
+
+    expect(decision.admitted).toBe(true);
+  });
+
+  test("a denied binding returns admitted: false", () => {
+    const engine = createCapabilityPolicyEngine({
+      deniedCapabilityIds: new Set(["code.execute"]),
+    });
+    const binding = makeBinding("code.execute");
+
+    const decision = engine.evaluateInvocation(binding, defaultContext);
+
+    expect(decision.admitted).toBe(false);
+  });
+
+  test("an invocation denial carries a non-secret reason", () => {
+    const engine = createCapabilityPolicyEngine({
+      deniedCapabilityIds: new Set(["code.execute"]),
+    });
+    const binding = makeBinding("code.execute");
+
+    const decision = engine.evaluateInvocation(binding, defaultContext);
+
+    expect(decision.admitted).toBe(false);
+    expect(typeof decision.reason).toBe("string");
+    expect((decision.reason ?? "").length).toBeGreaterThan(0);
+  });
+
+  test("decision includes capabilityId matching the binding", () => {
+    const engine = createCapabilityPolicyEngine();
+    const binding = makeBinding("web.search");
+
+    const decision = engine.evaluateInvocation(binding, defaultContext);
+
+    expect(decision.capabilityId).toBe("web.search");
+    expect(decision.executionClass).toBe("tuvren-server");
+  });
+
+  test("a binding denied at invocation-time yields requiresApproval false by default", () => {
+    const engine = createCapabilityPolicyEngine({
+      deniedCapabilityIds: new Set(["risky.op"]),
+    });
+    const binding = makeBinding("risky.op");
+
+    const decision = engine.evaluateInvocation(binding, defaultContext);
+
+    expect(decision.admitted).toBe(false);
+    expect(decision.requiresApproval).toBeFalsy();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Framework-owned: policy is above driver discretion
+// ---------------------------------------------------------------------------
+
+describe("CapabilityPolicyEngine — framework ownership", () => {
+  test("policy engine is independent of driver-supplied context (deterministic)", () => {
+    const engine = createCapabilityPolicyEngine({
+      deniedSurfaceNames: new Set(["restricted"]),
+    });
+    const surfaces = [makeSurface("restricted", "cap.restricted")];
+
+    // Called twice with different 'driver' contexts — result must be same
+    const d1 = engine.evaluateExposure(surfaces, {
+      ...defaultContext,
+      modelId: "model-a",
+    });
+    const d2 = engine.evaluateExposure(surfaces, {
+      ...defaultContext,
+      modelId: "model-b",
+    });
+
+    expect(d1[0]?.exposed).toBe(false);
+    expect(d2[0]?.exposed).toBe(false);
+  });
+
+  test("exposure and invocation decisions are consistent for the same capability", () => {
+    const engine = createCapabilityPolicyEngine({
+      deniedCapabilityIds: new Set(["dangerous"]),
+      deniedSurfaceNames: new Set(["danger-surface"]),
+    });
+    const surface = makeSurface("danger-surface", "dangerous");
+    const binding = makeBinding("dangerous");
+
+    const exposureDecisions = engine.evaluateExposure(
+      [surface],
+      defaultContext
+    );
+    const invocationDecision = engine.evaluateInvocation(
+      binding,
+      defaultContext
+    );
+
+    // Both decision points independently deny the same capability
+    expect(exposureDecisions[0]?.exposed).toBe(false);
+    expect(invocationDecision.admitted).toBe(false);
+  });
+});
