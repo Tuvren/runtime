@@ -570,9 +570,19 @@ export interface TuvrenToolDefinition {
   approval?: ApprovalPolicy;
   description: string;
   execute: ExecuteFunction;
+  /** Whether the framework may retry this invocation on a retriable failure. (AX002) */
+  idempotent?: boolean;
   inputSchema: TuvrenJsonSchema | CustomSchema;
+  /** Maximum retry attempts when idempotent is true. Defaults to 1. (AX002) */
+  maxRetries?: number;
   metadata?: Record<string, unknown>;
   name: string;
+  /**
+   * Declared result shape validated against the execute return value before
+   * surfacing. Violations surface as tool.result with isError true and
+   * code tool_result_validation_failed. (AX001)
+   */
+  outputSchema?: TuvrenJsonSchema | CustomSchema;
   timeout?: number;
 }
 

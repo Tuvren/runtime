@@ -16,6 +16,10 @@
 
 import type { EpochMs, HashString } from "@tuvren/core";
 import type { CapabilityPolicyEngine } from "@tuvren/core/capabilities";
+import {
+  TOOL_INPUT_VALIDATION_FAILED,
+  TOOL_RESULT_VALIDATION_FAILED,
+} from "@tuvren/core/errors";
 import type { TuvrenStreamEvent } from "@tuvren/core/events";
 import type { ContextManifest } from "@tuvren/core/execution";
 import type {
@@ -48,6 +52,7 @@ import {
   createRejectedToolResult,
   createToolExecutionContext,
   createToolStartBarrier,
+  createValidationErrorToolResult,
   emitToolStartIfNeeded,
   evaluateApprovalPolicy,
   getAroundToolHandlers,
@@ -63,6 +68,7 @@ import {
   ToolPauseSignal,
   toExecutableToolCall,
   validateToolInput,
+  validateToolOutput,
   zipStagedToolResults,
 } from "./tool-execution-helpers.js";
 import { resolveToolDefinition } from "./tool-registry.js";
@@ -433,8 +439,9 @@ async function resolveExecutableToolCall(
 
   if (!validation.valid) {
     return {
-      result: createErrorToolResult(
+      result: createValidationErrorToolResult(
         toolCall,
+        TOOL_INPUT_VALIDATION_FAILED,
         "Tool input failed validation.",
         validation.details
       ),
@@ -892,6 +899,35 @@ async function runAroundToolHandlers(
     }
 
     await startPromise;
+
+    // Output validation for tuvren-server class per §4.21 / AX001.
+    // Direct error results from the tool bypass validation; only successful
+    // outputs are checked against the declared outputSchema.
+    if (toolCall.tool.outputSchema !== undefined) {
+      const isDirectResult = isDirectToolResult(output, toolCall);
+      const isErrorResult =
+        isDirectResult && (output as ToolResultPart).isError === true;
+      if (!isErrorResult) {
+        const valueToValidate = isDirectResult
+          ? (output as ToolResultPart).output
+          : output;
+        const outputValidation = validateToolOutput(
+          toolCall.tool.outputSchema,
+          valueToValidate
+        );
+        if (!outputValidation.valid) {
+          return {
+            result: createValidationErrorToolResult(
+              toolCall.toolCall,
+              TOOL_RESULT_VALIDATION_FAILED,
+              "Tool output failed validation.",
+              outputValidation.details
+            ),
+            updates: [],
+          };
+        }
+      }
+    }
 
     if (isDirectToolResult(output, toolCall)) {
       return {

@@ -150,9 +150,12 @@ const TOOL_DEFINITION_KEYS = new Set([
   "approval",
   "description",
   "execute",
+  "idempotent",
   "inputSchema",
+  "maxRetries",
   "metadata",
   "name",
+  "outputSchema",
   "timeout",
 ]);
 const EXECUTION_STATUS_KEYS = new Set([
@@ -657,7 +660,10 @@ export function isTuvrenToolDefinition(
       typeof value.execute === "function" &&
       isKrakenToolSchema(value.inputSchema) &&
       isOptionalApprovalPolicy(value, "approval") &&
+      (value.idempotent === undefined || typeof value.idempotent === "boolean") &&
+      (value.maxRetries === undefined || typeof value.maxRetries === "number") &&
       isOptionalSerializableRecordProperty(value, "metadata") &&
+      (value.outputSchema === undefined || isKrakenToolSchema(value.outputSchema)) &&
       isOptionalTimeoutProperty(value, "timeout")
   );
 }

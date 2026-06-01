@@ -316,6 +316,41 @@ export async function evaluateApprovalPolicy(
   return typeof policy === "function" ? await policy(input, context) : policy;
 }
 
+export function validateToolOutput(
+  schema: NonNullable<TuvrenToolDefinition["outputSchema"]>,
+  output: unknown
+):
+  | { details?: unknown; valid: true; value: unknown }
+  | { details?: unknown; valid: false } {
+  if (
+    schema !== null &&
+    typeof schema === "object" &&
+    "validate" in schema &&
+    typeof schema.validate === "function"
+  ) {
+    let result: ReturnType<typeof schema.validate>;
+
+    try {
+      result = schema.validate(output);
+    } catch (error: unknown) {
+      return { details: { error: normalizeError(error).message }, valid: false };
+    }
+
+    return result.valid
+      ? { valid: true, value: result.value }
+      : { details: result.error, valid: false };
+  }
+
+  const validator = getCompiledValidator(schema);
+  const valid = validator(output);
+
+  if (valid) {
+    return { valid: true, value: output };
+  }
+
+  return { details: formatAjvErrors(validator.errors), valid: false };
+}
+
 export function validateToolInput(
   tool: TuvrenToolDefinition,
   input: unknown
@@ -451,6 +486,24 @@ export function createErrorToolResult(
         ? { error: message }
         : { details, error: message }),
       ...(approval === undefined ? {} : { approval }),
+    },
+    type: "tool_result",
+  };
+}
+
+export function createValidationErrorToolResult(
+  toolCall: ToolCallPart,
+  code: string,
+  message: string,
+  details?: unknown
+): ToolResultPart {
+  return {
+    callId: toolCall.callId,
+    isError: true,
+    name: toolCall.name,
+    output: {
+      code,
+      ...(details === undefined ? { error: message } : { details, error: message }),
     },
     type: "tool_result",
   };

@@ -247,8 +247,11 @@ export function defineTool<INPUT, OUTPUT>(options: {
     context: ToolExecutionContext
   ) => Promise<OUTPUT> | OUTPUT;
   approval?: ApprovalPolicy;
-  timeout?: number;
+  idempotent?: boolean;
+  maxRetries?: number;
   metadata?: Record<string, unknown>;
+  outputSchema?: TuvrenJsonSchema;
+  timeout?: number;
 }): TuvrenToolDefinition {
   const normalized = asSchema(options.inputSchema);
   const userExecute = options.execute;
@@ -286,9 +289,12 @@ export function defineTool<INPUT, OUTPUT>(options: {
     execute(input, context) {
       return userExecute(input as INPUT, context);
     },
+    idempotent: options.idempotent,
     inputSchema: customSchema,
+    maxRetries: options.maxRetries,
     metadata: options.metadata,
     name: options.name,
+    outputSchema: options.outputSchema,
     timeout: options.timeout,
   };
 }
