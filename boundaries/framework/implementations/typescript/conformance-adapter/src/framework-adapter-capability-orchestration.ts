@@ -286,10 +286,10 @@ export async function runCapabilityOrchestrationPolicyDecisions(): Promise<Adapt
   const events = await collectValues(handle.events());
 
   const toolResultEvent = events.find(
-    (e) => (e as Record<string, unknown>).type === "tool.result"
+    (e) => (e as unknown as Record<string, unknown>).type === "tool.result"
   );
   const toolResultIsError =
-    (toolResultEvent as Record<string, unknown> | undefined)?.isError === true;
+    (toolResultEvent as unknown as Record<string, unknown> | undefined)?.isError === true;
 
   const evidence = {
     capabilityPolicy: {
