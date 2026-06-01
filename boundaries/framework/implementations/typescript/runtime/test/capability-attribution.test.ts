@@ -18,6 +18,7 @@
 import { describe, expect, test } from "bun:test";
 import type { RuntimeDriver } from "@tuvren/core/driver";
 import type { ToolResultEvent, ToolStartEvent } from "@tuvren/core/events";
+import { isTuvrenStreamEvent } from "@tuvren/core/events";
 import type {
   TelemetrySpan,
   TuvrenTelemetrySink,
@@ -203,5 +204,82 @@ describe("Capability attribution — telemetry spans (AW006)", () => {
     expect(toolCallSpan?.attributes["tuvren.runtime.capability.owner"]).toBe(
       "tuvren"
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Attribution stream-event guard (AW006 — additive field contract)
+// ---------------------------------------------------------------------------
+
+describe("Capability attribution — stream-event guard contract", () => {
+  const toolStartBase = {
+    callId: "c1",
+    input: {},
+    name: "tool-x",
+    timestamp: 1000,
+    type: "tool.start",
+  };
+
+  const validAttribution = {
+    capabilityId: "tool.x",
+    executionClass: "tuvren-server",
+    observation: {
+      canAudit: true,
+      canCancel: true,
+      canObserveIntermediate: true,
+      canPersistResult: true,
+      canResume: true,
+      canRetry: true,
+      executionClass: "tuvren-server",
+    },
+    owner: "tuvren",
+  };
+
+  test("tool.start without attribution passes the guard (attribution is optional)", () => {
+    expect(isTuvrenStreamEvent(toolStartBase)).toBe(true);
+  });
+
+  test("tool.start with valid attribution passes the guard", () => {
+    expect(
+      isTuvrenStreamEvent({ ...toolStartBase, attribution: validAttribution })
+    ).toBe(true);
+  });
+
+  test("tool.start with out-of-range executionClass is rejected by the guard", () => {
+    expect(
+      isTuvrenStreamEvent({
+        ...toolStartBase,
+        attribution: { ...validAttribution, executionClass: "unknown-class" },
+      })
+    ).toBe(false);
+  });
+
+  test("tool.start with out-of-range owner is rejected by the guard", () => {
+    expect(
+      isTuvrenStreamEvent({
+        ...toolStartBase,
+        attribution: { ...validAttribution, owner: "platform" },
+      })
+    ).toBe(false);
+  });
+
+  test("tool.start with null attribution is rejected by the guard", () => {
+    expect(isTuvrenStreamEvent({ ...toolStartBase, attribution: null })).toBe(
+      false
+    );
+  });
+
+  test("tool.result with valid attribution passes the guard", () => {
+    expect(
+      isTuvrenStreamEvent({
+        callId: "c1",
+        isError: false,
+        name: "tool-x",
+        output: { ok: true },
+        timestamp: 1000,
+        type: "tool.result",
+        attribution: validAttribution,
+      })
+    ).toBe(true);
   });
 });

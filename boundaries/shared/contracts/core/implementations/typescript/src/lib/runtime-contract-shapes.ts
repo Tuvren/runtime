@@ -755,6 +755,12 @@ export interface AgentConfig {
    * framework evaluates invocation-time policy before each tool call; denied
    * invocations surface as `tool.result` with `isError: true` rather than
    * executing. When absent, all invocations are admitted.
+   *
+   * Note: the policy context passed to the engine (modelId, providerId,
+   * permissions) is not yet populated — those dimensions land in Epic BB.
+   * The baseline `createCapabilityPolicyEngine` is context-insensitive and
+   * works correctly; a context-sensitive engine wired here before Epic BB
+   * will receive empty values for those fields.
    */
   capabilityPolicyEngine?: CapabilityPolicyEngine;
   contextPolicy?: ContextPolicy;
