@@ -607,13 +607,14 @@ function resolveResumeDecision(
 
   if (!validation.valid) {
     return {
-      result: createErrorToolResult(
+      result: createValidationErrorToolResult(
         {
           callId: pendingToolCall.callId,
           input,
           name: pendingToolCall.name,
           type: "tool_call",
         },
+        TOOL_INPUT_VALIDATION_FAILED,
         "Approved tool input failed validation.",
         {
           decisionType: decision.type,

@@ -495,8 +495,11 @@ export function createValidationErrorToolResult(
   toolCall: ToolCallPart,
   code: string,
   message: string,
-  details?: unknown
+  details?: unknown,
+  decision?: ApprovalDecision,
+  audit?: EditedApprovalAudit
 ): ToolResultPart {
+  const approval = createApprovalResultMetadata(decision, audit);
   return {
     callId: toolCall.callId,
     isError: true,
@@ -504,6 +507,7 @@ export function createValidationErrorToolResult(
     output: {
       code,
       ...(details === undefined ? { error: message } : { details, error: message }),
+      ...(approval === undefined ? {} : { approval }),
     },
     type: "tool_result",
   };

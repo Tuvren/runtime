@@ -60,14 +60,14 @@ import {
 // Input schema with AJV enforcement (strict schema, raw TuvrenToolDefinition)
 // ---------------------------------------------------------------------------
 
-const STRICT_INPUT_SCHEMA = {
+const STRICT_INPUT_SCHEMA: import("@tuvren/core/tools").TuvrenJsonSchema = {
   type: "object",
   properties: {
     value: { type: "number" },
   },
   required: ["value"],
   additionalProperties: false,
-} as const;
+};
 
 // ---------------------------------------------------------------------------
 // Shared helpers
@@ -210,14 +210,14 @@ describe("KRT-AX001 — input validation", () => {
 describe("KRT-AX001 — output validation", () => {
   const toolName = "ax001-validate-output";
 
-  const OUTPUT_SCHEMA = {
+  const OUTPUT_SCHEMA: import("@tuvren/core/tools").TuvrenJsonSchema = {
     type: "object",
     properties: {
       count: { type: "number" },
     },
     required: ["count"],
     additionalProperties: false,
-  } as const;
+  };
 
   test("output validation failure surfaces as tool.result isError true", async () => {
     const tool: TuvrenToolDefinition = {
