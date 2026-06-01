@@ -18,6 +18,7 @@ import type { EpochMs, HashString } from "@tuvren/core";
 import type { CapabilityPolicyEngine } from "@tuvren/core/capabilities";
 import {
   TOOL_INPUT_VALIDATION_FAILED,
+  TOOL_INVOCATION_RATE_LIMITED,
   TOOL_RESULT_VALIDATION_FAILED,
 } from "@tuvren/core/errors";
 import type { TuvrenStreamEvent } from "@tuvren/core/events";
@@ -36,6 +37,7 @@ import type {
   TuvrenToolDefinition,
 } from "@tuvren/core/tools";
 import { createBindingResolver } from "./binding-resolver.js";
+import type { ServerRateLimiter } from "./server-rate-limiter.js";
 import { runWithTimeout } from "./execution-timeouts.js";
 import {
   buildSharedExports,
@@ -92,6 +94,12 @@ export interface ToolBatchEnvironment {
   publishEvent(event: TuvrenStreamEvent): void;
   reportSoftError(error: Error): void;
   runId: string;
+  /**
+   * Optional per-tenant rate limiter for the Tuvren-server execution class.
+   * Each runtime instance creates its own limiter from AgentConfig.serverExecution,
+   * so invocations from one tenant cannot consume another tenant's budget. (AX003)
+   */
+  serverExecutionRateLimiter?: ServerRateLimiter;
   signal?: AbortSignal;
   stageResult(result: ToolResultPart, orderIndex: number): Promise<HashString>;
   threadId: string;
@@ -472,6 +480,22 @@ async function resolveExecutableToolCall(
         ),
       };
     }
+  }
+
+  // Rate-limit check for Tuvren-server execution class per §4.21 / AX003.
+  // Invocations beyond the configured budget are rejected with a typed result
+  // rather than executed, preserving tenant isolation without error propagation.
+  if (
+    environment.serverExecutionRateLimiter !== undefined &&
+    !environment.serverExecutionRateLimiter.tryAcquire()
+  ) {
+    return {
+      result: createValidationErrorToolResult(
+        toolCall,
+        TOOL_INVOCATION_RATE_LIMITED,
+        `Tool "${tool.name}" invocation rejected: server execution rate limit exceeded.`
+      ),
+    };
   }
 
   const toolContext = createToolExecutionContext(

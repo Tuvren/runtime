@@ -29,6 +29,9 @@ import type { HeadState, LoopState } from "./runtime-core-loop.js";
 import { formatToolResultTaskId } from "./runtime-core-response.js";
 import { normalizeError } from "./runtime-core-shared.js";
 import type { RuntimeExecutionHandle } from "./runtime-execution-handle.js";
+import {
+  createServerRateLimiter,
+} from "./server-rate-limiter.js";
 import type { ToolBatchEnvironment } from "./tool-execution.js";
 
 export interface RuntimeCoreDriverSupportHost {
@@ -86,6 +89,13 @@ export function createToolBatchEnvironment(
   iterationCount: number,
   runId: string
 ): ToolBatchEnvironment {
+  // Create the rate limiter once per run (lazily on first iteration) and
+  // cache it on loopState so the same budget applies across all iterations.
+  const rateLimitConfig = loopState.activeConfig.serverExecution?.rateLimit;
+  if (rateLimitConfig !== undefined && loopState.serverExecutionRateLimiter === undefined) {
+    loopState.serverExecutionRateLimiter = createServerRateLimiter(rateLimitConfig);
+  }
+
   return {
     activeAgent: loopState.activeConfig.name,
     branchId: handle.request.branchId,
@@ -109,6 +119,7 @@ export function createToolBatchEnvironment(
       host.publishProjectedError(handle, error, false, loopState);
     },
     runId,
+    serverExecutionRateLimiter: loopState.serverExecutionRateLimiter,
     signal: handle.abortSignal,
     stageResult: async (result, orderIndex) => {
       return await host.stageToolResultMessage(runId, result, orderIndex);

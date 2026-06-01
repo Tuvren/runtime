@@ -759,6 +759,23 @@ export interface TuvrenExtension {
   tools?: TuvrenToolDefinition[];
 }
 
+export interface ServerExecutionRateLimitConfig {
+  /** Maximum invocations allowed within windowMs. */
+  maxCalls: number;
+  /** Duration of the fixed window in milliseconds. */
+  windowMs: number;
+}
+
+export interface ServerExecutionConfig {
+  /**
+   * Per-tenant (per-runtime-instance) call-budget rate limit for the
+   * Tuvren-server execution class. Invocations beyond the configured budget
+   * within the window are rejected with a typed tool_invocation_rate_limited
+   * result rather than executed. (AX003)
+   */
+  rateLimit?: ServerExecutionRateLimitConfig;
+}
+
 export interface AgentConfig {
   /**
    * Optional capability policy engine per ADR-046 §4.21. When set, the
@@ -781,6 +798,11 @@ export interface AgentConfig {
   model?: string | TuvrenProvider;
   name: string;
   responseFormat?: StructuredOutputRequest;
+  /**
+   * Server execution class configuration for this agent. Controls per-tenant
+   * rate limiting of Tuvren-server invocations. (AX003)
+   */
+  serverExecution?: ServerExecutionConfig;
   systemPrompt?: string;
   tools?: TuvrenToolDefinition[];
 }
