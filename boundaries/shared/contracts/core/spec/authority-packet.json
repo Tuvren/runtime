@@ -3,12 +3,13 @@
   "version": "1.2.0",
   "boundary": "framework",
   "surface": "core",
-  "description": "Merged shared-primitive authority packet for @tuvren/core. Absorbs tuvren.shared.core-types, tuvren.framework.runtime-api, tuvren.framework.event-stream, tuvren.framework.tool-contracts, and tuvren.framework.driver-api into a single packet with 10 binding sections per ADR-037 (Epic AP), ADR-042 (Epic AV), and ADR-046 (Epic AW — capabilities binding section added).",
+  "description": "Merged shared-primitive authority packet for @tuvren/core. Absorbs tuvren.shared.core-types, tuvren.framework.runtime-api, tuvren.framework.event-stream, tuvren.framework.tool-contracts, and tuvren.framework.driver-api into a single packet with 10 binding sections per ADR-037 (Epic AP), ADR-042 (Epic AV), and ADR-046 (Epic AW: capabilities binding section added, capability JSON schemas authored in artifacts/json-schema/).",
   "humanAuthorityRefs": [
     "docs/KrakenKernelSpecification.md",
     "docs/KrakenFrameworkSpecification.md",
     "constitution/TechSpec.md#adr-037",
-    "constitution/TechSpec.md#adr-046"
+    "constitution/TechSpec.md#adr-046",
+    "constitution/TechSpec.md#section-3-13"
   ],
   "authoritativeSources": [
     {
@@ -40,12 +41,6 @@
       "path": "boundaries/framework/contracts/driver-api/spec/typespec/main.tsp",
       "format": "typespec",
       "bindingSection": "driver"
-    },
-    {
-      "path": "boundaries/shared/contracts/core/implementations/typescript/src/lib/capability-shapes.ts",
-      "format": "typescript-source",
-      "bindingSection": "capabilities",
-      "note": "Canonical ADR-046 §3.13 capability-orchestration shapes authored directly in TypeScript until a TypeSpec source is promoted. The TypeScript source is the authority for the capabilities binding section only."
     },
     {
       "path": "boundaries/framework/conformance/plans/runtime-api-lifecycle.json",
@@ -94,11 +89,6 @@
     {
       "path": "boundaries/framework/conformance/plans/framework-operational-telemetry.json",
       "format": "conformance-plan"
-    },
-    {
-      "path": "boundaries/framework/conformance/plans/runtime-api-callables-extended.json",
-      "format": "conformance-plan",
-      "note": "AW007 capability-orchestration-foundation check set is appended to this plan."
     }
   ],
   "generatedArtifacts": [
@@ -122,7 +112,7 @@
     },
     {
       "planId": "tuvren.framework.runtime-api.callables-extended",
-      "planVersion": "0.4.0",
+      "planVersion": "0.3.0",
       "path": "boundaries/framework/conformance/plans/runtime-api-callables-extended.json"
     },
     {
