@@ -622,6 +622,11 @@ export interface TuvrenToolDefinition {
    * Declared result shape validated against the execute return value before
    * surfacing. Violations surface as tool.result with isError true and
    * code tool_result_validation_failed. (AX001)
+   *
+   * Note: validation applies to the terminal execute/sandbox result only.
+   * An aroundTool extension that short-circuits by returning its own result
+   * without calling next() bypasses outputSchema enforcement, since extensions
+   * are trusted host-side code and output-validation runs in the terminal branch.
    */
   outputSchema?: TuvrenJsonSchema | CustomSchema;
   timeout?: number;
@@ -804,6 +809,10 @@ export interface ServerExecutionRateLimitConfig {
   /**
    * Maximum invocations allowed within windowMs.
    * Must be a positive integer; zero immediately rejects all calls.
+   *
+   * Note: an idempotent tool retry consumes exactly one budget slot for the
+   * entire invocation regardless of how many retry attempts occur, because the
+   * rate-limit check runs once in resolveExecutableToolCall before the retry loop.
    */
   maxCalls: number;
   /**

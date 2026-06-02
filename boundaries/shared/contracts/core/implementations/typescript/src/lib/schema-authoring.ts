@@ -250,7 +250,12 @@ export function defineTool<INPUT, OUTPUT>(options: {
   idempotent?: boolean;
   maxRetries?: number;
   metadata?: Record<string, unknown>;
-  outputSchema?: TuvrenJsonSchema;
+  /**
+   * Declared result shape for output validation. Accepts a plain JSON Schema
+   * (AJV-validated) or a CustomSchema with a custom validate function. When
+   * omitted, output is not validated. See TuvrenToolDefinition.outputSchema.
+   */
+  outputSchema?: TuvrenJsonSchema | CustomSchema;
   timeout?: number;
 }): TuvrenToolDefinition {
   const normalized = asSchema(options.inputSchema);
