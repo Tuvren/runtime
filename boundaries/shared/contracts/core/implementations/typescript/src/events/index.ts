@@ -43,6 +43,7 @@ export type {
   ToolCallArgsDeltaEvent,
   ToolCallDoneEvent,
   ToolCallStartEvent,
+  ToolAuditEvent,
   ToolResultEvent,
   ToolStartEvent,
   TurnEndEvent,

@@ -17,6 +17,7 @@
 import type {
   CapabilityInvocationAttribution,
   CapabilityPolicyEngine,
+  ExecutionClass,
 } from "./capability-shapes.js";
 import type { EpochMs, HashString } from "./kernel-records.js";
 import type { TuvrenError } from "./tuvren-error.js";
@@ -457,6 +458,34 @@ export interface ToolResultEvent {
   type: "tool.result";
 }
 
+/**
+ * Lifecycle audit event for Tuvren-server invocations. Carries only structural
+ * lineage keys and lifecycle identifiers — no input, output, or metadata values
+ * that could contain secret material. (AX005)
+ */
+export interface ToolAuditEvent {
+  /** Stable tool name; used as the capability id for tuvren-server bindings. */
+  callId: string;
+  capabilityId: string;
+  executionClass: ExecutionClass;
+  /** Which lifecycle point this event records. */
+  lifecycle:
+    | "input_validated"
+    | "output_validated"
+    | "retry_attempt"
+    | "rate_limited"
+    | "cancelled";
+  runId: string;
+  source?: EventSource;
+  timestamp: EpochMs;
+  turnId: string;
+  /** Retry attempt number (1-based), present when lifecycle is retry_attempt. */
+  attempt?: number;
+  /** Whether the validation passed, present for input_validated / output_validated. */
+  validationPassed?: boolean;
+  type: "tool.audit";
+}
+
 export interface ApprovalRequestedEvent {
   request: ApprovalRequest;
   source?: EventSource;
@@ -505,6 +534,7 @@ export type TuvrenStreamEvent =
   | MessageDoneEvent
   | ToolStartEvent
   | ToolResultEvent
+  | ToolAuditEvent
   | ApprovalRequestedEvent
   | ApprovalResolvedEvent
   | SteeringIncorporatedEvent

@@ -58,6 +58,7 @@ import {
   createToolExecutionContext,
   createToolStartBarrier,
   createValidationErrorToolResult,
+  emitToolAuditEvent,
   emitToolStartIfNeeded,
   evaluateApprovalPolicy,
   getAroundToolHandlers,
@@ -456,6 +457,10 @@ async function resolveExecutableToolCall(
 
   const validation = validateToolInput(tool, toolCall.input);
 
+  emitToolAuditEvent(environment, toolCall.callId, toolCall.name, "input_validated", {
+    validationPassed: validation.valid,
+  });
+
   if (!validation.valid) {
     return {
       result: createValidationErrorToolResult(
@@ -500,6 +505,7 @@ async function resolveExecutableToolCall(
     environment.serverExecutionRateLimiter !== undefined &&
     !environment.serverExecutionRateLimiter.tryAcquire()
   ) {
+    emitToolAuditEvent(environment, toolCall.callId, toolCall.name, "rate_limited");
     return {
       result: createValidationErrorToolResult(
         toolCall,
@@ -728,6 +734,17 @@ async function executeSingleTool(
     // Do not retry when the environment signal is already aborted.
     if (attempt > 0 && environment.signal?.aborted) {
       break;
+    }
+
+    // Emit a retry_attempt audit event for each attempt after the first. (AX005)
+    if (attempt > 0) {
+      emitToolAuditEvent(
+        environment,
+        toolCall.toolCall.callId,
+        toolCall.tool.name,
+        "retry_attempt",
+        { attempt }
+      );
     }
 
     try {
@@ -995,6 +1012,13 @@ async function runAroundToolHandlers(
         const outputValidation = validateToolOutput(
           toolCall.tool.outputSchema,
           valueToValidate
+        );
+        emitToolAuditEvent(
+          environment,
+          toolCall.toolCall.callId,
+          toolCall.tool.name,
+          "output_validated",
+          { validationPassed: outputValidation.valid }
         );
         if (!outputValidation.valid) {
           return {

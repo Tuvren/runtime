@@ -949,6 +949,42 @@ function emitToolResultEvent(
   });
 }
 
+/**
+ * Emits a tool.audit event carrying only structural lineage keys — no input,
+ * output, or metadata values that could contain secret material. (AX005)
+ */
+export function emitToolAuditEvent(
+  environment: ToolBatchEnvironment,
+  callId: string,
+  toolName: string,
+  lifecycle: import("@tuvren/core/events").ToolAuditEvent["lifecycle"],
+  extras?: {
+    attempt?: number;
+    validationPassed?: boolean;
+  }
+): void {
+  const tool = environment.toolRegistry.get(toolName);
+  const executionClass =
+    tool !== undefined
+      ? buildToolAttribution(tool).executionClass
+      : "tuvren-server";
+
+  environment.publishEvent({
+    callId,
+    capabilityId: toolName,
+    executionClass,
+    lifecycle,
+    runId: environment.runId,
+    timestamp: environment.now(),
+    turnId: environment.turnId,
+    type: "tool.audit",
+    ...(extras?.attempt !== undefined ? { attempt: extras.attempt } : {}),
+    ...(extras?.validationPassed !== undefined
+      ? { validationPassed: extras.validationPassed }
+      : {}),
+  });
+}
+
 function asRecord(value: unknown): Record<string, unknown> {
   if (value !== null && typeof value === "object" && !Array.isArray(value)) {
     return value as Record<string, unknown>;

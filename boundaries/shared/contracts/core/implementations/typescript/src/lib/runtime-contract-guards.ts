@@ -103,6 +103,7 @@ const STREAM_EVENT_TYPES = new Set([
   "message.done",
   "tool.start",
   "tool.result",
+  "tool.audit",
   "approval.requested",
   "approval.resolved",
   "steering.incorporated",
@@ -589,6 +590,20 @@ function hasValidStreamEventPayload(
           isSerializableContractValue(value.output) &&
           isOptionalBooleanProperty(value, "isError") &&
           isOptionalCapabilityAttribution(value)
+      );
+    case "tool.audit":
+      return matchesStreamEventVariant(
+        value,
+        ["callId", "capabilityId", "executionClass", "lifecycle", "runId", "turnId", "attempt", "validationPassed"],
+        () =>
+          isNonEmptyStringProperty(value, "callId") &&
+          isNonEmptyStringProperty(value, "capabilityId") &&
+          isNonEmptyStringProperty(value, "executionClass") &&
+          isNonEmptyStringProperty(value, "lifecycle") &&
+          isNonEmptyStringProperty(value, "runId") &&
+          isNonEmptyStringProperty(value, "turnId") &&
+          (value.attempt === undefined || typeof value.attempt === "number") &&
+          (value.validationPassed === undefined || typeof value.validationPassed === "boolean")
       );
     case "approval.requested":
       return matchesStreamEventVariant(value, ["request"], () =>
