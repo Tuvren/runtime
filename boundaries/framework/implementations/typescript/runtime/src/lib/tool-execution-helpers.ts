@@ -207,6 +207,9 @@ export function toExecutableToolCall(
     approvalAudit: base.approvalAudit,
     approvalDecision: nextContext.approvalDecision ?? base.approvalDecision,
     input: nextContext.input,
+    // Preserve sandbox executor so aroundTool handlers that call next(context)
+    // do not silently bypass the configured isolation boundary. (AX004)
+    sandboxExecutor: base.sandboxExecutor,
     tool: nextContext.tool,
     toolCall: nextContext.toolCall,
   };

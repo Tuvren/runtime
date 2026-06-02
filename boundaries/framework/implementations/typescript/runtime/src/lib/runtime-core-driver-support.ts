@@ -121,10 +121,17 @@ export function createToolBatchEnvironment(
     runId,
     resolveSandboxExecutor:
       loopState.activeConfig.sandboxExecutors !== undefined
-        ? (endpointId: string) =>
-            loopState.activeConfig.sandboxExecutors?.get(endpointId) as
+        ? (endpointId: string) => {
+            // binding-resolver prefixes the id: "sandbox:<rawId>" — strip the
+            // prefix so AgentConfig.sandboxExecutors is keyed by the raw
+            // endpointId declared in metadata.sandbox.endpointId. (AX004)
+            const rawId = endpointId.startsWith("sandbox:")
+              ? endpointId.slice("sandbox:".length)
+              : endpointId;
+            return loopState.activeConfig.sandboxExecutors?.get(rawId) as
               | import("@tuvren/core/capabilities").TuvrenSandboxExecutor
-              | undefined
+              | undefined;
+          }
         : undefined,
     serverExecutionRateLimiter: loopState.serverExecutionRateLimiter,
     signal: handle.abortSignal,

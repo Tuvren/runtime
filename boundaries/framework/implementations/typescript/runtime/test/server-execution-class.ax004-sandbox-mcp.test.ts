@@ -207,7 +207,7 @@ describe("KRT-AX004 — sandbox endpoint", () => {
       config: {
         name: "primary",
         tools: [tool],
-        sandboxExecutors: new Map([["sandbox:my-sandbox", sandboxExecutor]]),
+        sandboxExecutors: new Map([["my-sandbox", sandboxExecutor]]),
       },
       signal: textSignal("sandbox test"),
       threadId: thread.threadId,
@@ -262,5 +262,64 @@ describe("KRT-AX004 — sandbox endpoint", () => {
     expect(observation.canAudit).toBe(true);
     expect(observation.canCancel).toBe(true);
     expect(observation.canRetry).toBe(true);
+  });
+
+  test("sandbox executor survives an aroundTool handler calling next(context)", async () => {
+    const toolName = "ax004-sandbox-around-tool";
+    const SANDBOX_OUTPUT = { sandboxed: true, fromSandbox: 99 };
+    let sandboxExecuteCalled = false;
+    let toolExecuteCalled = false;
+
+    const tool: TuvrenToolDefinition = {
+      name: toolName,
+      description: "sandbox tool with aroundTool wrapper",
+      inputSchema: { type: "object" },
+      execute() {
+        toolExecuteCalled = true;
+        return { wrong: true };
+      },
+      metadata: { sandbox: { endpointId: "around-sandbox" } },
+    };
+
+    const sandboxExecutor = {
+      execute(_input: unknown, _context: unknown) {
+        sandboxExecuteCalled = true;
+        return SANDBOX_OUTPUT;
+      },
+    };
+
+    const harness = createFakeKernelHarness();
+    const driver = makeDriver(toolName);
+    const runtime = createTuvrenRuntime({
+      defaultDriverId: "ax004-driver",
+      driverRegistry: createBaseDriverRegistry([driver]),
+      kernel: harness.kernel,
+    });
+    const thread = await runtime.createThread({});
+    const handle = runtime.executeTurn({
+      branchId: thread.branchId,
+      config: {
+        name: "primary",
+        tools: [tool],
+        sandboxExecutors: new Map([["around-sandbox", sandboxExecutor]]),
+        extensions: [
+          {
+            name: "passthrough-wrapper",
+            // AroundToolSpec as a function — triggers the next(context) code path
+            aroundTool: async (context, next) => next(context),
+          },
+        ],
+      },
+      signal: textSignal("around-tool sandbox test"),
+      threadId: thread.threadId,
+    });
+    const events = await collectEvents(handle.events());
+    const toolResult = findToolResult(events);
+
+    expect(sandboxExecuteCalled).toBe(true);
+    expect(toolExecuteCalled).toBe(false);
+    expect(toolResult?.isError).toBeFalsy();
+    const output = toolResult?.output as Record<string, unknown> | undefined;
+    expect(output?.fromSandbox).toBe(99);
   });
 });

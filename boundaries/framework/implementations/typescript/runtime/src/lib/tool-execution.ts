@@ -510,6 +510,9 @@ async function resolveExecutableToolCall(
   }
 
   // Resolve sandbox executor for tools declared with metadata.sandbox.endpointId.
+  // The resolver produces endpoint.id = "sandbox:<endpointId>"; we strip the
+  // prefix before the lookup so AgentConfig.sandboxExecutors is keyed by the
+  // raw endpointId the host declared in metadata.sandbox.endpointId. (AX004)
   const binding = createBindingResolver().resolveFromToolDefinition(tool);
   let sandboxExecutor: TuvrenSandboxExecutor | undefined;
   if (
@@ -518,6 +521,8 @@ async function resolveExecutableToolCall(
   ) {
     sandboxExecutor = environment.resolveSandboxExecutor(binding.endpoint.id);
   }
+
+
 
   const toolContext = createToolExecutionContext(
     toolCall,
