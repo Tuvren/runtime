@@ -30,32 +30,6 @@ import {
   createDriverRegistry,
   createTuvrenRuntime as createTuvrenRuntimeCore,
 } from "@tuvren/runtime";
-import type { CapabilityObservation } from "@tuvren/core/capabilities";
-
-function observationForClass(
-  executionClass: "tuvren-server" | "provider-native" | "provider-mediated" | "tuvren-client"
-): CapabilityObservation {
-  if (executionClass === "tuvren-server") {
-    return {
-      canAudit: true,
-      canCancel: true,
-      canObserveIntermediate: true,
-      canPersistResult: true,
-      canResume: true,
-      canRetry: true,
-      executionClass: "tuvren-server",
-    };
-  }
-  return {
-    canAudit: false,
-    canCancel: false,
-    canObserveIntermediate: false,
-    canPersistResult: true,
-    canResume: false,
-    canRetry: false,
-    executionClass,
-  };
-}
 import type { AdapterProjection } from "./framework-adapter-runtime.ts";
 import {
   AGENT_NAME,
@@ -390,13 +364,18 @@ export async function runTuvrenServerBindingClassification(): Promise<AdapterPro
   };
   const sandboxBinding = resolver.resolveFromToolDefinition(sandboxTool);
 
-  // Observation
-  const serverObservation = observationForClass("tuvren-server");
-
-  // MCP tool emits attribution in event stream
+  // MCP tool emits attribution in event stream — read production-emitted observation
+  // from the real tool.result event so the AX005 check detects regressions in
+  // capability-attribution.ts rather than asserting a hardcoded adapter constant.
   const mcpEvents = await runTurn(mcpTool);
   const mcpToolResult = findEvent(mcpEvents, "tool.result") as
     | { attribution?: Record<string, unknown> }
+    | undefined;
+  const mcpAttribution = mcpToolResult?.attribution as
+    | Record<string, unknown>
+    | undefined;
+  const productionObservation = mcpAttribution?.observation as
+    | Record<string, unknown>
     | undefined;
 
   const evidence = {
@@ -412,16 +391,213 @@ export async function runTuvrenServerBindingClassification(): Promise<AdapterPro
         capabilityId: sandboxBinding.capabilityId,
       },
       observation: {
-        executionClass: serverObservation.executionClass,
-        canAudit: serverObservation.canAudit,
-        canCancel: serverObservation.canCancel,
-        canObserveIntermediate: serverObservation.canObserveIntermediate,
-        canPersistResult: serverObservation.canPersistResult,
-        canResume: serverObservation.canResume,
-        canRetry: serverObservation.canRetry,
+        executionClass: productionObservation?.executionClass,
+        canAudit: productionObservation?.canAudit,
+        canCancel: productionObservation?.canCancel,
+        canObserveIntermediate: productionObservation?.canObserveIntermediate,
+        canPersistResult: productionObservation?.canPersistResult,
+        canResume: productionObservation?.canResume,
+        canRetry: productionObservation?.canRetry,
       },
       mcpToolResultAttribution: {
-        executionClass: mcpToolResult?.attribution?.executionClass,
+        executionClass: mcpAttribution?.executionClass,
+      },
+    },
+  };
+
+  return { evidence, result: evidence };
+}
+
+// ---------------------------------------------------------------------------
+// Operation: runtime.tuvren-server.cancellation
+//
+// Exercises:
+// - A late completion after handle.cancel() does not appear in durable branch
+//   messages — proving "late completion is ignored and cannot mutate invocation"
+// ---------------------------------------------------------------------------
+
+export async function runTuvrenServerCancellation(): Promise<AdapterProjection> {
+  const LATE_VALUE = "ax006-late-should-not-appear";
+  const TOOL_NAME = "ax006-cancellation-tool";
+  const harness = createConformanceKernelHarness();
+
+  let releaseToolLatch: (() => void) | undefined;
+  const toolStarted = new Promise<void>((resolve) => {
+    releaseToolLatch = resolve;
+  });
+  let releaseTool: (() => void) | undefined;
+
+  const driver = createStaticDriver(async (context) => {
+    await Promise.resolve();
+    if (!context.messages.some((m) => m.role === "tool")) {
+      return {
+        messages: [
+          assistantToolCalls([{ callId: "ax-cancel-1", input: {}, name: TOOL_NAME }]),
+        ],
+        resolution: { type: "continue_iteration" as const },
+        toolExecutionMode: "parallel" as const,
+      };
+    }
+    return {
+      messages: [assistantText("cancel done")],
+      resolution: { reason: "done", type: "end_turn" as const },
+    };
+  });
+
+  const runtime = createTuvrenRuntimeCore({
+    createId: createConformanceIdFactory(),
+    defaultDriverId: DRIVER_ID,
+    driverRegistry: createDriverRegistry([driver]),
+    kernel: harness.kernel,
+  });
+
+  const thread = await runtime.createThread({});
+  const handle = runtime.executeTurn({
+    branchId: thread.branchId,
+    config: {
+      name: AGENT_NAME,
+      tools: [
+        {
+          name: TOOL_NAME,
+          description: "cancellation tool",
+          inputSchema: { type: "object" },
+          async execute() {
+            releaseToolLatch?.();
+            await new Promise<void>((resolve) => {
+              releaseTool = resolve;
+            });
+            return { value: LATE_VALUE };
+          },
+        },
+      ],
+    },
+    signal: textSignal("ax006 cancellation"),
+    threadId: thread.threadId,
+  });
+
+  const eventsPromise = collectValues(handle.events()).then(
+    (v) => ({ ok: true as const, value: v }),
+    () => ({ ok: false as const, value: [] })
+  );
+
+  await toolStarted;
+  handle.cancel();
+  releaseTool?.();
+  await eventsPromise;
+
+  const messages = await harness.readBranchMessages(thread.branchId);
+  const toolMessages = messages.filter(
+    (m) => (m as Record<string, unknown>).role === "tool"
+  );
+  const lateResultPresent = toolMessages.some((m) => {
+    const parts = (m as Record<string, unknown>).parts;
+    if (!Array.isArray(parts)) return false;
+    return parts.some((p) => {
+      const output = (p as Record<string, unknown>).output;
+      return (
+        output !== null &&
+        typeof output === "object" &&
+        "value" in (output as Record<string, unknown>) &&
+        (output as Record<string, unknown>).value === LATE_VALUE
+      );
+    });
+  });
+
+  const evidence = {
+    tuvrenServer: {
+      cancellation: {
+        lateValueFoundInDurableMessages: lateResultPresent,
+      },
+    },
+  };
+
+  return { evidence, result: evidence };
+}
+
+// ---------------------------------------------------------------------------
+// Operation: runtime.tuvren-server.tenant-isolation
+//
+// Exercises:
+// - Two independent runtime instances with separate rate limits
+// - Exhausting instance A does not affect instance B
+// ---------------------------------------------------------------------------
+
+export async function runTuvrenServerTenantIsolation(): Promise<AdapterProjection> {
+  const TOOL_NAME = "ax006-isolation-tool";
+
+  async function runIsolatedTurn(maxCalls: number, callCount: number) {
+    const harness = createConformanceKernelHarness();
+    const driver = createStaticDriver(async (context) => {
+      await Promise.resolve();
+      const toolMessages = context.messages.filter((m) => m.role === "tool");
+      if (toolMessages.length < callCount) {
+        return {
+          messages: [
+            assistantToolCalls([
+              { callId: `ax-iso-${toolMessages.length}`, input: {}, name: TOOL_NAME },
+            ]),
+          ],
+          resolution: { type: "continue_iteration" as const },
+          toolExecutionMode: "parallel" as const,
+        };
+      }
+      return {
+        messages: [assistantText("done")],
+        resolution: { reason: "done", type: "end_turn" as const },
+      };
+    });
+
+    const runtime = createTuvrenRuntimeCore({
+      createId: createConformanceIdFactory(),
+      defaultDriverId: DRIVER_ID,
+      driverRegistry: createDriverRegistry([driver]),
+      kernel: harness.kernel,
+    });
+    const tool: TuvrenToolDefinition = {
+      name: TOOL_NAME,
+      description: "isolation tool",
+      inputSchema: { type: "object" },
+      execute() { return { ok: true }; },
+    };
+    const thread = await runtime.createThread({});
+    const handle = runtime.executeTurn({
+      branchId: thread.branchId,
+      config: {
+        name: AGENT_NAME,
+        tools: [tool],
+        serverExecution: { rateLimit: { maxCalls, windowMs: 60_000 } },
+      },
+      signal: textSignal("isolation test"),
+      threadId: thread.threadId,
+    });
+    return collectValues(handle.events());
+  }
+
+  const eventsA = await runIsolatedTurn(1, 2);
+  const toolResultsA = findAllEvents(eventsA, "tool.result");
+  const limitedInA = toolResultsA.some(
+    (r) =>
+      r.isError === true &&
+      (r.output as Record<string, unknown>)?.code === "tool_invocation_rate_limited"
+  );
+  const successInA = toolResultsA.some((r) => !r.isError);
+
+  const eventsB = await runIsolatedTurn(5, 1);
+  const toolResultsB = findAllEvents(eventsB, "tool.result");
+  const limitedInB = toolResultsB.some(
+    (r) =>
+      r.isError === true &&
+      (r.output as Record<string, unknown>)?.code === "tool_invocation_rate_limited"
+  );
+  const successInB = toolResultsB.some((r) => !r.isError);
+
+  const evidence = {
+    tuvrenServer: {
+      tenantIsolation: {
+        instanceAHadRateLimitedResult: limitedInA,
+        instanceAHadSuccessResult: successInA,
+        instanceBHadRateLimitedResult: limitedInB,
+        instanceBHadSuccessResult: successInB,
       },
     },
   };

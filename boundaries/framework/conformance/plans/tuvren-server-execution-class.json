@@ -294,6 +294,66 @@
       "input": { "scenarioPath": "$.tuvren-server-binding-classification" }
     },
     {
+      "checkId": "ax.ax002.cancellation-late-completion-not-in-durable-state",
+      "evidence": [
+        "result.tuvrenServer.cancellation.lateValueFoundInDurableMessages"
+      ],
+      "assertions": [
+        {
+          "kind": "resultField",
+          "field": "$.tuvrenServer.cancellation.lateValueFoundInDurableMessages",
+          "equals": false
+        }
+      ],
+      "operation": "runtime.tuvren-server.cancellation",
+      "scenario": "runtime-api-scenarios",
+      "input": { "scenarioPath": "$.tuvren-server-cancellation" }
+    },
+    {
+      "checkId": "ax.ax003.tenant-isolation-instance-a-has-rate-limit",
+      "evidence": [
+        "result.tuvrenServer.tenantIsolation.instanceAHadRateLimitedResult",
+        "result.tuvrenServer.tenantIsolation.instanceAHadSuccessResult"
+      ],
+      "assertions": [
+        {
+          "kind": "resultField",
+          "field": "$.tuvrenServer.tenantIsolation.instanceAHadRateLimitedResult",
+          "equals": true
+        },
+        {
+          "kind": "resultField",
+          "field": "$.tuvrenServer.tenantIsolation.instanceAHadSuccessResult",
+          "equals": true
+        }
+      ],
+      "operation": "runtime.tuvren-server.tenant-isolation",
+      "scenario": "runtime-api-scenarios",
+      "input": { "scenarioPath": "$.tuvren-server-tenant-isolation" }
+    },
+    {
+      "checkId": "ax.ax003.tenant-isolation-instance-b-not-affected",
+      "evidence": [
+        "result.tuvrenServer.tenantIsolation.instanceBHadRateLimitedResult",
+        "result.tuvrenServer.tenantIsolation.instanceBHadSuccessResult"
+      ],
+      "assertions": [
+        {
+          "kind": "resultField",
+          "field": "$.tuvrenServer.tenantIsolation.instanceBHadRateLimitedResult",
+          "equals": false
+        },
+        {
+          "kind": "resultField",
+          "field": "$.tuvrenServer.tenantIsolation.instanceBHadSuccessResult",
+          "equals": true
+        }
+      ],
+      "operation": "runtime.tuvren-server.tenant-isolation",
+      "scenario": "runtime-api-scenarios",
+      "input": { "scenarioPath": "$.tuvren-server-tenant-isolation" }
+    },
+    {
       "checkId": "ax.ax004.mcp-tool-result-attribution-is-tuvren-server",
       "evidence": [
         "result.tuvrenServer.mcpToolResultAttribution.executionClass"

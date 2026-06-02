@@ -40,7 +40,9 @@ import {
 } from "./framework-adapter-capability-orchestration.ts";
 import {
   runTuvrenServerBindingClassification,
+  runTuvrenServerCancellation,
   runTuvrenServerLifecycle,
+  runTuvrenServerTenantIsolation,
 } from "./framework-adapter-tuvren-server-execution-class.ts";
 import { createFrameworkAdapterDriver } from "./framework-adapter-driver.ts";
 import { createFrameworkAdapterEventStream } from "./framework-adapter-event-stream.ts";
@@ -379,6 +381,10 @@ export class TypeScriptFrameworkAdapter implements ImplementationAdapter {
         return runTuvrenServerLifecycle();
       case "runtime.tuvren-server.binding-classification":
         return runTuvrenServerBindingClassification();
+      case "runtime.tuvren-server.cancellation":
+        return runTuvrenServerCancellation();
+      case "runtime.tuvren-server.tenant-isolation":
+        return runTuvrenServerTenantIsolation();
       default:
         throw new Error(
           `unsupported promoted framework operation ${operation}`
