@@ -284,6 +284,10 @@
       "target": "boundaries/framework/conformance/plans/framework-operational-telemetry.json"
     },
     {
+      "kind": "conformance-plan",
+      "target": "boundaries/framework/conformance/plans/tuvren-server-execution-class.json"
+    },
+    {
       "kind": "freshness-check",
       "target": "boundaries/shared/contracts/core/artifacts/json-schema"
     }
