@@ -150,7 +150,7 @@ Completed ticket detail is removed from the active execution plan and retained t
 - **Effort:** 3
 - **Dependencies:** `KRT-AW007`
 - **Capability / Contract Mapping:** PRD `CAP-P0-057`, `CAP-P1-062`; TechSpec ADR-046
-- **Description:** Time-boxed investigation of what the AI-SDK-bridged providers actually expose in 2026 for provider-native tools (provider-hosted search, code execution, etc.) and provider-mediated tools (provider-invoked remote endpoints / remote MCP), including the events/results Tuvren can observe. Output: a concrete capability matrix that pins which concrete proofs `KRT-AY006` can deliver and which degrade to a documented representative integration.
+- **Description:** Time-boxed investigation of what the AI-SDK-bridged providers actually expose in 2026 for provider-native tools (provider-hosted search, code execution, etc.) and provider-mediated tools (provider-invoked remote endpoints / remote MCP), including the events/results Tuvren can observe. Output: a concrete capability matrix that pins which concrete proofs `KRT-AY006` can deliver and which degrade to a documented representative integration. **Support artifact:** `constitution/support/live/ay001-provider-surface-matrix.md`.
 - **Acceptance Criteria (Gherkin):**
 ```gherkin
 Given the AI SDK bridge and the providers it reaches today
