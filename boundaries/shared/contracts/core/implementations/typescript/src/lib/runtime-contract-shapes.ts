@@ -468,7 +468,12 @@ export interface ToolAuditEvent {
   callId: string;
   capabilityId: string;
   executionClass: ExecutionClass;
-  /** Which lifecycle point this event records. */
+  /**
+   * Which lifecycle point this event records.
+   * "cancelled" is reserved for future use when cooperative cancellation
+   * emits an explicit audit signal; currently observable via handle.cancel()
+   * + the existing event stream (canCancel: true in CapabilityObservation).
+   */
   lifecycle:
     | "input_validated"
     | "output_validated"

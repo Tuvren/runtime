@@ -113,6 +113,13 @@ const STREAM_EVENT_TYPES = new Set([
   "custom",
 ]);
 const TURN_END_STATUSES = new Set(["completed", "paused", "failed"]);
+const TOOL_AUDIT_LIFECYCLES = new Set([
+  "input_validated",
+  "output_validated",
+  "retry_attempt",
+  "rate_limited",
+  "cancelled",
+]);
 const EXECUTION_PHASES = new Set(["running", "paused", "completed", "failed"]);
 const SYSTEM_MESSAGE_KEYS = new Set(["role", "content"]);
 const USER_MESSAGE_KEYS = new Set(["role", "parts"]);
@@ -600,6 +607,7 @@ function hasValidStreamEventPayload(
           isNonEmptyStringProperty(value, "capabilityId") &&
           isNonEmptyStringProperty(value, "executionClass") &&
           isNonEmptyStringProperty(value, "lifecycle") &&
+          TOOL_AUDIT_LIFECYCLES.has(value.lifecycle as string) &&
           isNonEmptyStringProperty(value, "runId") &&
           isNonEmptyStringProperty(value, "turnId") &&
           (value.attempt === undefined || typeof value.attempt === "number") &&

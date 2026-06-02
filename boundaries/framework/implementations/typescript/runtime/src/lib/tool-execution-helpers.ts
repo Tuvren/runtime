@@ -965,11 +965,11 @@ export function emitToolAuditEvent(
 ): void {
   const tool = environment.toolRegistry.get(toolName);
   const executionClass =
-    tool !== undefined
-      ? buildToolAttribution(tool).executionClass
-      : "tuvren-server";
+    tool === undefined
+      ? ("tuvren-server" as const)
+      : buildToolAttribution(tool).executionClass;
 
-  environment.publishEvent({
+  const event: import("@tuvren/core/events").ToolAuditEvent = {
     callId,
     capabilityId: toolName,
     executionClass,
@@ -978,11 +978,17 @@ export function emitToolAuditEvent(
     timestamp: environment.now(),
     turnId: environment.turnId,
     type: "tool.audit",
-    ...(extras?.attempt !== undefined ? { attempt: extras.attempt } : {}),
-    ...(extras?.validationPassed !== undefined
-      ? { validationPassed: extras.validationPassed }
-      : {}),
-  });
+  };
+
+  if (extras?.attempt !== undefined) {
+    event.attempt = extras.attempt;
+  }
+
+  if (extras?.validationPassed !== undefined) {
+    event.validationPassed = extras.validationPassed;
+  }
+
+  environment.publishEvent(event);
 }
 
 function asRecord(value: unknown): Record<string, unknown> {
