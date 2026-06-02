@@ -74,7 +74,11 @@ function makeMultiCallDriver(toolName: string, callCount: number) {
       return {
         messages: [
           assistantToolCalls([
-            { callId: `ax-call-${toolMessages.length}`, input: {}, name: toolName },
+            {
+              callId: `ax-call-${toolMessages.length}`,
+              input: {},
+              name: toolName,
+            },
           ]),
         ],
         resolution: { type: "continue_iteration" as const },
@@ -94,9 +98,10 @@ async function runTurn(
   callCount = 1
 ) {
   const harness = createConformanceKernelHarness();
-  const driver = callCount > 1
-    ? makeMultiCallDriver(tool.name, callCount)
-    : makeSingleCallDriver(tool.name);
+  const driver =
+    callCount > 1
+      ? makeMultiCallDriver(tool.name, callCount)
+      : makeSingleCallDriver(tool.name);
 
   const runtime = createTuvrenRuntimeCore({
     createId: createConformanceIdFactory(),
@@ -164,7 +169,11 @@ export async function runTuvrenServerLifecycle(): Promise<AdapterProjection> {
       return {
         messages: [
           assistantToolCalls([
-            { callId: "ax-call-1", input: { wrongField: "bad" }, name: INPUT_VALIDATION_TOOL },
+            {
+              callId: "ax-call-1",
+              input: { wrongField: "bad" },
+              name: INPUT_VALIDATION_TOOL,
+            },
           ]),
         ],
         resolution: { type: "continue_iteration" as const },
@@ -285,12 +294,13 @@ export async function runTuvrenServerLifecycle(): Promise<AdapterProjection> {
     name: RATE_LIMIT_TOOL,
     description: "rate limited tool",
     inputSchema: { type: "object" },
-    execute() { return { ok: true }; },
+    execute() {
+      return { ok: true };
+    },
   };
-  const rateLimitEvents = await runTurn(
-    rateLimitTool,
-    { serverExecution: { rateLimit: { maxCalls: 0, windowMs: 60_000 } } }
-  );
+  const rateLimitEvents = await runTurn(rateLimitTool, {
+    serverExecution: { rateLimit: { maxCalls: 0, windowMs: 60_000 } },
+  });
   const rateLimitToolResult = findEvent(rateLimitEvents, "tool.result") as
     | { isError?: boolean; output?: Record<string, unknown> }
     | undefined;
@@ -354,7 +364,9 @@ export async function runTuvrenServerBindingClassification(): Promise<AdapterPro
     name: "ax006-mcp-tool",
     description: "mcp tool",
     inputSchema: { type: "object" },
-    execute() { return {}; },
+    execute() {
+      return {};
+    },
     metadata: { mcp: { serverName: "ax006-server" } },
   };
   const mcpBinding = resolver.resolveFromToolDefinition(mcpTool);
@@ -364,7 +376,9 @@ export async function runTuvrenServerBindingClassification(): Promise<AdapterPro
     name: "ax006-sandbox-tool",
     description: "sandbox tool",
     inputSchema: { type: "object" },
-    execute() { return {}; },
+    execute() {
+      return {};
+    },
     metadata: { sandbox: { endpointId: "ax006-sandbox" } },
   };
   const sandboxBinding = resolver.resolveFromToolDefinition(sandboxTool);
@@ -437,7 +451,9 @@ export async function runTuvrenServerCancellation(): Promise<AdapterProjection> 
     if (!context.messages.some((m) => m.role === "tool")) {
       return {
         messages: [
-          assistantToolCalls([{ callId: "ax-cancel-1", input: {}, name: TOOL_NAME }]),
+          assistantToolCalls([
+            { callId: "ax-cancel-1", input: {}, name: TOOL_NAME },
+          ]),
         ],
         resolution: { type: "continue_iteration" as const },
         toolExecutionMode: "parallel" as const,
@@ -496,7 +512,9 @@ export async function runTuvrenServerCancellation(): Promise<AdapterProjection> 
   );
   const lateResultPresent = toolMessages.some((m) => {
     const parts = (m as Record<string, unknown>).parts;
-    if (!Array.isArray(parts)) return false;
+    if (!Array.isArray(parts)) {
+      return false;
+    }
     return parts.some((p) => {
       const output = (p as Record<string, unknown>).output;
       return (
@@ -539,7 +557,11 @@ export async function runTuvrenServerTenantIsolation(): Promise<AdapterProjectio
         return {
           messages: [
             assistantToolCalls([
-              { callId: `ax-iso-${toolMessages.length}`, input: {}, name: TOOL_NAME },
+              {
+                callId: `ax-iso-${toolMessages.length}`,
+                input: {},
+                name: TOOL_NAME,
+              },
             ]),
           ],
           resolution: { type: "continue_iteration" as const },
@@ -562,7 +584,9 @@ export async function runTuvrenServerTenantIsolation(): Promise<AdapterProjectio
       name: TOOL_NAME,
       description: "isolation tool",
       inputSchema: { type: "object" },
-      execute() { return { ok: true }; },
+      execute() {
+        return { ok: true };
+      },
     };
     const thread = await runtime.createThread({});
     const handle = runtime.executeTurn({
@@ -583,7 +607,8 @@ export async function runTuvrenServerTenantIsolation(): Promise<AdapterProjectio
   const limitedInA = toolResultsA.some(
     (r) =>
       r.isError === true &&
-      (r.output as Record<string, unknown>)?.code === "tool_invocation_rate_limited"
+      (r.output as Record<string, unknown>)?.code ===
+        "tool_invocation_rate_limited"
   );
   const successInA = toolResultsA.some((r) => !r.isError);
 
@@ -592,7 +617,8 @@ export async function runTuvrenServerTenantIsolation(): Promise<AdapterProjectio
   const limitedInB = toolResultsB.some(
     (r) =>
       r.isError === true &&
-      (r.output as Record<string, unknown>)?.code === "tool_invocation_rate_limited"
+      (r.output as Record<string, unknown>)?.code ===
+        "tool_invocation_rate_limited"
   );
   const successInB = toolResultsB.some((r) => !r.isError);
 

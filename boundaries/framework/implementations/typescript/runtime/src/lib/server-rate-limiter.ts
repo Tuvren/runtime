@@ -36,11 +36,13 @@ export interface ServerRateLimitConfig {
 class FixedWindowRateLimiter implements ServerRateLimiter {
   private callCount = 0;
   private windowStart = 0;
+  private readonly maxCalls: number;
+  private readonly windowMs: number;
 
-  constructor(
-    private readonly maxCalls: number,
-    private readonly windowMs: number
-  ) {}
+  constructor(maxCalls: number, windowMs: number) {
+    this.maxCalls = maxCalls;
+    this.windowMs = windowMs;
+  }
 
   tryAcquire(now = Date.now()): boolean {
     if (now - this.windowStart >= this.windowMs) {

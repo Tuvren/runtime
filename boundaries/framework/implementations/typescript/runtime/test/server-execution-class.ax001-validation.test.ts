@@ -99,10 +99,7 @@ function makeDriverWithInput(toolName: string, input: unknown): RuntimeDriver {
   };
 }
 
-async function runWithTool(
-  tool: TuvrenToolDefinition,
-  driver: RuntimeDriver
-) {
+async function runWithTool(tool: TuvrenToolDefinition, driver: RuntimeDriver) {
   const harness = createFakeKernelHarness();
   const runtime = createTuvrenRuntime({
     defaultDriverId: driver.id,
@@ -141,7 +138,9 @@ describe("KRT-AX001 — input validation", () => {
       name: toolName,
       description: "tool with strict input schema",
       inputSchema: STRICT_INPUT_SCHEMA,
-      execute() { return { result: 0 }; },
+      execute() {
+        return { result: 0 };
+      },
     };
     const driver = makeDriverWithInput(toolName, { wrongField: "bad" });
     const events = await runWithTool(tool, driver);
@@ -156,7 +155,9 @@ describe("KRT-AX001 — input validation", () => {
       name: toolName,
       description: "tool with strict input schema",
       inputSchema: STRICT_INPUT_SCHEMA,
-      execute() { return { result: 0 }; },
+      execute() {
+        return { result: 0 };
+      },
     };
     const driver = makeDriverWithInput(toolName, { wrongField: "bad" });
     const events = await runWithTool(tool, driver);

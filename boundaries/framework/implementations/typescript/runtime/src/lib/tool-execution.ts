@@ -40,12 +40,12 @@ import type {
   TuvrenToolDefinition,
 } from "@tuvren/core/tools";
 import { createBindingResolver } from "./binding-resolver.js";
-import type { ServerRateLimiter } from "./server-rate-limiter.js";
 import { runWithTimeout } from "./execution-timeouts.js";
 import {
   buildSharedExports,
   type ExtensionStateUpdate,
 } from "./extension-runtime.js";
+import type { ServerRateLimiter } from "./server-rate-limiter.js";
 import {
   applyApprovalDecisionMetadata,
   composeAbortSignals,
@@ -97,6 +97,14 @@ export interface ToolBatchEnvironment {
   publishCustom(event: { data: unknown; name: string }): void;
   publishEvent(event: TuvrenStreamEvent): void;
   reportSoftError(error: Error): void;
+  /**
+   * Optional sandbox executor registry keyed by endpoint id. When a tool
+   * declares metadata.sandbox.endpointId, the gateway looks up the executor
+   * here and calls it instead of tool.execute. (AX004)
+   */
+  resolveSandboxExecutor?(
+    endpointId: string
+  ): TuvrenSandboxExecutor | undefined;
   runId: string;
   /**
    * Optional per-tenant rate limiter for the Tuvren-server execution class.
@@ -105,12 +113,6 @@ export interface ToolBatchEnvironment {
    */
   serverExecutionRateLimiter?: ServerRateLimiter;
   signal?: AbortSignal;
-  /**
-   * Optional sandbox executor registry keyed by endpoint id. When a tool
-   * declares metadata.sandbox.endpointId, the gateway looks up the executor
-   * here and calls it instead of tool.execute. (AX004)
-   */
-  resolveSandboxExecutor?(endpointId: string): TuvrenSandboxExecutor | undefined;
   stageResult(result: ToolResultPart, orderIndex: number): Promise<HashString>;
   threadId: string;
   toolRegistry: ToolRegistry;
@@ -457,9 +459,15 @@ async function resolveExecutableToolCall(
 
   const validation = validateToolInput(tool, toolCall.input);
 
-  emitToolAuditEvent(environment, toolCall.callId, toolCall.name, "input_validated", {
-    validationPassed: validation.valid,
-  });
+  emitToolAuditEvent(
+    environment,
+    toolCall.callId,
+    toolCall.name,
+    "input_validated",
+    {
+      validationPassed: validation.valid,
+    }
+  );
 
   if (!validation.valid) {
     return {
@@ -505,7 +513,12 @@ async function resolveExecutableToolCall(
     environment.serverExecutionRateLimiter !== undefined &&
     !environment.serverExecutionRateLimiter.tryAcquire()
   ) {
-    emitToolAuditEvent(environment, toolCall.callId, toolCall.name, "rate_limited");
+    emitToolAuditEvent(
+      environment,
+      toolCall.callId,
+      toolCall.name,
+      "rate_limited"
+    );
     return {
       result: createValidationErrorToolResult(
         toolCall,
@@ -722,9 +735,7 @@ async function executeSingleTool(
   // Idempotent retry per §4.21 / AX002. Non-idempotent tools are never
   // retried. maxRetries defaults to 1 when idempotent is true and unset.
   const maxAttempts =
-    toolCall.tool.idempotent === true
-      ? 1 + (toolCall.tool.maxRetries ?? 1)
-      : 1;
+    toolCall.tool.idempotent === true ? 1 + (toolCall.tool.maxRetries ?? 1) : 1;
 
   let lastError: unknown;
 
@@ -933,6 +944,62 @@ async function executeToolCallWave(
   return successfulOutcomes;
 }
 
+type OutputValidationResult =
+  | { ok: true; resolved: unknown }
+  | { ok: false; outcome: RawSingleToolOutcome };
+
+function applyOutputValidation(
+  toolCall: ExecutableToolCall,
+  output: unknown,
+  environment: ToolBatchEnvironment
+): OutputValidationResult {
+  if (toolCall.tool.outputSchema === undefined) {
+    return { ok: true, resolved: output };
+  }
+  const isDirectResult = isDirectToolResult(output, toolCall);
+  const isErrorResult =
+    isDirectResult && (output as ToolResultPart).isError === true;
+  if (isErrorResult) {
+    return { ok: true, resolved: output };
+  }
+  const valueToValidate = isDirectResult
+    ? (output as ToolResultPart).output
+    : output;
+  const outputValidation = validateToolOutput(
+    toolCall.tool.outputSchema,
+    valueToValidate
+  );
+  emitToolAuditEvent(
+    environment,
+    toolCall.toolCall.callId,
+    toolCall.tool.name,
+    "output_validated",
+    {
+      validationPassed: outputValidation.valid,
+    }
+  );
+  if (!outputValidation.valid) {
+    return {
+      ok: false,
+      outcome: {
+        result: createValidationErrorToolResult(
+          toolCall.toolCall,
+          TOOL_RESULT_VALIDATION_FAILED,
+          "Tool output failed validation.",
+          outputValidation.details
+        ),
+        updates: [],
+      },
+    };
+  }
+  // Forward the (potentially coerced) validated value, mirroring the
+  // input path which uses validation.value at resolveExecutableToolCall.
+  const resolved = isDirectResult
+    ? { ...(output as ToolResultPart), output: outputValidation.value }
+    : outputValidation.value;
+  return { ok: true, resolved };
+}
+
 async function runAroundToolHandlers(
   handlers: Array<{
     extensionName: string;
@@ -966,14 +1033,13 @@ async function runAroundToolHandlers(
     // Sandbox tools (endpoint.kind === "tuvren-sandbox") use the registered
     // sandbox executor instead of tool.execute. (AX004)
     const executeFunction =
-      toolCall.sandboxExecutor !== undefined
-        ? (input: unknown) =>
+      toolCall.sandboxExecutor === undefined
+        ? (input: unknown) => toolCall.tool.execute(input, executionContext)
+        : (input: unknown) =>
             (toolCall.sandboxExecutor as TuvrenSandboxExecutor).execute(
               input,
               executionContext
-            )
-        : (input: unknown) =>
-            toolCall.tool.execute(input, executionContext);
+            );
 
     try {
       output = await runWithTimeout(
@@ -996,49 +1062,13 @@ async function runAroundToolHandlers(
 
     await startPromise;
 
-    // Output validation for tuvren-server class per §4.21 / AX001.
-    // Direct error results from the tool bypass validation; only successful
-    // outputs are checked against the declared outputSchema.
-    // resolvedOutput may be replaced with the coerced value from the validator
-    // (CustomSchema validators can return a transformed result.value).
-    let resolvedOutput: unknown = output;
-    if (toolCall.tool.outputSchema !== undefined) {
-      const isDirectResult = isDirectToolResult(output, toolCall);
-      const isErrorResult =
-        isDirectResult && (output as ToolResultPart).isError === true;
-      if (!isErrorResult) {
-        const valueToValidate = isDirectResult
-          ? (output as ToolResultPart).output
-          : output;
-        const outputValidation = validateToolOutput(
-          toolCall.tool.outputSchema,
-          valueToValidate
-        );
-        emitToolAuditEvent(
-          environment,
-          toolCall.toolCall.callId,
-          toolCall.tool.name,
-          "output_validated",
-          { validationPassed: outputValidation.valid }
-        );
-        if (!outputValidation.valid) {
-          return {
-            result: createValidationErrorToolResult(
-              toolCall.toolCall,
-              TOOL_RESULT_VALIDATION_FAILED,
-              "Tool output failed validation.",
-              outputValidation.details
-            ),
-            updates: [],
-          };
-        }
-        // Forward the (potentially coerced) validated value, mirroring the
-        // input path which uses validation.value at resolveExecutableToolCall.
-        resolvedOutput = isDirectResult
-          ? { ...(output as ToolResultPart), output: outputValidation.value }
-          : outputValidation.value;
-      }
+    // Output validation per §4.21 / AX001. Extracted to applyOutputValidation
+    // to keep runAroundToolHandlers below the cognitive-complexity threshold.
+    const validation = applyOutputValidation(toolCall, output, environment);
+    if (!validation.ok) {
+      return validation.outcome;
     }
+    const resolvedOutput = validation.resolved;
 
     if (isDirectToolResult(resolvedOutput, toolCall)) {
       return {

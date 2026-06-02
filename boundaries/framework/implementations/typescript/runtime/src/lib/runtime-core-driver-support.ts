@@ -29,9 +29,7 @@ import type { HeadState, LoopState } from "./runtime-core-loop.js";
 import { formatToolResultTaskId } from "./runtime-core-response.js";
 import { normalizeError } from "./runtime-core-shared.js";
 import type { RuntimeExecutionHandle } from "./runtime-execution-handle.js";
-import {
-  createServerRateLimiter,
-} from "./server-rate-limiter.js";
+import { createServerRateLimiter } from "./server-rate-limiter.js";
 import type { ToolBatchEnvironment } from "./tool-execution.js";
 
 export interface RuntimeCoreDriverSupportHost {
@@ -95,8 +93,12 @@ export function createToolBatchEnvironment(
   // for the turn's lifetime and is not re-evaluated on agent handoff. See the
   // ServerExecutionConfig.rateLimit doc for multi-agent handoff semantics.
   const rateLimitConfig = loopState.activeConfig.serverExecution?.rateLimit;
-  if (rateLimitConfig !== undefined && loopState.serverExecutionRateLimiter === undefined) {
-    loopState.serverExecutionRateLimiter = createServerRateLimiter(rateLimitConfig);
+  if (
+    rateLimitConfig !== undefined &&
+    loopState.serverExecutionRateLimiter === undefined
+  ) {
+    loopState.serverExecutionRateLimiter =
+      createServerRateLimiter(rateLimitConfig);
   }
 
   return {
@@ -123,8 +125,9 @@ export function createToolBatchEnvironment(
     },
     runId,
     resolveSandboxExecutor:
-      loopState.activeConfig.sandboxExecutors !== undefined
-        ? (endpointId: string) => {
+      loopState.activeConfig.sandboxExecutors === undefined
+        ? undefined
+        : (endpointId: string) => {
             // binding-resolver prefixes the id: "sandbox:<rawId>" — strip the
             // prefix so AgentConfig.sandboxExecutors is keyed by the raw
             // endpointId declared in metadata.sandbox.endpointId. (AX004)
@@ -134,8 +137,7 @@ export function createToolBatchEnvironment(
             return loopState.activeConfig.sandboxExecutors?.get(rawId) as
               | import("@tuvren/core/capabilities").TuvrenSandboxExecutor
               | undefined;
-          }
-        : undefined,
+          },
     serverExecutionRateLimiter: loopState.serverExecutionRateLimiter,
     signal: handle.abortSignal,
     stageResult: async (result, orderIndex) => {

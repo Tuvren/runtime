@@ -47,7 +47,10 @@ import {
 // Helpers
 // ---------------------------------------------------------------------------
 
-function makeMultiCallDriver(toolName: string, callCount: number): RuntimeDriver {
+function makeMultiCallDriver(
+  toolName: string,
+  callCount: number
+): RuntimeDriver {
   return {
     id: "ax003-driver",
     async execute(context) {
@@ -240,7 +243,8 @@ describe("KRT-AX003 — tenant isolation", () => {
     const limited1 = results1.find(
       (r) =>
         r.isError === true &&
-        (r.output as Record<string, unknown>)?.code === TOOL_INVOCATION_RATE_LIMITED
+        (r.output as Record<string, unknown>)?.code ===
+          TOOL_INVOCATION_RATE_LIMITED
     );
     expect(limited1).toBeDefined();
 
@@ -249,7 +253,8 @@ describe("KRT-AX003 — tenant isolation", () => {
     expect(success2).toBeDefined();
     const anyLimited2 = results2.find(
       (r) =>
-        (r.output as Record<string, unknown>)?.code === TOOL_INVOCATION_RATE_LIMITED
+        (r.output as Record<string, unknown>)?.code ===
+        TOOL_INVOCATION_RATE_LIMITED
     );
     expect(anyLimited2).toBeUndefined();
   });

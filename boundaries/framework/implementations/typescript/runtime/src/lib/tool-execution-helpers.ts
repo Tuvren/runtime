@@ -336,7 +336,10 @@ export function validateToolOutput(
     try {
       result = schema.validate(output);
     } catch (error: unknown) {
-      return { details: { error: normalizeError(error).message }, valid: false };
+      return {
+        details: { error: normalizeError(error).message },
+        valid: false,
+      };
     }
 
     return result.valid
@@ -509,7 +512,9 @@ export function createValidationErrorToolResult(
     name: toolCall.name,
     output: {
       code,
-      ...(details === undefined ? { error: message } : { details, error: message }),
+      ...(details === undefined
+        ? { error: message }
+        : { details, error: message }),
       ...(approval === undefined ? {} : { approval }),
     },
     type: "tool_result",

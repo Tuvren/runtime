@@ -32,8 +32,8 @@ import type { RuntimeDriver } from "@tuvren/core/driver";
 import type { TuvrenToolDefinition } from "@tuvren/core/tools";
 import {
   createDriverRegistry as createBaseDriverRegistry,
-  createTuvrenRuntime,
   createBindingResolver,
+  createTuvrenRuntime,
 } from "../src/index.ts";
 import { observationForClass } from "../src/lib/capability-attribution.ts";
 import { createFakeKernelHarness } from "./fake-kernel.ts";
@@ -55,7 +55,9 @@ function makeDriver(toolName: string): RuntimeDriver {
       if (!context.messages.some((m) => m.role === "tool")) {
         return {
           messages: [
-            assistantToolCalls([{ callId: "call-ax004", input: {}, name: toolName }]),
+            assistantToolCalls([
+              { callId: "call-ax004", input: {}, name: toolName },
+            ]),
           ],
           resolution: { type: "continue_iteration" },
           toolExecutionMode: "parallel",
@@ -66,7 +68,9 @@ function makeDriver(toolName: string): RuntimeDriver {
         resolution: { reason: "done", type: "end_turn" },
       };
     },
-    async resume() { throw new Error("no"); },
+    async resume() {
+      throw new Error("no");
+    },
   };
 }
 
@@ -90,7 +94,9 @@ describe("KRT-AX004 — MCP binding classification", () => {
       name: "mcp.my-server.search",
       description: "MCP search tool",
       inputSchema: { type: "object" },
-      execute() { return {}; },
+      execute() {
+        return {};
+      },
       metadata: { mcp: { serverName: "my-server" } },
     };
 
@@ -120,7 +126,9 @@ describe("KRT-AX004 — MCP binding classification", () => {
       name: toolName,
       description: "mcp tool",
       inputSchema: { type: "object" },
-      execute() { return { found: true }; },
+      execute() {
+        return { found: true };
+      },
       metadata: { mcp: { serverName: "test-server" } },
     };
 
@@ -143,7 +151,9 @@ describe("KRT-AX004 — MCP binding classification", () => {
 
     expect(toolResult).toBeDefined();
     expect(toolResult?.isError).toBeFalsy();
-    const attribution = toolResult?.attribution as Record<string, unknown> | undefined;
+    const attribution = toolResult?.attribution as
+      | Record<string, unknown>
+      | undefined;
     expect(attribution?.executionClass).toBe("tuvren-server");
   });
 });
@@ -158,7 +168,9 @@ describe("KRT-AX004 — sandbox endpoint", () => {
       name: "code.execute",
       description: "sandbox code execution",
       inputSchema: { type: "object" },
-      execute() { return {}; },
+      execute() {
+        return {};
+      },
       metadata: { sandbox: { endpointId: "code-sandbox" } },
     };
 

@@ -40,7 +40,6 @@ import {
   assistantText,
   assistantToolCalls,
   collectEvents,
-  delay,
   extractToolMessages,
   textSignal,
   waitForAbort,
@@ -57,7 +56,9 @@ function makeDriver(toolName: string, input: unknown = {}): RuntimeDriver {
       if (!context.messages.some((m) => m.role === "tool")) {
         return {
           messages: [
-            assistantToolCalls([{ callId: "call-ax002", input, name: toolName }]),
+            assistantToolCalls([
+              { callId: "call-ax002", input, name: toolName },
+            ]),
           ],
           resolution: { type: "continue_iteration" },
           toolExecutionMode: "parallel",
@@ -177,7 +178,8 @@ describe("KRT-AX002 — idempotent retry", () => {
     let callCount = 0;
     const tool: TuvrenToolDefinition = {
       name: "ax002-non-idempotent-maxretries",
-      description: "non-idempotent tool with maxRetries set but idempotent false",
+      description:
+        "non-idempotent tool with maxRetries set but idempotent false",
       idempotent: false,
       maxRetries: 5,
       inputSchema: { type: "object" },
@@ -187,7 +189,7 @@ describe("KRT-AX002 — idempotent retry", () => {
       },
     };
 
-    const { events } = await runWithTool(tool);
+    await runWithTool(tool);
     expect(callCount).toBe(1);
   });
 

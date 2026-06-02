@@ -54,7 +54,9 @@ function makeDriver(toolName: string, input: unknown = {}): RuntimeDriver {
       if (!context.messages.some((m) => m.role === "tool")) {
         return {
           messages: [
-            assistantToolCalls([{ callId: "call-ax005", input, name: toolName }]),
+            assistantToolCalls([
+              { callId: "call-ax005", input, name: toolName },
+            ]),
           ],
           resolution: { type: "continue_iteration" },
           toolExecutionMode: "parallel",
@@ -65,11 +67,16 @@ function makeDriver(toolName: string, input: unknown = {}): RuntimeDriver {
         resolution: { reason: "done", type: "end_turn" },
       };
     },
-    async resume() { throw new Error("no"); },
+    async resume() {
+      throw new Error("no");
+    },
   };
 }
 
-async function runWithTool(tool: TuvrenToolDefinition, config: Record<string, unknown> = {}) {
+async function runWithTool(
+  tool: TuvrenToolDefinition,
+  config: Record<string, unknown> = {}
+) {
   const harness = createFakeKernelHarness();
   const driver = makeDriver(tool.name);
   const runtime = createTuvrenRuntime({
@@ -108,7 +115,9 @@ describe("KRT-AX005 — lifecycle audit signals", () => {
       name: toolName,
       description: "basic tool",
       inputSchema: { type: "object" },
-      execute() { return { ok: true }; },
+      execute() {
+        return { ok: true };
+      },
     };
 
     const events = await runWithTool(tool);
@@ -128,7 +137,9 @@ describe("KRT-AX005 — lifecycle audit signals", () => {
       name: "ax005-input-pass",
       description: "valid input",
       inputSchema: { type: "object" },
-      execute() { return {}; },
+      execute() {
+        return {};
+      },
     };
 
     const events = await runWithTool(tool);
@@ -148,7 +159,9 @@ describe("KRT-AX005 — lifecycle audit signals", () => {
         required: ["value"],
         additionalProperties: false,
       },
-      execute() { return {}; },
+      execute() {
+        return {};
+      },
     };
 
     const driver: RuntimeDriver = {
@@ -157,15 +170,26 @@ describe("KRT-AX005 — lifecycle audit signals", () => {
         if (!context.messages.some((m) => m.role === "tool")) {
           return {
             messages: [
-              assistantToolCalls([{ callId: "call-ax005", input: { bad: "field" }, name: tool.name }]),
+              assistantToolCalls([
+                {
+                  callId: "call-ax005",
+                  input: { bad: "field" },
+                  name: tool.name,
+                },
+              ]),
             ],
             resolution: { type: "continue_iteration" },
             toolExecutionMode: "parallel",
           };
         }
-        return { messages: [assistantText("done")], resolution: { reason: "done", type: "end_turn" } };
+        return {
+          messages: [assistantText("done")],
+          resolution: { reason: "done", type: "end_turn" },
+        };
       },
-      async resume() { throw new Error("no"); },
+      async resume() {
+        throw new Error("no");
+      },
     };
 
     const harness = createFakeKernelHarness();
@@ -199,7 +223,9 @@ describe("KRT-AX005 — lifecycle audit signals", () => {
         required: ["count"],
         additionalProperties: false,
       },
-      execute() { return { count: 3 }; },
+      execute() {
+        return { count: 3 };
+      },
     };
 
     const events = await runWithTool(tool);
@@ -220,7 +246,9 @@ describe("KRT-AX005 — lifecycle audit signals", () => {
       inputSchema: { type: "object" },
       execute() {
         callCount += 1;
-        if (callCount === 1) throw new Error("transient");
+        if (callCount === 1) {
+          throw new Error("transient");
+        }
         return { ok: true };
       },
     };
@@ -240,7 +268,9 @@ describe("KRT-AX005 — lifecycle audit signals", () => {
       name: toolName,
       description: "rate limited tool",
       inputSchema: { type: "object" },
-      execute() { return { ok: true }; },
+      execute() {
+        return { ok: true };
+      },
     };
 
     const driver: RuntimeDriver = {
@@ -249,14 +279,27 @@ describe("KRT-AX005 — lifecycle audit signals", () => {
         const toolMessages = context.messages.filter((m) => m.role === "tool");
         if (toolMessages.length < 2) {
           return {
-            messages: [assistantToolCalls([{ callId: `call-${toolMessages.length}`, input: {}, name: toolName }])],
+            messages: [
+              assistantToolCalls([
+                {
+                  callId: `call-${toolMessages.length}`,
+                  input: {},
+                  name: toolName,
+                },
+              ]),
+            ],
             resolution: { type: "continue_iteration" },
             toolExecutionMode: "parallel",
           };
         }
-        return { messages: [assistantText("done")], resolution: { reason: "done", type: "end_turn" } };
+        return {
+          messages: [assistantText("done")],
+          resolution: { reason: "done", type: "end_turn" },
+        };
       },
-      async resume() { throw new Error("no"); },
+      async resume() {
+        throw new Error("no");
+      },
     };
 
     const runtime = createTuvrenRuntime({
@@ -293,8 +336,13 @@ describe("KRT-AX005 — no secrets in audit signals", () => {
       name: "ax005-no-secrets",
       description: "tool with sensitive metadata",
       inputSchema: { type: "object" },
-      metadata: { apiKey: "secret-key-12345", endpoint: "https://internal.api" },
-      execute() { return { password: "should-not-appear" }; },
+      metadata: {
+        apiKey: "secret-key-12345",
+        endpoint: "https://internal.api",
+      },
+      execute() {
+        return { password: "should-not-appear" };
+      },
     };
 
     const events = await runWithTool(tool);
