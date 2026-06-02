@@ -89,8 +89,11 @@ export function createToolBatchEnvironment(
   iterationCount: number,
   runId: string
 ): ToolBatchEnvironment {
-  // Create the rate limiter once per run (lazily on first iteration) and
+  // Create the rate limiter once per turn (lazily on first iteration) and
   // cache it on loopState so the same budget applies across all iterations.
+  // Intentional scoping: the limiter is fixed to the initiating agent's config
+  // for the turn's lifetime and is not re-evaluated on agent handoff. See the
+  // ServerExecutionConfig.rateLimit doc for multi-agent handoff semantics.
   const rateLimitConfig = loopState.activeConfig.serverExecution?.rateLimit;
   if (rateLimitConfig !== undefined && loopState.serverExecutionRateLimiter === undefined) {
     loopState.serverExecutionRateLimiter = createServerRateLimiter(rateLimitConfig);

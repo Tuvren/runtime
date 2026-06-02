@@ -808,7 +808,9 @@ export interface TuvrenExtension {
 export interface ServerExecutionRateLimitConfig {
   /**
    * Maximum invocations allowed within windowMs.
-   * Must be a positive integer; zero immediately rejects all calls.
+   * Must be a non-negative integer; zero immediately rejects all calls.
+   * This value is trusted and not runtime-validated — a negative value would
+   * behave as an unbounded budget due to the callCount >= maxCalls comparison.
    *
    * Note: an idempotent tool retry consumes exactly one budget slot for the
    * entire invocation regardless of how many retry attempts occur, because the
@@ -837,6 +839,13 @@ export interface ServerExecutionConfig {
    * with a typed tool_invocation_rate_limited result rather than executed.
    * Scope: one executeTurn call — the budget resets between turns.
    * Tenant isolation: each runtime instance has an independent budget. (AX003)
+   *
+   * Multi-agent handoff note: the rate limiter is created once per turn from
+   * the initiating agent's serverExecution config and cached for the turn's
+   * lifetime. If the active agent changes via handoff, the cached limiter is
+   * not updated — the budget follows the turn's first agent regardless of
+   * subsequent handoffs. Configure rate limits on the entry-point agent when
+   * applying per-turn caps in multi-agent flows.
    */
   rateLimit?: ServerExecutionRateLimitConfig;
 }

@@ -528,8 +528,6 @@ async function resolveExecutableToolCall(
     sandboxExecutor = environment.resolveSandboxExecutor(binding.endpoint.id);
   }
 
-
-
   const toolContext = createToolExecutionContext(
     toolCall,
     tool,
