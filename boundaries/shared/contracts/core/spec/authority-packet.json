@@ -89,6 +89,10 @@
     {
       "path": "boundaries/framework/conformance/plans/framework-operational-telemetry.json",
       "format": "conformance-plan"
+    },
+    {
+      "path": "boundaries/framework/conformance/plans/tuvren-server-execution-class.json",
+      "format": "conformance-plan"
     }
   ],
   "generatedArtifacts": [

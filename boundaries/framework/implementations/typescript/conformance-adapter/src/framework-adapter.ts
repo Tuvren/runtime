@@ -38,6 +38,10 @@ import {
   runCapabilityOrchestrationFoundation,
   runCapabilityOrchestrationPolicyDecisions,
 } from "./framework-adapter-capability-orchestration.ts";
+import {
+  runTuvrenServerBindingClassification,
+  runTuvrenServerLifecycle,
+} from "./framework-adapter-tuvren-server-execution-class.ts";
 import { createFrameworkAdapterDriver } from "./framework-adapter-driver.ts";
 import { createFrameworkAdapterEventStream } from "./framework-adapter-event-stream.ts";
 import { createFrameworkAdapterEventStreamSse } from "./framework-adapter-event-stream-sse.ts";
@@ -371,6 +375,10 @@ export class TypeScriptFrameworkAdapter implements ImplementationAdapter {
         );
       case "runtime.capability-orchestration.policy-decisions":
         return runCapabilityOrchestrationPolicyDecisions();
+      case "runtime.tuvren-server.lifecycle":
+        return runTuvrenServerLifecycle();
+      case "runtime.tuvren-server.binding-classification":
+        return runTuvrenServerBindingClassification();
       default:
         throw new Error(
           `unsupported promoted framework operation ${operation}`

@@ -3,6 +3,12 @@
     "operation": "runtime.capability-orchestration.foundation",
     "toolName": "conformance-tool"
   },
+  "tuvren-server-lifecycle": {
+    "operation": "runtime.tuvren-server.lifecycle"
+  },
+  "tuvren-server-binding-classification": {
+    "operation": "runtime.tuvren-server.binding-classification"
+  },
   "completed-turn": {
     "operation": "runtime.execute-turn"
   },
