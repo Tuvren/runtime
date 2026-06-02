@@ -219,6 +219,9 @@ export async function runTuvrenServerLifecycle(): Promise<AdapterProjection> {
   const outputToolResult = findEvent(outputEvents, "tool.result") as
     | { isError?: boolean; output?: Record<string, unknown> }
     | undefined;
+  const outputAuditEvent = findAllEvents(outputEvents, "tool.audit").find(
+    (e) => e.lifecycle === "output_validated"
+  ) as { lifecycle?: string; validationPassed?: boolean } | undefined;
 
   // --- 3. Within-contract execution ---
   const WITHIN_CONTRACT_TOOL = "ax006-within-contract";
@@ -306,6 +309,8 @@ export async function runTuvrenServerLifecycle(): Promise<AdapterProjection> {
       outputValidation: {
         resultIsError: outputToolResult?.isError,
         resultOutputCode: outputToolResult?.output?.code,
+        auditLifecycle: outputAuditEvent?.lifecycle,
+        auditValidationPassed: outputAuditEvent?.validationPassed,
       },
       withinContract: {
         toolExecuted: withinContractExecuted,

@@ -1001,6 +1001,9 @@ async function runAroundToolHandlers(
     // Output validation for tuvren-server class per §4.21 / AX001.
     // Direct error results from the tool bypass validation; only successful
     // outputs are checked against the declared outputSchema.
+    // resolvedOutput may be replaced with the coerced value from the validator
+    // (CustomSchema validators can return a transformed result.value).
+    let resolvedOutput: unknown = output;
     if (toolCall.tool.outputSchema !== undefined) {
       const isDirectResult = isDirectToolResult(output, toolCall);
       const isErrorResult =
@@ -1031,12 +1034,17 @@ async function runAroundToolHandlers(
             updates: [],
           };
         }
+        // Forward the (potentially coerced) validated value, mirroring the
+        // input path which uses validation.value at resolveExecutableToolCall.
+        resolvedOutput = isDirectResult
+          ? { ...(output as ToolResultPart), output: outputValidation.value }
+          : outputValidation.value;
       }
     }
 
-    if (isDirectToolResult(output, toolCall)) {
+    if (isDirectToolResult(resolvedOutput, toolCall)) {
       return {
-        result: output,
+        result: resolvedOutput as ToolResultPart,
         updates: [],
       };
     }
@@ -1045,7 +1053,7 @@ async function runAroundToolHandlers(
       result: {
         callId: toolCall.toolCall.callId,
         name: toolCall.tool.name,
-        output,
+        output: resolvedOutput,
         type: "tool_result",
       },
       updates: [],

@@ -464,8 +464,9 @@ export interface ToolResultEvent {
  * that could contain secret material. (AX005)
  */
 export interface ToolAuditEvent {
-  /** Stable tool name; used as the capability id for tuvren-server bindings. */
+  /** Unique call identifier matching the tool_call / tool_result pair. */
   callId: string;
+  /** Stable tool name; used as the capability id for tuvren-server bindings. */
   capabilityId: string;
   executionClass: ExecutionClass;
   /**
@@ -605,7 +606,12 @@ export interface TuvrenToolDefinition {
   approval?: ApprovalPolicy;
   description: string;
   execute: ExecuteFunction;
-  /** Whether the framework may retry this invocation on a retriable failure. (AX002) */
+  /**
+   * Whether the framework may retry this invocation on a retriable failure. (AX002)
+   * When true, the entire aroundTool extension chain re-executes on each attempt,
+   * not just the terminal tool.execute call. Extension authors should account for
+   * this when writing aroundTool handlers with side effects.
+   */
   idempotent?: boolean;
   inputSchema: TuvrenJsonSchema | CustomSchema;
   /** Maximum retry attempts when idempotent is true. Defaults to 1. (AX002) */
@@ -806,6 +812,11 @@ export interface ServerExecutionRateLimitConfig {
    * starts with a fresh budget. Use maxCalls to cap per-turn invocations;
    * windowMs controls the reset interval within that turn for long-running
    * turns with tool calls spread over time.
+   *
+   * Note: an approval pause/resume creates a new execution session internally;
+   * the budget does not persist across the pause boundary, so an approval-gated
+   * turn consumes a slot on the pre-pause segment and gets a fresh budget on
+   * the resumed segment.
    */
   windowMs: number;
 }

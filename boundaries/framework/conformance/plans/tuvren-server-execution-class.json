@@ -80,6 +80,28 @@
       "input": { "scenarioPath": "$.tuvren-server-lifecycle" }
     },
     {
+      "checkId": "ax.ax001.output-validated-audit-event-emitted",
+      "evidence": [
+        "result.tuvrenServer.outputValidation.auditLifecycle",
+        "result.tuvrenServer.outputValidation.auditValidationPassed"
+      ],
+      "assertions": [
+        {
+          "kind": "resultField",
+          "field": "$.tuvrenServer.outputValidation.auditLifecycle",
+          "equals": "output_validated"
+        },
+        {
+          "kind": "resultField",
+          "field": "$.tuvrenServer.outputValidation.auditValidationPassed",
+          "equals": false
+        }
+      ],
+      "operation": "runtime.tuvren-server.lifecycle",
+      "scenario": "runtime-api-scenarios",
+      "input": { "scenarioPath": "$.tuvren-server-lifecycle" }
+    },
+    {
       "checkId": "ax.ax001.output-validation-failure-carries-code",
       "evidence": [
         "result.tuvrenServer.outputValidation.resultOutputCode"
