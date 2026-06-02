@@ -627,6 +627,12 @@ export interface TuvrenToolDefinition {
    * An aroundTool extension that short-circuits by returning its own result
    * without calling next() bypasses outputSchema enforcement, since extensions
    * are trusted host-side code and output-validation runs in the terminal branch.
+   *
+   * Retry interaction: an output-validation failure is not retried even when
+   * idempotent is true. Output-contract violations are deterministic — retrying
+   * the same execute function against the same schema cannot produce a different
+   * structural result — so the framework surfaces the validation error immediately
+   * rather than consuming the retry budget.
    */
   outputSchema?: TuvrenJsonSchema | CustomSchema;
   timeout?: number;

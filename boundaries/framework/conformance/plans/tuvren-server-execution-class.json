@@ -11,9 +11,7 @@
   "checks": [
     {
       "checkId": "ax.ax001.input-validation-failure-surfaces-error",
-      "evidence": [
-        "result.tuvrenServer.inputValidation.resultIsError"
-      ],
+      "evidence": ["result.tuvrenServer.inputValidation.resultIsError"],
       "assertions": [
         {
           "kind": "resultField",
@@ -27,9 +25,7 @@
     },
     {
       "checkId": "ax.ax001.input-validation-failure-carries-code",
-      "evidence": [
-        "result.tuvrenServer.inputValidation.resultOutputCode"
-      ],
+      "evidence": ["result.tuvrenServer.inputValidation.resultOutputCode"],
       "assertions": [
         {
           "kind": "resultField",
@@ -65,9 +61,7 @@
     },
     {
       "checkId": "ax.ax001.output-validation-failure-surfaces-error",
-      "evidence": [
-        "result.tuvrenServer.outputValidation.resultIsError"
-      ],
+      "evidence": ["result.tuvrenServer.outputValidation.resultIsError"],
       "assertions": [
         {
           "kind": "resultField",
@@ -103,9 +97,7 @@
     },
     {
       "checkId": "ax.ax001.output-validation-failure-carries-code",
-      "evidence": [
-        "result.tuvrenServer.outputValidation.resultOutputCode"
-      ],
+      "evidence": ["result.tuvrenServer.outputValidation.resultOutputCode"],
       "assertions": [
         {
           "kind": "resultField",
@@ -119,9 +111,7 @@
     },
     {
       "checkId": "ax.ax001.within-contract-invocation-executes-normally",
-      "evidence": [
-        "result.tuvrenServer.withinContract.toolExecuted"
-      ],
+      "evidence": ["result.tuvrenServer.withinContract.toolExecuted"],
       "assertions": [
         {
           "kind": "resultField",
@@ -135,9 +125,7 @@
     },
     {
       "checkId": "ax.ax002.idempotent-retry-executes-multiple-times",
-      "evidence": [
-        "result.tuvrenServer.idempotentRetry.callCount"
-      ],
+      "evidence": ["result.tuvrenServer.idempotentRetry.callCount"],
       "assertions": [
         {
           "kind": "resultField",
@@ -173,9 +161,7 @@
     },
     {
       "checkId": "ax.ax002.non-idempotent-never-retried",
-      "evidence": [
-        "result.tuvrenServer.nonIdempotentNoRetry.callCount"
-      ],
+      "evidence": ["result.tuvrenServer.nonIdempotentNoRetry.callCount"],
       "assertions": [
         {
           "kind": "resultField",
@@ -211,9 +197,7 @@
     },
     {
       "checkId": "ax.ax003.rate-limited-emits-audit-event",
-      "evidence": [
-        "result.tuvrenServer.rateLimit.auditLifecycle"
-      ],
+      "evidence": ["result.tuvrenServer.rateLimit.auditLifecycle"],
       "assertions": [
         {
           "kind": "resultField",
