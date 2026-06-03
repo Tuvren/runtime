@@ -337,6 +337,19 @@ describe("ClientEndpointBoundary — staleness handling (KRT-AZ003)", () => {
     expect(result?.content).toEqual({ ok: true });
   });
 
+  test("a thrown endpoint rejection is caught and returned as an isError result", async () => {
+    const boundary = createClientEndpointBoundary([
+      makeEndpoint("ep1", ["search"], () =>
+        Promise.reject(new Error("network failure"))
+      ),
+    ]);
+    const result = await boundary.dispatch("search", "call-throw", {});
+    expect(result).not.toBeNull();
+    expect(result?.isError).toBe(true);
+    const content = result?.content as Record<string, unknown> | undefined;
+    expect(typeof content?.error).toBe("string");
+  });
+
   test("each dispatch generates a unique leaseToken so stale cross-call results are detected", async () => {
     const tokens: string[] = [];
     const boundary = createClientEndpointBoundary([

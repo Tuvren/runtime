@@ -754,8 +754,12 @@ async function executeSingleTool(
       break;
     }
 
-    // Emit a retry_attempt audit event for each attempt after the first. (AX005)
-    if (attempt > 0) {
+    // Emit a retry_attempt audit event for each attempt after the first.
+    // Guard for tuvren-client tools: canAudit is false for the class, and
+    // buildClientEndpointTools never sets idempotent, so maxAttempts is always
+    // 1 for client tools. The guard makes the canAudit:false invariant structural
+    // rather than incidental. (AX005, KRT-AZ005)
+    if (attempt > 0 && !isClientEndpointTool(toolCall.tool)) {
       emitToolAuditEvent(
         environment,
         toolCall.toolCall.callId,

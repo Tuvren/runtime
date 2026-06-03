@@ -126,12 +126,29 @@ class BasicClientEndpointBoundary implements ClientEndpointBoundary {
     this.leaseCounter += 1;
     const leaseToken = `${capabilityId}:${callId}:${this.leaseCounter}`;
 
-    const reported = await entry.endpoint.dispatch({
-      callId,
-      capabilityId,
-      input,
-      leaseToken,
-    });
+    let reported: import("@tuvren/core/capabilities").ClientReportedResult;
+    try {
+      reported = await entry.endpoint.dispatch({
+        callId,
+        capabilityId,
+        input,
+        leaseToken,
+      });
+    } catch (err) {
+      // Convert a thrown endpoint rejection into an isError result. Client
+      // endpoints should surface failures via ClientReportedResult{isError:true}
+      // but throwing is a realistic failure mode (network error, client crash).
+      // Catching here ensures the turn surfaces a typed tuvren-client error
+      // ToolResultPart rather than a generic execution-failure. (KRT-AZ002)
+      reported = {
+        callId,
+        content: {
+          error: err instanceof Error ? err.message : String(err),
+        },
+        isError: true,
+        leaseToken,
+      };
+    }
 
     // Stale-result guard: if the client echoes back the wrong token or callId
     // this result was produced for a previous invocation and must not mutate
