@@ -18,7 +18,9 @@
     "providers.framework-owned-approval-boundary",
     "providers.framework-owned-tool-execution",
     "providers.mcp-client",
-    "providers.rejects-native-strict-structured-output"
+    "providers.rejects-native-strict-structured-output",
+    "providers.provider-native-execution-class",
+    "providers.provider-mediated-execution-class"
   ],
   "authorityPackets": [
     "boundaries/providers/contracts/provider-api/spec/authority-packet.json",

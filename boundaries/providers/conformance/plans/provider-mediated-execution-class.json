@@ -1,0 +1,127 @@
+{
+  "planId": "tuvren.providers.provider-mediated-execution-class",
+  "planVersion": "0.1.0",
+  "packetId": "tuvren.providers.provider-api",
+  "applicability": {
+    "capabilities": ["providers.provider-mediated-execution-class"]
+  },
+  "checks": [
+    {
+      "checkId": "ay.ay007.mediated-attribution-owner",
+      "evidence": ["result.attribution.owner"],
+      "assertions": [
+        {
+          "kind": "resultField",
+          "field": "$.attribution.owner",
+          "equals": "provider"
+        }
+      ],
+      "operation": "providers.provider-mediated.attribution",
+      "capabilities": ["providers.provider-mediated-execution-class"]
+    },
+    {
+      "checkId": "ay.ay007.mediated-attribution-execution-class",
+      "evidence": ["result.attribution.executionClass"],
+      "assertions": [
+        {
+          "kind": "resultField",
+          "field": "$.attribution.executionClass",
+          "equals": "provider-mediated"
+        }
+      ],
+      "operation": "providers.provider-mediated.attribution",
+      "capabilities": ["providers.provider-mediated-execution-class"]
+    },
+    {
+      "checkId": "ay.ay007.mediated-observation-can-audit-false",
+      "evidence": ["result.attribution.observation.canAudit"],
+      "assertions": [
+        {
+          "kind": "resultField",
+          "field": "$.attribution.observation.canAudit",
+          "equals": false
+        }
+      ],
+      "operation": "providers.provider-mediated.attribution",
+      "capabilities": ["providers.provider-mediated-execution-class"]
+    },
+    {
+      "checkId": "ay.ay007.mediated-observation-can-cancel-false",
+      "evidence": ["result.attribution.observation.canCancel"],
+      "assertions": [
+        {
+          "kind": "resultField",
+          "field": "$.attribution.observation.canCancel",
+          "equals": false
+        }
+      ],
+      "operation": "providers.provider-mediated.attribution",
+      "capabilities": ["providers.provider-mediated-execution-class"]
+    },
+    {
+      "checkId": "ay.ay007.mediated-observation-can-retry-false",
+      "evidence": ["result.attribution.observation.canRetry"],
+      "assertions": [
+        {
+          "kind": "resultField",
+          "field": "$.attribution.observation.canRetry",
+          "equals": false
+        }
+      ],
+      "operation": "providers.provider-mediated.attribution",
+      "capabilities": ["providers.provider-mediated-execution-class"]
+    },
+    {
+      "checkId": "ay.ay007.mediated-observation-can-resume-false",
+      "evidence": ["result.attribution.observation.canResume"],
+      "assertions": [
+        {
+          "kind": "resultField",
+          "field": "$.attribution.observation.canResume",
+          "equals": false
+        }
+      ],
+      "operation": "providers.provider-mediated.attribution",
+      "capabilities": ["providers.provider-mediated-execution-class"]
+    },
+    {
+      "checkId": "ay.ay007.mediated-no-tool-audit-event",
+      "evidence": ["result.toolAuditEventCount"],
+      "assertions": [
+        {
+          "kind": "resultField",
+          "field": "$.toolAuditEventCount",
+          "equals": 0
+        }
+      ],
+      "operation": "providers.provider-mediated.attribution",
+      "capabilities": ["providers.provider-mediated-execution-class"]
+    },
+    {
+      "checkId": "ay.ay007.mediated-mcp-binding-classification",
+      "evidence": ["result.attribution.executionClass"],
+      "assertions": [
+        {
+          "kind": "resultField",
+          "field": "$.attribution.executionClass",
+          "equals": "provider-mediated"
+        }
+      ],
+      "operation": "providers.provider-mediated.attribution",
+      "capabilities": ["providers.provider-mediated-execution-class"]
+    },
+    {
+      "checkId": "ay.ay007.mediated-turn-completes",
+      "evidence": ["result.turnStatus"],
+      "assertions": [
+        {
+          "kind": "resultField",
+          "field": "$.turnStatus",
+          "equals": "completed"
+        }
+      ],
+      "operation": "providers.provider-mediated.attribution",
+      "capabilities": ["providers.provider-mediated-execution-class"]
+    }
+  ]
+}
