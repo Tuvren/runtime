@@ -1,0 +1,140 @@
+{
+  "planId": "tuvren.providers.provider-native-execution-class",
+  "planVersion": "0.1.0",
+  "packetId": "tuvren.providers.provider-api",
+  "applicability": {
+    "capabilities": ["providers.provider-native-execution-class"]
+  },
+  "checks": [
+    {
+      "checkId": "ay.ay007.native-attribution-owner",
+      "evidence": ["result.attribution.owner"],
+      "assertions": [
+        {
+          "kind": "resultField",
+          "field": "$.attribution.owner",
+          "equals": "provider"
+        }
+      ],
+      "operation": "providers.provider-native.attribution",
+      "capabilities": ["providers.provider-native-execution-class"]
+    },
+    {
+      "checkId": "ay.ay007.native-attribution-execution-class",
+      "evidence": ["result.attribution.executionClass"],
+      "assertions": [
+        {
+          "kind": "resultField",
+          "field": "$.attribution.executionClass",
+          "equals": "provider-native"
+        }
+      ],
+      "operation": "providers.provider-native.attribution",
+      "capabilities": ["providers.provider-native-execution-class"]
+    },
+    {
+      "checkId": "ay.ay007.native-observation-can-audit-false",
+      "evidence": ["result.attribution.observation.canAudit"],
+      "assertions": [
+        {
+          "kind": "resultField",
+          "field": "$.attribution.observation.canAudit",
+          "equals": false
+        }
+      ],
+      "operation": "providers.provider-native.attribution",
+      "capabilities": ["providers.provider-native-execution-class"]
+    },
+    {
+      "checkId": "ay.ay007.native-observation-can-cancel-false",
+      "evidence": ["result.attribution.observation.canCancel"],
+      "assertions": [
+        {
+          "kind": "resultField",
+          "field": "$.attribution.observation.canCancel",
+          "equals": false
+        }
+      ],
+      "operation": "providers.provider-native.attribution",
+      "capabilities": ["providers.provider-native-execution-class"]
+    },
+    {
+      "checkId": "ay.ay007.native-observation-can-retry-false",
+      "evidence": ["result.attribution.observation.canRetry"],
+      "assertions": [
+        {
+          "kind": "resultField",
+          "field": "$.attribution.observation.canRetry",
+          "equals": false
+        }
+      ],
+      "operation": "providers.provider-native.attribution",
+      "capabilities": ["providers.provider-native-execution-class"]
+    },
+    {
+      "checkId": "ay.ay007.native-observation-can-resume-false",
+      "evidence": ["result.attribution.observation.canResume"],
+      "assertions": [
+        {
+          "kind": "resultField",
+          "field": "$.attribution.observation.canResume",
+          "equals": false
+        }
+      ],
+      "operation": "providers.provider-native.attribution",
+      "capabilities": ["providers.provider-native-execution-class"]
+    },
+    {
+      "checkId": "ay.ay007.native-no-tool-audit-event",
+      "evidence": ["result.toolAuditEventCount"],
+      "assertions": [
+        {
+          "kind": "resultField",
+          "field": "$.toolAuditEventCount",
+          "equals": 0
+        }
+      ],
+      "operation": "providers.provider-native.attribution",
+      "capabilities": ["providers.provider-native-execution-class"]
+    },
+    {
+      "checkId": "ay.ay007.native-no-local-execution",
+      "evidence": ["result.localExecuteCalled"],
+      "assertions": [
+        {
+          "kind": "resultField",
+          "field": "$.localExecuteCalled",
+          "equals": false
+        }
+      ],
+      "operation": "providers.provider-native.attribution",
+      "capabilities": ["providers.provider-native-execution-class"]
+    },
+    {
+      "checkId": "ay.ay007.native-turn-completes",
+      "evidence": ["result.turnStatus"],
+      "assertions": [
+        {
+          "kind": "resultField",
+          "field": "$.turnStatus",
+          "equals": "completed"
+        }
+      ],
+      "operation": "providers.provider-native.attribution",
+      "capabilities": ["providers.provider-native-execution-class"]
+    },
+    {
+      "checkId": "ay.ay007.native-tool-start-owner",
+      "evidence": ["result.toolStartOwner"],
+      "assertions": [
+        {
+          "kind": "resultField",
+          "field": "$.toolStartOwner",
+          "equals": "provider"
+        }
+      ],
+      "operation": "providers.provider-native.attribution",
+      "capabilities": ["providers.provider-native-execution-class"]
+    }
+  ]
+}

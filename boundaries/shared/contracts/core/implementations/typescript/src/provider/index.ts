@@ -22,6 +22,9 @@ export {
   isTuvrenModelResponse,
 } from "../lib/runtime-contract-guards.js";
 export type {
+  ProviderMediatedToolConfig,
+  ProviderNativeInvocationRecord,
+  ProviderNativeToolDeclaration,
   ProviderStreamChunk,
   ProviderUsage,
   StructuredOutputRequest,

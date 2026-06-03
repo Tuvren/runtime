@@ -961,6 +961,7 @@ class RuntimeCore implements TuvrenRuntime {
           ),
         materializeDriver: (driverId) =>
           materializeRuntimeCoreDriver(this.options.driverRegistry, driverId),
+        now: () => this.now(),
         reconcileCheckpointedPauseResolution: (...args) =>
           reconcileRuntimeCoreCheckpointedPauseResolution(
             this.hosts.turnProgress,

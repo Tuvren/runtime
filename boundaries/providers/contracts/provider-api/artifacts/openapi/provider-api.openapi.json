@@ -138,6 +138,88 @@
         "minLength": 1,
         "pattern": ".*\\S.*"
       },
+      "ProviderMediatedToolConfig": {
+        "type": "object",
+        "required": ["name", "mediationType", "endpoint"],
+        "properties": {
+          "name": {
+            "$ref": "#/components/schemas/NonEmptyString"
+          },
+          "mediationType": {
+            "type": "string",
+            "enum": ["mcp"]
+          },
+          "endpoint": {
+            "$ref": "#/components/schemas/NonEmptyString"
+          },
+          "providerOptions": {
+            "$ref": "#/components/schemas/Metadata"
+          },
+          "capabilityId": {
+            "type": "string"
+          }
+        },
+        "unevaluatedProperties": {
+          "not": {}
+        }
+      },
+      "ProviderNativeInvocationRecord": {
+        "type": "object",
+        "required": [
+          "callId",
+          "name",
+          "result",
+          "executionClass",
+          "providerCallId"
+        ],
+        "properties": {
+          "callId": {
+            "$ref": "#/components/schemas/NonEmptyString"
+          },
+          "name": {
+            "$ref": "#/components/schemas/NonEmptyString"
+          },
+          "result": {},
+          "isError": {
+            "type": "boolean"
+          },
+          "executionClass": {
+            "type": "string",
+            "enum": ["provider-native", "provider-mediated"]
+          },
+          "providerCallId": {
+            "$ref": "#/components/schemas/NonEmptyString"
+          },
+          "providerMetadata": {
+            "$ref": "#/components/schemas/Metadata"
+          }
+        },
+        "unevaluatedProperties": {
+          "not": {}
+        },
+        "description": "Record of a single provider-native or provider-mediated tool invocation. (AY002/AY004)"
+      },
+      "ProviderNativeToolDeclaration": {
+        "type": "object",
+        "required": ["id", "name"],
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/NonEmptyString"
+          },
+          "name": {
+            "$ref": "#/components/schemas/NonEmptyString"
+          },
+          "args": {
+            "$ref": "#/components/schemas/Metadata"
+          },
+          "capabilityId": {
+            "type": "string"
+          }
+        },
+        "unevaluatedProperties": {
+          "not": {}
+        }
+      },
       "ProviderStreamChunk": {
         "anyOf": [
           {
@@ -165,12 +247,41 @@
             "$ref": "#/components/schemas/ToolCallDoneChunk"
           },
           {
+            "$ref": "#/components/schemas/ProviderToolResultChunk"
+          },
+          {
             "$ref": "#/components/schemas/FinishChunk"
           },
           {
             "$ref": "#/components/schemas/ErrorChunk"
           }
         ]
+      },
+      "ProviderToolResultChunk": {
+        "type": "object",
+        "required": ["type", "providerCallId", "name", "result"],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["provider_tool_result"]
+          },
+          "providerCallId": {
+            "$ref": "#/components/schemas/NonEmptyString"
+          },
+          "name": {
+            "$ref": "#/components/schemas/NonEmptyString"
+          },
+          "result": {},
+          "isError": {
+            "type": "boolean"
+          },
+          "providerMetadata": {
+            "$ref": "#/components/schemas/Metadata"
+          }
+        },
+        "unevaluatedProperties": {
+          "not": {}
+        }
       },
       "ProviderUsage": {
         "type": "object",
@@ -577,6 +688,12 @@
               "$ref": "#/components/schemas/ContentPart"
             }
           },
+          "providerToolResults": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProviderNativeInvocationRecord"
+            }
+          },
           "usage": {
             "$ref": "#/components/schemas/ProviderUsage"
           },
@@ -603,6 +720,21 @@
             "items": {
               "$ref": "#/components/schemas/RenderedToolDefinition"
             }
+          },
+          "providerNativeTools": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProviderNativeToolDeclaration"
+            }
+          },
+          "providerMediatedTools": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProviderMediatedToolConfig"
+            }
+          },
+          "providerContinuity": {
+            "$ref": "#/components/schemas/Metadata"
           },
           "config": {
             "$ref": "#/components/schemas/TuvrenModelConfig"

@@ -35,6 +35,10 @@ import {
   sanitizeMetadataValue,
   sanitizeRecord,
 } from "./ai-sdk-provider-bridge-utils.js";
+/** Lookup function that returns the execution class for a provider-owned tool name, or undefined if not declared. */
+export type ProviderToolClassLookup = (
+  toolName: string
+) => "provider-native" | "provider-mediated" | undefined;
 
 export interface GenerateResultHelpers {
   mapFinishReason(
@@ -63,6 +67,7 @@ export interface GenerateResultHelpers {
 
 interface GenerateResultState {
   parts: TuvrenModelResponse["parts"];
+  providerToolResults: NonNullable<TuvrenModelResponse["providerToolResults"]>;
   responseFormat?: StructuredOutputRequest;
   sources: unknown[];
   structuredChunks: string[];
@@ -72,10 +77,12 @@ interface GenerateResultState {
 export function mapGenerateResult(
   result: LanguageModelV3GenerateResult,
   responseFormat: StructuredOutputRequest | undefined,
-  helpers: GenerateResultHelpers
+  helpers: GenerateResultHelpers,
+  providerToolClassLookup?: ProviderToolClassLookup
 ): TuvrenModelResponse {
   const state: GenerateResultState = {
     parts: [],
+    providerToolResults: [],
     responseFormat,
     sources: [],
     structuredChunks: [],
@@ -83,7 +90,13 @@ export function mapGenerateResult(
   };
 
   for (const contentPart of result.content) {
-    appendGenerateContentPart(contentPart, state, result, helpers);
+    appendGenerateContentPart(
+      contentPart,
+      state,
+      result,
+      helpers,
+      providerToolClassLookup
+    );
   }
 
   finalizeGenerateStructuredOutput(state, result.finishReason.unified, helpers);
@@ -100,6 +113,9 @@ export function mapGenerateResult(
       hasToolCalls: state.parts.some((part) => part.type === "tool_call"),
     }),
     parts: state.parts,
+    ...(state.providerToolResults.length > 0
+      ? { providerToolResults: state.providerToolResults }
+      : {}),
     ...(providerMetadata === undefined
       ? {}
       : {
@@ -117,7 +133,8 @@ function appendGenerateContentPart(
   contentPart: LanguageModelV3GenerateResult["content"][number],
   state: GenerateResultState,
   result: LanguageModelV3GenerateResult,
-  _helpers: GenerateResultHelpers
+  _helpers: GenerateResultHelpers,
+  providerToolClassLookup?: ProviderToolClassLookup
 ): void {
   switch (contentPart.type) {
     case "text":
@@ -132,7 +149,16 @@ function appendGenerateContentPart(
     case "tool-call":
       state.parts.push(mapGeneratedToolCallPart(contentPart, result));
       return;
-    case "tool-result":
+    case "tool-result": {
+      if (providerToolClassLookup !== undefined) {
+        const executionClass = providerToolClassLookup(contentPart.toolName);
+        if (executionClass !== undefined) {
+          state.providerToolResults.push(
+            mapProviderNativeGenerateResult(contentPart, executionClass)
+          );
+          return;
+        }
+      }
       throw bridgeError(
         "provider-executed tool results are out of scope for the baseline AI SDK bridge",
         "unsupported_ai_sdk_content",
@@ -142,6 +168,7 @@ function appendGenerateContentPart(
           toolName: contentPart.toolName,
         }
       );
+    }
     case "tool-approval-request":
       throw bridgeError(
         "provider-executed tool approvals are out of scope for the baseline AI SDK bridge",
@@ -160,6 +187,26 @@ function appendGenerateContentPart(
         "unsupported_ai_sdk_content"
       );
   }
+}
+
+function mapProviderNativeGenerateResult(
+  contentPart: Extract<
+    LanguageModelV3GenerateResult["content"][number],
+    { type: "tool-result" }
+  >,
+  executionClass: "provider-native" | "provider-mediated"
+): NonNullable<TuvrenModelResponse["providerToolResults"]>[number] {
+  const callId = randomUUID();
+  const providerMetadata = sanitizeRecord(contentPart.providerMetadata);
+  return {
+    callId,
+    executionClass,
+    ...(contentPart.isError === true ? { isError: true } : {}),
+    name: contentPart.toolName,
+    providerCallId: contentPart.toolCallId,
+    ...(providerMetadata === undefined ? {} : { providerMetadata }),
+    result: sanitizeMetadataValue(contentPart.result) ?? null,
+  };
 }
 
 function appendGenerateTextPart(

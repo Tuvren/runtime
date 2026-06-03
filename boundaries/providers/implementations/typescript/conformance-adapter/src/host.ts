@@ -45,6 +45,8 @@ import { createMcpToolSource } from "../../mcp-client/src/index.ts";
 import type { MCPClient } from "../../mcp-client/src/lib/mcp-sdk-client.ts";
 import { createMcpToolSourceInternal } from "../../mcp-client/src/lib/mcp-tool-source.ts";
 import { providerConformanceFixtures } from "./provider-conformance-fixtures.ts";
+import { runProviderMediatedAttribution } from "./provider-mediated-execution-class.ts";
+import { runProviderNativeAttribution } from "./provider-native-execution-class.ts";
 
 class TypeScriptProviderAdapter {
   initialize(
@@ -60,6 +62,8 @@ class TypeScriptProviderAdapter {
         "providers.framework-owned-tool-execution",
         "providers.mcp-client",
         "providers.rejects-native-strict-structured-output",
+        "providers.provider-native-execution-class",
+        "providers.provider-mediated-execution-class",
       ],
       packetId,
       planVersion,
@@ -97,6 +101,10 @@ class TypeScriptProviderAdapter {
           return result(await mcpClientValidationErrors());
         case "providers.mcp-client.transport-error-normalization":
           return result(await mcpClientTransportErrorNormalization());
+        case "providers.provider-native.attribution":
+          return result(await runProviderNativeAttribution());
+        case "providers.provider-mediated.attribution":
+          return result(await runProviderMediatedAttribution());
         default:
           return {
             error: {

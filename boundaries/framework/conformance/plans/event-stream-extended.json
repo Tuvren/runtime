@@ -86,7 +86,7 @@
       "assertions": [
         {
           "equals": "turn.end",
-          "field": "$.events.23.event",
+          "field": "$.events.24.event",
           "kind": "resultField"
         }
       ],
@@ -303,7 +303,7 @@
     {
       "assertions": [
         {
-          "field": "$.events.14.payload.resumedFrom",
+          "field": "$.events.15.payload.resumedFrom",
           "kind": "resultField",
           "matches": "^[a-f0-9]{64}$"
         }
@@ -711,7 +711,7 @@
       "assertions": [
         {
           "equals": "tool.start",
-          "field": "$.events.9.event",
+          "field": "$.events.10.event",
           "kind": "resultField"
         }
       ],
@@ -726,7 +726,7 @@
       "assertions": [
         {
           "equals": "tool.result",
-          "field": "$.events.10.event",
+          "field": "$.events.11.event",
           "kind": "resultField"
         }
       ],
@@ -741,7 +741,7 @@
       "assertions": [
         {
           "equals": "state.checkpoint",
-          "field": "$.events.11.event",
+          "field": "$.events.12.event",
           "kind": "resultField"
         }
       ],
@@ -756,7 +756,7 @@
       "assertions": [
         {
           "equals": "state.snapshot",
-          "field": "$.events.12.event",
+          "field": "$.events.13.event",
           "kind": "resultField"
         }
       ],
@@ -771,7 +771,7 @@
       "assertions": [
         {
           "equals": "iteration.end",
-          "field": "$.events.13.event",
+          "field": "$.events.14.event",
           "kind": "resultField"
         }
       ],
@@ -786,7 +786,7 @@
       "assertions": [
         {
           "equals": "iteration.start",
-          "field": "$.events.14.event",
+          "field": "$.events.15.event",
           "kind": "resultField"
         }
       ],
@@ -801,7 +801,7 @@
       "assertions": [
         {
           "equals": "message.start",
-          "field": "$.events.15.event",
+          "field": "$.events.16.event",
           "kind": "resultField"
         }
       ],
@@ -816,7 +816,7 @@
       "assertions": [
         {
           "equals": "text.delta",
-          "field": "$.events.16.event",
+          "field": "$.events.17.event",
           "kind": "resultField"
         }
       ],
@@ -831,7 +831,7 @@
       "assertions": [
         {
           "equals": "text.done",
-          "field": "$.events.17.event",
+          "field": "$.events.18.event",
           "kind": "resultField"
         }
       ],
@@ -846,7 +846,7 @@
       "assertions": [
         {
           "equals": "message.done",
-          "field": "$.events.18.event",
+          "field": "$.events.19.event",
           "kind": "resultField"
         }
       ],
@@ -861,7 +861,7 @@
       "assertions": [
         {
           "equals": "state.checkpoint",
-          "field": "$.events.19.event",
+          "field": "$.events.20.event",
           "kind": "resultField"
         }
       ],
@@ -876,7 +876,7 @@
       "assertions": [
         {
           "equals": "state.snapshot",
-          "field": "$.events.20.event",
+          "field": "$.events.21.event",
           "kind": "resultField"
         }
       ],
@@ -891,7 +891,7 @@
       "assertions": [
         {
           "equals": "iteration.end",
-          "field": "$.events.21.event",
+          "field": "$.events.22.event",
           "kind": "resultField"
         }
       ],
@@ -906,7 +906,7 @@
       "assertions": [
         {
           "equals": "state.checkpoint",
-          "field": "$.events.22.event",
+          "field": "$.events.23.event",
           "kind": "resultField"
         }
       ],
@@ -921,7 +921,7 @@
       "assertions": [
         {
           "equals": "turn.end",
-          "field": "$.events.23.event",
+          "field": "$.events.24.event",
           "kind": "resultField"
         }
       ],
@@ -1071,7 +1071,7 @@
       "assertions": [
         {
           "equals": "TOOL_CALL_RESULT",
-          "field": "$.events.9.type",
+          "field": "$.events.10.type",
           "kind": "resultField"
         }
       ],
@@ -1086,7 +1086,7 @@
       "assertions": [
         {
           "equals": "CUSTOM",
-          "field": "$.events.10.type",
+          "field": "$.events.11.type",
           "kind": "resultField"
         }
       ],
@@ -1101,7 +1101,7 @@
       "assertions": [
         {
           "equals": "STATE_SNAPSHOT",
-          "field": "$.events.11.type",
+          "field": "$.events.12.type",
           "kind": "resultField"
         }
       ],
@@ -1116,7 +1116,7 @@
       "assertions": [
         {
           "equals": "STEP_FINISHED",
-          "field": "$.events.12.type",
+          "field": "$.events.13.type",
           "kind": "resultField"
         }
       ],
@@ -1131,7 +1131,7 @@
       "assertions": [
         {
           "equals": "STEP_STARTED",
-          "field": "$.events.13.type",
+          "field": "$.events.14.type",
           "kind": "resultField"
         }
       ],
@@ -1146,7 +1146,7 @@
       "assertions": [
         {
           "equals": "TEXT_MESSAGE_START",
-          "field": "$.events.14.type",
+          "field": "$.events.15.type",
           "kind": "resultField"
         }
       ],
@@ -1161,7 +1161,7 @@
       "assertions": [
         {
           "equals": "TEXT_MESSAGE_CONTENT",
-          "field": "$.events.15.type",
+          "field": "$.events.16.type",
           "kind": "resultField"
         }
       ],
@@ -1176,7 +1176,7 @@
       "assertions": [
         {
           "equals": "TEXT_MESSAGE_END",
-          "field": "$.events.16.type",
+          "field": "$.events.17.type",
           "kind": "resultField"
         }
       ],
@@ -1191,7 +1191,7 @@
       "assertions": [
         {
           "equals": "CUSTOM",
-          "field": "$.events.17.type",
+          "field": "$.events.18.type",
           "kind": "resultField"
         }
       ],
@@ -1206,7 +1206,7 @@
       "assertions": [
         {
           "equals": "CUSTOM",
-          "field": "$.events.18.type",
+          "field": "$.events.19.type",
           "kind": "resultField"
         }
       ],
@@ -1221,7 +1221,7 @@
       "assertions": [
         {
           "equals": "STATE_SNAPSHOT",
-          "field": "$.events.19.type",
+          "field": "$.events.20.type",
           "kind": "resultField"
         }
       ],
@@ -1236,7 +1236,7 @@
       "assertions": [
         {
           "equals": "STEP_FINISHED",
-          "field": "$.events.20.type",
+          "field": "$.events.21.type",
           "kind": "resultField"
         }
       ],
@@ -1251,7 +1251,7 @@
       "assertions": [
         {
           "equals": "CUSTOM",
-          "field": "$.events.21.type",
+          "field": "$.events.22.type",
           "kind": "resultField"
         }
       ],
@@ -1266,7 +1266,7 @@
       "assertions": [
         {
           "equals": "RUN_FINISHED",
-          "field": "$.events.22.type",
+          "field": "$.events.23.type",
           "kind": "resultField"
         }
       ],
@@ -1551,7 +1551,7 @@
       "assertions": [
         {
           "equals": "STATE_SNAPSHOT",
-          "field": "$.events.9.type",
+          "field": "$.events.10.type",
           "kind": "resultField"
         }
       ],
@@ -1566,7 +1566,7 @@
       "assertions": [
         {
           "equals": "STEP_FINISHED",
-          "field": "$.events.10.type",
+          "field": "$.events.11.type",
           "kind": "resultField"
         }
       ],
@@ -1581,7 +1581,7 @@
       "assertions": [
         {
           "equals": "CUSTOM",
-          "field": "$.events.11.type",
+          "field": "$.events.12.type",
           "kind": "resultField"
         }
       ],
@@ -1596,7 +1596,7 @@
       "assertions": [
         {
           "equals": "CUSTOM",
-          "field": "$.events.12.type",
+          "field": "$.events.13.type",
           "kind": "resultField"
         }
       ],
@@ -1611,7 +1611,7 @@
       "assertions": [
         {
           "equals": "RUN_FINISHED",
-          "field": "$.events.13.type",
+          "field": "$.events.14.type",
           "kind": "resultField"
         }
       ],

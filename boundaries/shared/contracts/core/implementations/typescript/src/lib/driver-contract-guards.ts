@@ -57,6 +57,8 @@ const AGENT_CONFIG_KEYS = new Set([
   "maxParallelToolCalls",
   "model",
   "name",
+  "providerMediatedTools",
+  "providerNativeTools",
   "responseFormat",
   "systemPrompt",
   "tools",
@@ -398,12 +400,21 @@ function assertDriverMessages(
     });
   }
 
+  let assistantCount = 0;
+
   for (const [index, message] of value.messages.entries()) {
     assertTuvrenMessage(message, `${label}.messages[${index}]`);
+    // Pre-staged provider tool messages (AY003) are allowed alongside the assistant
+    // message so the framework can stage provider results without dispatching them
+    // through the Tool Execution Gateway.
+    if (isPrestagedProviderToolMessage(message as TuvrenMessage)) {
+      continue;
+    }
     assertDriverMessage(message, `${label}.messages[${index}]`);
+    assistantCount++;
   }
 
-  if (value.messages.length > 1) {
+  if (assistantCount > 1) {
     throw new TuvrenValidationError(
       `${label}.messages must not contain more than one assistant message`,
       {
@@ -412,6 +423,23 @@ function assertDriverMessages(
       }
     );
   }
+}
+
+function isPrestagedProviderToolMessage(message: TuvrenMessage): boolean {
+  if (message.role !== "tool") {
+    return false;
+  }
+  return message.parts.every((part) => {
+    if (part.type !== "tool_result") {
+      return false;
+    }
+    const meta = part.providerMetadata;
+    return (
+      typeof meta === "object" &&
+      meta !== null &&
+      (meta as Record<string, unknown>).owner === "provider"
+    );
+  });
 }
 
 function assertDriverPartialResult(

@@ -15,6 +15,7 @@
  */
 
 import { type HashString, TuvrenRuntimeError } from "@tuvren/core";
+import type { CapabilityInvocationAttribution } from "@tuvren/core/capabilities";
 import type {
   DriverExecutionContext,
   DriverExecutionResult,
@@ -34,6 +35,7 @@ import type {
 } from "@tuvren/core/messages";
 import type { TuvrenModelResponse } from "@tuvren/core/provider";
 import type { ToolRegistry } from "@tuvren/core/tools";
+import { observationForClass } from "./capability-attribution.js";
 import { updateContextManifest } from "./context-manifest.js";
 import type { ExtensionStateUpdate } from "./extension-runtime.js";
 import { validateDriverAssistantEvents } from "./runtime-core-assistant-validation.js";
@@ -211,6 +213,7 @@ export interface RuntimeCoreIterationHost {
     events: TuvrenStreamEvent[]
   ): TuvrenStreamEvent[];
   materializeDriver(driverId: string): KrakenDriver;
+  now(): number;
   reconcileCheckpointedPauseResolution(
     checkpointedPause: boolean,
     runId: string,
@@ -361,6 +364,72 @@ export function extractToolCallsFromMessages(
   return calls;
 }
 
+/**
+ * Emit tool.start + tool.result events for pre-staged provider tool messages
+ * (AY003). Provider-owned results arrive as tool-role messages in driverMessages
+ * rather than going through the Tool Execution Gateway. The framework emits
+ * attribution events with owner:"provider" so observers see the full invocation
+ * lifecycle with correct observation limits (canAudit/canCancel/canRetry = false).
+ *
+ * No tool.audit event is emitted — provider classes have canAudit:false.
+ * providerMetadata is never spread into event payloads, so continuity tokens
+ * remain isolated (AY005).
+ */
+function emitProviderToolAttributionEvents(
+  handle: RuntimeExecutionHandle,
+  driverMessages: TuvrenMessage[],
+  now: () => number
+): void {
+  for (const message of driverMessages) {
+    if (message.role !== "tool") {
+      continue;
+    }
+    for (const part of message.parts) {
+      const meta = part.providerMetadata;
+      if (
+        typeof meta !== "object" ||
+        meta === null ||
+        (meta as Record<string, unknown>).owner !== "provider"
+      ) {
+        // Invariant: isPrestagedProviderToolMessage in driver-contract-guards.ts
+        // uses parts.every(owner==="provider"), so a mixed tool message (some parts
+        // provider-owned, some not) is rejected before reaching here. If that guard
+        // is ever relaxed this per-part skip must be revisited to avoid leaving
+        // non-provider parts without tool.start/tool.result events.
+        continue;
+      }
+      const executionClass: "provider-native" | "provider-mediated" =
+        (meta as Record<string, unknown>).executionClass === "provider-mediated"
+          ? "provider-mediated"
+          : "provider-native";
+      const observation = observationForClass(executionClass);
+      const attribution: CapabilityInvocationAttribution = {
+        capabilityId: part.name,
+        executionClass,
+        observation,
+        owner: "provider",
+      };
+      handle.publish({
+        attribution,
+        callId: part.callId,
+        input: undefined,
+        name: part.name,
+        timestamp: now(),
+        type: "tool.start",
+      });
+      handle.publish({
+        attribution,
+        callId: part.callId,
+        isError: part.isError,
+        name: part.name,
+        output: part.output,
+        timestamp: now(),
+        type: "tool.result",
+      });
+    }
+  }
+}
+
 export async function executeIterationPhase(
   host: RuntimeCoreIterationHost,
   input: {
@@ -506,6 +575,9 @@ export async function executeIterationPhase(
     iterationRunId,
     driverMessages,
     input.iterationCount
+  );
+  emitProviderToolAttributionEvents(input.handle, driverMessages, () =>
+    host.now()
   );
   const driverResponse = synthesizeResponse(
     driverMessages,

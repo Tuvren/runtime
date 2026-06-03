@@ -15,6 +15,7 @@
  */
 
 import { isDeepStrictEqual } from "node:util";
+import type { Binding } from "@tuvren/core/capabilities";
 import type { AgentConfig, ContextManifest } from "@tuvren/core/execution";
 import type {
   AroundModelContext,
@@ -22,7 +23,12 @@ import type {
   TuvrenExtension,
 } from "@tuvren/core/extensions";
 import type { TuvrenMessage, TuvrenModelConfig } from "@tuvren/core/messages";
-import type { TuvrenModelResponse, TuvrenPrompt } from "@tuvren/core/provider";
+import type {
+  ProviderMediatedToolConfig,
+  ProviderNativeToolDeclaration,
+  TuvrenModelResponse,
+  TuvrenPrompt,
+} from "@tuvren/core/provider";
 import type { RenderedToolDefinition } from "@tuvren/core/tools";
 
 export interface PreparedPromptState {
@@ -55,6 +61,9 @@ export function createAroundModelContextSnapshot(input: {
   const prompt = createPromptSnapshot({
     config,
     messages,
+    providerContinuity: cloneValue(input.prompt.providerContinuity),
+    providerMediatedTools: cloneValue(input.prompt.providerMediatedTools),
+    providerNativeTools: cloneValue(input.prompt.providerNativeTools),
     responseFormat: cloneValue(input.prompt.responseFormat),
     tools,
   });
@@ -94,6 +103,16 @@ export function preparePromptState(input: {
   ] satisfies TuvrenMessage[];
   const tools = cloneValue(input.tools);
   const config = toPromptConfig(input.config.model);
+  const admittedNativeTools = admitProviderTools(
+    input.config.providerNativeTools,
+    "provider-native",
+    input.config
+  );
+  const admittedMediatedTools = admitProviderTools(
+    input.config.providerMediatedTools,
+    "provider-mediated",
+    input.config
+  );
   const prompt: TuvrenPrompt = {
     config,
     messages: baseMessages,
@@ -102,6 +121,12 @@ export function preparePromptState(input: {
         ? undefined
         : cloneValue(input.config.responseFormat),
     tools: tools.length === 0 ? undefined : tools,
+    ...(admittedNativeTools.length > 0
+      ? { providerNativeTools: admittedNativeTools }
+      : {}),
+    ...(admittedMediatedTools.length > 0
+      ? { providerMediatedTools: admittedMediatedTools }
+      : {}),
   };
 
   return {
@@ -148,6 +173,11 @@ export function normalizeNextAroundModelContext(
       ...createPromptSnapshot({
         config: resolvedConfig,
         messages: resolvedMessages,
+        providerContinuity: cloneValue(nextContext.prompt.providerContinuity),
+        providerMediatedTools: cloneValue(
+          nextContext.prompt.providerMediatedTools
+        ),
+        providerNativeTools: cloneValue(nextContext.prompt.providerNativeTools),
         responseFormat: cloneValue(nextContext.prompt.responseFormat),
         tools: resolvedTools,
       }),
@@ -291,6 +321,9 @@ function cloneValue<T>(value: T): T {
 function createPromptSnapshot(input: {
   config: TuvrenModelConfig;
   messages: TuvrenMessage[];
+  providerContinuity?: TuvrenPrompt["providerContinuity"];
+  providerMediatedTools?: TuvrenPrompt["providerMediatedTools"];
+  providerNativeTools?: TuvrenPrompt["providerNativeTools"];
   responseFormat: TuvrenPrompt["responseFormat"];
   tools: RenderedToolDefinition[];
 }): TuvrenPrompt {
@@ -299,6 +332,17 @@ function createPromptSnapshot(input: {
     messages: input.messages,
     responseFormat: input.responseFormat,
     tools: input.tools.length === 0 ? undefined : input.tools,
+    ...(input.providerNativeTools !== undefined &&
+    input.providerNativeTools.length > 0
+      ? { providerNativeTools: input.providerNativeTools }
+      : {}),
+    ...(input.providerMediatedTools !== undefined &&
+    input.providerMediatedTools.length > 0
+      ? { providerMediatedTools: input.providerMediatedTools }
+      : {}),
+    ...(input.providerContinuity === undefined
+      ? {}
+      : { providerContinuity: input.providerContinuity }),
   };
 }
 
@@ -333,4 +377,51 @@ function resolveAroundModelSurface<T>(input: {
 
 function surfacesMatch(left: unknown, right: unknown): boolean {
   return isDeepStrictEqual(left, right);
+}
+
+// ---------------------------------------------------------------------------
+// Provider-native / provider-mediated binding registration + policy (AY002/AY004)
+// ---------------------------------------------------------------------------
+
+function admitProviderTools<
+  T extends ProviderNativeToolDeclaration | ProviderMediatedToolConfig,
+>(
+  tools: T[] | undefined,
+  executionClass: "provider-native" | "provider-mediated",
+  config: AgentConfig
+): T[] {
+  if (tools === undefined || tools.length === 0) {
+    return [];
+  }
+
+  const admitted: T[] = [];
+
+  for (const tool of tools) {
+    const capabilityId =
+      (tool as { capabilityId?: string }).capabilityId ?? tool.name;
+
+    // Invocation-time policy check per ADR-046 §4.21. When no engine is
+    // configured, all provider tools are admitted. Construct the binding
+    // inline — the resolver factory lives in @tuvren/runtime which would
+    // create a circular dependency here.
+    if (config.capabilityPolicyEngine !== undefined) {
+      const binding: Binding = {
+        capabilityId,
+        endpoint: { id: "provider-runtime", kind: "provider-runtime" },
+        executionClass,
+      };
+      const decision = config.capabilityPolicyEngine.evaluateInvocation(
+        binding,
+        // Context dimensions land in Epic BB; baseline engine is context-insensitive.
+        { modelId: "", permissions: [], providerId: "" }
+      );
+      if (!decision.admitted) {
+        continue;
+      }
+    }
+
+    admitted.push(tool);
+  }
+
+  return admitted;
 }

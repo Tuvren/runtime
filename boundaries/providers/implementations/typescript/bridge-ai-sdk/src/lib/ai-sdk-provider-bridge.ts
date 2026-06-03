@@ -15,10 +15,16 @@ import type {
 import Ajv from "ajv";
 import Ajv2019 from "ajv/dist/2019.js";
 import Ajv2020 from "ajv/dist/2020.js";
-import { mapGenerateResult } from "./ai-sdk-provider-bridge-generate.js";
+import {
+  mapGenerateResult,
+  type ProviderToolClassLookup,
+} from "./ai-sdk-provider-bridge-generate.js";
 import {
   mapPromptMessages,
+  mapProviderMediatedToolConfigs,
+  mapProviderNativeToolDeclarations,
   mapToolDefinition,
+  resolveProviderToolExecutionClass,
 } from "./ai-sdk-provider-bridge-prompt.js";
 import {
   createStreamMappingState,
@@ -117,11 +123,17 @@ class AiSdkProviderBridge implements TuvrenProvider {
         })
       );
 
-      return mapGenerateResult(result, prompt.responseFormat, {
-        mapFinishReason,
-        mapUsage,
-        parseStructuredOutput,
-      });
+      const providerToolClassLookup = buildProviderToolClassLookup(prompt);
+      return mapGenerateResult(
+        result,
+        prompt.responseFormat,
+        {
+          mapFinishReason,
+          mapUsage,
+          parseStructuredOutput,
+        },
+        providerToolClassLookup
+      );
     } catch (error: unknown) {
       throw normalizeBridgeError(error, "ai_sdk_generate_failed", {
         modelId: this.model.modelId,
@@ -141,8 +153,12 @@ class AiSdkProviderBridge implements TuvrenProvider {
     });
     const streamResult = await loadStreamResult(this.model, callOptions);
     const reader = streamResult.stream.getReader();
+    const providerToolClassLookup = buildProviderToolClassLookup(prompt);
     const state = createStreamMappingState({
       model: this.model,
+      ...(providerToolClassLookup === undefined
+        ? {}
+        : { providerToolClassLookup }),
       responseFormat: prompt.responseFormat,
       streamResult,
     });
@@ -219,6 +235,26 @@ async function loadStreamResult(
   }
 }
 
+function assertProviderMediatedToolsSupported(
+  prompt: TuvrenPrompt,
+  activeProvider: string
+): void {
+  if (
+    prompt.providerMediatedTools !== undefined &&
+    prompt.providerMediatedTools.length > 0 &&
+    activeProvider !== "openai"
+  ) {
+    throw bridgeError(
+      "provider-mediated tools require an OpenAI-bound model; bind an openai provider or remove providerMediatedTools",
+      "invalid_ai_sdk_bridge_config",
+      {
+        activeProvider,
+        reason: "provider_mediated_tools_require_openai",
+      }
+    );
+  }
+}
+
 function createCallOptions(input: {
   bridgeId: string;
   defaultHeaders?: Record<string, string | undefined>;
@@ -277,12 +313,20 @@ function createCallOptions(input: {
     );
   }
 
+  assertProviderMediatedToolsSupported(input.prompt, input.model.provider);
+
   const headers = mergeHeaders(input.defaultHeaders, settings.headers);
   const providerOptions = mergeProviderOptions(
-    input.defaultProviderOptions,
+    mergeProviderOptions(
+      input.defaultProviderOptions,
+      // Thread providerContinuity artifacts into providerOptions so the provider
+      // receives its own namespace continuity data on the next turn. (AY005)
+      continuityToProviderOptions(input.prompt.providerContinuity)
+    ),
     settings.providerOptions
   );
   const toolChoice = normalizeToolChoice(settings.toolChoice);
+  const allTools = buildAllTools(input.prompt);
 
   return {
     ...(typeof settings.frequencyPenalty === "number"
@@ -345,10 +389,10 @@ function createCallOptions(input: {
       : {
           toolChoice,
         }),
-    ...(input.prompt.tools === undefined || input.prompt.tools.length === 0
+    ...(allTools.length === 0
       ? {}
       : {
-          tools: input.prompt.tools.map(mapToolDefinition),
+          tools: allTools,
         }),
     ...(typeof settings.topK === "number"
       ? {
@@ -820,4 +864,61 @@ function readSchemaDialect(
       dialect: schema.$schema,
     }
   );
+}
+
+// ---------------------------------------------------------------------------
+// Provider-native / provider-mediated tool helpers (AY002, AY004, AY005)
+// ---------------------------------------------------------------------------
+
+import type {
+  LanguageModelV3FunctionTool,
+  LanguageModelV3ProviderTool,
+} from "@ai-sdk/provider";
+
+function buildAllTools(
+  prompt: TuvrenPrompt
+): Array<LanguageModelV3FunctionTool | LanguageModelV3ProviderTool> {
+  const functionTools =
+    prompt.tools !== undefined && prompt.tools.length > 0
+      ? prompt.tools.map(mapToolDefinition)
+      : [];
+  const nativeTools =
+    prompt.providerNativeTools !== undefined &&
+    prompt.providerNativeTools.length > 0
+      ? mapProviderNativeToolDeclarations(prompt.providerNativeTools)
+      : [];
+  const mediatedTools =
+    prompt.providerMediatedTools !== undefined &&
+    prompt.providerMediatedTools.length > 0
+      ? mapProviderMediatedToolConfigs(prompt.providerMediatedTools)
+      : [];
+  return [...functionTools, ...nativeTools, ...mediatedTools];
+}
+
+function continuityToProviderOptions(
+  providerContinuity: Record<string, unknown> | undefined
+): SharedV3ProviderOptions | undefined {
+  if (
+    providerContinuity === undefined ||
+    Object.keys(providerContinuity).length === 0
+  ) {
+    return undefined;
+  }
+  return cloneProviderOptions(providerContinuity);
+}
+
+function buildProviderToolClassLookup(
+  prompt: TuvrenPrompt
+): ProviderToolClassLookup | undefined {
+  const hasNative = (prompt.providerNativeTools?.length ?? 0) > 0;
+  const hasMediated = (prompt.providerMediatedTools?.length ?? 0) > 0;
+  if (!(hasNative || hasMediated)) {
+    return undefined;
+  }
+  return (toolName: string) =>
+    resolveProviderToolExecutionClass(
+      toolName,
+      prompt.providerNativeTools,
+      prompt.providerMediatedTools
+    );
 }
