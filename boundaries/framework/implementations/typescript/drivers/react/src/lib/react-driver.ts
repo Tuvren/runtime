@@ -842,10 +842,12 @@ function buildPrestagedProviderToolMessage(
     name: record.name,
     output: record.result,
     providerMetadata: {
+      // Spread record.providerMetadata first so canonical attribution fields
+      // below are always authoritative regardless of what the provider stamps. (AY002/AY004)
+      ...(record.providerMetadata ?? {}),
       executionClass: record.executionClass,
       owner: "provider",
       providerCallId: record.providerCallId,
-      ...(record.providerMetadata ?? {}),
     },
     type: "tool_result" as const,
   }));

@@ -764,11 +764,66 @@ describe("driver-react", () => {
     const toolResultPart = toolMessageParts?.[0] as Record<string, unknown> | undefined;
     expect(toolResultPart?.["name"]).toBe("code_execution");
     expect(toolResultPart?.["type"]).toBe("tool_result");
-    expect(
-      (toolResultPart?.["providerMetadata"] as Record<string, unknown> | undefined)?.["owner"]
-    ).toBe("provider");
+    const nativeMeta = toolResultPart?.["providerMetadata"] as Record<string, unknown> | undefined;
+    expect(nativeMeta?.["owner"]).toBe("provider");
+    expect(nativeMeta?.["executionClass"]).toBe("provider-native");
 
     // Resolution should be end_turn (no regular tool calls dispatched)
+    expect(result.resolution.type).toBe("end_turn");
+  });
+
+  test("stream path: provider-mediated provider_tool_result chunk preserves executionClass in pre-staged result", async () => {
+    const driverFactory = createReActDriver();
+    const driver = driverFactory.create();
+    const chunks: ProviderStreamChunk[] = [
+      {
+        name: "mcp_tool",
+        providerCallId: "mediated-stream-call-1",
+        providerMetadata: { executionClass: "provider-mediated", owner: "provider" },
+        result: { items: ["a", "b"] },
+        type: "provider_tool_result",
+      },
+      {
+        finishReason: "stop",
+        type: "finish",
+        usage: { inputTokens: 3, outputTokens: 1 },
+      },
+    ];
+
+    const provider: TuvrenProvider = {
+      id: "mock",
+      generate() {
+        throw new Error("should not call generate");
+      },
+      async *stream() {
+        for (const chunk of chunks) {
+          yield chunk;
+        }
+      },
+    };
+
+    const config = {
+      model: provider,
+      name: "test-agent",
+      providerMediatedTools: [
+        { endpoint: "https://example.com/mcp", mediationType: "mcp" as const, name: "mcp_tool" },
+      ],
+    };
+
+    const context = createDriverExecutionContext({ config });
+    const result = await driver.execute(context);
+
+    expect(result.messages).toHaveLength(1);
+    const toolMessage = result.messages?.[0];
+    expect(toolMessage?.role).toBe("tool");
+    const toolResultPart = (toolMessage as { parts?: unknown[] })?.parts?.[0] as
+      | Record<string, unknown>
+      | undefined;
+    expect(toolResultPart?.["name"]).toBe("mcp_tool");
+    // Canonical attribution fields must survive end-to-end
+    const meta = toolResultPart?.["providerMetadata"] as Record<string, unknown> | undefined;
+    expect(meta?.["owner"]).toBe("provider");
+    expect(meta?.["executionClass"]).toBe("provider-mediated");
     expect(result.resolution.type).toBe("end_turn");
   });
 });
