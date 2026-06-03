@@ -250,10 +250,24 @@ describe("KRT-AY003 — provider-mediated attribution events", () => {
 
 // ---------------------------------------------------------------------------
 // KRT-AY005: continuation-state secret isolation
+//
+// Scope: these tests validate the event-emitter path owned by this commit.
+// emitProviderToolAttributionEvents only uses explicit fields (callId, name,
+// output, isError) and never spreads providerMetadata into any event payload.
+//
+// Durable-lineage isolation is guaranteed structurally at the bridge layer:
+// continuityToProviderOptions in ai-sdk-provider-bridge.ts consumes
+// TuvrenPrompt.providerContinuity into providerOptions for the next call, and
+// buildPrestagedProviderToolMessage never includes providerContinuity in the
+// staged tool message's providerMetadata. So in the production data flow
+// providerContinuity never rides inside a staged tool-message part at all.
 // ---------------------------------------------------------------------------
 
-describe("KRT-AY005 — providerContinuity not in emitted events", () => {
-  test("providerContinuity in providerMetadata does not leak into any emitted event", async () => {
+describe("KRT-AY005 — providerContinuity not in emitted events (event-emitter scope)", () => {
+  test("providerContinuity present in providerMetadata does not appear in any emitted event", async () => {
+    // Simulate a worst-case scenario where providerContinuity is present in the
+    // pre-staged message's providerMetadata (production path: bridge never does
+    // this). The emitter must not propagate it to any event regardless.
     const events = await runWithProviderTool("provider-native", {
       providerContinuity: {
         sessionToken: "secret-abc-123",
@@ -265,7 +279,7 @@ describe("KRT-AY005 — providerContinuity not in emitted events", () => {
     expect(serialized).not.toContain("secret-abc-123");
   });
 
-  test("providerCallId in providerMetadata does not leak into tool.start input", async () => {
+  test("providerCallId in providerMetadata does not appear in tool.start input field", async () => {
     const events = await runWithProviderTool("provider-native");
     const starts = filterByType(events, "tool.start");
     const providerStart = starts.find(
@@ -274,7 +288,7 @@ describe("KRT-AY005 — providerContinuity not in emitted events", () => {
         e.attribution !== null &&
         (e.attribution as Record<string, unknown>).owner === "provider"
     );
-    // The tool.start input field must not carry providerMetadata blob
+    // tool.start input must be undefined — emitter does not spread providerMetadata.
     expect(providerStart?.input).toBeUndefined();
   });
 });

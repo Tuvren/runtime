@@ -393,6 +393,11 @@ function emitProviderToolAttributionEvents(
         meta === null ||
         (meta as Record<string, unknown>).owner !== "provider"
       ) {
+        // Invariant: isPrestagedProviderToolMessage in driver-contract-guards.ts
+        // uses parts.every(owner==="provider"), so a mixed tool message (some parts
+        // provider-owned, some not) is rejected before reaching here. If that guard
+        // is ever relaxed this per-part skip must be revisited to avoid leaving
+        // non-provider parts without tool.start/tool.result events.
         continue;
       }
       const executionClass: "provider-native" | "provider-mediated" =
