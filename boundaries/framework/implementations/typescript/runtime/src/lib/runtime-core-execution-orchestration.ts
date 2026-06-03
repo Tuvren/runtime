@@ -227,6 +227,7 @@ interface RuntimeIterationPhaseDependencies {
     events: TuvrenStreamEvent[]
   ): TuvrenStreamEvent[];
   materializeDriver(driverId: string): KrakenDriver;
+  now(): number;
   reconcileCheckpointedPauseResolution(
     checkpointedPause: boolean,
     runId: string,
@@ -383,6 +384,7 @@ export async function executeRuntimeIterationPhaseFacade(
       ensureDriverAssistantEvents: (...args) =>
         dependencies.ensureDriverAssistantEvents(...args),
       materializeDriver: (driverId) => dependencies.materializeDriver(driverId),
+      now: () => dependencies.now(),
       reconcileCheckpointedPauseResolution: (...args) =>
         dependencies.reconcileCheckpointedPauseResolution(...args),
       stageDriverMessages: (...args) =>
