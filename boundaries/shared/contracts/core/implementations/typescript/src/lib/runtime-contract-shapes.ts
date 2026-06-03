@@ -15,8 +15,10 @@
  */
 
 import type {
+  AttachedClientEndpoint,
   CapabilityInvocationAttribution,
   CapabilityPolicyEngine,
+  ClientEndpointBoundary,
   ExecutionClass,
 } from "./capability-shapes.js";
 import type { EpochMs, HashString } from "./kernel-records.js";
@@ -945,6 +947,39 @@ export interface AgentConfig {
    * will receive empty values for those fields.
    */
   capabilityPolicyEngine?: CapabilityPolicyEngine;
+  /**
+   * Optional pre-built ClientEndpointBoundary for this agent.
+   *
+   * When set, the runtime uses this boundary directly instead of creating one
+   * from `clientEndpoints`. Use this escape hatch when the host needs to
+   * manage endpoint lifecycle explicitly — for example, to call `detach()` on
+   * the boundary after it was constructed so that subsequent invocations yield
+   * `capability_binding_unavailable` rather than dispatching. Useful for
+   * conformance tests and host scenarios where endpoints become unavailable
+   * after turn start. (KRT-AZ001, KRT-AZ003)
+   *
+   * If both `clientEndpoints` and `clientEndpointBoundary` are set,
+   * `clientEndpointBoundary` takes precedence for dispatch; `clientEndpoints`
+   * is still used to register the advertised capabilities in the tool registry
+   * (so the model can still "see" the capabilities even if the endpoint is
+   * unavailable at invocation time).
+   */
+  clientEndpointBoundary?: ClientEndpointBoundary;
+  /**
+   * Attached client endpoints for this agent. Each endpoint advertises the
+   * capabilities it can execute (on behalf of the runtime, in a client
+   * environment such as a browser extension, desktop app, or device agent).
+   *
+   * The runtime registers each advertised capability as a tuvren-client
+   * binding and dispatches matching tool calls to the endpoint via an
+   * invocation envelope. No client credentials or environment secrets should
+   * appear in the envelope or the reported result — they stay at the client edge.
+   *
+   * Concrete client endpoints are host-developer deliverables. The runtime
+   * only needs this interface to orchestrate, lease, and observe client-side
+   * execution. (KRT-AZ001)
+   */
+  clientEndpoints?: AttachedClientEndpoint[];
   contextPolicy?: ContextPolicy;
   extensions?: TuvrenExtension[];
   loopPolicy?: LoopPolicy;

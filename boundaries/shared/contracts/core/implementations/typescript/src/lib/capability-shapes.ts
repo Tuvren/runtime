@@ -229,3 +229,118 @@ export interface CapabilityPolicyEngine {
     context: CapabilityPolicyContext
   ): InvocationDecision;
 }
+
+// ---------------------------------------------------------------------------
+// Tuvren-client execution class shapes (§4.21 / KRT-AZ001)
+// ---------------------------------------------------------------------------
+
+/**
+ * A capability advertised by an attached client endpoint. Each advertisement
+ * declares the capability the client endpoint can execute and the schema of
+ * its inputs. The runtime registers these as tuvren-client bindings.
+ *
+ * When mcpServerName is set, the capability is a client-side MCP tool: the
+ * client endpoint invokes or runs the MCP server. The binding's endpoint kind
+ * becomes "mcp-server" under the tuvren-client execution class — it is never
+ * reclassified as a Tuvren-server or provider-mediated binding.
+ */
+export interface ClientEndpointCapabilityAdvertisement {
+  capabilityId: string;
+  description: string;
+  inputSchema: TuvrenJsonSchema;
+  /** When set, this capability is a client-side MCP tool under the tuvren-client class. */
+  mcpServerName?: string;
+}
+
+/**
+ * The invocation envelope the runtime dispatches to an attached client endpoint.
+ * Contains everything the client needs to execute the capability. Credentials
+ * and environment secrets are never included — they are owned by the client edge.
+ */
+export interface ClientInvocationEnvelope {
+  callId: string;
+  capabilityId: string;
+  input: unknown;
+  /** Opaque non-secret lease token. The client must echo it in ClientReportedResult. Mismatches are stale. */
+  leaseToken: string;
+}
+
+/**
+ * The result a client endpoint reports back after executing a capability.
+ * The client owns environmental execution; Tuvren records this result as a
+ * canonical capability result with partial-observability limits.
+ *
+ * The leaseToken must match the envelope's leaseToken. A mismatch signals a
+ * stale late-completion that the runtime will ignore rather than accept.
+ *
+ * No secret material (credentials, environment tokens, internal state) should
+ * appear in content — this value enters durable lineage.
+ */
+export interface ClientReportedResult {
+  callId: string;
+  content: unknown;
+  isError?: boolean;
+  /** Must echo the envelope's leaseToken. Mismatches are treated as stale. */
+  leaseToken: string;
+}
+
+/**
+ * A client endpoint that can be attached to a runtime instance. Concrete
+ * implementations are host-developer deliverables (browser extension, desktop
+ * app, device agent, client-side MCP runner). The runtime side only needs this
+ * interface to orchestrate, lease, and observe client-side execution.
+ *
+ * The runtime owns orchestration and policy; the client endpoint owns
+ * environmental execution and may hold authority the server does not.
+ */
+export interface AttachedClientEndpoint {
+  /** Capabilities this endpoint can execute, advertised at attach time. */
+  advertisedCapabilities: ClientEndpointCapabilityAdvertisement[];
+  /** Dispatch a capability invocation. Must echo back the envelope's leaseToken. */
+  dispatch(envelope: ClientInvocationEnvelope): Promise<ClientReportedResult>;
+  /** Stable non-secret identifier for this endpoint. */
+  endpointId: string;
+}
+
+/**
+ * Runtime boundary for the Tuvren-client execution class (§4.21 / KRT-AZ001).
+ *
+ * The interface is defined here in @tuvren/core/capabilities so AgentConfig
+ * can reference it without a circular dependency. The implementation lives in
+ * @tuvren/runtime. Hosts that need dynamic endpoint lifecycle control
+ * (e.g. to signal unavailability for conformance testing) can obtain an
+ * instance via createClientEndpointBoundary from @tuvren/runtime and pass it
+ * as AgentConfig.clientEndpointBoundary.
+ */
+export interface ClientEndpointBoundary {
+  /**
+   * Remove all capabilities backed by the given endpointId from the boundary.
+   *
+   * After detach, `isAvailable` returns false for those capabilities. The
+   * tuvren-client `execute` closures check `isAvailable` before dispatching
+   * and surface `capability_binding_unavailable` when false. This models an
+   * attached endpoint that has become unavailable mid-turn. (KRT-AZ003)
+   */
+  detach(endpointId: string): void;
+  /**
+   * Dispatch a capability invocation to the attached endpoint. Generates a
+   * fresh leaseToken, validates the echoed token on the result, and returns
+   * null when the result is stale. Throws capability_binding_unavailable when
+   * no endpoint is attached for the capability.
+   */
+  dispatch(
+    capabilityId: string,
+    callId: string,
+    input: unknown
+  ): Promise<ClientDispatchResult | null>;
+  /** Whether any attached endpoint currently advertises the given capabilityId. */
+  isAvailable(capabilityId: string): boolean;
+  /** Resolve the Binding for a capabilityId, or undefined if unavailable. */
+  resolveBinding(capabilityId: string): Binding | undefined;
+}
+
+/** Resolved dispatch result: the client-reported content and error flag. */
+export interface ClientDispatchResult {
+  content: unknown;
+  isError: boolean;
+}

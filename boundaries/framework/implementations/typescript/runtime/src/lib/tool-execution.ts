@@ -39,7 +39,10 @@ import type {
   ToolRegistry,
   TuvrenToolDefinition,
 } from "@tuvren/core/tools";
-import { createBindingResolver } from "./binding-resolver.js";
+import {
+  createBindingResolver,
+  isClientEndpointTool,
+} from "./binding-resolver.js";
 import { runWithTimeout } from "./execution-timeouts.js";
 import {
   buildSharedExports,
@@ -458,16 +461,22 @@ async function resolveExecutableToolCall(
   }
 
   const validation = validateToolInput(tool, toolCall.input);
+  // Tuvren-client tools carry partial observability: canAudit is false, so
+  // tool.audit events must not be emitted for them. The isClientEndpointTool
+  // guard gates all audit-event emission points in this function. (KRT-AZ005)
+  const isClientTool = isClientEndpointTool(tool);
 
-  emitToolAuditEvent(
-    environment,
-    toolCall.callId,
-    toolCall.name,
-    "input_validated",
-    {
-      validationPassed: validation.valid,
-    }
-  );
+  if (!isClientTool) {
+    emitToolAuditEvent(
+      environment,
+      toolCall.callId,
+      toolCall.name,
+      "input_validated",
+      {
+        validationPassed: validation.valid,
+      }
+    );
+  }
 
   if (!validation.valid) {
     return {
@@ -507,9 +516,9 @@ async function resolveExecutableToolCall(
   }
 
   // Rate-limit check for Tuvren-server execution class per §4.21 / AX003.
-  // Invocations beyond the configured budget are rejected with a typed result
-  // rather than executed, preserving tenant isolation without error propagation.
+  // Client endpoint tools are not subject to server-side rate limiting.
   if (
+    !isClientTool &&
     environment.serverExecutionRateLimiter !== undefined &&
     !environment.serverExecutionRateLimiter.tryAcquire()
   ) {
@@ -745,8 +754,12 @@ async function executeSingleTool(
       break;
     }
 
-    // Emit a retry_attempt audit event for each attempt after the first. (AX005)
-    if (attempt > 0) {
+    // Emit a retry_attempt audit event for each attempt after the first.
+    // Guard for tuvren-client tools: canAudit is false for the class, and
+    // buildClientEndpointTools never sets idempotent, so maxAttempts is always
+    // 1 for client tools. The guard makes the canAudit:false invariant structural
+    // rather than incidental. (AX005, KRT-AZ005)
+    if (attempt > 0 && !isClientEndpointTool(toolCall.tool)) {
       emitToolAuditEvent(
         environment,
         toolCall.toolCall.callId,
@@ -969,15 +982,18 @@ function applyOutputValidation(
     toolCall.tool.outputSchema,
     valueToValidate
   );
-  emitToolAuditEvent(
-    environment,
-    toolCall.toolCall.callId,
-    toolCall.tool.name,
-    "output_validated",
-    {
-      validationPassed: outputValidation.valid,
-    }
-  );
+  // Tuvren-client tools: canAudit is false — suppress audit events. (KRT-AZ005)
+  if (!isClientEndpointTool(toolCall.tool)) {
+    emitToolAuditEvent(
+      environment,
+      toolCall.toolCall.callId,
+      toolCall.tool.name,
+      "output_validated",
+      {
+        validationPassed: outputValidation.valid,
+      }
+    );
+  }
   if (!outputValidation.valid) {
     return {
       ok: false,

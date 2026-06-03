@@ -105,6 +105,9 @@ export async function applyRuntimeCoreTerminalAgentTransitionIfNeeded(
     | {
         activeConfig: AgentConfig;
         activeToolRegistry: ToolRegistry;
+        clientEndpointBoundary:
+          | import("@tuvren/core/capabilities").ClientEndpointBoundary
+          | undefined;
       }
     | undefined;
 
@@ -138,6 +141,7 @@ export async function applyRuntimeCoreTerminalAgentTransitionIfNeeded(
 
   loopState.activeConfig = handoff.activeConfig;
   loopState.activeToolRegistry = handoff.activeToolRegistry;
+  loopState.clientEndpointBoundary = handoff.clientEndpointBoundary;
   loopState.carriedStateUpdates = [];
   return true;
 }

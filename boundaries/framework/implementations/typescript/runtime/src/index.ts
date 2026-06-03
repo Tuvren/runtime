@@ -147,6 +147,7 @@ export type { CapabilityPolicyEngineOptions } from "./lib/capability-policy-engi
 export { createCapabilityPolicyEngine } from "./lib/capability-policy-engine.js";
 export type { CapabilityRegistry } from "./lib/capability-registry.js";
 export { createCapabilityRegistry } from "./lib/capability-registry.js";
+export { createClientEndpointBoundary } from "./lib/client-endpoint-boundary.js";
 export {
   createContextManifest,
   createEmptyContextManifest,

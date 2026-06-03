@@ -18,12 +18,18 @@
 
 // Re-export from the core lib so this module owns the canonical declaration.
 export type {
+  AttachedClientEndpoint,
   Binding,
   Capability,
   CapabilityInvocationAttribution,
   CapabilityObservation,
   CapabilityPolicyContext,
   CapabilityPolicyEngine,
+  ClientDispatchResult,
+  ClientEndpointBoundary,
+  ClientEndpointCapabilityAdvertisement,
+  ClientInvocationEnvelope,
+  ClientReportedResult,
   Endpoint,
   EndpointKind,
   ExecutionClass,

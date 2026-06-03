@@ -20,10 +20,12 @@ import {
   type HashString,
   TuvrenRuntimeError,
 } from "@tuvren/core";
+import type { ClientEndpointBoundary } from "@tuvren/core/capabilities";
 import type { AgentConfig, ContextManifest } from "@tuvren/core/execution";
 import type { TuvrenExtension } from "@tuvren/core/extensions";
 import type { ToolRegistry, TuvrenToolDefinition } from "@tuvren/core/tools";
 import { encodeDeterministicKernelRecord } from "@tuvren/kernel-protocol";
+import { createClientEndpointBoundary } from "./client-endpoint-boundary.js";
 import type { ExtensionStateUpdate } from "./extension-runtime.js";
 import type { RuntimeRunLivenessOptions } from "./runtime-core.js";
 import {
@@ -31,18 +33,62 @@ import {
   cloneValue,
   createFrozenSnapshot,
 } from "./runtime-core-shared.js";
-import { createToolRegistry } from "./tool-registry.js";
+import {
+  buildClientEndpointTools,
+  createToolRegistry,
+} from "./tool-registry.js";
 
 const readonlyDriverToolRegistryCache = new WeakMap<
   ToolRegistry,
   ToolRegistry
 >();
 
+/**
+ * Create or resolve the ClientEndpointBoundary for the given AgentConfig.
+ *
+ * When `config.clientEndpointBoundary` is provided, that pre-built boundary
+ * is used directly — this lets hosts call `boundary.detach()` before the turn
+ * to prove the `capability_binding_unavailable` typed outcome (KRT-AZ003).
+ * When absent, a fresh boundary is created from `config.clientEndpoints`.
+ * Returns undefined when no client endpoints or boundary are configured.
+ * (KRT-AZ001)
+ */
+export function createClientEndpointBoundaryFromConfig(
+  config: AgentConfig
+): ClientEndpointBoundary | undefined {
+  if (config.clientEndpointBoundary !== undefined) {
+    return config.clientEndpointBoundary;
+  }
+  const endpoints = config.clientEndpoints ?? [];
+  return endpoints.length > 0
+    ? createClientEndpointBoundary(endpoints)
+    : undefined;
+}
+
+/**
+ * Create the active tool registry for a turn.
+ *
+ * When a clientEndpointBoundary is provided (created from AgentConfig.clientEndpoints),
+ * synthetic tuvren-client tool definitions are added to the registry for each
+ * advertised capability. The boundary must be stored on LoopState so the
+ * tool-execution path can dispatch to the correct endpoint. (KRT-AZ001)
+ */
 export function createActiveToolRegistry(
   requestTools: TuvrenToolDefinition[] | undefined,
-  config: AgentConfig
+  config: AgentConfig,
+  clientEndpointBoundary?: ClientEndpointBoundary
 ): ToolRegistry {
-  const activeTools = requestTools ?? config.tools ?? [];
+  const clientEndpointTools = clientEndpointBoundary
+    ? buildClientEndpointTools(
+        config.clientEndpoints ?? [],
+        clientEndpointBoundary
+      )
+    : [];
+
+  const activeTools = [
+    ...(requestTools ?? config.tools ?? []),
+    ...clientEndpointTools,
+  ];
   return createToolRegistry(activeTools, config.extensions ?? []);
 }
 
@@ -230,7 +276,16 @@ export function createDriverToolDefinitionSnapshot(
 }
 
 export function cloneAgentConfigForRequest(config: AgentConfig): AgentConfig {
-  return cloneSnapshotPreservingFunctions(config);
+  const cloned = cloneSnapshotPreservingFunctions(config);
+  // clientEndpointBoundary is a stateful, identity-preserving object (the
+  // capabilityIndex is mutable and external callers may detach endpoints).
+  // Deep-cloning it would sever the connection between the caller's detach()
+  // calls and the boundary the tool closures observe. Restore the original
+  // reference so the caller and the closures share the same live object.
+  if (config.clientEndpointBoundary !== undefined) {
+    cloned.clientEndpointBoundary = config.clientEndpointBoundary;
+  }
+  return cloned;
 }
 
 export function encodeKernelRecord(value: unknown, label: string): Uint8Array {
