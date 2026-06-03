@@ -130,6 +130,8 @@ class BasicClientEndpointBoundary implements ClientEndpointBoundary {
     // (runtime-generated per invocation), not by the counter alone — a reset
     // counter with a matching callId requires an astronomically unlikely
     // collision across process lifetimes.
+    // The token is COMPARE-ONLY and is never parsed back into components;
+    // do not add a parser without re-escaping the interpolated fields.
     const leaseToken = `${capabilityId}:${callId}:${this.leaseCounter}`;
 
     let reported: import("@tuvren/core/capabilities").ClientReportedResult;
@@ -146,6 +148,10 @@ class BasicClientEndpointBoundary implements ClientEndpointBoundary {
       // but throwing is a realistic failure mode (network error, client crash).
       // Catching here ensures the turn surfaces a typed tuvren-client error
       // ToolResultPart rather than a generic execution-failure. (KRT-AZ002)
+      //
+      // NOTE: err.message is host-controlled and enters durable lineage
+      // unscrubbed. The secret-isolation contract is a host responsibility —
+      // the runtime does not validate or redact the thrown message content.
       reported = {
         callId,
         content: {
