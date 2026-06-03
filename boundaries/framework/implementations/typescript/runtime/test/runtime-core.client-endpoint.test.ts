@@ -567,3 +567,47 @@ describe("tuvren-client: boundary preserved through approval pause/resume", () =
     expect(output?.code).toBe(CAPABILITY_BINDING_UNAVAILABLE);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Cross-source tool name collision
+// ---------------------------------------------------------------------------
+
+describe("tuvren-client: tool name collision with regular tools", () => {
+  test("a client capability sharing a name with a regular tool throws duplicate_tool_registration at turn construction", async () => {
+    // A regular server tool and a client capability with the same name are both
+    // added to createToolRegistry, which throws duplicate_tool_registration.
+    // This fails loudly (not silently), but is distinct from the
+    // invalid_runtime_options code used for intra-boundary collisions.
+    const endpoint = makeOkEndpoint("ep1", "shared.tool", { ok: true });
+    const harness = createFakeKernelHarness();
+    const driver = makeOneCallDriver("shared.tool");
+    const runtime = createTuvrenRuntime({
+      createId: makeId,
+      defaultDriverId: "test-driver",
+      driverRegistry: createDriverRegistry([driver]),
+      kernel: harness.kernel,
+    });
+    const thread = await runtime.createThread({});
+    const handle = runtime.executeTurn({
+      branchId: thread.branchId,
+      config: {
+        name: "test-agent",
+        clientEndpoints: [endpoint],
+        tools: [
+          {
+            description: "a regular server tool with the same name",
+            execute: () => Promise.resolve({ server: true }),
+            inputSchema: { type: "object" },
+            name: "shared.tool",
+          },
+        ],
+      },
+      signal: textSignal("cross-source collision"),
+      threadId: thread.threadId,
+    });
+    const result = await handle.awaitResult();
+    // The turn fails (not rejects) because the registry error is caught and
+    // surfaced as a failed execution status rather than a thrown promise.
+    expect(result.status).toBe("failed");
+  });
+});

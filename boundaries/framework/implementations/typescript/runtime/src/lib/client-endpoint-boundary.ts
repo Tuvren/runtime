@@ -124,6 +124,12 @@ class BasicClientEndpointBoundary implements ClientEndpointBoundary {
     }
 
     this.leaseCounter += 1;
+    // leaseToken encodes capabilityId, callId, and a per-boundary counter. The
+    // counter is in-memory only; after a process restart with a fresh boundary
+    // it resets to 0. Staleness is therefore guaranteed by callId uniqueness
+    // (runtime-generated per invocation), not by the counter alone — a reset
+    // counter with a matching callId requires an astronomically unlikely
+    // collision across process lifetimes.
     const leaseToken = `${capabilityId}:${callId}:${this.leaseCounter}`;
 
     let reported: import("@tuvren/core/capabilities").ClientReportedResult;
