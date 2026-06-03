@@ -17,6 +17,7 @@
 import { TuvrenRuntimeError } from "@tuvren/core";
 import type {
   AttachedClientEndpoint,
+  ClientDispatchResult,
   ClientEndpointBoundary,
 } from "@tuvren/core/capabilities";
 import {
@@ -163,6 +164,32 @@ function toJsonSchema(
 // ---------------------------------------------------------------------------
 
 /**
+ * Wraps `boundary.dispatch` to catch the safety-net throw that fires when
+ * `detach()` races ahead of dispatch (TOCTOU gap between `isAvailable` and
+ * `dispatch`). Returns the string sentinel `"unavailable"` in that case so
+ * callers can surface the typed `capability_binding_unavailable` ToolResultPart
+ * rather than letting the throw become a generic execution failure.
+ */
+async function dispatchToClientEndpoint(
+  boundary: ClientEndpointBoundary,
+  capabilityId: string,
+  callId: string,
+  input: unknown
+): Promise<ClientDispatchResult | null | "unavailable"> {
+  try {
+    return await boundary.dispatch(capabilityId, callId, input);
+  } catch (err) {
+    if (
+      err instanceof TuvrenRuntimeError &&
+      err.code === CAPABILITY_BINDING_UNAVAILABLE
+    ) {
+      return "unavailable";
+    }
+    throw err;
+  }
+}
+
+/**
  * Build synthetic TuvrenToolDefinition entries from attached client endpoints.
  *
  * Each advertised capability becomes a tool whose execute callback dispatches
@@ -204,11 +231,27 @@ export function buildClientEndpointTools(
             };
           }
 
-          const dispatched = await boundary.dispatch(
+          const dispatched = await dispatchToClientEndpoint(
+            boundary,
             capabilityId,
             context.callId,
             input
           );
+
+          if (dispatched === "unavailable") {
+            // TOCTOU: detach() ran between the isAvailable check and dispatch.
+            // Surface the same typed result as the !isAvailable branch above.
+            return {
+              callId: context.callId,
+              isError: true,
+              name: capabilityId,
+              output: {
+                code: CAPABILITY_BINDING_UNAVAILABLE,
+                error: `Tuvren-client capability "${capabilityId}" has no attached endpoint.`,
+              },
+              type: "tool_result",
+            };
+          }
 
           if (dispatched === null) {
             // Stale late-completion: the endpoint echoed a wrong leaseToken or
@@ -237,10 +280,17 @@ export function buildClientEndpointTools(
             };
           }
 
-          // Return the raw client-reported content. Client tools never carry an
-          // outputSchema, so the structural asymmetry with the error branches is
-          // intentional and safe — output validation is skipped for this class.
-          return dispatched.content;
+          // Always return an explicit ToolResultPart for the success path so
+          // client-shaped content cannot shadow the runtime's isError:false
+          // intent. Client tools never carry an outputSchema, so no output
+          // validation is applied to this class.
+          return {
+            callId: context.callId,
+            isError: false,
+            name: capabilityId,
+            output: dispatched.content,
+            type: "tool_result",
+          };
         },
         inputSchema: cap.inputSchema as TuvrenJsonSchema,
         metadata: {
