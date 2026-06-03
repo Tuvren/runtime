@@ -57,6 +57,8 @@ const AGENT_CONFIG_KEYS = new Set([
   "maxParallelToolCalls",
   "model",
   "name",
+  "providerMediatedTools",
+  "providerNativeTools",
   "responseFormat",
   "systemPrompt",
   "tools",

@@ -192,6 +192,15 @@ const CAPABILITY_EXECUTION_CLASSES = new Set([
   "tuvren-client",
 ]);
 const CAPABILITY_INVOCATION_OWNERS = new Set(["provider", "tuvren"]);
+const PROVIDER_NATIVE_INVOCATION_RECORD_KEYS = new Set([
+  "callId",
+  "executionClass",
+  "isError",
+  "name",
+  "providerCallId",
+  "providerMetadata",
+  "result",
+]);
 const TUVREN_MODEL_RESPONSE_KEYS = new Set([
   "finishReason",
   "parts",
@@ -221,6 +230,22 @@ function isOptionalCapabilityAttribution(
   );
 }
 
+function isProviderNativeInvocationRecord(value: unknown): boolean {
+  return safePredicate(
+    () =>
+      isPlainObject(value) &&
+      hasOnlyAllowedKeys(value, PROVIDER_NATIVE_INVOCATION_RECORD_KEYS) &&
+      isNonEmptyStringProperty(value, "callId") &&
+      isStringProperty(value, "executionClass") &&
+      CAPABILITY_EXECUTION_CLASSES.has(value.executionClass) &&
+      isNonEmptyStringProperty(value, "name") &&
+      isNonEmptyStringProperty(value, "providerCallId") &&
+      "result" in value &&
+      (value.isError === undefined || typeof value.isError === "boolean") &&
+      isOptionalSerializableRecordProperty(value, "providerMetadata")
+  );
+}
+
 export function isTuvrenModelResponse(
   value: unknown
 ): value is TuvrenModelResponse {
@@ -232,6 +257,9 @@ export function isTuvrenModelResponse(
       FINISH_REASONS.has(value.finishReason) &&
       Array.isArray(value.parts) &&
       value.parts.every(isContentPart) &&
+      (!("providerToolResults" in value) ||
+        (Array.isArray(value.providerToolResults) &&
+          value.providerToolResults.every(isProviderNativeInvocationRecord))) &&
       isOptionalProviderUsage(value, "usage") &&
       isOptionalSerializableRecordProperty(value, "providerMetadata")
   );

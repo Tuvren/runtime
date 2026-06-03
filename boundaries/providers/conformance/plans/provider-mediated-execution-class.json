@@ -98,13 +98,13 @@
       "capabilities": ["providers.provider-mediated-execution-class"]
     },
     {
-      "checkId": "ay.ay007.mediated-mcp-binding-classification",
-      "evidence": ["result.attribution.executionClass"],
+      "checkId": "ay.ay007.mediated-tool-start-owner",
+      "evidence": ["result.toolStartOwner"],
       "assertions": [
         {
           "kind": "resultField",
-          "field": "$.attribution.executionClass",
-          "equals": "provider-mediated"
+          "field": "$.toolStartOwner",
+          "equals": "provider"
         }
       ],
       "operation": "providers.provider-mediated.attribution",

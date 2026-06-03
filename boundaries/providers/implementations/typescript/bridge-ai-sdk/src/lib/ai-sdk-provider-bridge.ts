@@ -304,6 +304,7 @@ function createCallOptions(input: {
     settings.providerOptions
   );
   const toolChoice = normalizeToolChoice(settings.toolChoice);
+  const allTools = buildAllTools(input.prompt);
 
   return {
     ...(typeof settings.frequencyPenalty === "number"
@@ -366,10 +367,10 @@ function createCallOptions(input: {
       : {
           toolChoice,
         }),
-    ...(buildAllTools(input.prompt).length === 0
+    ...(allTools.length === 0
       ? {}
       : {
-          tools: buildAllTools(input.prompt),
+          tools: allTools,
         }),
     ...(typeof settings.topK === "number"
       ? {

@@ -651,8 +651,10 @@ function doesSerializedDeltaMatchValue(
 function isProviderOnlyResponseEventSet(
   assistantEvents: TuvrenStreamEvent[]
 ): boolean {
-  return assistantEvents.every(
-    (e) => e.type === "message.start" || e.type === "message.done"
+  return (
+    assistantEvents.length === 2 &&
+    assistantEvents[0]?.type === "message.start" &&
+    assistantEvents[1]?.type === "message.done"
   );
 }
 

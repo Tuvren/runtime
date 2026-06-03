@@ -975,24 +975,6 @@
     {
       "assertionResults": [
         {
-          "assertionId": "ay.ay007.mediated-mcp-binding-classification.1.resultField",
-          "status": "pass"
-        },
-        {
-          "assertionId": "ay.ay007.mediated-mcp-binding-classification.requiredEvidence.result.attribution.executionClass",
-          "status": "pass"
-        }
-      ],
-      "checkId": "ay.ay007.mediated-mcp-binding-classification",
-      "details": {
-        "adapterId": "typescript-providers",
-        "planId": "tuvren.providers.provider-mediated-execution-class"
-      },
-      "status": "pass"
-    },
-    {
-      "assertionResults": [
-        {
           "assertionId": "ay.ay007.mediated-no-tool-audit-event.1.resultField",
           "status": "pass"
         },
@@ -1074,6 +1056,24 @@
         }
       ],
       "checkId": "ay.ay007.mediated-observation-can-retry-false",
+      "details": {
+        "adapterId": "typescript-providers",
+        "planId": "tuvren.providers.provider-mediated-execution-class"
+      },
+      "status": "pass"
+    },
+    {
+      "assertionResults": [
+        {
+          "assertionId": "ay.ay007.mediated-tool-start-owner.1.resultField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "ay.ay007.mediated-tool-start-owner.requiredEvidence.result.toolStartOwner",
+          "status": "pass"
+        }
+      ],
+      "checkId": "ay.ay007.mediated-tool-start-owner",
       "details": {
         "adapterId": "typescript-providers",
         "planId": "tuvren.providers.provider-mediated-execution-class"

@@ -152,6 +152,13 @@ export async function runProviderMediatedAttribution(): Promise<
       (e.attribution as Record<string, unknown>).owner === "provider"
   );
 
+  const providerToolStart = toolStartEvents.find(
+    (e) =>
+      typeof e.attribution === "object" &&
+      e.attribution !== null &&
+      (e.attribution as Record<string, unknown>).owner === "provider"
+  );
+
   const attribution =
     typeof providerToolResult?.attribution === "object" &&
     providerToolResult.attribution !== null
@@ -163,6 +170,12 @@ export async function runProviderMediatedAttribution(): Promise<
     attribution.observation !== null
       ? (attribution.observation as Record<string, unknown>)
       : {};
+
+  const toolStartOwner =
+    typeof providerToolStart?.attribution === "object" &&
+    providerToolStart.attribution !== null
+      ? (providerToolStart.attribution as Record<string, unknown>).owner
+      : undefined;
 
   return {
     evidence: {
@@ -180,6 +193,7 @@ export async function runProviderMediatedAttribution(): Promise<
       toolAuditEventCount: toolAuditEvents.length,
       toolResultEventCount: toolResultEvents.length,
       toolStartEventCount: toolStartEvents.length,
+      toolStartOwner,
       turnStatus: turnEndEvent?.status,
     },
     result: {
@@ -197,6 +211,7 @@ export async function runProviderMediatedAttribution(): Promise<
       toolAuditEventCount: toolAuditEvents.length,
       toolResultEventCount: toolResultEvents.length,
       toolStartEventCount: toolStartEvents.length,
+      toolStartOwner,
       turnStatus: turnEndEvent?.status,
     },
   };
