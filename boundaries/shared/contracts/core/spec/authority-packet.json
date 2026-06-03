@@ -211,7 +211,7 @@
       "description": "TuvrenTelemetrySink, telemetry lineage, span, event, and kind record types"
     },
     "capabilities": {
-      "description": "ExecutionClass, EndpointKind, Capability, ToolSurface, Endpoint, Binding, CapabilityObservation, ExposureDecision, InvocationDecision, InvocationOwner, CapabilityInvocationAttribution — ADR-046 §3.13 capability-orchestration shapes"
+      "description": "ExecutionClass, EndpointKind, InvocationLifecycleState, Capability, ToolSurface, Endpoint, Binding, CapabilityObservation, ExposureDecision, InvocationDecision, InvocationOwner, CapabilityInvocationAttribution — ADR-046 §3.13 capability-orchestration shapes; InvocationLifecycleState added per KRT-BA001"
     }
   },
   "bindingProjections": {

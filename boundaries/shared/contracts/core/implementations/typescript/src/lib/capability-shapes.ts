@@ -28,6 +28,32 @@ import type { TuvrenJsonSchema } from "./runtime-contract-shapes.js";
 // Closed sets
 // ---------------------------------------------------------------------------
 
+/**
+ * Uniform cross-class invocation lifecycle states per KRT-BA001 / ADR-046
+ * §4.21. Every model-visible tool call flows through this lifecycle regardless
+ * of execution class. The conceptual invariant: every invocation resolves to
+ * exactly one ExecutionClass and terminates at one of the terminal states.
+ *
+ * States:
+ * - resolved:        capability binding was resolved from the tool name.
+ * - policy-admitted: invocation-time policy granted admission.
+ * - dispatched:      invocation was sent to the execution-class endpoint
+ *                    (observable: tool.start event emitted).
+ * - completed:       terminal — execution completed successfully
+ *                    (observable: tool.result with isError: false or absent).
+ * - failed:          terminal — execution failed or was policy-denied
+ *                    (observable: tool.result with isError: true).
+ * - ignored:         terminal — late completion after cancellation; result
+ *                    discarded without mutation (tuvren-server only).
+ */
+export type InvocationLifecycleState =
+  | "resolved"
+  | "policy-admitted"
+  | "dispatched"
+  | "completed"
+  | "failed"
+  | "ignored";
+
 /** Who owns a capability invocation. Closed set per ADR-046. */
 export type ExecutionClass =
   | "provider-native"
