@@ -156,7 +156,12 @@ export interface StructuredOutputRequest {
 export interface TuvrenPrompt {
   config?: TuvrenModelConfig;
   messages: TuvrenMessage[];
-  /** Opaque non-secret provider continuity artifacts for multi-turn operation. (AY005) */
+  /**
+   * Non-secret provider continuity artifacts for multi-turn operation. (AY005)
+   * Must follow the provider-namespaced shape required by SharedV3ProviderOptions:
+   * `{ [providerNamespace]: Record<string, unknown> }` (e.g. `{ anthropic: { sessionId } }`).
+   * Flat top-level values are not supported and will throw at the bridge edge.
+   */
   providerContinuity?: Record<string, unknown>;
   /** Provider-mediated tools: provider invokes developer endpoint. (AY004) */
   providerMediatedTools?: ProviderMediatedToolConfig[];

@@ -130,14 +130,16 @@ export class StreamAccumulator {
           chunk.name,
           chunk.providerMetadata
         );
-      case "provider_tool_result":
+      case "provider_tool_result": {
         // Accumulate provider-native/mediated result for pre-staging (AY002/AY004).
+        const rawClass = chunk.providerMetadata?.executionClass;
+        const executionClass: ProviderNativeInvocationRecord["executionClass"] =
+          rawClass === "provider-native" || rawClass === "provider-mediated"
+            ? rawClass
+            : "provider-native";
         this._providerToolResults.push({
           callId: randomUUID(),
-          executionClass:
-            (chunk.providerMetadata
-              ?.executionClass as ProviderNativeInvocationRecord["executionClass"]) ??
-            "provider-native",
+          executionClass,
           ...(chunk.isError === true ? { isError: true } : {}),
           name: chunk.name,
           providerCallId: chunk.providerCallId,
@@ -147,6 +149,7 @@ export class StreamAccumulator {
           result: chunk.result,
         });
         return [];
+      }
       case "finish":
         this.finishChunk = cloneValue(chunk);
         this.assertCompletedProviderParts();
