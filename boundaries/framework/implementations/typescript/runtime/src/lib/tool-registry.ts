@@ -163,6 +163,20 @@ function toJsonSchema(
 // Tuvren-client execution class: synthetic tool definitions (KRT-AZ001)
 // ---------------------------------------------------------------------------
 
+/** Produces the typed capability_binding_unavailable ToolResultPart for a callId/name pair. */
+function makeUnavailableResult(callId: string, capabilityId: string) {
+  return {
+    callId,
+    isError: true as const,
+    name: capabilityId,
+    output: {
+      code: CAPABILITY_BINDING_UNAVAILABLE,
+      error: `Tuvren-client capability "${capabilityId}" has no attached endpoint.`,
+    },
+    type: "tool_result" as const,
+  };
+}
+
 /**
  * Wraps `boundary.dispatch` to catch the safety-net throw that fires when
  * `detach()` races ahead of dispatch (TOCTOU gap between `isAvailable` and
@@ -219,16 +233,7 @@ export function buildClientEndpointTools(
           if (!boundary.isAvailable(capabilityId)) {
             // Surface as a direct ToolResultPart so the capability_binding_unavailable
             // code reaches the model result. (KRT-AZ003)
-            return {
-              callId: context.callId,
-              isError: true,
-              name: capabilityId,
-              output: {
-                code: CAPABILITY_BINDING_UNAVAILABLE,
-                error: `Tuvren-client capability "${capabilityId}" has no attached endpoint.`,
-              },
-              type: "tool_result",
-            };
+            return makeUnavailableResult(context.callId, capabilityId);
           }
 
           const dispatched = await dispatchToClientEndpoint(
@@ -241,16 +246,7 @@ export function buildClientEndpointTools(
           if (dispatched === "unavailable") {
             // TOCTOU: detach() ran between the isAvailable check and dispatch.
             // Surface the same typed result as the !isAvailable branch above.
-            return {
-              callId: context.callId,
-              isError: true,
-              name: capabilityId,
-              output: {
-                code: CAPABILITY_BINDING_UNAVAILABLE,
-                error: `Tuvren-client capability "${capabilityId}" has no attached endpoint.`,
-              },
-              type: "tool_result",
-            };
+            return makeUnavailableResult(context.callId, capabilityId);
           }
 
           if (dispatched === null) {

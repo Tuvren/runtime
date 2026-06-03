@@ -461,3 +461,109 @@ describe("tuvren-client: partial-observability model (KRT-AZ005)", () => {
     expect(auditEvents).toHaveLength(0);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Boundary preservation across pause/resume
+// ---------------------------------------------------------------------------
+
+describe("tuvren-client: boundary preserved through approval pause/resume", () => {
+  test("detaching the boundary during a paused approval causes the resumed client dispatch to return capability_binding_unavailable", async () => {
+    // Scenario: driver first requests a server tool with approval:true (pauses
+    // the turn). We detach the client endpoint from the boundary. On resume,
+    // the driver requests the client tool. The preserved boundary governs the
+    // resumed dispatch, so isAvailable returns false → capability_binding_unavailable.
+    const endpoint = makeOkEndpoint("ep1", "resume.cap", { resumed: true });
+    const boundary = createClientEndpointBoundary([endpoint]);
+
+    const harness = createFakeKernelHarness();
+    let callCount = 0;
+    const driver = {
+      id: "test-driver",
+      execute(
+        _context: DriverExecutionContext
+      ): Promise<DriverExecutionResult> {
+        callCount += 1;
+        if (callCount === 1) {
+          return Promise.resolve({
+            messages: [
+              assistantToolCalls([
+                { callId: "call-gate", input: {}, name: "approval.gate" },
+              ]),
+            ],
+            resolution: { type: "continue_iteration" as const },
+            toolExecutionMode: "parallel" as const,
+          });
+        }
+        if (callCount === 2) {
+          return Promise.resolve({
+            messages: [
+              assistantToolCalls([
+                { callId: "call-client", input: {}, name: "resume.cap" },
+              ]),
+            ],
+            resolution: { type: "continue_iteration" as const },
+            toolExecutionMode: "parallel" as const,
+          });
+        }
+        return Promise.resolve({
+          messages: [assistantText("done")],
+          resolution: { reason: "done", type: "end_turn" as const },
+        });
+      },
+    };
+
+    const runtime = createTuvrenRuntime({
+      createId: makeId,
+      defaultDriverId: "test-driver",
+      driverRegistry: createDriverRegistry([driver]),
+      kernel: harness.kernel,
+    });
+    const thread = await runtime.createThread({});
+
+    const pausedHandle = runtime.executeTurn({
+      branchId: thread.branchId,
+      config: {
+        name: "test-agent",
+        clientEndpoints: [endpoint],
+        clientEndpointBoundary: boundary,
+        tools: [
+          {
+            approval: true,
+            description: "gate requiring approval",
+            execute: () => Promise.resolve({ gated: true }),
+            inputSchema: { type: "object" },
+            name: "approval.gate",
+          },
+        ],
+      },
+      signal: textSignal("pause then resume with detached boundary"),
+      threadId: thread.threadId,
+    });
+
+    await collectEvents(pausedHandle.events());
+    expect(pausedHandle.status().phase).toBe("paused");
+
+    // Detach the endpoint AFTER pause and BEFORE resume.
+    boundary.detach("ep1");
+
+    const resumedHandle = pausedHandle.resolveApproval({
+      decisions: [{ callId: "call-gate", type: "approve" }],
+    });
+    const resumedEvents = await collectEvents(resumedHandle.events());
+
+    const toolResultEvents = resumedEvents.filter(
+      (e) => (e as TuvrenStreamEvent).type === "tool.result"
+    ) as (TuvrenStreamEvent & {
+      type: "tool.result";
+      isError?: boolean;
+      name?: string;
+      output?: unknown;
+    })[];
+
+    const clientResult = toolResultEvents.find((e) => e.name === "resume.cap");
+    expect(clientResult).toBeDefined();
+    expect(clientResult?.isError).toBe(true);
+    const output = clientResult?.output as Record<string, unknown> | undefined;
+    expect(output?.code).toBe(CAPABILITY_BINDING_UNAVAILABLE);
+  });
+});

@@ -50,7 +50,7 @@ The runtime calls this once per admitted invocation. The endpoint must:
    - `isError?: boolean`: set to `true` when the execution produced an error.
    - `leaseToken`: **must match** `envelope.leaseToken` exactly.
 
-> **Error handling:** Surface failures by returning `ClientReportedResult{ isError: true, content: { error: "..." } }`. Do **not** throw or reject the returned `Promise` — while the runtime catches thrown rejections and converts them to typed `tuvren-client` error results, throwing is a lower-fidelity path: the `content` becomes a stringified error message and the result is indistinguishable from other error conditions at the model level. Return `isError: true` to give the model actionable error context.
+> **Error handling:** Surface failures by returning `ClientReportedResult{ isError: true, content: { error: "..." } }`. Do **not** throw or reject the returned `Promise` — while the runtime catches thrown rejections and converts them to typed `tuvren-client` error results, throwing is a lower-fidelity path: the `content` becomes `{ error: "<message>" }` without a `code` field (unlike the `{ code, error }` shape used by runtime-side errors such as `capability_binding_unavailable`), and the result is harder to distinguish from other error conditions at the model or operator level. Return `isError: true` to give the model actionable, consistently-shaped error context.
 
 ```ts
 export interface ClientInvocationEnvelope {

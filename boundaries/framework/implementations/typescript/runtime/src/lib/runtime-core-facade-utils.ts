@@ -276,7 +276,16 @@ export function createDriverToolDefinitionSnapshot(
 }
 
 export function cloneAgentConfigForRequest(config: AgentConfig): AgentConfig {
-  return cloneSnapshotPreservingFunctions(config);
+  const cloned = cloneSnapshotPreservingFunctions(config);
+  // clientEndpointBoundary is a stateful, identity-preserving object (the
+  // capabilityIndex is mutable and external callers may detach endpoints).
+  // Deep-cloning it would sever the connection between the caller's detach()
+  // calls and the boundary the tool closures observe. Restore the original
+  // reference so the caller and the closures share the same live object.
+  if (config.clientEndpointBoundary !== undefined) {
+    cloned.clientEndpointBoundary = config.clientEndpointBoundary;
+  }
+  return cloned;
 }
 
 export function encodeKernelRecord(value: unknown, label: string): Uint8Array {
