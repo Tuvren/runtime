@@ -84,7 +84,7 @@ export async function runCapabilityPolicyExposureDimensions(): Promise<AdapterPr
       exposure: {
         endpointDenied: {
           exposed: byName.get(endpointDeniedId)?.exposed,
-          hasReason: (byName.get(endpointDeniedId)?.reason ?? "").length > 0,
+          reason: byName.get(endpointDeniedId)?.reason ?? "",
         },
         permitted: {
           exposed: byName.get(permittedId)?.exposed,
@@ -94,11 +94,11 @@ export async function runCapabilityPolicyExposureDimensions(): Promise<AdapterPr
         },
         residencyDenied: {
           exposed: byName.get(residencyDeniedId)?.exposed,
-          hasReason: (byName.get(residencyDeniedId)?.reason ?? "").length > 0,
+          reason: byName.get(residencyDeniedId)?.reason ?? "",
         },
         riskDenied: {
           exposed: byName.get(riskDeniedId)?.exposed,
-          hasReason: (byName.get(riskDeniedId)?.reason ?? "").length > 0,
+          reason: byName.get(riskDeniedId)?.reason ?? "",
         },
       },
     },
@@ -163,18 +163,18 @@ export async function runCapabilityPolicyInvocationDimensions(): Promise<Adapter
       invocation: {
         credentialDenied: {
           admitted: credentialDecision.admitted,
-          hasReason: (credentialDecision.reason ?? "").length > 0,
+          reason: credentialDecision.reason ?? "",
         },
         permitted: {
           admitted: permittedDecision.admitted,
         },
         presenceDenied: {
           admitted: presenceDecision.admitted,
-          hasReason: (presenceDecision.reason ?? "").length > 0,
+          reason: presenceDecision.reason ?? "",
         },
         residencyDenied: {
           admitted: residencyDecision.admitted,
-          hasReason: (residencyDecision.reason ?? "").length > 0,
+          reason: residencyDecision.reason ?? "",
         },
       },
     },

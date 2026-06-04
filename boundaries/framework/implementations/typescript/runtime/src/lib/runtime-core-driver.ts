@@ -206,6 +206,11 @@ export function createDriverExecutionContext(
           : "",
       permissions: [],
       providerId: "",
+      // Wired path: only client-endpoint tools are checked here via
+      // clientEndpointBoundary. Non-client requiresActiveEndpoint tools
+      // cannot reach this dimension through policyContextInputs — they
+      // must be filtered by a custom engine or a host-supplied context
+      // extension in a future ADR.
       unavailableCapabilityIds: buildUnavailableCapabilityIds(
         allTools,
         loopState.clientEndpointBoundary

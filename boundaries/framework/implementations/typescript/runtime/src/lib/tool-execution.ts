@@ -668,9 +668,12 @@ function resolveResumeDecision(
     };
   }
 
-  // BB005: re-evaluate invocation-time policy on the resume path to catch
-  // context-sensitive dimension changes between the initial pause and the
-  // resumed execution (e.g. lapsed credentials, changed residency context).
+  // BB005: re-evaluate invocation-time policy on the resume path. The
+  // baseline engine uses frozen policyContextInputs from pauseContext, so
+  // it will produce the same decision as the pre-pause check for static
+  // dimensions. The guard is meaningful for context-sensitive custom engines
+  // whose decisions depend on external mutable state (e.g. a host engine
+  // that rechecks live credential validity rather than a snapshot).
   // The risk-based approval path (requiresApproval) is intentionally not
   // re-raised here: the host has just approved this specific invocation,
   // so we honour that approval and only check for hard denials.

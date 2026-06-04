@@ -20,14 +20,12 @@
     },
     {
       "checkId": "bb.bb001.residency-exposure-withheld-has-reason",
-      "evidence": [
-        "result.capabilityPolicy.exposure.residencyDenied.hasReason"
-      ],
+      "evidence": ["result.capabilityPolicy.exposure.residencyDenied.reason"],
       "assertions": [
         {
           "kind": "resultField",
-          "field": "$.capabilityPolicy.exposure.residencyDenied.hasReason",
-          "equals": true
+          "field": "$.capabilityPolicy.exposure.residencyDenied.reason",
+          "matches": ".+"
         }
       ],
       "operation": "runtime.capability-policy.exposure-dimensions"
@@ -60,14 +58,12 @@
     },
     {
       "checkId": "bb.bb001.residency-invocation-denied-has-reason",
-      "evidence": [
-        "result.capabilityPolicy.invocation.residencyDenied.hasReason"
-      ],
+      "evidence": ["result.capabilityPolicy.invocation.residencyDenied.reason"],
       "assertions": [
         {
           "kind": "resultField",
-          "field": "$.capabilityPolicy.invocation.residencyDenied.hasReason",
-          "equals": true
+          "field": "$.capabilityPolicy.invocation.residencyDenied.reason",
+          "matches": ".+"
         }
       ],
       "operation": "runtime.capability-policy.invocation-dimensions"
@@ -86,12 +82,12 @@
     },
     {
       "checkId": "bb.bb002.risk-class-exposure-withheld-has-reason",
-      "evidence": ["result.capabilityPolicy.exposure.riskDenied.hasReason"],
+      "evidence": ["result.capabilityPolicy.exposure.riskDenied.reason"],
       "assertions": [
         {
           "kind": "resultField",
-          "field": "$.capabilityPolicy.exposure.riskDenied.hasReason",
-          "equals": true
+          "field": "$.capabilityPolicy.exposure.riskDenied.reason",
+          "matches": ".+"
         }
       ],
       "operation": "runtime.capability-policy.exposure-dimensions"
@@ -110,12 +106,12 @@
     },
     {
       "checkId": "bb.bb003.active-endpoint-exposure-withheld-has-reason",
-      "evidence": ["result.capabilityPolicy.exposure.endpointDenied.hasReason"],
+      "evidence": ["result.capabilityPolicy.exposure.endpointDenied.reason"],
       "assertions": [
         {
           "kind": "resultField",
-          "field": "$.capabilityPolicy.exposure.endpointDenied.hasReason",
-          "equals": true
+          "field": "$.capabilityPolicy.exposure.endpointDenied.reason",
+          "matches": ".+"
         }
       ],
       "operation": "runtime.capability-policy.exposure-dimensions"
@@ -136,14 +132,12 @@
     },
     {
       "checkId": "bb.bb003.user-presence-invocation-denied-has-reason",
-      "evidence": [
-        "result.capabilityPolicy.invocation.presenceDenied.hasReason"
-      ],
+      "evidence": ["result.capabilityPolicy.invocation.presenceDenied.reason"],
       "assertions": [
         {
           "kind": "resultField",
-          "field": "$.capabilityPolicy.invocation.presenceDenied.hasReason",
-          "equals": true
+          "field": "$.capabilityPolicy.invocation.presenceDenied.reason",
+          "matches": ".+"
         }
       ],
       "operation": "runtime.capability-policy.invocation-dimensions"
@@ -165,13 +159,13 @@
     {
       "checkId": "bb.bb004.credential-boundary-invocation-denied-has-reason",
       "evidence": [
-        "result.capabilityPolicy.invocation.credentialDenied.hasReason"
+        "result.capabilityPolicy.invocation.credentialDenied.reason"
       ],
       "assertions": [
         {
           "kind": "resultField",
-          "field": "$.capabilityPolicy.invocation.credentialDenied.hasReason",
-          "equals": true
+          "field": "$.capabilityPolicy.invocation.credentialDenied.reason",
+          "matches": ".+"
         }
       ],
       "operation": "runtime.capability-policy.invocation-dimensions"
