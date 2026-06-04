@@ -969,8 +969,7 @@ class RuntimeCore implements TuvrenRuntime {
           ),
         stageDriverMessages: (...args) =>
           stageRuntimeCoreDriverMessages(this.hosts, ...args),
-        publishEvent: (h, event, ls) =>
-          this.publishRuntimeEvent(h, event, ls),
+        publishEvent: (h, event, ls) => this.publishRuntimeEvent(h, event, ls),
       },
       handle,
       schemaId,

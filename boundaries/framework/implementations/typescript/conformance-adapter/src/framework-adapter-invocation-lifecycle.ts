@@ -54,7 +54,7 @@ import {
 
 function findEvents(events: unknown[], type: string) {
   return events.filter(
-    (e) => (e as Record<string, unknown>)["type"] === type
+    (e) => (e as Record<string, unknown>).type === type
   ) as Record<string, unknown>[];
 }
 
@@ -70,19 +70,32 @@ function buildProviderToolMessage(
         callId,
         name,
         output: { conformanceValue: executionClass },
-        providerMetadata: { executionClass, owner: "provider", providerCallId: callId },
+        providerMetadata: {
+          executionClass,
+          owner: "provider",
+          providerCallId: callId,
+        },
         type: "tool_result",
       },
     ],
   };
 }
 
-function makeProviderDriver(executionClass: "provider-native" | "provider-mediated", toolName: string) {
+function makeProviderDriver(
+  executionClass: "provider-native" | "provider-mediated",
+  toolName: string
+) {
   return createStaticDriver(async (context) => {
     await Promise.resolve();
     if (!context.messages.some((m) => m.role === "tool")) {
       return {
-        messages: [buildProviderToolMessage(`ba005-call-${executionClass}`, toolName, executionClass)],
+        messages: [
+          buildProviderToolMessage(
+            `ba005-call-${executionClass}`,
+            toolName,
+            executionClass
+          ),
+        ],
         resolution: { type: "continue_iteration" as const },
       };
     }
@@ -98,7 +111,11 @@ function makeSingleCallDriver(toolName: string) {
     await Promise.resolve();
     if (!context.messages.some((m) => m.role === "tool")) {
       return {
-        messages: [assistantToolCalls([{ callId: "ba005-call-1", input: {}, name: toolName }])],
+        messages: [
+          assistantToolCalls([
+            { callId: "ba005-call-1", input: {}, name: toolName },
+          ]),
+        ],
         resolution: { type: "continue_iteration" as const },
         toolExecutionMode: "parallel" as const,
       };
@@ -110,37 +127,69 @@ function makeSingleCallDriver(toolName: string) {
   });
 }
 
-function makeOkEndpoint(endpointId: string, capabilityId: string): AttachedClientEndpoint {
+function makeOkEndpoint(
+  endpointId: string,
+  capabilityId: string
+): AttachedClientEndpoint {
   return {
     endpointId,
-    advertisedCapabilities: [{ capabilityId, description: "ba005 cap", inputSchema: { type: "object" } }],
-    dispatch(envelope: ClientInvocationEnvelope): Promise<ClientReportedResult> {
-      return Promise.resolve({ callId: envelope.callId, content: { ok: true }, leaseToken: envelope.leaseToken });
+    advertisedCapabilities: [
+      {
+        capabilityId,
+        description: "ba005 cap",
+        inputSchema: { type: "object" },
+      },
+    ],
+    dispatch(
+      envelope: ClientInvocationEnvelope
+    ): Promise<ClientReportedResult> {
+      return Promise.resolve({
+        callId: envelope.callId,
+        content: { ok: true },
+        leaseToken: envelope.leaseToken,
+      });
     },
   };
 }
 
-function makeStaleEndpoint(endpointId: string, capabilityId: string): AttachedClientEndpoint {
+function makeStaleEndpoint(
+  endpointId: string,
+  capabilityId: string
+): AttachedClientEndpoint {
   return {
     endpointId,
-    advertisedCapabilities: [{ capabilityId, description: "ba005 stale cap", inputSchema: { type: "object" } }],
-    dispatch(envelope: ClientInvocationEnvelope): Promise<ClientReportedResult> {
-      return Promise.resolve({ callId: envelope.callId, content: { stale: true }, leaseToken: "wrong-token-ba005" });
+    advertisedCapabilities: [
+      {
+        capabilityId,
+        description: "ba005 stale cap",
+        inputSchema: { type: "object" },
+      },
+    ],
+    dispatch(
+      envelope: ClientInvocationEnvelope
+    ): Promise<ClientReportedResult> {
+      return Promise.resolve({
+        callId: envelope.callId,
+        content: { stale: true },
+        leaseToken: "wrong-token-ba005",
+      });
     },
   };
 }
 
 function extractAttribution(event: Record<string, unknown>) {
-  const attr = event["attribution"] as Record<string, unknown> | undefined;
-  if (!attr) return undefined;
-  const obs = attr["observation"] as Record<string, unknown> | undefined;
+  const attr = event.attribution as Record<string, unknown> | undefined;
+  if (!attr) {
+    return undefined;
+  }
+  const obs = attr.observation as Record<string, unknown> | undefined;
   return {
-    canAudit: obs?.["canAudit"],
-    canCancel: obs?.["canCancel"],
-    canResume: obs?.["canResume"],
-    canRetry: obs?.["canRetry"],
-    executionClass: attr["executionClass"],
-    owner: attr["owner"],
+    canAudit: obs?.canAudit,
+    canCancel: obs?.canCancel,
+    canResume: obs?.canResume,
+    canRetry: obs?.canRetry,
+    executionClass: attr.executionClass,
+    owner: attr.owner,
   };
 }
 
@@ -166,7 +215,14 @@ export async function runInvocationLifecycleCrossClass(): Promise<AdapterProject
     branchId: serverThread.branchId,
     config: {
       name: AGENT_NAME,
-      tools: [{ name: SERVER_TOOL, description: "ba005 server", inputSchema: { type: "object" }, execute: async () => ({ ok: true }) }],
+      tools: [
+        {
+          name: SERVER_TOOL,
+          description: "ba005 server",
+          inputSchema: { type: "object" },
+          execute: async () => ({ ok: true }),
+        },
+      ],
     },
     signal: textSignal("ba005 server"),
     threadId: serverThread.threadId,
@@ -183,7 +239,9 @@ export async function runInvocationLifecycleCrossClass(): Promise<AdapterProject
   const pnRuntime = createTuvrenRuntimeCore({
     createId: createConformanceIdFactory(),
     defaultDriverId: DRIVER_ID,
-    driverRegistry: createDriverRegistry([makeProviderDriver("provider-native", PN_TOOL)]),
+    driverRegistry: createDriverRegistry([
+      makeProviderDriver("provider-native", PN_TOOL),
+    ]),
     kernel: pnHarness.kernel,
   });
   const pnThread = await pnRuntime.createThread({});
@@ -205,7 +263,9 @@ export async function runInvocationLifecycleCrossClass(): Promise<AdapterProject
   const pmRuntime = createTuvrenRuntimeCore({
     createId: createConformanceIdFactory(),
     defaultDriverId: DRIVER_ID,
-    driverRegistry: createDriverRegistry([makeProviderDriver("provider-mediated", PM_TOOL)]),
+    driverRegistry: createDriverRegistry([
+      makeProviderDriver("provider-mediated", PM_TOOL),
+    ]),
     kernel: pmHarness.kernel,
   });
   const pmThread = await pmRuntime.createThread({});
@@ -251,7 +311,9 @@ export async function runInvocationLifecycleCrossClass(): Promise<AdapterProject
 
   // --- 5. policy-denied (tuvren-server) ---
   const DENIED_TOOL = "ba005.lifecycle.denied";
-  const denyEngine = createCapabilityPolicyEngine({ deniedCapabilityIds: new Set([DENIED_TOOL]) });
+  const denyEngine = createCapabilityPolicyEngine({
+    deniedCapabilityIds: new Set([DENIED_TOOL]),
+  });
   const deniedHarness = createConformanceKernelHarness();
   const deniedRuntime = createTuvrenRuntimeCore({
     createId: createConformanceIdFactory(),
@@ -265,7 +327,14 @@ export async function runInvocationLifecycleCrossClass(): Promise<AdapterProject
     config: {
       name: AGENT_NAME,
       capabilityPolicyEngine: denyEngine,
-      tools: [{ name: DENIED_TOOL, description: "ba005 denied", inputSchema: { type: "object" }, execute: async () => ({ ok: true }) }],
+      tools: [
+        {
+          name: DENIED_TOOL,
+          description: "ba005 denied",
+          inputSchema: { type: "object" },
+          execute: async () => ({ ok: true }),
+        },
+      ],
     },
     signal: textSignal("ba005 denied"),
     threadId: deniedThread.threadId,
@@ -273,7 +342,9 @@ export async function runInvocationLifecycleCrossClass(): Promise<AdapterProject
   const deniedEvents = await collectValues(deniedHandle.events());
   const deniedStarts = findEvents(deniedEvents, "tool.start");
   const deniedResults = findEvents(deniedEvents, "tool.result");
-  const deniedResultEvent = deniedResults[0] as Record<string, unknown> | undefined;
+  const deniedResultEvent = deniedResults[0] as
+    | Record<string, unknown>
+    | undefined;
 
   // --- 6. stale late-completion (tuvren-client) ---
   const STALE_CAP = "ba005.lifecycle.stale";
@@ -289,14 +360,22 @@ export async function runInvocationLifecycleCrossClass(): Promise<AdapterProject
   const staleThread = await staleRuntime.createThread({});
   const staleHandle = staleRuntime.executeTurn({
     branchId: staleThread.branchId,
-    config: { name: AGENT_NAME, clientEndpoints: [staleEndpoint], clientEndpointBoundary: staleBoundary },
+    config: {
+      name: AGENT_NAME,
+      clientEndpoints: [staleEndpoint],
+      clientEndpointBoundary: staleBoundary,
+    },
     signal: textSignal("ba005 stale"),
     threadId: staleThread.threadId,
   });
   const staleEvents = await collectValues(staleHandle.events());
   const staleResults = findEvents(staleEvents, "tool.result");
-  const staleResultEvent = staleResults[0] as Record<string, unknown> | undefined;
-  const staleOutput = staleResultEvent?.["output"] as Record<string, unknown> | undefined;
+  const staleResultEvent = staleResults[0] as
+    | Record<string, unknown>
+    | undefined;
+  const staleOutput = staleResultEvent?.output as
+    | Record<string, unknown>
+    | undefined;
 
   // --- 7. tuvren-server fail-clean: tool that throws an error → isError: true ---
   const ERROR_TOOL = "ba005.lifecycle.server.error";
@@ -312,12 +391,17 @@ export async function runInvocationLifecycleCrossClass(): Promise<AdapterProject
     branchId: errorThread.branchId,
     config: {
       name: AGENT_NAME,
-      tools: [{
-        name: ERROR_TOOL,
-        description: "ba005 error tool",
-        inputSchema: { type: "object" },
-        execute: async () => { throw new Error("ba005 deliberate error"); },
-      }],
+      tools: [
+        {
+          name: ERROR_TOOL,
+          description: "ba005 error tool",
+          inputSchema: { type: "object" },
+          // biome-ignore lint/suspicious/useAwait: async required by TuvrenToolDefinition.execute contract
+          execute: async () => {
+            throw new Error("ba005 deliberate error");
+          },
+        },
+      ],
     },
     signal: textSignal("ba005 error"),
     threadId: errorThread.threadId,
@@ -325,7 +409,9 @@ export async function runInvocationLifecycleCrossClass(): Promise<AdapterProject
   const errorEvents = await collectValues(errorHandle.events());
   const errorStarts = findEvents(errorEvents, "tool.start");
   const errorResults = findEvents(errorEvents, "tool.result");
-  const errorResultEvent = errorResults[0] as Record<string, unknown> | undefined;
+  const errorResultEvent = errorResults[0] as
+    | Record<string, unknown>
+    | undefined;
 
   // --- 8. tuvren-client unavailable endpoint: fail-clean without fabricating ---
   const UNAVAIL_CAP = "ba005.lifecycle.client.unavail";
@@ -342,14 +428,22 @@ export async function runInvocationLifecycleCrossClass(): Promise<AdapterProject
   const unavailThread = await unavailRuntime.createThread({});
   const unavailHandle = unavailRuntime.executeTurn({
     branchId: unavailThread.branchId,
-    config: { name: AGENT_NAME, clientEndpoints: [unavailEndpoint], clientEndpointBoundary: unavailBoundary },
+    config: {
+      name: AGENT_NAME,
+      clientEndpoints: [unavailEndpoint],
+      clientEndpointBoundary: unavailBoundary,
+    },
     signal: textSignal("ba005 unavail"),
     threadId: unavailThread.threadId,
   });
   const unavailEvents = await collectValues(unavailHandle.events());
   const unavailResults = findEvents(unavailEvents, "tool.result");
-  const unavailResultEvent = unavailResults[0] as Record<string, unknown> | undefined;
-  const unavailOutput = unavailResultEvent?.["output"] as Record<string, unknown> | undefined;
+  const unavailResultEvent = unavailResults[0] as
+    | Record<string, unknown>
+    | undefined;
+  const unavailOutput = unavailResultEvent?.output as
+    | Record<string, unknown>
+    | undefined;
 
   return {
     result: {
@@ -401,21 +495,21 @@ export async function runInvocationLifecycleCrossClass(): Promise<AdapterProject
         policyDenied: {
           toolStartCount: deniedStarts.length,
           toolResultCount: deniedResults.length,
-          resultIsError: deniedResultEvent?.["isError"],
+          resultIsError: deniedResultEvent?.isError,
         },
         staleLateCompletion: {
-          toolResultIsError: staleResultEvent?.["isError"],
-          toolResultCode: staleOutput?.["code"],
+          toolResultIsError: staleResultEvent?.isError,
+          toolResultCode: staleOutput?.code,
         },
         // BA003 fail-clean proofs: non-fabricated clean failures
         serverErrorFailClean: {
           toolStartCount: errorStarts.length,
           toolResultCount: errorResults.length,
-          resultIsError: errorResultEvent?.["isError"],
+          resultIsError: errorResultEvent?.isError,
         },
         clientUnavailableFailClean: {
-          toolResultIsError: unavailResultEvent?.["isError"],
-          toolResultCode: unavailOutput?.["code"],
+          toolResultIsError: unavailResultEvent?.isError,
+          toolResultCode: unavailOutput?.code,
         },
       },
     },

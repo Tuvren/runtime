@@ -214,17 +214,6 @@ export interface RuntimeCoreIterationHost {
   ): TuvrenStreamEvent[];
   materializeDriver(driverId: string): KrakenDriver;
   now(): number;
-  reconcileCheckpointedPauseResolution(
-    checkpointedPause: boolean,
-    runId: string,
-    turnId: string,
-    resolution: RuntimeResolution
-  ): Promise<RuntimeResolution>;
-  stageDriverMessages(
-    runId: string,
-    messages: TuvrenMessage[],
-    iterationCount: number
-  ): Promise<HashString[]>;
   /**
    * Publish an event through the full runtime event + telemetry path. Used by
    * provider-tool attribution to ensure telemetry observes the same events as
@@ -241,6 +230,17 @@ export interface RuntimeCoreIterationHost {
       enteredIterationLoop: boolean;
     }
   ): void;
+  reconcileCheckpointedPauseResolution(
+    checkpointedPause: boolean,
+    runId: string,
+    turnId: string,
+    resolution: RuntimeResolution
+  ): Promise<RuntimeResolution>;
+  stageDriverMessages(
+    runId: string,
+    messages: TuvrenMessage[],
+    iterationCount: number
+  ): Promise<HashString[]>;
 }
 
 export function findInvalidDriverResolution(

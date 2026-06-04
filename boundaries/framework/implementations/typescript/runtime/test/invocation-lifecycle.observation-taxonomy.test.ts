@@ -48,7 +48,10 @@ import type {
   ToolStartEvent,
 } from "@tuvren/core/events";
 import type { TuvrenMessage } from "@tuvren/core/messages";
-import type { TelemetrySpan, TuvrenTelemetrySink } from "@tuvren/core/telemetry";
+import type {
+  TelemetrySpan,
+  TuvrenTelemetrySink,
+} from "@tuvren/core/telemetry";
 import {
   createClientEndpointBoundary,
   createDriverRegistry,
@@ -74,8 +77,12 @@ function createTelemetryCapture(): {
   return {
     spans,
     sink: {
-      event: () => {},
-      span: (span) => { spans.push(span); },
+      event: (_e) => {
+        /* noop */
+      },
+      span: (span) => {
+        spans.push(span);
+      },
     },
   };
 }
@@ -85,11 +92,19 @@ function extractEventsByType(events: unknown[]) {
   const results: ToolResultEvent[] = [];
   const audits: ToolAuditEvent[] = [];
   for (const ev of events) {
-    if (typeof ev !== "object" || ev === null) continue;
+    if (typeof ev !== "object" || ev === null) {
+      continue;
+    }
     const e = ev as Record<string, unknown>;
-    if (e["type"] === "tool.start") starts.push(e as unknown as ToolStartEvent);
-    if (e["type"] === "tool.result") results.push(e as unknown as ToolResultEvent);
-    if (e["type"] === "tool.audit") audits.push(e as unknown as ToolAuditEvent);
+    if (e.type === "tool.start") {
+      starts.push(e as unknown as ToolStartEvent);
+    }
+    if (e.type === "tool.result") {
+      results.push(e as unknown as ToolResultEvent);
+    }
+    if (e.type === "tool.audit") {
+      audits.push(e as unknown as ToolAuditEvent);
+    }
   }
   return { audits, results, starts };
 }
@@ -117,19 +132,32 @@ function buildProviderToolMessage(
   };
 }
 
-function makeProviderDriver(executionClass: "provider-native" | "provider-mediated"): RuntimeDriver {
+function makeProviderDriver(
+  executionClass: "provider-native" | "provider-mediated"
+): RuntimeDriver {
   return {
     id: `ba002-driver-${executionClass}`,
     async execute(context) {
       if (!context.messages.some((m) => m.role === "tool")) {
         return {
-          messages: [buildProviderToolMessage(`call-${executionClass}`, `prov_${executionClass.replace("-", "_")}`, executionClass)],
+          messages: [
+            buildProviderToolMessage(
+              `call-${executionClass}`,
+              `prov_${executionClass.replace("-", "_")}`,
+              executionClass
+            ),
+          ],
           resolution: { type: "continue_iteration" },
         };
       }
-      return { messages: [assistantText("done")], resolution: { reason: "done", type: "end_turn" } };
+      return {
+        messages: [assistantText("done")],
+        resolution: { reason: "done", type: "end_turn" },
+      };
     },
-    async resume() { throw new Error("no"); },
+    async resume() {
+      throw new Error("no");
+    },
   };
 }
 
@@ -139,14 +167,23 @@ function makeServerDriver(toolName: string): RuntimeDriver {
     async execute(context) {
       if (!context.messages.some((m) => m.role === "tool")) {
         return {
-          messages: [assistantToolCalls([{ callId: "ba002-call-server", input: {}, name: toolName }])],
+          messages: [
+            assistantToolCalls([
+              { callId: "ba002-call-server", input: {}, name: toolName },
+            ]),
+          ],
           resolution: { type: "continue_iteration" },
           toolExecutionMode: "parallel",
         };
       }
-      return { messages: [assistantText("done")], resolution: { reason: "done", type: "end_turn" } };
+      return {
+        messages: [assistantText("done")],
+        resolution: { reason: "done", type: "end_turn" },
+      };
     },
-    async resume() { throw new Error("no"); },
+    async resume() {
+      throw new Error("no");
+    },
   };
 }
 
@@ -156,23 +193,47 @@ function makeClientDriver(capabilityId: string): RuntimeDriver {
     async execute(context) {
       if (!context.messages.some((m) => m.role === "tool")) {
         return {
-          messages: [assistantToolCalls([{ callId: "ba002-call-client", input: {}, name: capabilityId }])],
+          messages: [
+            assistantToolCalls([
+              { callId: "ba002-call-client", input: {}, name: capabilityId },
+            ]),
+          ],
           resolution: { type: "continue_iteration" },
           toolExecutionMode: "parallel",
         };
       }
-      return { messages: [assistantText("done")], resolution: { reason: "done", type: "end_turn" } };
+      return {
+        messages: [assistantText("done")],
+        resolution: { reason: "done", type: "end_turn" },
+      };
     },
-    async resume() { throw new Error("no"); },
+    async resume() {
+      throw new Error("no");
+    },
   };
 }
 
-function makeOkEndpoint(endpointId: string, capabilityId: string): AttachedClientEndpoint {
+function makeOkEndpoint(
+  endpointId: string,
+  capabilityId: string
+): AttachedClientEndpoint {
   return {
     endpointId,
-    advertisedCapabilities: [{ capabilityId, description: "ba002 client cap", inputSchema: { type: "object" } }],
-    async dispatch(envelope: ClientInvocationEnvelope): Promise<ClientReportedResult> {
-      return { callId: envelope.callId, content: "ok", leaseToken: envelope.leaseToken };
+    advertisedCapabilities: [
+      {
+        capabilityId,
+        description: "ba002 client cap",
+        inputSchema: { type: "object" },
+      },
+    ],
+    async dispatch(
+      envelope: ClientInvocationEnvelope
+    ): Promise<ClientReportedResult> {
+      return {
+        callId: envelope.callId,
+        content: "ok",
+        leaseToken: envelope.leaseToken,
+      };
     },
   };
 }
@@ -213,8 +274,12 @@ describe("BA002 telemetry taxonomy — tuvren-server", () => {
 
     const toolCallSpan = capture.spans.find((s) => s.kind === "tool_call");
     expect(toolCallSpan).toBeDefined();
-    expect(toolCallSpan?.attributes["tuvren.runtime.capability.execution_class"]).toBe("tuvren-server");
-    expect(toolCallSpan?.attributes["tuvren.runtime.capability.owner"]).toBe("tuvren");
+    expect(
+      toolCallSpan?.attributes["tuvren.runtime.capability.execution_class"]
+    ).toBe("tuvren-server");
+    expect(toolCallSpan?.attributes["tuvren.runtime.capability.owner"]).toBe(
+      "tuvren"
+    );
 
     // Event stream attribution must match the telemetry span
     const { starts } = extractEventsByType(events);
@@ -235,7 +300,14 @@ describe("BA002 telemetry taxonomy — tuvren-server", () => {
       branchId: thread.branchId,
       config: {
         name: "agent",
-        tools: [{ name: toolName, description: "audit tool", inputSchema: { type: "object" }, execute: async () => ({ ok: true }) }],
+        tools: [
+          {
+            name: toolName,
+            description: "audit tool",
+            inputSchema: { type: "object" },
+            execute: async () => ({ ok: true }),
+          },
+        ],
       },
       signal: textSignal("go"),
       threadId: thread.threadId,
@@ -261,7 +333,9 @@ describe("BA002 telemetry taxonomy — provider-native", () => {
     const harness = createFakeKernelHarness();
     const runtime = createTuvrenRuntime({
       defaultDriverId: "ba002-driver-provider-native",
-      driverRegistry: createDriverRegistry([makeProviderDriver("provider-native")]),
+      driverRegistry: createDriverRegistry([
+        makeProviderDriver("provider-native"),
+      ]),
       kernel: harness.kernel,
       telemetry: capture.sink,
     });
@@ -276,8 +350,12 @@ describe("BA002 telemetry taxonomy — provider-native", () => {
 
     const toolCallSpan = capture.spans.find((s) => s.kind === "tool_call");
     expect(toolCallSpan).toBeDefined();
-    expect(toolCallSpan?.attributes["tuvren.runtime.capability.execution_class"]).toBe("provider-native");
-    expect(toolCallSpan?.attributes["tuvren.runtime.capability.owner"]).toBe("provider");
+    expect(
+      toolCallSpan?.attributes["tuvren.runtime.capability.execution_class"]
+    ).toBe("provider-native");
+    expect(toolCallSpan?.attributes["tuvren.runtime.capability.owner"]).toBe(
+      "provider"
+    );
 
     // Event stream matches telemetry
     const { starts, audits } = extractEventsByType(events);
@@ -299,7 +377,9 @@ describe("BA002 telemetry taxonomy — provider-mediated", () => {
     const harness = createFakeKernelHarness();
     const runtime = createTuvrenRuntime({
       defaultDriverId: "ba002-driver-provider-mediated",
-      driverRegistry: createDriverRegistry([makeProviderDriver("provider-mediated")]),
+      driverRegistry: createDriverRegistry([
+        makeProviderDriver("provider-mediated"),
+      ]),
       kernel: harness.kernel,
       telemetry: capture.sink,
     });
@@ -314,8 +394,12 @@ describe("BA002 telemetry taxonomy — provider-mediated", () => {
 
     const toolCallSpan = capture.spans.find((s) => s.kind === "tool_call");
     expect(toolCallSpan).toBeDefined();
-    expect(toolCallSpan?.attributes["tuvren.runtime.capability.execution_class"]).toBe("provider-mediated");
-    expect(toolCallSpan?.attributes["tuvren.runtime.capability.owner"]).toBe("provider");
+    expect(
+      toolCallSpan?.attributes["tuvren.runtime.capability.execution_class"]
+    ).toBe("provider-mediated");
+    expect(toolCallSpan?.attributes["tuvren.runtime.capability.owner"]).toBe(
+      "provider"
+    );
 
     const { starts, audits } = extractEventsByType(events);
     expect(starts[0].attribution?.executionClass).toBe("provider-mediated");
@@ -359,8 +443,12 @@ describe("BA002 telemetry taxonomy — tuvren-client", () => {
 
     const toolCallSpan = capture.spans.find((s) => s.kind === "tool_call");
     expect(toolCallSpan).toBeDefined();
-    expect(toolCallSpan?.attributes["tuvren.runtime.capability.execution_class"]).toBe("tuvren-client");
-    expect(toolCallSpan?.attributes["tuvren.runtime.capability.owner"]).toBe("tuvren");
+    expect(
+      toolCallSpan?.attributes["tuvren.runtime.capability.execution_class"]
+    ).toBe("tuvren-client");
+    expect(toolCallSpan?.attributes["tuvren.runtime.capability.owner"]).toBe(
+      "tuvren"
+    );
 
     const { starts, audits } = extractEventsByType(events);
     expect(starts[0].attribution?.executionClass).toBe("tuvren-client");
@@ -378,11 +466,16 @@ describe("BA002 telemetry taxonomy — tuvren-client", () => {
 
 describe("BA002 cross-class observation limits", () => {
   test("provider-owned classes expose no resume/cancel/retry/audit affordances", async () => {
-    for (const executionClass of ["provider-native", "provider-mediated"] as const) {
+    for (const executionClass of [
+      "provider-native",
+      "provider-mediated",
+    ] as const) {
       const harness = createFakeKernelHarness();
       const runtime = createTuvrenRuntime({
         defaultDriverId: `ba002-driver-${executionClass}`,
-        driverRegistry: createDriverRegistry([makeProviderDriver(executionClass)]),
+        driverRegistry: createDriverRegistry([
+          makeProviderDriver(executionClass),
+        ]),
         kernel: harness.kernel,
       });
       const thread = await runtime.createThread({});
@@ -423,7 +516,14 @@ describe("BA002 cross-class observation limits", () => {
       branchId: thread.branchId,
       config: {
         name: "agent",
-        tools: [{ name: toolName, description: "obs tool", inputSchema: { type: "object" }, execute: async () => ({ ok: true }) }],
+        tools: [
+          {
+            name: toolName,
+            description: "obs tool",
+            inputSchema: { type: "object" },
+            execute: async () => ({ ok: true }),
+          },
+        ],
       },
       signal: textSignal("go"),
       threadId: thread.threadId,

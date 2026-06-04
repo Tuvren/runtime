@@ -80,10 +80,16 @@ function extractToolEvents(events: unknown[]) {
   const starts: ToolStartEvent[] = [];
   const results: ToolResultEvent[] = [];
   for (const ev of events) {
-    if (typeof ev !== "object" || ev === null) continue;
+    if (typeof ev !== "object" || ev === null) {
+      continue;
+    }
     const e = ev as Record<string, unknown>;
-    if (e["type"] === "tool.start") starts.push(e as unknown as ToolStartEvent);
-    if (e["type"] === "tool.result") results.push(e as unknown as ToolResultEvent);
+    if (e.type === "tool.start") {
+      starts.push(e as unknown as ToolStartEvent);
+    }
+    if (e.type === "tool.result") {
+      results.push(e as unknown as ToolResultEvent);
+    }
   }
   return { results, starts };
 }
@@ -101,7 +107,11 @@ function buildProviderToolMessage(
         callId,
         name,
         output,
-        providerMetadata: { executionClass, owner: "provider", providerCallId: callId },
+        providerMetadata: {
+          executionClass,
+          owner: "provider",
+          providerCallId: callId,
+        },
         type: "tool_result",
       },
     ],
@@ -113,7 +123,10 @@ function buildProviderToolMessage(
 // ---------------------------------------------------------------------------
 
 describe("BA003 recovery semantics — provider-native / provider-mediated", () => {
-  for (const executionClass of ["provider-native", "provider-mediated"] as const) {
+  for (const executionClass of [
+    "provider-native",
+    "provider-mediated",
+  ] as const) {
     test(`${executionClass}: result resolves from observed driver output — not fabricated by framework`, async () => {
       const harness = createFakeKernelHarness();
       const expectedOutput = { value: 42, executionClass };
@@ -124,13 +137,25 @@ describe("BA003 recovery semantics — provider-native / provider-mediated", () 
         async execute(context) {
           if (!context.messages.some((m) => m.role === "tool")) {
             return {
-              messages: [buildProviderToolMessage(`call-${executionClass}`, toolName, executionClass, expectedOutput)],
+              messages: [
+                buildProviderToolMessage(
+                  `call-${executionClass}`,
+                  toolName,
+                  executionClass,
+                  expectedOutput
+                ),
+              ],
               resolution: { type: "continue_iteration" },
             };
           }
-          return { messages: [assistantText("done")], resolution: { reason: "done", type: "end_turn" } };
+          return {
+            messages: [assistantText("done")],
+            resolution: { reason: "done", type: "end_turn" },
+          };
         },
-        async resume() { throw new Error("no"); },
+        async resume() {
+          throw new Error("no");
+        },
       };
       const runtime = createTuvrenRuntime({
         defaultDriverId: `ba003-driver-${executionClass}`,
@@ -181,13 +206,25 @@ describe("BA003 recovery semantics — provider-native / provider-mediated", () 
       async execute(context) {
         if (!context.messages.some((m) => m.role === "tool")) {
           return {
-            messages: [buildProviderToolMessage("call-pair", "pair_tool", "provider-native", { done: true })],
+            messages: [
+              buildProviderToolMessage(
+                "call-pair",
+                "pair_tool",
+                "provider-native",
+                { done: true }
+              ),
+            ],
             resolution: { type: "continue_iteration" },
           };
         }
-        return { messages: [assistantText("done")], resolution: { reason: "done", type: "end_turn" } };
+        return {
+          messages: [assistantText("done")],
+          resolution: { reason: "done", type: "end_turn" },
+        };
       },
-      async resume() { throw new Error("no"); },
+      async resume() {
+        throw new Error("no");
+      },
     };
     const runtime = createTuvrenRuntime({
       defaultDriverId: "ba003-pair-driver",
@@ -225,10 +262,22 @@ describe("BA003 recovery semantics — tuvren-client", () => {
 
     const staleEndpoint: AttachedClientEndpoint = {
       endpointId: "ep-stale-ba003",
-      advertisedCapabilities: [{ capabilityId, description: "stale cap", inputSchema: { type: "object" } }],
-      async dispatch(envelope: ClientInvocationEnvelope): Promise<ClientReportedResult> {
+      advertisedCapabilities: [
+        {
+          capabilityId,
+          description: "stale cap",
+          inputSchema: { type: "object" },
+        },
+      ],
+      async dispatch(
+        envelope: ClientInvocationEnvelope
+      ): Promise<ClientReportedResult> {
         // Echo a wrong leaseToken to simulate a stale late-completion
-        return { callId: envelope.callId, content: { fabricated: true }, leaseToken: "wrong-token" };
+        return {
+          callId: envelope.callId,
+          content: { fabricated: true },
+          leaseToken: "wrong-token",
+        };
       },
     };
     const boundary = createClientEndpointBoundary([staleEndpoint]);
@@ -238,14 +287,23 @@ describe("BA003 recovery semantics — tuvren-client", () => {
       async execute(context) {
         if (!context.messages.some((m) => m.role === "tool")) {
           return {
-            messages: [assistantToolCalls([{ callId: "call-stale", input: {}, name: capabilityId }])],
+            messages: [
+              assistantToolCalls([
+                { callId: "call-stale", input: {}, name: capabilityId },
+              ]),
+            ],
             resolution: { type: "continue_iteration" },
             toolExecutionMode: "parallel",
           };
         }
-        return { messages: [assistantText("done")], resolution: { reason: "done", type: "end_turn" } };
+        return {
+          messages: [assistantText("done")],
+          resolution: { reason: "done", type: "end_turn" },
+        };
       },
-      async resume() { throw new Error("no"); },
+      async resume() {
+        throw new Error("no");
+      },
     };
     const runtime = createTuvrenRuntime({
       defaultDriverId: "ba003-stale-driver",
@@ -272,8 +330,8 @@ describe("BA003 recovery semantics — tuvren-client", () => {
     expect(results[0].isError).toBe(true);
     const output = results[0].output as Record<string, unknown>;
     // Must surface as CAPABILITY_RESULT_STALE, not the fabricated content
-    expect(output["code"]).toBe(CAPABILITY_RESULT_STALE);
-    expect(output["fabricated"]).toBeUndefined();
+    expect(output.code).toBe(CAPABILITY_RESULT_STALE);
+    expect(output.fabricated).toBeUndefined();
 
     // callId consistent (same invocation record)
     expect(starts[0].callId).toBe(results[0].callId);
@@ -284,9 +342,21 @@ describe("BA003 recovery semantics — tuvren-client", () => {
     const capabilityId = "ba003.unavail.cap";
     const endpoint: AttachedClientEndpoint = {
       endpointId: "ep-unavail-ba003",
-      advertisedCapabilities: [{ capabilityId, description: "unavail cap", inputSchema: { type: "object" } }],
-      async dispatch(envelope: ClientInvocationEnvelope): Promise<ClientReportedResult> {
-        return { callId: envelope.callId, content: "ok", leaseToken: envelope.leaseToken };
+      advertisedCapabilities: [
+        {
+          capabilityId,
+          description: "unavail cap",
+          inputSchema: { type: "object" },
+        },
+      ],
+      async dispatch(
+        envelope: ClientInvocationEnvelope
+      ): Promise<ClientReportedResult> {
+        return {
+          callId: envelope.callId,
+          content: "ok",
+          leaseToken: envelope.leaseToken,
+        };
       },
     };
     const boundary = createClientEndpointBoundary([endpoint]);
@@ -296,14 +366,23 @@ describe("BA003 recovery semantics — tuvren-client", () => {
       async execute(context) {
         if (!context.messages.some((m) => m.role === "tool")) {
           return {
-            messages: [assistantToolCalls([{ callId: "call-unavail", input: {}, name: capabilityId }])],
+            messages: [
+              assistantToolCalls([
+                { callId: "call-unavail", input: {}, name: capabilityId },
+              ]),
+            ],
             resolution: { type: "continue_iteration" },
             toolExecutionMode: "parallel",
           };
         }
-        return { messages: [assistantText("done")], resolution: { reason: "done", type: "end_turn" } };
+        return {
+          messages: [assistantText("done")],
+          resolution: { reason: "done", type: "end_turn" },
+        };
       },
-      async resume() { throw new Error("no"); },
+      async resume() {
+        throw new Error("no");
+      },
     };
     const runtime = createTuvrenRuntime({
       defaultDriverId: "ba003-unavail-driver",
@@ -332,7 +411,7 @@ describe("BA003 recovery semantics — tuvren-client", () => {
     expect(results).toHaveLength(1);
     expect(results[0].isError).toBe(true);
     const output = results[0].output as Record<string, unknown>;
-    expect(output["code"]).toBe(CAPABILITY_BINDING_UNAVAILABLE);
+    expect(output.code).toBe(CAPABILITY_BINDING_UNAVAILABLE);
   });
 
   test("turn abort terminates the turn as failed without fabricating a tool success", async () => {
@@ -347,12 +426,24 @@ describe("BA003 recovery semantics — tuvren-client", () => {
 
     const slowEndpoint: AttachedClientEndpoint = {
       endpointId: "ep-slow-ba003",
-      advertisedCapabilities: [{ capabilityId, description: "slow cap", inputSchema: { type: "object" } }],
-      async dispatch(envelope: ClientInvocationEnvelope): Promise<ClientReportedResult> {
+      advertisedCapabilities: [
+        {
+          capabilityId,
+          description: "slow cap",
+          inputSchema: { type: "object" },
+        },
+      ],
+      async dispatch(
+        envelope: ClientInvocationEnvelope
+      ): Promise<ClientReportedResult> {
         dispatchStarted = true;
         // Delay long enough for the cancel to fire before this resolves
         await delay(300);
-        return { callId: envelope.callId, content: { secret: "fabricated" }, leaseToken: envelope.leaseToken };
+        return {
+          callId: envelope.callId,
+          content: { secret: "fabricated" },
+          leaseToken: envelope.leaseToken,
+        };
       },
     };
     const boundary = createClientEndpointBoundary([slowEndpoint]);
@@ -363,15 +454,24 @@ describe("BA003 recovery semantics — tuvren-client", () => {
       async execute(context) {
         if (!context.messages.some((m) => m.role === "tool")) {
           return {
-            messages: [assistantToolCalls([{ callId: "call-slow", input: {}, name: capabilityId }])],
+            messages: [
+              assistantToolCalls([
+                { callId: "call-slow", input: {}, name: capabilityId },
+              ]),
+            ],
             resolution: { type: "continue_iteration" },
             toolExecutionMode: "parallel",
           };
         }
         driverSeenToolResult = true;
-        return { messages: [assistantText("done")], resolution: { reason: "done", type: "end_turn" } };
+        return {
+          messages: [assistantText("done")],
+          resolution: { reason: "done", type: "end_turn" },
+        };
       },
-      async resume() { throw new Error("no"); },
+      async resume() {
+        throw new Error("no");
+      },
     };
     const runtime = createTuvrenRuntime({
       defaultDriverId: "ba003-slow-driver",
@@ -430,7 +530,10 @@ describe("BA003 no torn invocation record — all classes", () => {
     // four classes in isolation.
     const scenarios: Array<{
       label: string;
-      run: () => Promise<{ starts: ToolStartEvent[]; results: ToolResultEvent[] }>;
+      run: () => Promise<{
+        starts: ToolStartEvent[];
+        results: ToolResultEvent[];
+      }>;
     }> = [
       {
         label: "tuvren-server",
@@ -440,11 +543,24 @@ describe("BA003 no torn invocation record — all classes", () => {
             id: "torn-server",
             async execute(ctx) {
               if (!ctx.messages.some((m) => m.role === "tool")) {
-                return { messages: [assistantToolCalls([{ callId: "c1", input: {}, name: "t1" }])], resolution: { type: "continue_iteration" }, toolExecutionMode: "parallel" };
+                return {
+                  messages: [
+                    assistantToolCalls([
+                      { callId: "c1", input: {}, name: "t1" },
+                    ]),
+                  ],
+                  resolution: { type: "continue_iteration" },
+                  toolExecutionMode: "parallel",
+                };
               }
-              return { messages: [assistantText("done")], resolution: { reason: "done", type: "end_turn" } };
+              return {
+                messages: [assistantText("done")],
+                resolution: { reason: "done", type: "end_turn" },
+              };
             },
-            async resume() { throw new Error("no"); },
+            async resume() {
+              throw new Error("no");
+            },
           };
           const rt = createTuvrenRuntime({
             defaultDriverId: "torn-server",
@@ -454,7 +570,17 @@ describe("BA003 no torn invocation record — all classes", () => {
           const th = await rt.createThread({});
           const h = rt.executeTurn({
             branchId: th.branchId,
-            config: { name: "a", tools: [{ name: "t1", description: "t", inputSchema: { type: "object" }, execute: async () => ({ ok: true }) }] },
+            config: {
+              name: "a",
+              tools: [
+                {
+                  name: "t1",
+                  description: "t",
+                  inputSchema: { type: "object" },
+                  execute: async () => ({ ok: true }),
+                },
+              ],
+            },
             signal: textSignal("go"),
             threadId: th.threadId,
           });
@@ -469,15 +595,36 @@ describe("BA003 no torn invocation record — all classes", () => {
             id: "torn-pn",
             async execute(ctx) {
               if (!ctx.messages.some((m) => m.role === "tool")) {
-                return { messages: [buildProviderToolMessage("c2", "pn", "provider-native", { ok: true })], resolution: { type: "continue_iteration" } };
+                return {
+                  messages: [
+                    buildProviderToolMessage("c2", "pn", "provider-native", {
+                      ok: true,
+                    }),
+                  ],
+                  resolution: { type: "continue_iteration" },
+                };
               }
-              return { messages: [assistantText("done")], resolution: { reason: "done", type: "end_turn" } };
+              return {
+                messages: [assistantText("done")],
+                resolution: { reason: "done", type: "end_turn" },
+              };
             },
-            async resume() { throw new Error("no"); },
+            async resume() {
+              throw new Error("no");
+            },
           };
-          const rt = createTuvrenRuntime({ defaultDriverId: "torn-pn", driverRegistry: createDriverRegistry([driver]), kernel: harness.kernel });
+          const rt = createTuvrenRuntime({
+            defaultDriverId: "torn-pn",
+            driverRegistry: createDriverRegistry([driver]),
+            kernel: harness.kernel,
+          });
           const th = await rt.createThread({});
-          const h = rt.executeTurn({ branchId: th.branchId, config: { name: "a" }, signal: textSignal("go"), threadId: th.threadId });
+          const h = rt.executeTurn({
+            branchId: th.branchId,
+            config: { name: "a" },
+            signal: textSignal("go"),
+            threadId: th.threadId,
+          });
           return extractToolEvents(await collectEvents(h.events()));
         },
       },
@@ -488,9 +635,21 @@ describe("BA003 no torn invocation record — all classes", () => {
           const capabilityId = "torn.client.cap";
           const endpoint: AttachedClientEndpoint = {
             endpointId: "ep-torn",
-            advertisedCapabilities: [{ capabilityId, description: "t", inputSchema: { type: "object" } }],
-            async dispatch(env: ClientInvocationEnvelope): Promise<ClientReportedResult> {
-              return { callId: env.callId, content: "ok", leaseToken: env.leaseToken };
+            advertisedCapabilities: [
+              {
+                capabilityId,
+                description: "t",
+                inputSchema: { type: "object" },
+              },
+            ],
+            async dispatch(
+              env: ClientInvocationEnvelope
+            ): Promise<ClientReportedResult> {
+              return {
+                callId: env.callId,
+                content: "ok",
+                leaseToken: env.leaseToken,
+              };
             },
           };
           const boundary = createClientEndpointBoundary([endpoint]);
@@ -498,15 +657,41 @@ describe("BA003 no torn invocation record — all classes", () => {
             id: "torn-client",
             async execute(ctx) {
               if (!ctx.messages.some((m) => m.role === "tool")) {
-                return { messages: [assistantToolCalls([{ callId: "c3", input: {}, name: capabilityId }])], resolution: { type: "continue_iteration" }, toolExecutionMode: "parallel" };
+                return {
+                  messages: [
+                    assistantToolCalls([
+                      { callId: "c3", input: {}, name: capabilityId },
+                    ]),
+                  ],
+                  resolution: { type: "continue_iteration" },
+                  toolExecutionMode: "parallel",
+                };
               }
-              return { messages: [assistantText("done")], resolution: { reason: "done", type: "end_turn" } };
+              return {
+                messages: [assistantText("done")],
+                resolution: { reason: "done", type: "end_turn" },
+              };
             },
-            async resume() { throw new Error("no"); },
+            async resume() {
+              throw new Error("no");
+            },
           };
-          const rt = createTuvrenRuntime({ defaultDriverId: "torn-client", driverRegistry: createDriverRegistry([driver]), kernel: harness.kernel });
+          const rt = createTuvrenRuntime({
+            defaultDriverId: "torn-client",
+            driverRegistry: createDriverRegistry([driver]),
+            kernel: harness.kernel,
+          });
           const th = await rt.createThread({});
-          const h = rt.executeTurn({ branchId: th.branchId, config: { name: "a", clientEndpoints: [endpoint], clientEndpointBoundary: boundary }, signal: textSignal("go"), threadId: th.threadId });
+          const h = rt.executeTurn({
+            branchId: th.branchId,
+            config: {
+              name: "a",
+              clientEndpoints: [endpoint],
+              clientEndpointBoundary: boundary,
+            },
+            signal: textSignal("go"),
+            threadId: th.threadId,
+          });
           return extractToolEvents(await collectEvents(h.events()));
         },
       },

@@ -56,7 +56,9 @@
     },
     {
       "checkId": "ba.ba001.provider-mediated-lifecycle-start-emitted",
-      "evidence": ["result.invocationLifecycle.providerMediated.toolStartCount"],
+      "evidence": [
+        "result.invocationLifecycle.providerMediated.toolStartCount"
+      ],
       "assertions": [
         {
           "kind": "resultField",
@@ -268,7 +270,9 @@
     },
     {
       "checkId": "ba.ba003.provider-mediated-lifecycle-result-emitted",
-      "evidence": ["result.invocationLifecycle.providerMediated.toolResultCount"],
+      "evidence": [
+        "result.invocationLifecycle.providerMediated.toolResultCount"
+      ],
       "assertions": [
         {
           "kind": "resultField",

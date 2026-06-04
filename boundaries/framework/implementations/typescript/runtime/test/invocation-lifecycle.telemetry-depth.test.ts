@@ -38,11 +38,11 @@
 import { describe, expect, test } from "bun:test";
 import type { RuntimeDriver } from "@tuvren/core/driver";
 import type { TuvrenMessage } from "@tuvren/core/messages";
-import type { TelemetrySpan, TuvrenTelemetrySink } from "@tuvren/core/telemetry";
-import {
-  createDriverRegistry,
-  createTuvrenRuntime,
-} from "../src/index.ts";
+import type {
+  TelemetrySpan,
+  TuvrenTelemetrySink,
+} from "@tuvren/core/telemetry";
+import { createDriverRegistry, createTuvrenRuntime } from "../src/index.ts";
 import { TUVREN_RUNTIME_TELEMETRY_ATTRIBUTE_KEYS } from "../src/lib/generated/tuvren-runtime-telemetry.ts";
 import { createFakeKernelHarness } from "./fake-kernel.ts";
 import {
@@ -63,7 +63,14 @@ function createTelemetryCapture(): {
   const spans: TelemetrySpan[] = [];
   return {
     spans,
-    sink: { event: () => {}, span: (s) => { spans.push(s); } },
+    sink: {
+      event: (_e) => {
+        /* noop */
+      },
+      span: (s) => {
+        spans.push(s);
+      },
+    },
   };
 }
 
@@ -79,7 +86,11 @@ function buildProviderToolMessage(
         callId,
         name,
         output: { value: 1 },
-        providerMetadata: { executionClass, owner: "provider", providerCallId: callId },
+        providerMetadata: {
+          executionClass,
+          owner: "provider",
+          providerCallId: callId,
+        },
         type: "tool_result",
       },
     ],
@@ -99,11 +110,22 @@ describe("BA004 lifecycle telemetry — keyed to runtime lineage", () => {
       id: "ba004-server",
       async execute(ctx) {
         if (!ctx.messages.some((m) => m.role === "tool")) {
-          return { messages: [assistantToolCalls([{ callId: "c1", input: {}, name: toolName }])], resolution: { type: "continue_iteration" }, toolExecutionMode: "parallel" };
+          return {
+            messages: [
+              assistantToolCalls([{ callId: "c1", input: {}, name: toolName }]),
+            ],
+            resolution: { type: "continue_iteration" },
+            toolExecutionMode: "parallel",
+          };
         }
-        return { messages: [assistantText("done")], resolution: { reason: "done", type: "end_turn" } };
+        return {
+          messages: [assistantText("done")],
+          resolution: { reason: "done", type: "end_turn" },
+        };
       },
-      async resume() { throw new Error("no"); },
+      async resume() {
+        throw new Error("no");
+      },
     };
     const runtime = createTuvrenRuntime({
       defaultDriverId: "ba004-server",
@@ -114,7 +136,17 @@ describe("BA004 lifecycle telemetry — keyed to runtime lineage", () => {
     const thread = await runtime.createThread({});
     const handle = runtime.executeTurn({
       branchId: thread.branchId,
-      config: { name: "agent", tools: [{ name: toolName, description: "t", inputSchema: { type: "object" }, execute: async () => ({ ok: true }) }] },
+      config: {
+        name: "agent",
+        tools: [
+          {
+            name: toolName,
+            description: "t",
+            inputSchema: { type: "object" },
+            execute: async () => ({ ok: true }),
+          },
+        ],
+      },
       signal: textSignal("go"),
       threadId: thread.threadId,
     });
@@ -129,8 +161,12 @@ describe("BA004 lifecycle telemetry — keyed to runtime lineage", () => {
     expect(toolCallSpan?.lineage.turnId).toBeDefined();
 
     // Span carries execution-class and owner (taxonomy dimension)
-    expect(toolCallSpan?.attributes["tuvren.runtime.capability.execution_class"]).toBe("tuvren-server");
-    expect(toolCallSpan?.attributes["tuvren.runtime.capability.owner"]).toBe("tuvren");
+    expect(
+      toolCallSpan?.attributes["tuvren.runtime.capability.execution_class"]
+    ).toBe("tuvren-server");
+    expect(toolCallSpan?.attributes["tuvren.runtime.capability.owner"]).toBe(
+      "tuvren"
+    );
   });
 
   test("provider-native tool_call span carries threadId and branchId in lineage", async () => {
@@ -140,11 +176,21 @@ describe("BA004 lifecycle telemetry — keyed to runtime lineage", () => {
       id: "ba004-pn",
       async execute(ctx) {
         if (!ctx.messages.some((m) => m.role === "tool")) {
-          return { messages: [buildProviderToolMessage("c2", "pn_tool", "provider-native")], resolution: { type: "continue_iteration" } };
+          return {
+            messages: [
+              buildProviderToolMessage("c2", "pn_tool", "provider-native"),
+            ],
+            resolution: { type: "continue_iteration" },
+          };
         }
-        return { messages: [assistantText("done")], resolution: { reason: "done", type: "end_turn" } };
+        return {
+          messages: [assistantText("done")],
+          resolution: { reason: "done", type: "end_turn" },
+        };
       },
-      async resume() { throw new Error("no"); },
+      async resume() {
+        throw new Error("no");
+      },
     };
     const runtime = createTuvrenRuntime({
       defaultDriverId: "ba004-pn",
@@ -170,8 +216,12 @@ describe("BA004 lifecycle telemetry — keyed to runtime lineage", () => {
     expect(toolCallSpan?.lineage.turnId).toBeDefined();
 
     // Span distinguishes provider-native from tuvren-owned
-    expect(toolCallSpan?.attributes["tuvren.runtime.capability.execution_class"]).toBe("provider-native");
-    expect(toolCallSpan?.attributes["tuvren.runtime.capability.owner"]).toBe("provider");
+    expect(
+      toolCallSpan?.attributes["tuvren.runtime.capability.execution_class"]
+    ).toBe("provider-native");
+    expect(toolCallSpan?.attributes["tuvren.runtime.capability.owner"]).toBe(
+      "provider"
+    );
   });
 });
 
@@ -193,14 +243,27 @@ describe("BA004 lifecycle telemetry — no secret material", () => {
       async execute(ctx) {
         if (!ctx.messages.some((m) => m.role === "tool")) {
           return {
-            messages: [assistantToolCalls([{ callId: "cs", input: { apiKey: "should-be-screened" }, name: toolName }])],
+            messages: [
+              assistantToolCalls([
+                {
+                  callId: "cs",
+                  input: { apiKey: "should-be-screened" },
+                  name: toolName,
+                },
+              ]),
+            ],
             resolution: { type: "continue_iteration" },
             toolExecutionMode: "parallel",
           };
         }
-        return { messages: [assistantText("done")], resolution: { reason: "done", type: "end_turn" } };
+        return {
+          messages: [assistantText("done")],
+          resolution: { reason: "done", type: "end_turn" },
+        };
       },
-      async resume() { throw new Error("no"); },
+      async resume() {
+        throw new Error("no");
+      },
     };
     const runtime = createTuvrenRuntime({
       defaultDriverId: "ba004-secret",
@@ -213,12 +276,14 @@ describe("BA004 lifecycle telemetry — no secret material", () => {
       branchId: thread.branchId,
       config: {
         name: "agent",
-        tools: [{
-          name: toolName,
-          description: "secret check",
-          inputSchema: { type: "object" },
-          execute: async () => ({ ok: true }),
-        }],
+        tools: [
+          {
+            name: toolName,
+            description: "secret check",
+            inputSchema: { type: "object" },
+            execute: async () => ({ ok: true }),
+          },
+        ],
       },
       signal: textSignal("go"),
       threadId: thread.threadId,
@@ -231,7 +296,15 @@ describe("BA004 lifecycle telemetry — no secret material", () => {
     const attrs = toolCallSpan?.attributes ?? {};
 
     // Credential-shaped key names must not appear in span attributes
-    const credentialKeyPatterns = ["authorization", "token", "password", "api-key", "api_key", "secret", "apikey"];
+    const credentialKeyPatterns = [
+      "authorization",
+      "token",
+      "password",
+      "api-key",
+      "api_key",
+      "secret",
+      "apikey",
+    ];
     for (const key of Object.keys(attrs)) {
       const lowerKey = key.toLowerCase();
       for (const pattern of credentialKeyPatterns) {
@@ -246,7 +319,9 @@ describe("BA004 lifecycle telemetry — no secret material", () => {
     }
 
     // Lifecycle attribution is present (non-secret structural data only)
-    expect(attrs["tuvren.runtime.capability.execution_class"]).toBe("tuvren-server");
+    expect(attrs["tuvren.runtime.capability.execution_class"]).toBe(
+      "tuvren-server"
+    );
     expect(attrs["tuvren.runtime.capability.owner"]).toBe("tuvren");
     expect(attrs["tuvren.runtime.tool_call.id"]).toBe("cs");
   });

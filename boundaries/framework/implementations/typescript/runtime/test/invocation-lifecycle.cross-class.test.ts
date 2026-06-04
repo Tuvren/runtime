@@ -81,12 +81,19 @@ function extractInvocationEvents(events: unknown[]): {
   const results: ToolResultEvent[] = [];
   const audits: ToolAuditEvent[] = [];
   for (const ev of events) {
-    if (typeof ev !== "object" || ev === null) continue;
+    if (typeof ev !== "object" || ev === null) {
+      continue;
+    }
     const e = ev as Record<string, unknown>;
-    if (e["type"] === "tool.start") starts.push(e as unknown as ToolStartEvent);
-    if (e["type"] === "tool.result")
+    if (e.type === "tool.start") {
+      starts.push(e as unknown as ToolStartEvent);
+    }
+    if (e.type === "tool.result") {
       results.push(e as unknown as ToolResultEvent);
-    if (e["type"] === "tool.audit") audits.push(e as unknown as ToolAuditEvent);
+    }
+    if (e.type === "tool.audit") {
+      audits.push(e as unknown as ToolAuditEvent);
+    }
   }
   return { starts, results, audits };
 }
@@ -254,8 +261,7 @@ describe("BA001 invocation lifecycle — tuvren-server", () => {
               properties: { x: { type: "number" } },
             },
             execute: async (input) => ({
-              doubled:
-                (input as Record<string, number>)["x"] * 2,
+              doubled: (input as Record<string, number>).x * 2,
             }),
           },
         ],
@@ -278,20 +284,20 @@ describe("BA001 invocation lifecycle — tuvren-server", () => {
     expect(result.attribution).toBeDefined();
 
     // tuvren-server class
-    expect(start.attribution!.executionClass).toBe("tuvren-server");
-    expect(result.attribution!.executionClass).toBe("tuvren-server");
+    expect(start.attribution?.executionClass).toBe("tuvren-server");
+    expect(result.attribution?.executionClass).toBe("tuvren-server");
 
     // tuvren-server is owned by tuvren
-    expect(start.attribution!.owner).toBe("tuvren");
-    expect(result.attribution!.owner).toBe("tuvren");
+    expect(start.attribution?.owner).toBe("tuvren");
+    expect(result.attribution?.owner).toBe("tuvren");
 
     // tuvren-server observation: full lifecycle control
-    const obs = start.attribution!.observation;
-    expect(obs.canAudit).toBe(true);
-    expect(obs.canCancel).toBe(true);
-    expect(obs.canResume).toBe(true);
-    expect(obs.canRetry).toBe(true);
-    expect(obs.canPersistResult).toBe(true);
+    const obs = start.attribution?.observation;
+    expect(obs?.canAudit).toBe(true);
+    expect(obs?.canCancel).toBe(true);
+    expect(obs?.canResume).toBe(true);
+    expect(obs?.canRetry).toBe(true);
+    expect(obs?.canPersistResult).toBe(true);
 
     // callId is consistent across start and result (same invocation)
     expect(start.callId).toBe(result.callId);
@@ -380,18 +386,18 @@ describe("BA001 invocation lifecycle — provider-native", () => {
     expect(result.attribution).toBeDefined();
 
     // provider-native class and owner
-    expect(start.attribution!.executionClass).toBe("provider-native");
-    expect(result.attribution!.executionClass).toBe("provider-native");
-    expect(start.attribution!.owner).toBe("provider");
-    expect(result.attribution!.owner).toBe("provider");
+    expect(start.attribution?.executionClass).toBe("provider-native");
+    expect(result.attribution?.executionClass).toBe("provider-native");
+    expect(start.attribution?.owner).toBe("provider");
+    expect(result.attribution?.owner).toBe("provider");
 
     // provider-native observation: no lifecycle control from Tuvren
-    const obs = start.attribution!.observation;
-    expect(obs.canAudit).toBe(false);
-    expect(obs.canCancel).toBe(false);
-    expect(obs.canResume).toBe(false);
-    expect(obs.canRetry).toBe(false);
-    expect(obs.canPersistResult).toBe(true);
+    const obs = start.attribution?.observation;
+    expect(obs?.canAudit).toBe(false);
+    expect(obs?.canCancel).toBe(false);
+    expect(obs?.canResume).toBe(false);
+    expect(obs?.canRetry).toBe(false);
+    expect(obs?.canPersistResult).toBe(true);
 
     // callId consistent across start and result
     expect(start.callId).toBe(result.callId);
@@ -427,17 +433,17 @@ describe("BA001 invocation lifecycle — provider-mediated", () => {
     expect(starts).toHaveLength(1);
     expect(results).toHaveLength(1);
 
-    expect(starts[0].attribution!.executionClass).toBe("provider-mediated");
-    expect(starts[0].attribution!.owner).toBe("provider");
-    expect(results[0].attribution!.executionClass).toBe("provider-mediated");
-    expect(results[0].attribution!.owner).toBe("provider");
+    expect(starts[0].attribution?.executionClass).toBe("provider-mediated");
+    expect(starts[0].attribution?.owner).toBe("provider");
+    expect(results[0].attribution?.executionClass).toBe("provider-mediated");
+    expect(results[0].attribution?.owner).toBe("provider");
 
-    const obs = starts[0].attribution!.observation;
-    expect(obs.canAudit).toBe(false);
-    expect(obs.canCancel).toBe(false);
-    expect(obs.canResume).toBe(false);
-    expect(obs.canRetry).toBe(false);
-    expect(obs.canPersistResult).toBe(true);
+    const obs = starts[0].attribution?.observation;
+    expect(obs?.canAudit).toBe(false);
+    expect(obs?.canCancel).toBe(false);
+    expect(obs?.canResume).toBe(false);
+    expect(obs?.canRetry).toBe(false);
+    expect(obs?.canPersistResult).toBe(true);
 
     expect(starts[0].callId).toBe(results[0].callId);
 
@@ -459,7 +465,9 @@ describe("BA001 invocation lifecycle — tuvren-client", () => {
 
     const runtime = createTuvrenRuntime({
       defaultDriverId: "driver-tuvren-client",
-      driverRegistry: createDriverRegistry([makeTuvrenClientDriver(capabilityId)]),
+      driverRegistry: createDriverRegistry([
+        makeTuvrenClientDriver(capabilityId),
+      ]),
       kernel: harness.kernel,
     });
     const thread = await runtime.createThread({});
@@ -488,20 +496,20 @@ describe("BA001 invocation lifecycle — tuvren-client", () => {
     expect(result.attribution).toBeDefined();
 
     // tuvren-client class
-    expect(start.attribution!.executionClass).toBe("tuvren-client");
-    expect(result.attribution!.executionClass).toBe("tuvren-client");
+    expect(start.attribution?.executionClass).toBe("tuvren-client");
+    expect(result.attribution?.executionClass).toBe("tuvren-client");
 
     // tuvren-client: Tuvren orchestrates, client executes — owner is tuvren
-    expect(start.attribution!.owner).toBe("tuvren");
-    expect(result.attribution!.owner).toBe("tuvren");
+    expect(start.attribution?.owner).toBe("tuvren");
+    expect(result.attribution?.owner).toBe("tuvren");
 
     // tuvren-client observation: partial — no audit/cancel/retry/resume from runtime
-    const obs = start.attribution!.observation;
-    expect(obs.canAudit).toBe(false);
-    expect(obs.canCancel).toBe(false);
-    expect(obs.canResume).toBe(false);
-    expect(obs.canRetry).toBe(false);
-    expect(obs.canPersistResult).toBe(true);
+    const obs = start.attribution?.observation;
+    expect(obs?.canAudit).toBe(false);
+    expect(obs?.canCancel).toBe(false);
+    expect(obs?.canResume).toBe(false);
+    expect(obs?.canRetry).toBe(false);
+    expect(obs?.canPersistResult).toBe(true);
 
     expect(start.callId).toBe(result.callId);
 

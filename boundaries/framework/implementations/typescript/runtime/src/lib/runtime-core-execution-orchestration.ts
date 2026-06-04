@@ -228,17 +228,6 @@ interface RuntimeIterationPhaseDependencies {
   ): TuvrenStreamEvent[];
   materializeDriver(driverId: string): KrakenDriver;
   now(): number;
-  reconcileCheckpointedPauseResolution(
-    checkpointedPause: boolean,
-    runId: string,
-    turnId: string,
-    resolution: RuntimeResolution
-  ): Promise<RuntimeResolution>;
-  stageDriverMessages(
-    runId: string,
-    messages: TuvrenMessage[],
-    iterationCount: number
-  ): Promise<HashString[]>;
   /**
    * Publish through the full runtime event + telemetry path (KRT-BA002).
    * The iteration phase uses this for provider-tool attribution events so the
@@ -250,6 +239,17 @@ interface RuntimeIterationPhaseDependencies {
     event: TuvrenStreamEvent,
     loopState: LoopState
   ): void;
+  reconcileCheckpointedPauseResolution(
+    checkpointedPause: boolean,
+    runId: string,
+    turnId: string,
+    resolution: RuntimeResolution
+  ): Promise<RuntimeResolution>;
+  stageDriverMessages(
+    runId: string,
+    messages: TuvrenMessage[],
+    iterationCount: number
+  ): Promise<HashString[]>;
 }
 
 export async function runRuntimeExecutionLoopFacade(
