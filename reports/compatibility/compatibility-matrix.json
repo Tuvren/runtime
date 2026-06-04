@@ -157,12 +157,17 @@
             "ba.ba001.tuvren-client-lifecycle-start-emitted",
             "ba.ba001.tuvren-server-lifecycle-result-emitted",
             "ba.ba001.tuvren-server-lifecycle-start-emitted",
+            "ba.ba002.provider-mediated-owner-is-provider",
             "ba.ba002.provider-native-no-audit-affordance",
             "ba.ba002.provider-native-owner-is-provider",
             "ba.ba002.tuvren-client-no-audit-affordance",
             "ba.ba002.tuvren-server-full-affordances",
             "ba.ba002.tuvren-server-owner-is-tuvren",
+            "ba.ba003.provider-mediated-lifecycle-result-emitted",
             "ba.ba003.stale-late-completion-is-error-not-success",
+            "ba.ba003.tuvren-client-lifecycle-result-emitted",
+            "ba.ba003.tuvren-client-unavailable-fails-clean",
+            "ba.ba003.tuvren-server-fails-clean-on-error",
             "react-driver-callable.after-iteration",
             "react-driver-callable.around-model",
             "react-driver-callable.around-tool",
@@ -403,9 +408,9 @@
           ],
           "checkSummary": {
             "failedChecks": 0,
-            "passedChecks": 393,
-            "totalChecks": 405,
-            "applicableChecks": 393,
+            "passedChecks": 398,
+            "totalChecks": 410,
+            "applicableChecks": 398,
             "nonApplicableChecks": 12
           },
           "declaredCapabilities": [
@@ -446,9 +451,9 @@
           "checkSummary": {
             "failedChecks": 0,
             "passedChecks": 12,
-            "totalChecks": 405,
+            "totalChecks": 410,
             "applicableChecks": 12,
-            "nonApplicableChecks": 393
+            "nonApplicableChecks": 398
           },
           "declaredCapabilities": ["framework.batteries-included"],
           "evidencePath": "reports/compatibility/evidence/shared-conformance-runner.framework-batteries-included-conformance-runner.json",
@@ -899,9 +904,9 @@
           "checkSummary": {
             "failedChecks": 0,
             "passedChecks": 0,
-            "totalChecks": 405,
+            "totalChecks": 410,
             "applicableChecks": 0,
-            "nonApplicableChecks": 405
+            "nonApplicableChecks": 410
           },
           "declaredCapabilities": [],
           "evidencePath": "reports/compatibility/evidence/shared-conformance-runner.framework-rust-conformance-runner.json",

@@ -219,6 +219,88 @@
         }
       ],
       "operation": "runtime.invocation-lifecycle.cross-class"
+    },
+    {
+      "checkId": "ba.ba003.tuvren-server-fails-clean-on-error",
+      "evidence": [
+        "result.invocationLifecycle.serverErrorFailClean.toolStartCount",
+        "result.invocationLifecycle.serverErrorFailClean.toolResultCount",
+        "result.invocationLifecycle.serverErrorFailClean.resultIsError"
+      ],
+      "assertions": [
+        {
+          "kind": "resultField",
+          "field": "$.invocationLifecycle.serverErrorFailClean.toolStartCount",
+          "equals": 1
+        },
+        {
+          "kind": "resultField",
+          "field": "$.invocationLifecycle.serverErrorFailClean.toolResultCount",
+          "equals": 1
+        },
+        {
+          "kind": "resultField",
+          "field": "$.invocationLifecycle.serverErrorFailClean.resultIsError",
+          "equals": true
+        }
+      ],
+      "operation": "runtime.invocation-lifecycle.cross-class"
+    },
+    {
+      "checkId": "ba.ba003.tuvren-client-unavailable-fails-clean",
+      "evidence": [
+        "result.invocationLifecycle.clientUnavailableFailClean.toolResultIsError",
+        "result.invocationLifecycle.clientUnavailableFailClean.toolResultCode"
+      ],
+      "assertions": [
+        {
+          "kind": "resultField",
+          "field": "$.invocationLifecycle.clientUnavailableFailClean.toolResultIsError",
+          "equals": true
+        },
+        {
+          "kind": "resultField",
+          "field": "$.invocationLifecycle.clientUnavailableFailClean.toolResultCode",
+          "equals": "capability_binding_unavailable"
+        }
+      ],
+      "operation": "runtime.invocation-lifecycle.cross-class"
+    },
+    {
+      "checkId": "ba.ba003.provider-mediated-lifecycle-result-emitted",
+      "evidence": ["result.invocationLifecycle.providerMediated.toolResultCount"],
+      "assertions": [
+        {
+          "kind": "resultField",
+          "field": "$.invocationLifecycle.providerMediated.toolResultCount",
+          "equals": 1
+        }
+      ],
+      "operation": "runtime.invocation-lifecycle.cross-class"
+    },
+    {
+      "checkId": "ba.ba003.tuvren-client-lifecycle-result-emitted",
+      "evidence": ["result.invocationLifecycle.tuvrenClient.toolResultCount"],
+      "assertions": [
+        {
+          "kind": "resultField",
+          "field": "$.invocationLifecycle.tuvrenClient.toolResultCount",
+          "equals": 1
+        }
+      ],
+      "operation": "runtime.invocation-lifecycle.cross-class"
+    },
+    {
+      "checkId": "ba.ba002.provider-mediated-owner-is-provider",
+      "evidence": ["result.invocationLifecycle.providerMediated.owner"],
+      "assertions": [
+        {
+          "kind": "resultField",
+          "field": "$.invocationLifecycle.providerMediated.owner",
+          "equals": "provider"
+        }
+      ],
+      "operation": "runtime.invocation-lifecycle.cross-class"
     }
   ]
 }

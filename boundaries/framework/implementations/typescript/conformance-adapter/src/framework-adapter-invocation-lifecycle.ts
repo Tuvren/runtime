@@ -298,6 +298,59 @@ export async function runInvocationLifecycleCrossClass(): Promise<AdapterProject
   const staleResultEvent = staleResults[0] as Record<string, unknown> | undefined;
   const staleOutput = staleResultEvent?.["output"] as Record<string, unknown> | undefined;
 
+  // --- 7. tuvren-server fail-clean: tool that throws an error → isError: true ---
+  const ERROR_TOOL = "ba005.lifecycle.server.error";
+  const errorHarness = createConformanceKernelHarness();
+  const errorRuntime = createTuvrenRuntimeCore({
+    createId: createConformanceIdFactory(),
+    defaultDriverId: DRIVER_ID,
+    driverRegistry: createDriverRegistry([makeSingleCallDriver(ERROR_TOOL)]),
+    kernel: errorHarness.kernel,
+  });
+  const errorThread = await errorRuntime.createThread({});
+  const errorHandle = errorRuntime.executeTurn({
+    branchId: errorThread.branchId,
+    config: {
+      name: AGENT_NAME,
+      tools: [{
+        name: ERROR_TOOL,
+        description: "ba005 error tool",
+        inputSchema: { type: "object" },
+        execute: async () => { throw new Error("ba005 deliberate error"); },
+      }],
+    },
+    signal: textSignal("ba005 error"),
+    threadId: errorThread.threadId,
+  });
+  const errorEvents = await collectValues(errorHandle.events());
+  const errorStarts = findEvents(errorEvents, "tool.start");
+  const errorResults = findEvents(errorEvents, "tool.result");
+  const errorResultEvent = errorResults[0] as Record<string, unknown> | undefined;
+
+  // --- 8. tuvren-client unavailable endpoint: fail-clean without fabricating ---
+  const UNAVAIL_CAP = "ba005.lifecycle.client.unavail";
+  const unavailEndpoint = makeOkEndpoint("ep-ba005-unavail", UNAVAIL_CAP);
+  const unavailBoundary = createClientEndpointBoundary([unavailEndpoint]);
+  unavailBoundary.detach("ep-ba005-unavail"); // pre-detach to trigger unavailability
+  const unavailHarness = createConformanceKernelHarness();
+  const unavailRuntime = createTuvrenRuntimeCore({
+    createId: createConformanceIdFactory(),
+    defaultDriverId: DRIVER_ID,
+    driverRegistry: createDriverRegistry([makeSingleCallDriver(UNAVAIL_CAP)]),
+    kernel: unavailHarness.kernel,
+  });
+  const unavailThread = await unavailRuntime.createThread({});
+  const unavailHandle = unavailRuntime.executeTurn({
+    branchId: unavailThread.branchId,
+    config: { name: AGENT_NAME, clientEndpoints: [unavailEndpoint], clientEndpointBoundary: unavailBoundary },
+    signal: textSignal("ba005 unavail"),
+    threadId: unavailThread.threadId,
+  });
+  const unavailEvents = await collectValues(unavailHandle.events());
+  const unavailResults = findEvents(unavailEvents, "tool.result");
+  const unavailResultEvent = unavailResults[0] as Record<string, unknown> | undefined;
+  const unavailOutput = unavailResultEvent?.["output"] as Record<string, unknown> | undefined;
+
   return {
     result: {
       invocationLifecycle: {
@@ -353,6 +406,16 @@ export async function runInvocationLifecycleCrossClass(): Promise<AdapterProject
         staleLateCompletion: {
           toolResultIsError: staleResultEvent?.["isError"],
           toolResultCode: staleOutput?.["code"],
+        },
+        // BA003 fail-clean proofs: non-fabricated clean failures
+        serverErrorFailClean: {
+          toolStartCount: errorStarts.length,
+          toolResultCount: errorResults.length,
+          resultIsError: errorResultEvent?.["isError"],
+        },
+        clientUnavailableFailClean: {
+          toolResultIsError: unavailResultEvent?.["isError"],
+          toolResultCode: unavailOutput?.["code"],
         },
       },
     },
