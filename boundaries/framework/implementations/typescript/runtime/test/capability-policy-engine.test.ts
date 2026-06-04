@@ -807,3 +807,139 @@ describe("CapabilityPolicyEngine — BB002 wired risk-approval gate", () => {
     expect(status.approval).toBeDefined();
   });
 });
+
+// ---------------------------------------------------------------------------
+// BB003: User-Presence and Active-Endpoint Requirement Policy
+// ---------------------------------------------------------------------------
+
+describe("CapabilityPolicyEngine — BB003 user-presence and active-endpoint", () => {
+  const presenceCapabilityId = "human.task";
+  const endpointCapabilityId = "client.browse";
+  const openCapabilityId = "server.compute";
+
+  const capabilityMetadata = new Map([
+    [presenceCapabilityId, { requiresUserPresence: true }],
+    [endpointCapabilityId, { requiresActiveEndpoint: true }],
+    // openCapabilityId has no requirements
+  ]);
+
+  // --- Active-endpoint: exposure-time ---
+
+  test("exposure: capability requiring active endpoint is withheld when unavailable", () => {
+    const engine = createCapabilityPolicyEngine();
+    const surface = makeSurface(endpointCapabilityId, endpointCapabilityId);
+    const decisions = engine.evaluateExposure([surface], {
+      ...defaultContext,
+      capabilityMetadata,
+      unavailableCapabilityIds: new Set([endpointCapabilityId]),
+    });
+    expect(decisions[0]?.exposed).toBe(false);
+  });
+
+  test("exposure: capability requiring active endpoint is exposed when available", () => {
+    const engine = createCapabilityPolicyEngine();
+    const surface = makeSurface(endpointCapabilityId, endpointCapabilityId);
+    // unavailableCapabilityIds does not include this capability
+    const decisions = engine.evaluateExposure([surface], {
+      ...defaultContext,
+      capabilityMetadata,
+      unavailableCapabilityIds: new Set<string>(),
+    });
+    expect(decisions[0]?.exposed).toBe(true);
+  });
+
+  test("exposure: capability requiring active endpoint is exposed when unavailableCapabilityIds absent", () => {
+    const engine = createCapabilityPolicyEngine();
+    const surface = makeSurface(endpointCapabilityId, endpointCapabilityId);
+    // No unavailableCapabilityIds in context — unknown means admit
+    const decisions = engine.evaluateExposure([surface], {
+      ...defaultContext,
+      capabilityMetadata,
+    });
+    expect(decisions[0]?.exposed).toBe(true);
+  });
+
+  test("exposure: active-endpoint denial carries a non-secret reason", () => {
+    const engine = createCapabilityPolicyEngine();
+    const surface = makeSurface(endpointCapabilityId, endpointCapabilityId);
+    const decisions = engine.evaluateExposure([surface], {
+      ...defaultContext,
+      capabilityMetadata,
+      unavailableCapabilityIds: new Set([endpointCapabilityId]),
+    });
+    expect(decisions[0]?.exposed).toBe(false);
+    expect(typeof decisions[0]?.reason).toBe("string");
+    expect((decisions[0]?.reason ?? "").length).toBeGreaterThan(0);
+  });
+
+  test("exposure: capability with no endpoint requirement is unaffected", () => {
+    const engine = createCapabilityPolicyEngine();
+    const surface = makeSurface(openCapabilityId, openCapabilityId);
+    const decisions = engine.evaluateExposure([surface], {
+      ...defaultContext,
+      capabilityMetadata,
+      unavailableCapabilityIds: new Set([endpointCapabilityId]),
+    });
+    expect(decisions[0]?.exposed).toBe(true);
+  });
+
+  // --- User-presence: invocation-time ---
+
+  test("invocation: capability requiring user presence is denied when absent", () => {
+    const engine = createCapabilityPolicyEngine();
+    const binding = makeBinding(presenceCapabilityId);
+    const decision = engine.evaluateInvocation(binding, {
+      ...defaultContext,
+      capabilityMetadata,
+      userPresent: false,
+    });
+    expect(decision.admitted).toBe(false);
+  });
+
+  test("invocation: capability requiring user presence is admitted when present", () => {
+    const engine = createCapabilityPolicyEngine();
+    const binding = makeBinding(presenceCapabilityId);
+    const decision = engine.evaluateInvocation(binding, {
+      ...defaultContext,
+      capabilityMetadata,
+      userPresent: true,
+    });
+    expect(decision.admitted).toBe(true);
+  });
+
+  test("invocation: capability requiring user presence is admitted when userPresent absent (unknown)", () => {
+    const engine = createCapabilityPolicyEngine();
+    const binding = makeBinding(presenceCapabilityId);
+    // userPresent not set in context — unknown means admit
+    const decision = engine.evaluateInvocation(binding, {
+      ...defaultContext,
+      capabilityMetadata,
+    });
+    expect(decision.admitted).toBe(true);
+  });
+
+  test("invocation: presence denial carries a non-secret reason", () => {
+    const engine = createCapabilityPolicyEngine();
+    const binding = makeBinding(presenceCapabilityId);
+    const decision = engine.evaluateInvocation(binding, {
+      ...defaultContext,
+      capabilityMetadata,
+      userPresent: false,
+    });
+    expect(decision.admitted).toBe(false);
+    expect(typeof decision.reason).toBe("string");
+    expect((decision.reason ?? "").length).toBeGreaterThan(0);
+  });
+
+  test("invocation: capability with no requirements is admitted normally", () => {
+    const engine = createCapabilityPolicyEngine();
+    const binding = makeBinding(openCapabilityId);
+    const decision = engine.evaluateInvocation(binding, {
+      ...defaultContext,
+      capabilityMetadata,
+      userPresent: false,
+      unavailableCapabilityIds: new Set([endpointCapabilityId]),
+    });
+    expect(decision.admitted).toBe(true);
+  });
+});
