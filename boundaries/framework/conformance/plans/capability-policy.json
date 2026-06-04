@@ -34,9 +34,7 @@
     },
     {
       "checkId": "bb.bb001.residency-allowed-exposure-passes",
-      "evidence": [
-        "result.capabilityPolicy.exposure.residencyAllowed.exposed"
-      ],
+      "evidence": ["result.capabilityPolicy.exposure.residencyAllowed.exposed"],
       "assertions": [
         {
           "kind": "resultField",
@@ -112,9 +110,7 @@
     },
     {
       "checkId": "bb.bb003.active-endpoint-exposure-withheld-has-reason",
-      "evidence": [
-        "result.capabilityPolicy.exposure.endpointDenied.hasReason"
-      ],
+      "evidence": ["result.capabilityPolicy.exposure.endpointDenied.hasReason"],
       "assertions": [
         {
           "kind": "resultField",
@@ -182,9 +178,7 @@
     },
     {
       "checkId": "bb.bb004.credential-boundary-wired-denial-is-error",
-      "evidence": [
-        "result.capabilityPolicy.wiredDenial.toolResultIsError"
-      ],
+      "evidence": ["result.capabilityPolicy.wiredDenial.toolResultIsError"],
       "assertions": [
         {
           "kind": "resultField",
@@ -196,9 +190,7 @@
     },
     {
       "checkId": "bb.bb004.credential-boundary-wired-denial-tool-not-executed",
-      "evidence": [
-        "result.capabilityPolicy.wiredDenial.toolBodyNotExecuted"
-      ],
+      "evidence": ["result.capabilityPolicy.wiredDenial.toolBodyNotExecuted"],
       "assertions": [
         {
           "kind": "resultField",
@@ -252,9 +244,7 @@
     },
     {
       "checkId": "bb.bb005.composition-exposure-has-reason",
-      "evidence": [
-        "result.capabilityPolicy.composition.exposure.hasReason"
-      ],
+      "evidence": ["result.capabilityPolicy.composition.exposure.hasReason"],
       "assertions": [
         {
           "kind": "resultField",
@@ -308,9 +298,7 @@
     },
     {
       "checkId": "bb.bb005.composition-invocation-has-reason",
-      "evidence": [
-        "result.capabilityPolicy.composition.invocation.hasReason"
-      ],
+      "evidence": ["result.capabilityPolicy.composition.invocation.hasReason"],
       "assertions": [
         {
           "kind": "resultField",
@@ -348,9 +336,7 @@
     },
     {
       "checkId": "bb.bb000.permitted-capability-invocation-admitted",
-      "evidence": [
-        "result.capabilityPolicy.invocation.permitted.admitted"
-      ],
+      "evidence": ["result.capabilityPolicy.invocation.permitted.admitted"],
       "assertions": [
         {
           "kind": "resultField",

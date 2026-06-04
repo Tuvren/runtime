@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+// biome-ignore-all lint/suspicious/useAwait: adapter operations must return Promise<AdapterProjection> per adapter contract
 import {
   createCapabilityPolicyEngine,
   createDriverRegistry,
