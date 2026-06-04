@@ -227,7 +227,8 @@ class BasicCapabilityPolicyEngine implements CapabilityPolicyEngine {
     return surfaces.map((surface) => {
       const metadata = context.capabilityMetadata?.get(surface.capabilityId);
 
-      // Compose all exposure-time dimensions; first denial wins.
+      // Compose all exposure-time dimensions; all denials accumulate into a
+      // single joined reason string.
       const denyReasons: string[] = [];
 
       // Static deny-list (AW baseline)

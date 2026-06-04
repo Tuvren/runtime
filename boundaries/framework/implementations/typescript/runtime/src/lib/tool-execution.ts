@@ -523,6 +523,14 @@ async function resolveExecutableToolCall(
       policyContext
     );
     if (!decision.admitted) {
+      if (!isClientTool) {
+        emitToolAuditEvent(
+          environment,
+          toolCall.callId,
+          toolCall.name,
+          "policy_denied"
+        );
+      }
       return {
         result: createErrorToolResult(
           toolCall,
@@ -696,6 +704,14 @@ function resolveResumeDecision(
         policyContext
       );
     if (!resumeDecision.admitted) {
+      if (!isClientEndpointTool(tool)) {
+        emitToolAuditEvent(
+          environment,
+          pendingToolCall.callId,
+          pendingToolCall.name,
+          "policy_denied"
+        );
+      }
       return {
         result: createErrorToolResult(
           {

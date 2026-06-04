@@ -547,6 +547,7 @@ export interface ToolAuditEvent {
   lifecycle:
     | "input_validated"
     | "output_validated"
+    | "policy_denied"
     | "retry_attempt"
     | "rate_limited"
     | "cancelled";

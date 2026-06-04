@@ -117,6 +117,7 @@ const TURN_END_STATUSES = new Set(["completed", "paused", "failed"]);
 const TOOL_AUDIT_LIFECYCLES = new Set([
   "input_validated",
   "output_validated",
+  "policy_denied",
   "retry_attempt",
   "rate_limited",
   "cancelled",

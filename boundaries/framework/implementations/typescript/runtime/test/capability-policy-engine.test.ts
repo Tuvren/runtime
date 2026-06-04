@@ -806,6 +806,89 @@ describe("CapabilityPolicyEngine — BB002 wired risk-approval gate", () => {
     // An approval request should be present in the status
     expect(status.approval).toBeDefined();
   });
+
+  test("wired: approving a policy-risk-gated call executes the tool and does not re-raise requiresApproval", async () => {
+    // Verifies the invariant documented at tool-execution.ts resolveResumeDecision:
+    // once the host approves, requiresApproval is NOT re-raised on the resume
+    // path (only hard denials are re-checked), so the tool body executes.
+    const highRiskToolName = "dangerous.delete";
+    let toolExecuted = false;
+
+    const harness = createFakeKernelHarness();
+    const engine = createCapabilityPolicyEngine({
+      requireApprovalForRiskClass: "high",
+    });
+
+    const driver = {
+      id: "risk-approval-resume-driver",
+      async execute(context: Parameters<RuntimeDriver["execute"]>[0]) {
+        if (!context.messages.some((m) => m.role === "tool")) {
+          return {
+            messages: [
+              assistantToolCalls([
+                {
+                  callId: "risk-resume-1",
+                  input: {},
+                  name: highRiskToolName,
+                },
+              ]),
+            ],
+            resolution: { type: "continue_iteration" as const },
+            toolExecutionMode: "parallel",
+          };
+        }
+        return {
+          messages: [assistantText("done")],
+          resolution: { reason: "done", type: "end_turn" as const },
+        };
+      },
+      async resume() {
+        throw new Error("resume not expected in this test");
+      },
+    } satisfies RuntimeDriver;
+
+    const runtime = createTuvrenRuntime({
+      defaultDriverId: "risk-approval-resume-driver",
+      driverRegistry: createBaseDriverRegistry([driver]),
+      kernel: harness.kernel,
+    });
+
+    const thread = await runtime.createThread({});
+    const handle = runtime.executeTurn({
+      branchId: thread.branchId,
+      config: {
+        capabilityPolicyEngine: engine,
+        name: "primary",
+        tools: [
+          {
+            description: "High-risk dangerous tool",
+            execute() {
+              toolExecuted = true;
+              return { deleted: true };
+            },
+            inputSchema: { type: "object" },
+            name: highRiskToolName,
+            riskClass: "high",
+          },
+        ],
+      },
+      signal: textSignal("risk approval resume test"),
+      threadId: thread.threadId,
+    });
+    await collectEvents(handle.events());
+    expect(handle.status().phase).toBe("paused");
+
+    // Approve the pending call — resume must execute the tool body
+    const resumedHandle = handle.resolveApproval({
+      decisions: [{ callId: "risk-resume-1", type: "approve" }],
+    });
+    await collectEvents(resumedHandle.events());
+
+    // Tool must have executed (requiresApproval not re-raised on resume path)
+    expect(toolExecuted).toBe(true);
+    // Turn must complete, not loop back into paused
+    expect(resumedHandle.status().phase).not.toBe("paused");
+  });
 });
 
 // ---------------------------------------------------------------------------
