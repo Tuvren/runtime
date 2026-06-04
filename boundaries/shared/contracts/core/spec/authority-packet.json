@@ -97,6 +97,10 @@
     {
       "path": "boundaries/framework/conformance/plans/tuvren-client-execution-class.json",
       "format": "conformance-plan"
+    },
+    {
+      "path": "boundaries/framework/conformance/plans/invocation-lifecycle-observation.json",
+      "format": "conformance-plan"
     }
   ],
   "generatedArtifacts": [
@@ -177,6 +181,11 @@
       "planId": "tuvren.framework.tuvren-client-execution-class",
       "planVersion": "0.2.0",
       "path": "boundaries/framework/conformance/plans/tuvren-client-execution-class.json"
+    },
+    {
+      "planId": "tuvren.framework.invocation-lifecycle-observation",
+      "planVersion": "0.1.0",
+      "path": "boundaries/framework/conformance/plans/invocation-lifecycle-observation.json"
     }
   ],
   "bindingSections": {
@@ -299,6 +308,10 @@
     {
       "kind": "conformance-plan",
       "target": "boundaries/framework/conformance/plans/tuvren-client-execution-class.json"
+    },
+    {
+      "kind": "conformance-plan",
+      "target": "boundaries/framework/conformance/plans/invocation-lifecycle-observation.json"
     },
     {
       "kind": "freshness-check",

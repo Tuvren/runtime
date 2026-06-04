@@ -49,6 +49,7 @@ import type {
 } from "./framework-adapter-runtime.ts";
 import { createFrameworkAdapterRuntimeScenarios } from "./framework-adapter-runtime-scenarios.ts";
 import { createFrameworkAdapterSchemaAuthoring } from "./framework-adapter-schema-authoring.ts";
+import { runInvocationLifecycleCrossClass } from "./framework-adapter-invocation-lifecycle.ts";
 import { runTuvrenClientLifecycle } from "./framework-adapter-tuvren-client-execution-class.ts";
 import {
   runTuvrenServerBindingClassification,
@@ -378,6 +379,8 @@ export class TypeScriptFrameworkAdapter implements ImplementationAdapter {
         );
       case "runtime.capability-orchestration.policy-decisions":
         return runCapabilityOrchestrationPolicyDecisions();
+      case "runtime.invocation-lifecycle.cross-class":
+        return runInvocationLifecycleCrossClass();
       case "runtime.tuvren-client.lifecycle":
         return runTuvrenClientLifecycle();
       case "runtime.tuvren-server.lifecycle":
