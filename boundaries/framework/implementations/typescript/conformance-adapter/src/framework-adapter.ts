@@ -38,6 +38,13 @@ import {
   runCapabilityOrchestrationFoundation,
   runCapabilityOrchestrationPolicyDecisions,
 } from "./framework-adapter-capability-orchestration.ts";
+import {
+  runCapabilityPolicyComposition,
+  runCapabilityPolicyExposureDimensions,
+  runCapabilityPolicyInvocationDimensions,
+  runCapabilityPolicyNonretryablePolicy,
+  runCapabilityPolicyWiredInvocationDenial,
+} from "./framework-adapter-capability-policy.ts";
 import { createFrameworkAdapterDriver } from "./framework-adapter-driver.ts";
 import { createFrameworkAdapterEventStream } from "./framework-adapter-event-stream.ts";
 import { createFrameworkAdapterEventStreamSse } from "./framework-adapter-event-stream-sse.ts";
@@ -391,6 +398,16 @@ export class TypeScriptFrameworkAdapter implements ImplementationAdapter {
         return runTuvrenServerCancellation();
       case "runtime.tuvren-server.tenant-isolation":
         return runTuvrenServerTenantIsolation();
+      case "runtime.capability-policy.exposure-dimensions":
+        return runCapabilityPolicyExposureDimensions();
+      case "runtime.capability-policy.invocation-dimensions":
+        return runCapabilityPolicyInvocationDimensions();
+      case "runtime.capability-policy.composition":
+        return runCapabilityPolicyComposition();
+      case "runtime.capability-policy.wired-invocation-denial":
+        return runCapabilityPolicyWiredInvocationDenial();
+      case "runtime.capability-policy.nonretryable-policy":
+        return runCapabilityPolicyNonretryablePolicy();
       default:
         throw new Error(
           `unsupported promoted framework operation ${operation}`
