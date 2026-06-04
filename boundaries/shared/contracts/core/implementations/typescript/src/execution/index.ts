@@ -34,6 +34,7 @@ export type {
   AroundModelResult,
   BranchMessagesCursor,
   BranchSummary,
+  CapabilityPolicyContextInputs,
   ContextEngineeringContext,
   ContextEngineeringHelpers,
   ContextEngineeringPlan,

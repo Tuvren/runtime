@@ -1,0 +1,372 @@
+{
+  "planId": "tuvren.framework.capability-policy",
+  "planVersion": "0.1.0",
+  "packetId": "tuvren.shared.core",
+  "applicability": {
+    "capabilities": ["framework.runtime-api"]
+  },
+  "checks": [
+    {
+      "checkId": "bb.bb001.residency-exposure-withheld",
+      "evidence": ["result.capabilityPolicy.exposure.residencyDenied.exposed"],
+      "assertions": [
+        {
+          "kind": "resultField",
+          "field": "$.capabilityPolicy.exposure.residencyDenied.exposed",
+          "equals": false
+        }
+      ],
+      "operation": "runtime.capability-policy.exposure-dimensions"
+    },
+    {
+      "checkId": "bb.bb001.residency-exposure-withheld-has-reason",
+      "evidence": ["result.capabilityPolicy.exposure.residencyDenied.reason"],
+      "assertions": [
+        {
+          "kind": "resultField",
+          "field": "$.capabilityPolicy.exposure.residencyDenied.reason",
+          "matches": ".+"
+        }
+      ],
+      "operation": "runtime.capability-policy.exposure-dimensions"
+    },
+    {
+      "checkId": "bb.bb001.residency-allowed-exposure-passes",
+      "evidence": ["result.capabilityPolicy.exposure.residencyAllowed.exposed"],
+      "assertions": [
+        {
+          "kind": "resultField",
+          "field": "$.capabilityPolicy.exposure.residencyAllowed.exposed",
+          "equals": true
+        }
+      ],
+      "operation": "runtime.capability-policy.exposure-dimensions"
+    },
+    {
+      "checkId": "bb.bb001.residency-invocation-denied",
+      "evidence": [
+        "result.capabilityPolicy.invocation.residencyDenied.admitted"
+      ],
+      "assertions": [
+        {
+          "kind": "resultField",
+          "field": "$.capabilityPolicy.invocation.residencyDenied.admitted",
+          "equals": false
+        }
+      ],
+      "operation": "runtime.capability-policy.invocation-dimensions"
+    },
+    {
+      "checkId": "bb.bb001.residency-invocation-denied-has-reason",
+      "evidence": ["result.capabilityPolicy.invocation.residencyDenied.reason"],
+      "assertions": [
+        {
+          "kind": "resultField",
+          "field": "$.capabilityPolicy.invocation.residencyDenied.reason",
+          "matches": ".+"
+        }
+      ],
+      "operation": "runtime.capability-policy.invocation-dimensions"
+    },
+    {
+      "checkId": "bb.bb002.risk-class-exposure-withheld",
+      "evidence": ["result.capabilityPolicy.exposure.riskDenied.exposed"],
+      "assertions": [
+        {
+          "kind": "resultField",
+          "field": "$.capabilityPolicy.exposure.riskDenied.exposed",
+          "equals": false
+        }
+      ],
+      "operation": "runtime.capability-policy.exposure-dimensions"
+    },
+    {
+      "checkId": "bb.bb002.risk-class-exposure-withheld-has-reason",
+      "evidence": ["result.capabilityPolicy.exposure.riskDenied.reason"],
+      "assertions": [
+        {
+          "kind": "resultField",
+          "field": "$.capabilityPolicy.exposure.riskDenied.reason",
+          "matches": ".+"
+        }
+      ],
+      "operation": "runtime.capability-policy.exposure-dimensions"
+    },
+    {
+      "checkId": "bb.bb003.active-endpoint-exposure-withheld",
+      "evidence": ["result.capabilityPolicy.exposure.endpointDenied.exposed"],
+      "assertions": [
+        {
+          "kind": "resultField",
+          "field": "$.capabilityPolicy.exposure.endpointDenied.exposed",
+          "equals": false
+        }
+      ],
+      "operation": "runtime.capability-policy.exposure-dimensions"
+    },
+    {
+      "checkId": "bb.bb003.active-endpoint-exposure-withheld-has-reason",
+      "evidence": ["result.capabilityPolicy.exposure.endpointDenied.reason"],
+      "assertions": [
+        {
+          "kind": "resultField",
+          "field": "$.capabilityPolicy.exposure.endpointDenied.reason",
+          "matches": ".+"
+        }
+      ],
+      "operation": "runtime.capability-policy.exposure-dimensions"
+    },
+    {
+      "checkId": "bb.bb003.user-presence-invocation-denied",
+      "evidence": [
+        "result.capabilityPolicy.invocation.presenceDenied.admitted"
+      ],
+      "assertions": [
+        {
+          "kind": "resultField",
+          "field": "$.capabilityPolicy.invocation.presenceDenied.admitted",
+          "equals": false
+        }
+      ],
+      "operation": "runtime.capability-policy.invocation-dimensions"
+    },
+    {
+      "checkId": "bb.bb003.user-presence-invocation-denied-has-reason",
+      "evidence": ["result.capabilityPolicy.invocation.presenceDenied.reason"],
+      "assertions": [
+        {
+          "kind": "resultField",
+          "field": "$.capabilityPolicy.invocation.presenceDenied.reason",
+          "matches": ".+"
+        }
+      ],
+      "operation": "runtime.capability-policy.invocation-dimensions"
+    },
+    {
+      "checkId": "bb.bb004.credential-boundary-invocation-denied",
+      "evidence": [
+        "result.capabilityPolicy.invocation.credentialDenied.admitted"
+      ],
+      "assertions": [
+        {
+          "kind": "resultField",
+          "field": "$.capabilityPolicy.invocation.credentialDenied.admitted",
+          "equals": false
+        }
+      ],
+      "operation": "runtime.capability-policy.invocation-dimensions"
+    },
+    {
+      "checkId": "bb.bb004.credential-boundary-invocation-denied-has-reason",
+      "evidence": [
+        "result.capabilityPolicy.invocation.credentialDenied.reason"
+      ],
+      "assertions": [
+        {
+          "kind": "resultField",
+          "field": "$.capabilityPolicy.invocation.credentialDenied.reason",
+          "matches": ".+"
+        }
+      ],
+      "operation": "runtime.capability-policy.invocation-dimensions"
+    },
+    {
+      "checkId": "bb.bb004.credential-boundary-wired-denial-is-error",
+      "evidence": ["result.capabilityPolicy.wiredDenial.toolResultIsError"],
+      "assertions": [
+        {
+          "kind": "resultField",
+          "field": "$.capabilityPolicy.wiredDenial.toolResultIsError",
+          "equals": true
+        }
+      ],
+      "operation": "runtime.capability-policy.wired-invocation-denial"
+    },
+    {
+      "checkId": "bb.bb004.credential-boundary-wired-denial-tool-not-executed",
+      "evidence": ["result.capabilityPolicy.wiredDenial.toolBodyNotExecuted"],
+      "assertions": [
+        {
+          "kind": "resultField",
+          "field": "$.capabilityPolicy.wiredDenial.toolBodyNotExecuted",
+          "equals": true
+        }
+      ],
+      "operation": "runtime.capability-policy.wired-invocation-denial"
+    },
+    {
+      "checkId": "bb.bb002.risk-approval-gate-wired-pauses-turn",
+      "evidence": ["result.capabilityPolicy.wiredRiskApproval.statusPhase"],
+      "assertions": [
+        {
+          "kind": "resultField",
+          "field": "$.capabilityPolicy.wiredRiskApproval.statusPhase",
+          "equals": "paused"
+        }
+      ],
+      "operation": "runtime.capability-policy.wired-risk-approval"
+    },
+    {
+      "checkId": "bb.bb002.risk-approval-gate-wired-tool-not-executed",
+      "evidence": [
+        "result.capabilityPolicy.wiredRiskApproval.toolBodyNotExecuted"
+      ],
+      "assertions": [
+        {
+          "kind": "resultField",
+          "field": "$.capabilityPolicy.wiredRiskApproval.toolBodyNotExecuted",
+          "equals": true
+        }
+      ],
+      "operation": "runtime.capability-policy.wired-risk-approval"
+    },
+    {
+      "checkId": "bb.bb004.nonretryable-policy-suppresses-retry",
+      "evidence": ["result.capabilityPolicy.nonRetryablePolicy.attemptCount"],
+      "assertions": [
+        {
+          "kind": "resultField",
+          "field": "$.capabilityPolicy.nonRetryablePolicy.attemptCount",
+          "equals": 1
+        }
+      ],
+      "operation": "runtime.capability-policy.nonretryable-policy"
+    },
+    {
+      "checkId": "bb.bb005.composition-exposure-deny-from-any-dimension",
+      "evidence": ["result.capabilityPolicy.composition.exposure.exposed1"],
+      "assertions": [
+        {
+          "kind": "resultField",
+          "field": "$.capabilityPolicy.composition.exposure.exposed1",
+          "equals": false
+        }
+      ],
+      "operation": "runtime.capability-policy.composition"
+    },
+    {
+      "checkId": "bb.bb005.composition-exposure-multi-dimension-reason",
+      "evidence": ["result.capabilityPolicy.composition.exposure.reason"],
+      "assertions": [
+        {
+          "kind": "resultField",
+          "field": "$.capabilityPolicy.composition.exposure.reason",
+          "contains": "residency"
+        },
+        {
+          "kind": "resultField",
+          "field": "$.capabilityPolicy.composition.exposure.reason",
+          "contains": "risk"
+        }
+      ],
+      "operation": "runtime.capability-policy.composition"
+    },
+    {
+      "checkId": "bb.bb005.composition-exposure-has-reason",
+      "evidence": ["result.capabilityPolicy.composition.exposure.reason"],
+      "assertions": [
+        {
+          "kind": "resultField",
+          "field": "$.capabilityPolicy.composition.exposure.reason",
+          "matches": ".+"
+        }
+      ],
+      "operation": "runtime.capability-policy.composition"
+    },
+    {
+      "checkId": "bb.bb005.composition-exposure-deterministic",
+      "evidence": [
+        "result.capabilityPolicy.composition.exposure.exposed1",
+        "result.capabilityPolicy.composition.exposure.exposed2"
+      ],
+      "assertions": [
+        {
+          "kind": "resultField",
+          "field": "$.capabilityPolicy.composition.exposure.exposed1",
+          "equalsPath": "$.result.capabilityPolicy.composition.exposure.exposed2"
+        }
+      ],
+      "operation": "runtime.capability-policy.composition"
+    },
+    {
+      "checkId": "bb.bb005.composition-invocation-deny-from-any-dimension",
+      "evidence": ["result.capabilityPolicy.composition.invocation.admitted1"],
+      "assertions": [
+        {
+          "kind": "resultField",
+          "field": "$.capabilityPolicy.composition.invocation.admitted1",
+          "equals": false
+        }
+      ],
+      "operation": "runtime.capability-policy.composition"
+    },
+    {
+      "checkId": "bb.bb005.composition-invocation-multi-dimension-reason",
+      "evidence": ["result.capabilityPolicy.composition.invocation.reason"],
+      "assertions": [
+        {
+          "kind": "resultField",
+          "field": "$.capabilityPolicy.composition.invocation.reason",
+          "contains": "residency"
+        },
+        {
+          "kind": "resultField",
+          "field": "$.capabilityPolicy.composition.invocation.reason",
+          "contains": "credential"
+        }
+      ],
+      "operation": "runtime.capability-policy.composition"
+    },
+    {
+      "checkId": "bb.bb005.composition-invocation-has-reason",
+      "evidence": ["result.capabilityPolicy.composition.invocation.reason"],
+      "assertions": [
+        {
+          "kind": "resultField",
+          "field": "$.capabilityPolicy.composition.invocation.reason",
+          "matches": ".+"
+        }
+      ],
+      "operation": "runtime.capability-policy.composition"
+    },
+    {
+      "checkId": "bb.bb005.composition-invocation-deterministic",
+      "evidence": [
+        "result.capabilityPolicy.composition.invocation.admitted1",
+        "result.capabilityPolicy.composition.invocation.admitted2"
+      ],
+      "assertions": [
+        {
+          "kind": "resultField",
+          "field": "$.capabilityPolicy.composition.invocation.admitted1",
+          "equalsPath": "$.result.capabilityPolicy.composition.invocation.admitted2"
+        }
+      ],
+      "operation": "runtime.capability-policy.composition"
+    },
+    {
+      "checkId": "bb.bb000.permitted-capability-passes-all-policy",
+      "evidence": ["result.capabilityPolicy.exposure.permitted.exposed"],
+      "assertions": [
+        {
+          "kind": "resultField",
+          "field": "$.capabilityPolicy.exposure.permitted.exposed",
+          "equals": true
+        }
+      ],
+      "operation": "runtime.capability-policy.exposure-dimensions"
+    },
+    {
+      "checkId": "bb.bb000.permitted-capability-invocation-admitted",
+      "evidence": ["result.capabilityPolicy.invocation.permitted.admitted"],
+      "assertions": [
+        {
+          "kind": "resultField",
+          "field": "$.capabilityPolicy.invocation.permitted.admitted",
+          "equals": true
+        }
+      ],
+      "operation": "runtime.capability-policy.invocation-dimensions"
+    }
+  ]
+}

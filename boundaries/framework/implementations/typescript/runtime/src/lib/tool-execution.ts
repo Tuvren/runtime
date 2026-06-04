@@ -97,6 +97,21 @@ export interface ToolBatchEnvironment {
   manifest: ContextManifest;
   maxParallelToolCalls: number;
   now(): EpochMs;
+  /**
+   * Per-capability policy metadata keyed by capabilityId. Built by the runtime
+   * from TuvrenToolDefinition policy fields for the wired invocation-time check.
+   * Populated when capabilityPolicyEngine is set. BB001–BB004.
+   */
+  policyCapabilityMetadata?: ReadonlyMap<
+    string,
+    import("@tuvren/core/capabilities").PolicyCapabilityMetadata
+  >;
+  /**
+   * Session-level policy context inputs from AgentConfig.policyContextInputs.
+   * Used to populate the CapabilityPolicyContext for the wired invocation-time
+   * check. BB001–BB004.
+   */
+  policyContextInputs?: import("@tuvren/core/execution").CapabilityPolicyContextInputs;
   publishCustom(event: { data: unknown; name: string }): void;
   publishEvent(event: TuvrenStreamEvent): void;
   reportSoftError(error: Error): void;
@@ -489,27 +504,50 @@ async function resolveExecutableToolCall(
     };
   }
 
-  // Invocation-time policy check per ADR-046 §4.21.
+  // Invocation-time policy check per ADR-046 §4.21 (Epic BB: context populated).
   if (environment.capabilityPolicyEngine !== undefined) {
     const resolver = createBindingResolver();
     const binding = resolver.resolveFromToolDefinition(tool);
-    // Context dimensions (modelId, providerId, permissions) are populated in
-    // Epic BB. The baseline engine is context-insensitive; a context-sensitive
-    // engine wired before Epic BB would receive empty values here.
+    const inputs = environment.policyContextInputs ?? {};
     const policyContext = {
+      allowedResidencies: inputs.allowedResidencies,
+      availableCredentialScopes: inputs.availableCredentialScopes,
+      capabilityMetadata: environment.policyCapabilityMetadata,
       modelId: "",
       permissions: [] as string[],
       providerId: "",
+      userPresent: inputs.userPresent,
     };
     const decision = environment.capabilityPolicyEngine.evaluateInvocation(
       binding,
       policyContext
     );
     if (!decision.admitted) {
+      if (!isClientTool) {
+        emitToolAuditEvent(
+          environment,
+          toolCall.callId,
+          toolCall.name,
+          "policy_denied"
+        );
+      }
       return {
         result: createErrorToolResult(
           toolCall,
           decision.reason ?? "invocation denied by capability policy"
+        ),
+      };
+    }
+    // BB002: risk-based approval gate. When the policy engine signals that
+    // this capability requires explicit approval (e.g. high-risk class), gate
+    // execution through the existing pending-approval flow. The framework
+    // owns this decision above driver discretion per §4.21 / ADR-046.
+    if (decision.requiresApproval === true) {
+      return {
+        pendingToolCall: createPendingToolCall(
+          toolCall,
+          validation.value,
+          decision.reason
         ),
       };
     }
@@ -638,11 +676,56 @@ function resolveResumeDecision(
     };
   }
 
-  // Epic BB: add an evaluateInvocation check here mirroring resolveExecutableToolCall.
-  // With the baseline context-insensitive deny-list engine this is safe — a denied
-  // capability is rejected at the fresh-call stage and never enters the approval queue.
-  // A context-sensitive engine (e.g., one that checks lapsed permissions at invoke time)
-  // would bypass the gate on this resume path until the context dimensions are wired.
+  // BB005: re-evaluate invocation-time policy on the resume path. Inputs
+  // come from the current agent config (environment.policyContextInputs),
+  // not a snapshot captured at pause time. Static dimensions therefore
+  // produce the same decision as pre-pause unless the host mutates config
+  // between pause and resume. The guard is meaningful for context-sensitive
+  // custom engines that consult external mutable state (e.g. live credential
+  // validity) independently of policyContextInputs.
+  // The risk-based approval path (requiresApproval) is intentionally not
+  // re-raised here: the host has just approved this specific invocation,
+  // so we honour that approval and only check for hard denials.
+  if (environment.capabilityPolicyEngine !== undefined) {
+    const resolver = createBindingResolver();
+    const binding = resolver.resolveFromToolDefinition(tool);
+    const inputs = environment.policyContextInputs ?? {};
+    const policyContext = {
+      allowedResidencies: inputs.allowedResidencies,
+      availableCredentialScopes: inputs.availableCredentialScopes,
+      capabilityMetadata: environment.policyCapabilityMetadata,
+      modelId: "",
+      permissions: [] as string[],
+      providerId: "",
+      userPresent: inputs.userPresent,
+    };
+    const resumeDecision =
+      environment.capabilityPolicyEngine.evaluateInvocation(
+        binding,
+        policyContext
+      );
+    if (!resumeDecision.admitted) {
+      if (!isClientEndpointTool(tool)) {
+        emitToolAuditEvent(
+          environment,
+          pendingToolCall.callId,
+          pendingToolCall.name,
+          "policy_denied"
+        );
+      }
+      return {
+        result: createErrorToolResult(
+          {
+            callId: pendingToolCall.callId,
+            input: pendingToolCall.input,
+            name: pendingToolCall.name,
+            type: "tool_call",
+          },
+          resumeDecision.reason ?? "invocation denied by capability policy"
+        ),
+      };
+    }
+  }
 
   if (decision.type === "approve") {
     return {
@@ -743,8 +826,11 @@ async function executeSingleTool(
 ): Promise<SingleToolOutcome> {
   // Idempotent retry per §4.21 / AX002. Non-idempotent tools are never
   // retried. maxRetries defaults to 1 when idempotent is true and unset.
+  // BB004: nonRetryable overrides idempotent: true — policy governs retry.
   const maxAttempts =
-    toolCall.tool.idempotent === true ? 1 + (toolCall.tool.maxRetries ?? 1) : 1;
+    toolCall.tool.idempotent === true && toolCall.tool.nonRetryable !== true
+      ? 1 + (toolCall.tool.maxRetries ?? 1)
+      : 1;
 
   let lastError: unknown;
 

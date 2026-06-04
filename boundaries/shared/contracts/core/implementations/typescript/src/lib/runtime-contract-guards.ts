@@ -117,6 +117,7 @@ const TURN_END_STATUSES = new Set(["completed", "paused", "failed"]);
 const TOOL_AUDIT_LIFECYCLES = new Set([
   "input_validated",
   "output_validated",
+  "policy_denied",
   "retry_attempt",
   "rate_limited",
   "cancelled",
@@ -172,7 +173,12 @@ const TOOL_DEFINITION_KEYS = new Set([
   "maxRetries",
   "metadata",
   "name",
+  "nonRetryable",
   "outputSchema",
+  "requiredCredentialScopes",
+  "requiredResidency",
+  "requiresUserPresence",
+  "riskClass",
   "timeout",
 ]);
 const EXECUTION_STATUS_KEYS = new Set([
@@ -750,8 +756,23 @@ export function isTuvrenToolDefinition(
       (value.maxRetries === undefined ||
         typeof value.maxRetries === "number") &&
       isOptionalSerializableRecordProperty(value, "metadata") &&
+      (value.nonRetryable === undefined ||
+        typeof value.nonRetryable === "boolean") &&
       (value.outputSchema === undefined ||
         isKrakenToolSchema(value.outputSchema)) &&
+      (value.requiredCredentialScopes === undefined ||
+        (Array.isArray(value.requiredCredentialScopes) &&
+          value.requiredCredentialScopes.every(
+            (s) => typeof s === "string"
+          ))) &&
+      (value.requiredResidency === undefined ||
+        typeof value.requiredResidency === "string") &&
+      (value.requiresUserPresence === undefined ||
+        typeof value.requiresUserPresence === "boolean") &&
+      (value.riskClass === undefined ||
+        value.riskClass === "low" ||
+        value.riskClass === "medium" ||
+        value.riskClass === "high") &&
       isOptionalTimeoutProperty(value, "timeout")
   );
 }
