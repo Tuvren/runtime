@@ -187,6 +187,10 @@ export function createDriverExecutionContext(
   const policyEngine = loopState.activeConfig.capabilityPolicyEngine;
   if (policyEngine !== undefined) {
     const allTools = loopState.activeToolRegistry.list();
+    // Exposure surfaces use a stub inputSchema because the baseline engine
+    // only reads surface.name/capabilityId. Custom policy engines that
+    // inspect inputSchema at exposure time should receive the tool's real
+    // schema — extend this when a host-engine use case requires it.
     const surfaces = allTools.map((tool) => ({
       capabilityId: tool.name,
       description: tool.description,

@@ -282,6 +282,11 @@ class BasicCapabilityPolicyEngine implements CapabilityPolicyEngine {
     binding: Binding,
     context: CapabilityPolicyContext
   ): InvocationDecision {
+    // Note: maxExposedRiskClass (BB002) and requiresActiveEndpoint (BB003)
+    // are exposure-time-only dimensions by design. A conforming driver only
+    // calls tools it received from the filtered registry, so those checks do
+    // not need to be repeated here. A driver that bypasses the filtered
+    // registry is outside the threat model for this engine.
     const metadata = context.capabilityMetadata?.get(binding.capabilityId);
     const denyReasons: string[] = [];
 

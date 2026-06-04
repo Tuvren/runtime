@@ -676,12 +676,13 @@ function resolveResumeDecision(
     };
   }
 
-  // BB005: re-evaluate invocation-time policy on the resume path. The
-  // baseline engine uses frozen policyContextInputs from pauseContext, so
-  // it will produce the same decision as the pre-pause check for static
-  // dimensions. The guard is meaningful for context-sensitive custom engines
-  // whose decisions depend on external mutable state (e.g. a host engine
-  // that rechecks live credential validity rather than a snapshot).
+  // BB005: re-evaluate invocation-time policy on the resume path. Inputs
+  // come from the current agent config (environment.policyContextInputs),
+  // not a snapshot captured at pause time. Static dimensions therefore
+  // produce the same decision as pre-pause unless the host mutates config
+  // between pause and resume. The guard is meaningful for context-sensitive
+  // custom engines that consult external mutable state (e.g. live credential
+  // validity) independently of policyContextInputs.
   // The risk-based approval path (requiresApproval) is intentionally not
   // re-raised here: the host has just approved this specific invocation,
   // so we honour that approval and only check for hard denials.
