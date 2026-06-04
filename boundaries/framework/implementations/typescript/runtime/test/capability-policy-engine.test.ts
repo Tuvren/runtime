@@ -433,46 +433,46 @@ describe("CapabilityPolicyEngine — BB001 data-residency dimension", () => {
 
   test("exposure: surface bound to disallowed residency is withheld", () => {
     const engine = createCapabilityPolicyEngine();
-    const decisions = engine.evaluateExposure(
-      [euSurface],
-      { ...residencyContext, capabilityMetadata }
-    );
+    const decisions = engine.evaluateExposure([euSurface], {
+      ...residencyContext,
+      capabilityMetadata,
+    });
     expect(decisions[0]?.exposed).toBe(false);
   });
 
   test("exposure: surface bound to allowed residency is exposed", () => {
     const engine = createCapabilityPolicyEngine();
-    const decisions = engine.evaluateExposure(
-      [usSurface],
-      { ...residencyContext, capabilityMetadata }
-    );
+    const decisions = engine.evaluateExposure([usSurface], {
+      ...residencyContext,
+      capabilityMetadata,
+    });
     expect(decisions[0]?.exposed).toBe(true);
   });
 
   test("exposure: surface with no residency requirement is exposed regardless of allowedResidencies", () => {
     const engine = createCapabilityPolicyEngine();
-    const decisions = engine.evaluateExposure(
-      [noResidencySurface],
-      { ...residencyContext, capabilityMetadata }
-    );
+    const decisions = engine.evaluateExposure([noResidencySurface], {
+      ...residencyContext,
+      capabilityMetadata,
+    });
     expect(decisions[0]?.exposed).toBe(true);
   });
 
   test("exposure: without allowedResidencies in context, all surfaces pass", () => {
     const engine = createCapabilityPolicyEngine();
-    const decisions = engine.evaluateExposure(
-      [euSurface, usSurface],
-      { ...defaultContext, capabilityMetadata }
-    );
+    const decisions = engine.evaluateExposure([euSurface, usSurface], {
+      ...defaultContext,
+      capabilityMetadata,
+    });
     expect(decisions.every((d) => d.exposed)).toBe(true);
   });
 
   test("exposure: denial carries a non-secret reason", () => {
     const engine = createCapabilityPolicyEngine();
-    const decisions = engine.evaluateExposure(
-      [euSurface],
-      { ...residencyContext, capabilityMetadata }
-    );
+    const decisions = engine.evaluateExposure([euSurface], {
+      ...residencyContext,
+      capabilityMetadata,
+    });
     const denied = decisions.find((d) => !d.exposed);
     expect(typeof denied?.reason).toBe("string");
     expect((denied?.reason ?? "").length).toBeGreaterThan(0);

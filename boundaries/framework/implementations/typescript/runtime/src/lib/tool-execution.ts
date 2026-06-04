@@ -92,6 +92,11 @@ export interface ToolBatchEnvironment {
    * being executed. When absent, all invocations are admitted (default).
    */
   capabilityPolicyEngine?: CapabilityPolicyEngine;
+  extensions: TuvrenExtension[];
+  iterationCount: number;
+  manifest: ContextManifest;
+  maxParallelToolCalls: number;
+  now(): EpochMs;
   /**
    * Per-capability policy metadata keyed by capabilityId. Built by the runtime
    * from TuvrenToolDefinition policy fields for the wired invocation-time check.
@@ -107,11 +112,6 @@ export interface ToolBatchEnvironment {
    * check. BB001–BB004.
    */
   policyContextInputs?: import("@tuvren/core/execution").CapabilityPolicyContextInputs;
-  extensions: TuvrenExtension[];
-  iterationCount: number;
-  manifest: ContextManifest;
-  maxParallelToolCalls: number;
-  now(): EpochMs;
   publishCustom(event: { data: unknown; name: string }): void;
   publishEvent(event: TuvrenStreamEvent): void;
   reportSoftError(error: Error): void;

@@ -30,9 +30,8 @@ import type {
 } from "@tuvren/core/messages";
 import type { TuvrenModelResponse } from "@tuvren/core/provider";
 import type { ToolRegistry } from "@tuvren/core/tools";
-import {
-  buildCapabilityMetadataFromTools,
-} from "./capability-policy-engine.js";
+import { isClientEndpointTool } from "./binding-resolver.js";
+import { buildCapabilityMetadataFromTools } from "./capability-policy-engine.js";
 import { runAfterIterationHooks } from "./extension-runtime.js";
 import type { HeadState, LoopState } from "./runtime-core-loop.js";
 import type { LoopOutcome } from "./runtime-core-recovery.js";
@@ -42,7 +41,6 @@ import {
   createFrozenSnapshot,
   normalizeError,
 } from "./runtime-core-shared.js";
-import { isClientEndpointTool } from "./binding-resolver.js";
 import type { RuntimeExecutionHandle } from "./runtime-execution-handle.js";
 import {
   executeToolBatch,
@@ -60,7 +58,9 @@ function buildUnavailableCapabilityIds(
     | import("@tuvren/core/capabilities").ClientEndpointBoundary
     | undefined
 ): ReadonlySet<string> | undefined {
-  if (boundary === undefined) return undefined;
+  if (boundary === undefined) {
+    return undefined;
+  }
   const unavailable = new Set<string>();
   for (const tool of tools) {
     if (isClientEndpointTool(tool) && !boundary.isAvailable(tool.name)) {
@@ -198,8 +198,7 @@ export function createDriverExecutionContext(
     const capabilityMetadata = buildCapabilityMetadataFromTools(allTools);
     const exposureContext = {
       allowedResidencies: policyContextInputs.allowedResidencies,
-      availableCredentialScopes:
-        policyContextInputs.availableCredentialScopes,
+      availableCredentialScopes: policyContextInputs.availableCredentialScopes,
       capabilityMetadata,
       modelId:
         typeof loopState.activeConfig.model === "string"
@@ -226,9 +225,8 @@ export function createDriverExecutionContext(
     }
   }
 
-  const toolRegistrySnapshot = host.createReadonlyDriverToolRegistry(
-    registryForDriver
-  );
+  const toolRegistrySnapshot =
+    host.createReadonlyDriverToolRegistry(registryForDriver);
 
   return {
     branchId: handle.request.branchId,

@@ -35,6 +35,13 @@ export interface CapabilityPolicyEngineOptions {
   deniedCapabilityIds?: Set<string>;
   /** Surface names to deny at exposure-time regardless of other context. */
   deniedSurfaceNames?: Set<string>;
+  /**
+   * Capabilities strictly above this risk class are withheld at exposure time
+   * (exposed: false). "high" means only high-risk capabilities are withheld;
+   * "medium" means medium and high are withheld; "low" withholds all.
+   * Absent means no risk-based exposure cap is active. BB002.
+   */
+  maxExposedRiskClass?: "low" | "medium" | "high";
   // ── BB002: risk-based policy ─────────────────────────────────────────────
   /**
    * Capabilities at or above this risk class require explicit user approval
@@ -43,13 +50,6 @@ export interface CapabilityPolicyEngineOptions {
    * Absent means no risk-based approval gate is active. BB002.
    */
   requireApprovalForRiskClass?: "low" | "medium" | "high";
-  /**
-   * Capabilities strictly above this risk class are withheld at exposure time
-   * (exposed: false). "high" means only high-risk capabilities are withheld;
-   * "medium" means medium and high are withheld; "low" withholds all.
-   * Absent means no risk-based exposure cap is active. BB002.
-   */
-  maxExposedRiskClass?: "low" | "medium" | "high";
 }
 
 // ---------------------------------------------------------------------------
@@ -102,7 +102,9 @@ function checkActiveEndpointExposure(
   metadata: PolicyCapabilityMetadata | undefined,
   context: CapabilityPolicyContext
 ): string | null {
-  if (!metadata?.requiresActiveEndpoint) return null;
+  if (!metadata?.requiresActiveEndpoint) {
+    return null;
+  }
   if (context.unavailableCapabilityIds?.has(capabilityId)) {
     return `capability "${capabilityId}" requires an active endpoint but none is currently attached`;
   }
@@ -148,7 +150,9 @@ function checkUserPresenceInvocation(
   metadata: PolicyCapabilityMetadata | undefined,
   context: CapabilityPolicyContext
 ): string | null {
-  if (!metadata?.requiresUserPresence) return null;
+  if (!metadata?.requiresUserPresence) {
+    return null;
+  }
   if (context.userPresent === false) {
     return `capability "${capabilityId}" requires user presence but no user is present`;
   }
@@ -237,7 +241,9 @@ class BasicCapabilityPolicyEngine implements CapabilityPolicyEngine {
         metadata,
         context
       );
-      if (residencyReason !== null) denyReasons.push(residencyReason);
+      if (residencyReason !== null) {
+        denyReasons.push(residencyReason);
+      }
 
       // BB002: risk-class cap
       const riskReason = checkRiskClassExposure(
@@ -245,7 +251,9 @@ class BasicCapabilityPolicyEngine implements CapabilityPolicyEngine {
         metadata,
         this.options
       );
-      if (riskReason !== null) denyReasons.push(riskReason);
+      if (riskReason !== null) {
+        denyReasons.push(riskReason);
+      }
 
       // BB003: active-endpoint requirement
       const endpointReason = checkActiveEndpointExposure(
@@ -253,7 +261,9 @@ class BasicCapabilityPolicyEngine implements CapabilityPolicyEngine {
         metadata,
         context
       );
-      if (endpointReason !== null) denyReasons.push(endpointReason);
+      if (endpointReason !== null) {
+        denyReasons.push(endpointReason);
+      }
 
       if (denyReasons.length > 0) {
         return {
@@ -285,7 +295,9 @@ class BasicCapabilityPolicyEngine implements CapabilityPolicyEngine {
       metadata,
       context
     );
-    if (residencyReason !== null) denyReasons.push(residencyReason);
+    if (residencyReason !== null) {
+      denyReasons.push(residencyReason);
+    }
 
     // BB003: user-presence
     const presenceReason = checkUserPresenceInvocation(
@@ -293,7 +305,9 @@ class BasicCapabilityPolicyEngine implements CapabilityPolicyEngine {
       metadata,
       context
     );
-    if (presenceReason !== null) denyReasons.push(presenceReason);
+    if (presenceReason !== null) {
+      denyReasons.push(presenceReason);
+    }
 
     // BB004: credential-boundary
     const credentialReason = checkCredentialBoundaryInvocation(
@@ -301,7 +315,9 @@ class BasicCapabilityPolicyEngine implements CapabilityPolicyEngine {
       metadata,
       context
     );
-    if (credentialReason !== null) denyReasons.push(credentialReason);
+    if (credentialReason !== null) {
+      denyReasons.push(credentialReason);
+    }
 
     if (denyReasons.length > 0) {
       return {
@@ -350,28 +366,51 @@ export function createCapabilityPolicyEngine(
  * Builds a capabilityMetadata map from TuvrenToolDefinition policy fields.
  * The runtime calls this once per iteration to populate the wired policy
  * context. Only tools that declare at least one BB policy field are included.
+ *
+ * Tuvren-client tools (detected via metadata.clientEndpointId, the same tag
+ * used by isClientEndpointTool) are automatically assigned
+ * requiresActiveEndpoint: true so the BB003 active-endpoint exposure check
+ * fires correctly on the wired path when the client endpoint boundary reports
+ * unavailability via unavailableCapabilityIds.
  */
 export function buildCapabilityMetadataFromTools(
   tools: ReadonlyArray<{
+    metadata?: Record<string, unknown>;
     name: string;
-    riskClass?: "low" | "medium" | "high";
+    nonRetryable?: boolean;
+    requiredCredentialScopes?: readonly string[];
     requiredResidency?: string;
     requiresUserPresence?: boolean;
-    requiredCredentialScopes?: readonly string[];
-    nonRetryable?: boolean;
+    riskClass?: "low" | "medium" | "high";
   }>
 ): ReadonlyMap<string, PolicyCapabilityMetadata> {
   const map = new Map<string, PolicyCapabilityMetadata>();
   for (const tool of tools) {
     const entry: PolicyCapabilityMetadata = {};
-    if (tool.riskClass !== undefined) entry.riskClass = tool.riskClass;
-    if (tool.requiredResidency !== undefined)
+    if (tool.riskClass !== undefined) {
+      entry.riskClass = tool.riskClass;
+    }
+    if (tool.requiredResidency !== undefined) {
       entry.requiredResidency = tool.requiredResidency;
-    if (tool.requiresUserPresence !== undefined)
+    }
+    if (tool.requiresUserPresence !== undefined) {
       entry.requiresUserPresence = tool.requiresUserPresence;
-    if (tool.requiredCredentialScopes !== undefined)
+    }
+    if (tool.requiredCredentialScopes !== undefined) {
       entry.requiredCredentialScopes = tool.requiredCredentialScopes;
-    if (tool.nonRetryable !== undefined) entry.nonRetryable = tool.nonRetryable;
+    }
+    if (tool.nonRetryable !== undefined) {
+      entry.nonRetryable = tool.nonRetryable;
+    }
+    // Tuvren-client synthetic tools require an active endpoint to be exposed.
+    // Detect them by the same metadata.clientEndpointId tag used by
+    // isClientEndpointTool in the binding resolver.
+    const clientEndpointId = (
+      tool.metadata as { clientEndpointId?: unknown } | undefined
+    )?.clientEndpointId;
+    if (typeof clientEndpointId === "string" && clientEndpointId.length > 0) {
+      entry.requiresActiveEndpoint = true;
+    }
     if (Object.keys(entry).length > 0) {
       map.set(tool.name, entry);
     }

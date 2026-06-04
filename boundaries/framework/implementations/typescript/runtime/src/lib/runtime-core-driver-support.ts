@@ -107,9 +107,9 @@ export function createToolBatchEnvironment(
   // for the wired invocation-time policy check in resolveExecutableToolCall.
   const policyEngine = loopState.activeConfig.capabilityPolicyEngine;
   const policyCapabilityMetadata =
-    policyEngine !== undefined
-      ? buildCapabilityMetadataFromTools(loopState.activeToolRegistry.list())
-      : undefined;
+    policyEngine === undefined
+      ? undefined
+      : buildCapabilityMetadataFromTools(loopState.activeToolRegistry.list());
   const policyContextInputs =
     loopState.activeConfig.policyContextInputs ?? undefined;
 

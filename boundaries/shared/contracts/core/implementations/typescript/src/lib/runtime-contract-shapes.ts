@@ -696,6 +696,12 @@ export interface TuvrenToolDefinition {
   metadata?: Record<string, unknown>;
   name: string;
   /**
+   * When true, the framework must not retry this capability even when
+   * idempotent is true. Overrides the tool-level idempotency opt-in for the
+   * retry budget. BB004.
+   */
+  nonRetryable?: boolean;
+  /**
    * Declared result shape validated against the execute return value before
    * surfacing. Violations surface as tool.result with isError true and
    * code tool_result_validation_failed. (AX001)
@@ -712,6 +718,12 @@ export interface TuvrenToolDefinition {
    * rather than consuming the retry budget.
    */
   outputSchema?: TuvrenJsonSchema | CustomSchema;
+  /**
+   * Credential scopes required for this capability's invocation. The invocation
+   * is denied when not all listed scopes are in the policy context's
+   * availableCredentialScopes. BB004.
+   */
+  requiredCredentialScopes?: readonly string[];
   // ── BB001–BB004: capability policy fields ────────────────────────────────
   /**
    * Data residency zone that this tool's binding processes data in. The
@@ -720,29 +732,17 @@ export interface TuvrenToolDefinition {
    */
   requiredResidency?: string;
   /**
-   * Risk classification for this capability. The runtime uses this to drive
-   * exposure and invocation policy (e.g. requiring approval for high-risk
-   * capabilities). BB002.
-   */
-  riskClass?: "low" | "medium" | "high";
-  /**
    * Whether explicit user presence is required at invocation time. When true
    * and the policy context's userPresent is false, the invocation is denied.
    * BB003.
    */
   requiresUserPresence?: boolean;
   /**
-   * Credential scopes required for this capability's invocation. The invocation
-   * is denied when not all listed scopes are in the policy context's
-   * availableCredentialScopes. BB004.
+   * Risk classification for this capability. The runtime uses this to drive
+   * exposure and invocation policy (e.g. requiring approval for high-risk
+   * capabilities). BB002.
    */
-  requiredCredentialScopes?: readonly string[];
-  /**
-   * When true, the framework must not retry this capability even when
-   * idempotent is true. Overrides the tool-level idempotency opt-in for the
-   * retry budget. BB004.
-   */
-  nonRetryable?: boolean;
+  riskClass?: "low" | "medium" | "high";
   timeout?: number;
 }
 
@@ -1038,6 +1038,14 @@ export interface AgentConfig {
   model?: string | TuvrenProvider;
   name: string;
   /**
+   * Host-configurable inputs to the Capability Policy Context. The runtime
+   * uses these to populate the CapabilityPolicyContext for both the
+   * exposure-time and invocation-time engine calls. Omitting this field means
+   * the corresponding BB policy dimensions (residency, presence, credential
+   * boundary) are not evaluated for this agent's turns. BB001–BB004.
+   */
+  policyContextInputs?: CapabilityPolicyContextInputs;
+  /**
    * Provider-mediated tool configurations for this agent. The developer
    * supplies the endpoint; the provider invokes it. (AY004)
    *
@@ -1080,14 +1088,6 @@ export interface AgentConfig {
       ): Promise<unknown> | unknown;
     }
   >;
-  /**
-   * Host-configurable inputs to the Capability Policy Context. The runtime
-   * uses these to populate the CapabilityPolicyContext for both the
-   * exposure-time and invocation-time engine calls. Omitting this field means
-   * the corresponding BB policy dimensions (residency, presence, credential
-   * boundary) are not evaluated for this agent's turns. BB001–BB004.
-   */
-  policyContextInputs?: CapabilityPolicyContextInputs;
   /**
    * Server execution class configuration for this agent. Controls per-tenant
    * rate limiting of Tuvren-server invocations. (AX003)
