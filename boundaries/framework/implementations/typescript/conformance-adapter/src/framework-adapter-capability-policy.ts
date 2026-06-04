@@ -338,17 +338,16 @@ export async function runCapabilityPolicyWiredInvocationDenial(): Promise<Adapte
 
   const events = await collectValues(handle.events());
 
-  const toolResultEvent = events.find(
-    (e) => (e as Record<string, unknown>).type === "tool.result"
-  );
+  const toolResultEvent = events.find((e) => e.type === "tool.result");
 
   const evidence = {
     capabilityPolicy: {
       wiredDenial: {
         toolBodyNotExecuted: !toolExecuted,
         toolResultIsError:
-          (toolResultEvent as Record<string, unknown> | undefined)?.isError ===
-          true,
+          toolResultEvent?.type === "tool.result"
+            ? toolResultEvent.isError === true
+            : false,
       },
     },
   };
