@@ -328,7 +328,7 @@
           "status": "pass"
         },
         {
-          "assertionId": "bb.bb004.nonretryable-policy-suppresses-retry.requiredEvidence.result.capabilityPolicy.nonRetryablePolicy.exactlyOneAttempt",
+          "assertionId": "bb.bb004.nonretryable-policy-suppresses-retry.requiredEvidence.result.capabilityPolicy.nonRetryablePolicy.attemptCount",
           "status": "pass"
         }
       ],
@@ -346,7 +346,7 @@
           "status": "pass"
         },
         {
-          "assertionId": "bb.bb005.composition-exposure-deny-from-any-dimension.requiredEvidence.result.capabilityPolicy.composition.exposure.multiDenyExposed",
+          "assertionId": "bb.bb005.composition-exposure-deny-from-any-dimension.requiredEvidence.result.capabilityPolicy.composition.exposure.exposed1",
           "status": "pass"
         }
       ],
@@ -364,7 +364,11 @@
           "status": "pass"
         },
         {
-          "assertionId": "bb.bb005.composition-exposure-deterministic.requiredEvidence.result.capabilityPolicy.composition.exposure.deterministic",
+          "assertionId": "bb.bb005.composition-exposure-deterministic.requiredEvidence.result.capabilityPolicy.composition.exposure.exposed1",
+          "status": "pass"
+        },
+        {
+          "assertionId": "bb.bb005.composition-exposure-deterministic.requiredEvidence.result.capabilityPolicy.composition.exposure.exposed2",
           "status": "pass"
         }
       ],
@@ -382,7 +386,7 @@
           "status": "pass"
         },
         {
-          "assertionId": "bb.bb005.composition-exposure-has-reason.requiredEvidence.result.capabilityPolicy.composition.exposure.hasReason",
+          "assertionId": "bb.bb005.composition-exposure-has-reason.requiredEvidence.result.capabilityPolicy.composition.exposure.reason",
           "status": "pass"
         }
       ],
@@ -400,7 +404,11 @@
           "status": "pass"
         },
         {
-          "assertionId": "bb.bb005.composition-exposure-multi-dimension-reason.requiredEvidence.result.capabilityPolicy.composition.exposure.hasMultiDimensionReason",
+          "assertionId": "bb.bb005.composition-exposure-multi-dimension-reason.2.resultField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "bb.bb005.composition-exposure-multi-dimension-reason.requiredEvidence.result.capabilityPolicy.composition.exposure.reason",
           "status": "pass"
         }
       ],
@@ -418,7 +426,7 @@
           "status": "pass"
         },
         {
-          "assertionId": "bb.bb005.composition-invocation-deny-from-any-dimension.requiredEvidence.result.capabilityPolicy.composition.invocation.multiDenyAdmitted",
+          "assertionId": "bb.bb005.composition-invocation-deny-from-any-dimension.requiredEvidence.result.capabilityPolicy.composition.invocation.admitted1",
           "status": "pass"
         }
       ],
@@ -436,7 +444,11 @@
           "status": "pass"
         },
         {
-          "assertionId": "bb.bb005.composition-invocation-deterministic.requiredEvidence.result.capabilityPolicy.composition.invocation.deterministic",
+          "assertionId": "bb.bb005.composition-invocation-deterministic.requiredEvidence.result.capabilityPolicy.composition.invocation.admitted1",
+          "status": "pass"
+        },
+        {
+          "assertionId": "bb.bb005.composition-invocation-deterministic.requiredEvidence.result.capabilityPolicy.composition.invocation.admitted2",
           "status": "pass"
         }
       ],
@@ -454,7 +466,7 @@
           "status": "pass"
         },
         {
-          "assertionId": "bb.bb005.composition-invocation-has-reason.requiredEvidence.result.capabilityPolicy.composition.invocation.hasReason",
+          "assertionId": "bb.bb005.composition-invocation-has-reason.requiredEvidence.result.capabilityPolicy.composition.invocation.reason",
           "status": "pass"
         }
       ],
@@ -472,7 +484,11 @@
           "status": "pass"
         },
         {
-          "assertionId": "bb.bb005.composition-invocation-multi-dimension-reason.requiredEvidence.result.capabilityPolicy.composition.invocation.hasMultiDimensionReason",
+          "assertionId": "bb.bb005.composition-invocation-multi-dimension-reason.2.resultField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "bb.bb005.composition-invocation-multi-dimension-reason.requiredEvidence.result.capabilityPolicy.composition.invocation.reason",
           "status": "pass"
         }
       ],

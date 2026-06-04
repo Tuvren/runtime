@@ -202,27 +202,23 @@
     },
     {
       "checkId": "bb.bb004.nonretryable-policy-suppresses-retry",
-      "evidence": [
-        "result.capabilityPolicy.nonRetryablePolicy.exactlyOneAttempt"
-      ],
+      "evidence": ["result.capabilityPolicy.nonRetryablePolicy.attemptCount"],
       "assertions": [
         {
           "kind": "resultField",
-          "field": "$.capabilityPolicy.nonRetryablePolicy.exactlyOneAttempt",
-          "equals": true
+          "field": "$.capabilityPolicy.nonRetryablePolicy.attemptCount",
+          "equals": 1
         }
       ],
       "operation": "runtime.capability-policy.nonretryable-policy"
     },
     {
       "checkId": "bb.bb005.composition-exposure-deny-from-any-dimension",
-      "evidence": [
-        "result.capabilityPolicy.composition.exposure.multiDenyExposed"
-      ],
+      "evidence": ["result.capabilityPolicy.composition.exposure.exposed1"],
       "assertions": [
         {
           "kind": "resultField",
-          "field": "$.capabilityPolicy.composition.exposure.multiDenyExposed",
+          "field": "$.capabilityPolicy.composition.exposure.exposed1",
           "equals": false
         }
       ],
@@ -230,26 +226,29 @@
     },
     {
       "checkId": "bb.bb005.composition-exposure-multi-dimension-reason",
-      "evidence": [
-        "result.capabilityPolicy.composition.exposure.hasMultiDimensionReason"
-      ],
+      "evidence": ["result.capabilityPolicy.composition.exposure.reason"],
       "assertions": [
         {
           "kind": "resultField",
-          "field": "$.capabilityPolicy.composition.exposure.hasMultiDimensionReason",
-          "equals": true
+          "field": "$.capabilityPolicy.composition.exposure.reason",
+          "contains": "residency"
+        },
+        {
+          "kind": "resultField",
+          "field": "$.capabilityPolicy.composition.exposure.reason",
+          "contains": "risk"
         }
       ],
       "operation": "runtime.capability-policy.composition"
     },
     {
       "checkId": "bb.bb005.composition-exposure-has-reason",
-      "evidence": ["result.capabilityPolicy.composition.exposure.hasReason"],
+      "evidence": ["result.capabilityPolicy.composition.exposure.reason"],
       "assertions": [
         {
           "kind": "resultField",
-          "field": "$.capabilityPolicy.composition.exposure.hasReason",
-          "equals": true
+          "field": "$.capabilityPolicy.composition.exposure.reason",
+          "matches": ".+"
         }
       ],
       "operation": "runtime.capability-policy.composition"
@@ -257,26 +256,25 @@
     {
       "checkId": "bb.bb005.composition-exposure-deterministic",
       "evidence": [
-        "result.capabilityPolicy.composition.exposure.deterministic"
+        "result.capabilityPolicy.composition.exposure.exposed1",
+        "result.capabilityPolicy.composition.exposure.exposed2"
       ],
       "assertions": [
         {
           "kind": "resultField",
-          "field": "$.capabilityPolicy.composition.exposure.deterministic",
-          "equals": true
+          "field": "$.capabilityPolicy.composition.exposure.exposed1",
+          "equalsPath": "$.result.capabilityPolicy.composition.exposure.exposed2"
         }
       ],
       "operation": "runtime.capability-policy.composition"
     },
     {
       "checkId": "bb.bb005.composition-invocation-deny-from-any-dimension",
-      "evidence": [
-        "result.capabilityPolicy.composition.invocation.multiDenyAdmitted"
-      ],
+      "evidence": ["result.capabilityPolicy.composition.invocation.admitted1"],
       "assertions": [
         {
           "kind": "resultField",
-          "field": "$.capabilityPolicy.composition.invocation.multiDenyAdmitted",
+          "field": "$.capabilityPolicy.composition.invocation.admitted1",
           "equals": false
         }
       ],
@@ -284,26 +282,29 @@
     },
     {
       "checkId": "bb.bb005.composition-invocation-multi-dimension-reason",
-      "evidence": [
-        "result.capabilityPolicy.composition.invocation.hasMultiDimensionReason"
-      ],
+      "evidence": ["result.capabilityPolicy.composition.invocation.reason"],
       "assertions": [
         {
           "kind": "resultField",
-          "field": "$.capabilityPolicy.composition.invocation.hasMultiDimensionReason",
-          "equals": true
+          "field": "$.capabilityPolicy.composition.invocation.reason",
+          "contains": "residency"
+        },
+        {
+          "kind": "resultField",
+          "field": "$.capabilityPolicy.composition.invocation.reason",
+          "contains": "credential"
         }
       ],
       "operation": "runtime.capability-policy.composition"
     },
     {
       "checkId": "bb.bb005.composition-invocation-has-reason",
-      "evidence": ["result.capabilityPolicy.composition.invocation.hasReason"],
+      "evidence": ["result.capabilityPolicy.composition.invocation.reason"],
       "assertions": [
         {
           "kind": "resultField",
-          "field": "$.capabilityPolicy.composition.invocation.hasReason",
-          "equals": true
+          "field": "$.capabilityPolicy.composition.invocation.reason",
+          "matches": ".+"
         }
       ],
       "operation": "runtime.capability-policy.composition"
@@ -311,13 +312,14 @@
     {
       "checkId": "bb.bb005.composition-invocation-deterministic",
       "evidence": [
-        "result.capabilityPolicy.composition.invocation.deterministic"
+        "result.capabilityPolicy.composition.invocation.admitted1",
+        "result.capabilityPolicy.composition.invocation.admitted2"
       ],
       "assertions": [
         {
           "kind": "resultField",
-          "field": "$.capabilityPolicy.composition.invocation.deterministic",
-          "equals": true
+          "field": "$.capabilityPolicy.composition.invocation.admitted1",
+          "equalsPath": "$.result.capabilityPolicy.composition.invocation.admitted2"
         }
       ],
       "operation": "runtime.capability-policy.composition"

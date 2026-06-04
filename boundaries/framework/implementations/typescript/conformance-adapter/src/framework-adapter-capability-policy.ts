@@ -244,23 +244,14 @@ export async function runCapabilityPolicyComposition(): Promise<AdapterProjectio
     capabilityPolicy: {
       composition: {
         exposure: {
-          deterministic: d1[0]?.exposed === d2[0]?.exposed,
-          hasMultiDimensionReason:
-            (d1[0]?.reason ?? "").includes("residency") &&
-            (d1[0]?.reason ?? "").includes("risk"),
-          // renamed from nonSecretReason — this field proves a reason string exists
-          // (non-emptiness), not the absence of secret material; name matches what the
-          // runner evaluates per AGENTS.md assertion-name discipline.
-          hasReason: (d1[0]?.reason ?? "").length > 0,
-          multiDenyExposed: d1[0]?.exposed,
+          exposed1: d1[0]?.exposed,
+          exposed2: d2[0]?.exposed,
+          reason: d1[0]?.reason ?? "",
         },
         invocation: {
-          deterministic: inv1.admitted === inv2.admitted,
-          hasMultiDimensionReason:
-            (inv1.reason ?? "").includes("residency") &&
-            (inv1.reason ?? "").includes("credential"),
-          hasReason: (inv1.reason ?? "").length > 0,
-          multiDenyAdmitted: inv1.admitted,
+          admitted1: inv1.admitted,
+          admitted2: inv2.admitted,
+          reason: inv1.reason ?? "",
         },
       },
     },
@@ -418,8 +409,7 @@ export async function runCapabilityPolicyNonretryablePolicy(): Promise<AdapterPr
   const evidence = {
     capabilityPolicy: {
       nonRetryablePolicy: {
-        // nonRetryable: true suppresses all retries → exactly one attempt
-        exactlyOneAttempt: attemptCount === 1,
+        attemptCount,
       },
     },
   };
