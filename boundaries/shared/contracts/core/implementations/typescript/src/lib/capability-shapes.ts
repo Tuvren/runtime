@@ -105,22 +105,17 @@ export interface ToolSurface {
   /** The Capability this surface presents. */
   capabilityId: string;
   description: string;
+  /**
+   * Non-secret region tag for the endpoint this surface is backed by.
+   * Used by the data-residency policy dimension at exposure time (BB001).
+   */
+  endpointRegion?: string;
   /** Provider-wire shape (CustomSchema-normalized upstream). */
   inputSchema: TuvrenJsonSchema;
   /** Model-facing name. */
   name: string;
   /** Provider-specific rendering constraints (non-secret). */
   providerRendering?: Record<string, unknown>;
-  /**
-   * Non-secret region tag for the endpoint this surface is backed by.
-   * Used by the data-residency policy dimension at exposure time (BB001).
-   */
-  endpointRegion?: string;
-  /**
-   * Risk classification of the underlying capability, denormalized here for
-   * exposure-time policy evaluation without a registry lookup (BB002).
-   */
-  riskClass?: "low" | "medium" | "high";
   /**
    * When true, the surface is withheld at exposure time if the policy context
    * signals no active endpoint is attached (BB003).
@@ -132,6 +127,11 @@ export interface ToolSurface {
    * enforcement; mirrored here for exposure-time surface metadata (BB003).
    */
   requiresUserPresence?: boolean;
+  /**
+   * Risk classification of the underlying capability, denormalized here for
+   * exposure-time policy evaluation without a registry lookup (BB002).
+   */
+  riskClass?: "low" | "medium" | "high";
 }
 
 /**
@@ -139,6 +139,11 @@ export interface ToolSurface {
  * are owned by the execution-class endpoint container, not stored here.
  */
 export interface Endpoint {
+  /**
+   * Credential scope required to invoke capabilities through this endpoint.
+   * Used by the credential-boundary policy dimension (BB004).
+   */
+  credentialScope?: string;
   /** Stable, non-secret endpoint identifier. */
   id: string;
   kind: EndpointKind;
@@ -147,11 +152,6 @@ export interface Endpoint {
    * Used by the data-residency policy dimension (BB001).
    */
   region?: string;
-  /**
-   * Credential scope required to invoke capabilities through this endpoint.
-   * Used by the credential-boundary policy dimension (BB004).
-   */
-  credentialScope?: string;
 }
 
 /**
@@ -161,18 +161,14 @@ export interface Endpoint {
  */
 export interface Binding {
   capabilityId: string;
+  /**
+   * Credential scope required to invoke this capability. When set and
+   * credential-boundary enforcement is active, the invoking context must
+   * include this scope in entitledCredentialScopes (BB004).
+   */
+  credentialScope?: string;
   endpoint: Endpoint;
   executionClass: ExecutionClass;
-  /**
-   * Risk classification of the underlying capability, denormalized for
-   * invocation-time policy evaluation without a registry lookup (BB002).
-   */
-  riskClass?: "low" | "medium" | "high";
-  /**
-   * When true, the invocation is denied if the policy context signals
-   * no user is present (BB003).
-   */
-  requiresUserPresence?: boolean;
   /**
    * Idempotency policy for this binding at the framework policy level.
    * "idempotent": the framework may retry on retriable failure.
@@ -181,11 +177,15 @@ export interface Binding {
    */
   idempotencyPolicy?: "idempotent" | "non-idempotent";
   /**
-   * Credential scope required to invoke this capability. When set and
-   * credential-boundary enforcement is active, the invoking context must
-   * include this scope in entitledCredentialScopes (BB004).
+   * When true, the invocation is denied if the policy context signals
+   * no user is present (BB003).
    */
-  credentialScope?: string;
+  requiresUserPresence?: boolean;
+  /**
+   * Risk classification of the underlying capability, denormalized for
+   * invocation-time policy evaluation without a registry lookup (BB002).
+   */
+  riskClass?: "low" | "medium" | "high";
 }
 
 // ---------------------------------------------------------------------------
@@ -226,16 +226,16 @@ export interface InvocationDecision {
   admitted: boolean;
   capabilityId: string;
   executionClass: ExecutionClass;
-  /** Non-secret denial reason when admitted is false. */
-  reason?: string;
-  /** True when the invocation requires an explicit approval decision first. */
-  requiresApproval?: boolean;
   /**
    * Whether the framework policy permits retrying this invocation on failure.
    * Populated when the binding carries an idempotencyPolicy. When absent, the
    * tool-definition-level idempotent flag governs retry (BB004).
    */
   policyCanRetry?: boolean;
+  /** Non-secret denial reason when admitted is false. */
+  reason?: string;
+  /** True when the invocation requires an explicit approval decision first. */
+  requiresApproval?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -272,10 +272,6 @@ export interface CapabilityInvocationAttribution {
  * evaluated from the context side.
  */
 export interface CapabilityPolicyContext {
-  modelId: string;
-  /** User/org permission tokens present for this invocation. */
-  permissions: string[];
-  providerId: string;
   /**
    * Allowed data-residency regions for this context. When set and non-empty,
    * capabilities bound to endpoints whose region is not in this set are
@@ -283,16 +279,6 @@ export interface CapabilityPolicyContext {
    * intersection (most restrictive wins).
    */
   allowedRegions?: string[];
-  /**
-   * Maximum risk class permitted in this context. Surfaces and bindings with
-   * a riskClass that exceeds this limit are withheld or denied (BB002).
-   */
-  maxAllowedRiskClass?: "low" | "medium" | "high";
-  /**
-   * Whether an active user is present for this invocation. When false,
-   * capabilities that requiresUserPresence are denied (BB003).
-   */
-  userPresent?: boolean;
   /**
    * Whether the required execution endpoint is currently attached. When false,
    * surfaces that requiresActiveEndpoint are withheld (BB003).
@@ -304,6 +290,20 @@ export interface CapabilityPolicyContext {
    * from this set is denied (BB004).
    */
   entitledCredentialScopes?: string[];
+  /**
+   * Maximum risk class permitted in this context. Surfaces and bindings with
+   * a riskClass that exceeds this limit are withheld or denied (BB002).
+   */
+  maxAllowedRiskClass?: "low" | "medium" | "high";
+  modelId: string;
+  /** User/org permission tokens present for this invocation. */
+  permissions: string[];
+  providerId: string;
+  /**
+   * Whether an active user is present for this invocation. When false,
+   * capabilities that requiresUserPresence are denied (BB003).
+   */
+  userPresent?: boolean;
 }
 
 /**

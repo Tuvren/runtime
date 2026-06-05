@@ -323,6 +323,10 @@
       "target": "boundaries/framework/conformance/plans/invocation-lifecycle-observation.json"
     },
     {
+      "kind": "conformance-plan",
+      "target": "boundaries/framework/conformance/plans/capability-policy.json"
+    },
+    {
       "kind": "freshness-check",
       "target": "boundaries/shared/contracts/core/artifacts/json-schema"
     }

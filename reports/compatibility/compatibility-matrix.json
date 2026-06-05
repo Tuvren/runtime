@@ -7,6 +7,32 @@
       "results": [
         {
           "checkIds": [
+            "bb.bb001.compliant-residency-passes-exposure",
+            "bb.bb001.compliant-residency-passes-invocation",
+            "bb.bb001.residency-denied-at-invocation",
+            "bb.bb001.residency-exposure-denial-has-reason",
+            "bb.bb001.residency-invocation-denial-has-reason",
+            "bb.bb001.residency-withheld-at-exposure",
+            "bb.bb002.high-risk-exposure-denial-has-reason",
+            "bb.bb002.high-risk-requires-approval-when-configured",
+            "bb.bb002.high-risk-withheld-in-medium-context",
+            "bb.bb002.low-risk-passes-both-decision-points",
+            "bb.bb003.presence-denial-has-reason",
+            "bb.bb003.requirements-met-capability-passes",
+            "bb.bb003.requires-active-endpoint-withheld-when-absent",
+            "bb.bb003.requires-user-presence-denied-when-absent",
+            "bb.bb004.credential-denial-has-non-empty-non-secret-reason",
+            "bb.bb004.credential-denied-when-scope-absent",
+            "bb.bb004.entitled-scope-admitted",
+            "bb.bb004.idempotent-binding-policyCanRetry-true",
+            "bb.bb004.no-credential-scope-always-admitted",
+            "bb.bb004.non-idempotent-binding-policyCanRetry-false",
+            "bb.bb005.composed-decision-is-deterministic",
+            "bb.bb005.denial-reason-is-non-empty",
+            "bb.bb005.extension-dimension-honored-after-framework-pass",
+            "bb.bb005.first-dimension-denial-honored",
+            "bb.bb005.framework-denial-not-overridable-by-extension",
+            "bb.bb005.reason-identifies-denying-dimension",
             "driver-api.error.envelope",
             "driver-api.execute.resolution",
             "driver-api.resume.approval",
@@ -409,9 +435,9 @@
           ],
           "checkSummary": {
             "failedChecks": 0,
-            "passedChecks": 399,
-            "totalChecks": 411,
-            "applicableChecks": 399,
+            "passedChecks": 425,
+            "totalChecks": 437,
+            "applicableChecks": 425,
             "nonApplicableChecks": 12
           },
           "declaredCapabilities": [
@@ -452,9 +478,9 @@
           "checkSummary": {
             "failedChecks": 0,
             "passedChecks": 12,
-            "totalChecks": 411,
+            "totalChecks": 437,
             "applicableChecks": 12,
-            "nonApplicableChecks": 399
+            "nonApplicableChecks": 425
           },
           "declaredCapabilities": ["framework.batteries-included"],
           "evidencePath": "reports/compatibility/evidence/shared-conformance-runner.framework-batteries-included-conformance-runner.json",
@@ -905,9 +931,9 @@
           "checkSummary": {
             "failedChecks": 0,
             "passedChecks": 0,
-            "totalChecks": 411,
+            "totalChecks": 437,
             "applicableChecks": 0,
-            "nonApplicableChecks": 411
+            "nonApplicableChecks": 437
           },
           "declaredCapabilities": [],
           "evidencePath": "reports/compatibility/evidence/shared-conformance-runner.framework-rust-conformance-runner.json",

@@ -127,14 +127,14 @@ class BasicBindingResolver implements BindingResolver {
       endpoint: {
         id: TUVREN_IN_PROCESS_ENDPOINT_ID,
         kind: "tuvren-in-process",
-        ...(region !== undefined ? { region } : {}),
-        ...(credentialScope !== undefined ? { credentialScope } : {}),
+        ...(region === undefined ? {} : { region }),
+        ...(credentialScope === undefined ? {} : { credentialScope }),
       },
       executionClass: "tuvren-server",
-      ...(riskClass !== undefined ? { riskClass } : {}),
-      ...(requiresUserPresence !== undefined ? { requiresUserPresence } : {}),
-      ...(idempotencyPolicy !== undefined ? { idempotencyPolicy } : {}),
-      ...(credentialScope !== undefined ? { credentialScope } : {}),
+      ...(riskClass === undefined ? {} : { riskClass }),
+      ...(requiresUserPresence === undefined ? {} : { requiresUserPresence }),
+      ...(idempotencyPolicy === undefined ? {} : { idempotencyPolicy }),
+      ...(credentialScope === undefined ? {} : { credentialScope }),
     };
   }
 
@@ -216,9 +216,7 @@ export function isClientEndpointTool(tool: TuvrenToolDefinition): boolean {
  * Extract the optional endpoint region tag from a tool definition's metadata.
  * Used by the data-residency policy dimension (BB001).
  */
-function extractEndpointRegion(
-  tool: TuvrenToolDefinition
-): string | undefined {
+function extractEndpointRegion(tool: TuvrenToolDefinition): string | undefined {
   const meta = tool.metadata as { endpointRegion?: string } | undefined;
   const region = meta?.endpointRegion;
   return typeof region === "string" && region.length > 0 ? region : undefined;
@@ -233,7 +231,9 @@ function extractRiskClass(
 ): "low" | "medium" | "high" | undefined {
   const meta = tool.metadata as { riskClass?: string } | undefined;
   const rc = meta?.riskClass;
-  if (rc === "low" || rc === "medium" || rc === "high") return rc;
+  if (rc === "low" || rc === "medium" || rc === "high") {
+    return rc;
+  }
   return undefined;
 }
 
@@ -258,7 +258,9 @@ function extractIdempotencyPolicy(
 ): "idempotent" | "non-idempotent" | undefined {
   const meta = tool.metadata as { idempotencyPolicy?: string } | undefined;
   const v = meta?.idempotencyPolicy;
-  if (v === "idempotent" || v === "non-idempotent") return v;
+  if (v === "idempotent" || v === "non-idempotent") {
+    return v;
+  }
   return undefined;
 }
 

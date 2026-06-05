@@ -18,6 +18,522 @@
     {
       "assertionResults": [
         {
+          "assertionId": "bb.bb001.compliant-residency-passes-exposure.1.resultField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "bb.bb001.compliant-residency-passes-exposure.requiredEvidence.result.residency.exposure.allowedRegion.exposed",
+          "status": "pass"
+        }
+      ],
+      "checkId": "bb.bb001.compliant-residency-passes-exposure",
+      "details": {
+        "adapterId": "typescript-framework",
+        "planId": "tuvren.framework.capability-policy"
+      },
+      "status": "pass"
+    },
+    {
+      "assertionResults": [
+        {
+          "assertionId": "bb.bb001.compliant-residency-passes-invocation.1.resultField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "bb.bb001.compliant-residency-passes-invocation.requiredEvidence.result.residency.invocation.allowedRegion.admitted",
+          "status": "pass"
+        }
+      ],
+      "checkId": "bb.bb001.compliant-residency-passes-invocation",
+      "details": {
+        "adapterId": "typescript-framework",
+        "planId": "tuvren.framework.capability-policy"
+      },
+      "status": "pass"
+    },
+    {
+      "assertionResults": [
+        {
+          "assertionId": "bb.bb001.residency-denied-at-invocation.1.resultField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "bb.bb001.residency-denied-at-invocation.requiredEvidence.result.residency.invocation.disallowedRegion.admitted",
+          "status": "pass"
+        }
+      ],
+      "checkId": "bb.bb001.residency-denied-at-invocation",
+      "details": {
+        "adapterId": "typescript-framework",
+        "planId": "tuvren.framework.capability-policy"
+      },
+      "status": "pass"
+    },
+    {
+      "assertionResults": [
+        {
+          "assertionId": "bb.bb001.residency-exposure-denial-has-reason.1.resultField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "bb.bb001.residency-exposure-denial-has-reason.requiredEvidence.result.residency.exposure.disallowedRegion.hasReason",
+          "status": "pass"
+        }
+      ],
+      "checkId": "bb.bb001.residency-exposure-denial-has-reason",
+      "details": {
+        "adapterId": "typescript-framework",
+        "planId": "tuvren.framework.capability-policy"
+      },
+      "status": "pass"
+    },
+    {
+      "assertionResults": [
+        {
+          "assertionId": "bb.bb001.residency-invocation-denial-has-reason.1.resultField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "bb.bb001.residency-invocation-denial-has-reason.requiredEvidence.result.residency.invocation.disallowedRegion.hasReason",
+          "status": "pass"
+        }
+      ],
+      "checkId": "bb.bb001.residency-invocation-denial-has-reason",
+      "details": {
+        "adapterId": "typescript-framework",
+        "planId": "tuvren.framework.capability-policy"
+      },
+      "status": "pass"
+    },
+    {
+      "assertionResults": [
+        {
+          "assertionId": "bb.bb001.residency-withheld-at-exposure.1.resultField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "bb.bb001.residency-withheld-at-exposure.requiredEvidence.result.residency.exposure.disallowedRegion.exposed",
+          "status": "pass"
+        }
+      ],
+      "checkId": "bb.bb001.residency-withheld-at-exposure",
+      "details": {
+        "adapterId": "typescript-framework",
+        "planId": "tuvren.framework.capability-policy"
+      },
+      "status": "pass"
+    },
+    {
+      "assertionResults": [
+        {
+          "assertionId": "bb.bb002.high-risk-exposure-denial-has-reason.1.resultField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "bb.bb002.high-risk-exposure-denial-has-reason.requiredEvidence.result.riskClassification.exposure.highRiskInMediumContext.hasReason",
+          "status": "pass"
+        }
+      ],
+      "checkId": "bb.bb002.high-risk-exposure-denial-has-reason",
+      "details": {
+        "adapterId": "typescript-framework",
+        "planId": "tuvren.framework.capability-policy"
+      },
+      "status": "pass"
+    },
+    {
+      "assertionResults": [
+        {
+          "assertionId": "bb.bb002.high-risk-requires-approval-when-configured.1.resultField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "bb.bb002.high-risk-requires-approval-when-configured.requiredEvidence.result.riskClassification.invocation.highRiskApproval.requiresApproval",
+          "status": "pass"
+        }
+      ],
+      "checkId": "bb.bb002.high-risk-requires-approval-when-configured",
+      "details": {
+        "adapterId": "typescript-framework",
+        "planId": "tuvren.framework.capability-policy"
+      },
+      "status": "pass"
+    },
+    {
+      "assertionResults": [
+        {
+          "assertionId": "bb.bb002.high-risk-withheld-in-medium-context.1.resultField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "bb.bb002.high-risk-withheld-in-medium-context.requiredEvidence.result.riskClassification.exposure.highRiskInMediumContext.exposed",
+          "status": "pass"
+        }
+      ],
+      "checkId": "bb.bb002.high-risk-withheld-in-medium-context",
+      "details": {
+        "adapterId": "typescript-framework",
+        "planId": "tuvren.framework.capability-policy"
+      },
+      "status": "pass"
+    },
+    {
+      "assertionResults": [
+        {
+          "assertionId": "bb.bb002.low-risk-passes-both-decision-points.1.resultField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "bb.bb002.low-risk-passes-both-decision-points.2.resultField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "bb.bb002.low-risk-passes-both-decision-points.requiredEvidence.result.riskClassification.exposure.lowRisk.exposed",
+          "status": "pass"
+        },
+        {
+          "assertionId": "bb.bb002.low-risk-passes-both-decision-points.requiredEvidence.result.riskClassification.invocation.lowRisk.admitted",
+          "status": "pass"
+        }
+      ],
+      "checkId": "bb.bb002.low-risk-passes-both-decision-points",
+      "details": {
+        "adapterId": "typescript-framework",
+        "planId": "tuvren.framework.capability-policy"
+      },
+      "status": "pass"
+    },
+    {
+      "assertionResults": [
+        {
+          "assertionId": "bb.bb003.presence-denial-has-reason.1.resultField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "bb.bb003.presence-denial-has-reason.requiredEvidence.result.presence.invocation.noUser.hasReason",
+          "status": "pass"
+        }
+      ],
+      "checkId": "bb.bb003.presence-denial-has-reason",
+      "details": {
+        "adapterId": "typescript-framework",
+        "planId": "tuvren.framework.capability-policy"
+      },
+      "status": "pass"
+    },
+    {
+      "assertionResults": [
+        {
+          "assertionId": "bb.bb003.requirements-met-capability-passes.1.resultField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "bb.bb003.requirements-met-capability-passes.2.resultField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "bb.bb003.requirements-met-capability-passes.requiredEvidence.result.presence.exposure.endpointPresent.exposed",
+          "status": "pass"
+        },
+        {
+          "assertionId": "bb.bb003.requirements-met-capability-passes.requiredEvidence.result.presence.invocation.userPresent.admitted",
+          "status": "pass"
+        }
+      ],
+      "checkId": "bb.bb003.requirements-met-capability-passes",
+      "details": {
+        "adapterId": "typescript-framework",
+        "planId": "tuvren.framework.capability-policy"
+      },
+      "status": "pass"
+    },
+    {
+      "assertionResults": [
+        {
+          "assertionId": "bb.bb003.requires-active-endpoint-withheld-when-absent.1.resultField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "bb.bb003.requires-active-endpoint-withheld-when-absent.2.resultField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "bb.bb003.requires-active-endpoint-withheld-when-absent.requiredEvidence.result.presence.exposure.noEndpoint.exposed",
+          "status": "pass"
+        },
+        {
+          "assertionId": "bb.bb003.requires-active-endpoint-withheld-when-absent.requiredEvidence.result.presence.exposure.noEndpoint.hasReason",
+          "status": "pass"
+        }
+      ],
+      "checkId": "bb.bb003.requires-active-endpoint-withheld-when-absent",
+      "details": {
+        "adapterId": "typescript-framework",
+        "planId": "tuvren.framework.capability-policy"
+      },
+      "status": "pass"
+    },
+    {
+      "assertionResults": [
+        {
+          "assertionId": "bb.bb003.requires-user-presence-denied-when-absent.1.resultField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "bb.bb003.requires-user-presence-denied-when-absent.requiredEvidence.result.presence.invocation.noUser.admitted",
+          "status": "pass"
+        }
+      ],
+      "checkId": "bb.bb003.requires-user-presence-denied-when-absent",
+      "details": {
+        "adapterId": "typescript-framework",
+        "planId": "tuvren.framework.capability-policy"
+      },
+      "status": "pass"
+    },
+    {
+      "assertionResults": [
+        {
+          "assertionId": "bb.bb004.credential-denial-has-non-empty-non-secret-reason.1.resultField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "bb.bb004.credential-denial-has-non-empty-non-secret-reason.2.resultField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "bb.bb004.credential-denial-has-non-empty-non-secret-reason.requiredEvidence.result.credentialBoundary.invocation.missingScope.hasReason",
+          "status": "pass"
+        },
+        {
+          "assertionId": "bb.bb004.credential-denial-has-non-empty-non-secret-reason.requiredEvidence.result.credentialBoundary.invocation.missingScope.reasonExposesScope",
+          "status": "pass"
+        }
+      ],
+      "checkId": "bb.bb004.credential-denial-has-non-empty-non-secret-reason",
+      "details": {
+        "adapterId": "typescript-framework",
+        "planId": "tuvren.framework.capability-policy"
+      },
+      "status": "pass"
+    },
+    {
+      "assertionResults": [
+        {
+          "assertionId": "bb.bb004.credential-denied-when-scope-absent.1.resultField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "bb.bb004.credential-denied-when-scope-absent.requiredEvidence.result.credentialBoundary.invocation.missingScope.admitted",
+          "status": "pass"
+        }
+      ],
+      "checkId": "bb.bb004.credential-denied-when-scope-absent",
+      "details": {
+        "adapterId": "typescript-framework",
+        "planId": "tuvren.framework.capability-policy"
+      },
+      "status": "pass"
+    },
+    {
+      "assertionResults": [
+        {
+          "assertionId": "bb.bb004.entitled-scope-admitted.1.resultField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "bb.bb004.entitled-scope-admitted.requiredEvidence.result.credentialBoundary.invocation.entitledScope.admitted",
+          "status": "pass"
+        }
+      ],
+      "checkId": "bb.bb004.entitled-scope-admitted",
+      "details": {
+        "adapterId": "typescript-framework",
+        "planId": "tuvren.framework.capability-policy"
+      },
+      "status": "pass"
+    },
+    {
+      "assertionResults": [
+        {
+          "assertionId": "bb.bb004.idempotent-binding-policyCanRetry-true.1.resultField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "bb.bb004.idempotent-binding-policyCanRetry-true.requiredEvidence.result.credentialBoundary.invocation.idempotentBinding.policyCanRetry",
+          "status": "pass"
+        }
+      ],
+      "checkId": "bb.bb004.idempotent-binding-policyCanRetry-true",
+      "details": {
+        "adapterId": "typescript-framework",
+        "planId": "tuvren.framework.capability-policy"
+      },
+      "status": "pass"
+    },
+    {
+      "assertionResults": [
+        {
+          "assertionId": "bb.bb004.no-credential-scope-always-admitted.1.resultField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "bb.bb004.no-credential-scope-always-admitted.requiredEvidence.result.credentialBoundary.invocation.noScope.admitted",
+          "status": "pass"
+        }
+      ],
+      "checkId": "bb.bb004.no-credential-scope-always-admitted",
+      "details": {
+        "adapterId": "typescript-framework",
+        "planId": "tuvren.framework.capability-policy"
+      },
+      "status": "pass"
+    },
+    {
+      "assertionResults": [
+        {
+          "assertionId": "bb.bb004.non-idempotent-binding-policyCanRetry-false.1.resultField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "bb.bb004.non-idempotent-binding-policyCanRetry-false.requiredEvidence.result.credentialBoundary.invocation.nonIdempotentBinding.policyCanRetry",
+          "status": "pass"
+        }
+      ],
+      "checkId": "bb.bb004.non-idempotent-binding-policyCanRetry-false",
+      "details": {
+        "adapterId": "typescript-framework",
+        "planId": "tuvren.framework.capability-policy"
+      },
+      "status": "pass"
+    },
+    {
+      "assertionResults": [
+        {
+          "assertionId": "bb.bb005.composed-decision-is-deterministic.1.resultField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "bb.bb005.composed-decision-is-deterministic.2.resultField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "bb.bb005.composed-decision-is-deterministic.3.resultField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "bb.bb005.composed-decision-is-deterministic.requiredEvidence.result.composition.deterministicRuns.reasonsMatch",
+          "status": "pass"
+        },
+        {
+          "assertionId": "bb.bb005.composed-decision-is-deterministic.requiredEvidence.result.composition.deterministicRuns.run1Admitted",
+          "status": "pass"
+        },
+        {
+          "assertionId": "bb.bb005.composed-decision-is-deterministic.requiredEvidence.result.composition.deterministicRuns.run2Admitted",
+          "status": "pass"
+        }
+      ],
+      "checkId": "bb.bb005.composed-decision-is-deterministic",
+      "details": {
+        "adapterId": "typescript-framework",
+        "planId": "tuvren.framework.capability-policy"
+      },
+      "status": "pass"
+    },
+    {
+      "assertionResults": [
+        {
+          "assertionId": "bb.bb005.denial-reason-is-non-empty.1.resultField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "bb.bb005.denial-reason-is-non-empty.requiredEvidence.result.composition.denialHasReason",
+          "status": "pass"
+        }
+      ],
+      "checkId": "bb.bb005.denial-reason-is-non-empty",
+      "details": {
+        "adapterId": "typescript-framework",
+        "planId": "tuvren.framework.capability-policy"
+      },
+      "status": "pass"
+    },
+    {
+      "assertionResults": [
+        {
+          "assertionId": "bb.bb005.extension-dimension-honored-after-framework-pass.1.resultField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "bb.bb005.extension-dimension-honored-after-framework-pass.requiredEvidence.result.composition.extensionDimensionDenial.admitted",
+          "status": "pass"
+        }
+      ],
+      "checkId": "bb.bb005.extension-dimension-honored-after-framework-pass",
+      "details": {
+        "adapterId": "typescript-framework",
+        "planId": "tuvren.framework.capability-policy"
+      },
+      "status": "pass"
+    },
+    {
+      "assertionResults": [
+        {
+          "assertionId": "bb.bb005.first-dimension-denial-honored.1.resultField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "bb.bb005.first-dimension-denial-honored.requiredEvidence.result.composition.firstDimensionDenialHonored",
+          "status": "pass"
+        }
+      ],
+      "checkId": "bb.bb005.first-dimension-denial-honored",
+      "details": {
+        "adapterId": "typescript-framework",
+        "planId": "tuvren.framework.capability-policy"
+      },
+      "status": "pass"
+    },
+    {
+      "assertionResults": [
+        {
+          "assertionId": "bb.bb005.framework-denial-not-overridable-by-extension.1.resultField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "bb.bb005.framework-denial-not-overridable-by-extension.requiredEvidence.result.composition.frameworkDenialNotOverridden",
+          "status": "pass"
+        }
+      ],
+      "checkId": "bb.bb005.framework-denial-not-overridable-by-extension",
+      "details": {
+        "adapterId": "typescript-framework",
+        "planId": "tuvren.framework.capability-policy"
+      },
+      "status": "pass"
+    },
+    {
+      "assertionResults": [
+        {
+          "assertionId": "bb.bb005.reason-identifies-denying-dimension.1.resultField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "bb.bb005.reason-identifies-denying-dimension.requiredEvidence.result.composition.reasonIdentifiesDimension",
+          "status": "pass"
+        }
+      ],
+      "checkId": "bb.bb005.reason-identifies-denying-dimension",
+      "details": {
+        "adapterId": "typescript-framework",
+        "planId": "tuvren.framework.capability-policy"
+      },
+      "status": "pass"
+    },
+    {
+      "assertionResults": [
+        {
           "assertionId": "driver-api.error.envelope.1.errorEnvelope",
           "status": "pass"
         },
@@ -8787,9 +9303,9 @@
   "status": "pass",
   "summary": {
     "failedChecks": 0,
-    "passedChecks": 399,
-    "totalChecks": 411,
-    "applicableChecks": 399,
+    "passedChecks": 425,
+    "totalChecks": 437,
+    "applicableChecks": 425,
     "nonApplicableChecks": 12
   },
   "suiteId": "tuvren.framework.promoted-authority",

@@ -80,7 +80,9 @@
     },
     {
       "checkId": "bb.bb002.high-risk-withheld-in-medium-context",
-      "evidence": ["result.riskClassification.exposure.highRiskInMediumContext.exposed"],
+      "evidence": [
+        "result.riskClassification.exposure.highRiskInMediumContext.exposed"
+      ],
       "operation": "runtime.capability-policy.risk-classification",
       "assertions": [
         {
@@ -92,7 +94,9 @@
     },
     {
       "checkId": "bb.bb002.high-risk-exposure-denial-has-reason",
-      "evidence": ["result.riskClassification.exposure.highRiskInMediumContext.hasReason"],
+      "evidence": [
+        "result.riskClassification.exposure.highRiskInMediumContext.hasReason"
+      ],
       "operation": "runtime.capability-policy.risk-classification",
       "assertions": [
         {
@@ -104,7 +108,9 @@
     },
     {
       "checkId": "bb.bb002.high-risk-requires-approval-when-configured",
-      "evidence": ["result.riskClassification.invocation.highRiskApproval.requiresApproval"],
+      "evidence": [
+        "result.riskClassification.invocation.highRiskApproval.requiresApproval"
+      ],
       "operation": "runtime.capability-policy.risk-classification",
       "assertions": [
         {
@@ -200,7 +206,9 @@
     },
     {
       "checkId": "bb.bb004.credential-denied-when-scope-absent",
-      "evidence": ["result.credentialBoundary.invocation.missingScope.admitted"],
+      "evidence": [
+        "result.credentialBoundary.invocation.missingScope.admitted"
+      ],
       "operation": "runtime.capability-policy.credential-boundary",
       "assertions": [
         {
@@ -232,7 +240,9 @@
     },
     {
       "checkId": "bb.bb004.entitled-scope-admitted",
-      "evidence": ["result.credentialBoundary.invocation.entitledScope.admitted"],
+      "evidence": [
+        "result.credentialBoundary.invocation.entitledScope.admitted"
+      ],
       "operation": "runtime.capability-policy.credential-boundary",
       "assertions": [
         {
@@ -244,7 +254,9 @@
     },
     {
       "checkId": "bb.bb004.idempotent-binding-policyCanRetry-true",
-      "evidence": ["result.credentialBoundary.invocation.idempotentBinding.policyCanRetry"],
+      "evidence": [
+        "result.credentialBoundary.invocation.idempotentBinding.policyCanRetry"
+      ],
       "operation": "runtime.capability-policy.credential-boundary",
       "assertions": [
         {
@@ -256,7 +268,9 @@
     },
     {
       "checkId": "bb.bb004.non-idempotent-binding-policyCanRetry-false",
-      "evidence": ["result.credentialBoundary.invocation.nonIdempotentBinding.policyCanRetry"],
+      "evidence": [
+        "result.credentialBoundary.invocation.nonIdempotentBinding.policyCanRetry"
+      ],
       "operation": "runtime.capability-policy.credential-boundary",
       "assertions": [
         {

@@ -92,16 +92,16 @@ export interface ToolBatchEnvironment {
    * being executed. When absent, all invocations are admitted (default).
    */
   capabilityPolicyEngine?: CapabilityPolicyEngine;
-  /**
-   * Policy context for the current turn, supplied to the policy engine at
-   * both decision points. Populated from the active loop state (BB001).
-   */
-  policyContext?: import("@tuvren/core/capabilities").CapabilityPolicyContext;
   extensions: TuvrenExtension[];
   iterationCount: number;
   manifest: ContextManifest;
   maxParallelToolCalls: number;
   now(): EpochMs;
+  /**
+   * Policy context for the current turn, supplied to the policy engine at
+   * both decision points. Populated from the active loop state (BB001).
+   */
+  policyContext?: import("@tuvren/core/capabilities").CapabilityPolicyContext;
   publishCustom(event: { data: unknown; name: string }): void;
   publishEvent(event: TuvrenStreamEvent): void;
   reportSoftError(error: Error): void;
@@ -585,7 +585,7 @@ async function resolveExecutableToolCall(
   return {
     executable: {
       input: validation.value,
-      ...(policyCanRetry !== undefined ? { policyCanRetry } : {}),
+      ...(policyCanRetry === undefined ? {} : { policyCanRetry }),
       sandboxExecutor,
       tool,
       toolCall,
@@ -737,6 +737,7 @@ function resolveResumeDecision(
   };
 }
 
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: tool execution state machine requires tracking multiple concurrent lifecycle dimensions; extracting further would obscure the contract rather than clarify it
 async function executeSingleTool(
   toolCall: ExecutableToolCall,
   orderIndex: number,

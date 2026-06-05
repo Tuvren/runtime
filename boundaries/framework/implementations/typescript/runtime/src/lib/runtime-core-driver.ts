@@ -28,8 +28,8 @@ import type {
   ToolResultPart,
   TuvrenMessage,
 } from "@tuvren/core/messages";
-import type { TuvrenToolDefinition, ToolRegistry } from "@tuvren/core/tools";
 import type { TuvrenModelResponse } from "@tuvren/core/provider";
+import type { ToolRegistry, TuvrenToolDefinition } from "@tuvren/core/tools";
 import { runAfterIterationHooks } from "./extension-runtime.js";
 import type { HeadState, LoopState } from "./runtime-core-loop.js";
 import type { LoopOutcome } from "./runtime-core-recovery.js";
@@ -423,7 +423,9 @@ function applyExposureFilter(
   loopState: LoopState
 ): ToolRegistry {
   const engine = loopState.activeConfig.capabilityPolicyEngine;
-  if (engine === undefined) return registry;
+  if (engine === undefined) {
+    return registry;
+  }
 
   const allTools = registry.list();
   // Derive ToolSurface from each TuvrenToolDefinition. Policy-relevant fields
@@ -431,16 +433,22 @@ function applyExposureFilter(
   // evaluate them: endpointRegion (BB001), riskClass (BB002),
   // requiresActiveEndpoint (BB003).
   const surfaces = allTools.map((tool) => {
-    const meta = tool.metadata as {
-      endpointRegion?: string;
-      riskClass?: string;
-      requiresActiveEndpoint?: boolean;
-    } | undefined;
+    const meta = tool.metadata as
+      | {
+          endpointRegion?: string;
+          riskClass?: string;
+          requiresActiveEndpoint?: boolean;
+        }
+      | undefined;
     const endpointRegion =
-      typeof meta?.endpointRegion === "string" ? meta.endpointRegion : undefined;
+      typeof meta?.endpointRegion === "string"
+        ? meta.endpointRegion
+        : undefined;
     const riskClassVal = meta?.riskClass;
     const riskClass: "low" | "medium" | "high" | undefined =
-      riskClassVal === "low" || riskClassVal === "medium" || riskClassVal === "high"
+      riskClassVal === "low" ||
+      riskClassVal === "medium" ||
+      riskClassVal === "high"
         ? riskClassVal
         : undefined;
     const requiresActiveEndpoint =
@@ -450,13 +458,17 @@ function applyExposureFilter(
     return {
       capabilityId: tool.name,
       description: tool.description,
-      ...(endpointRegion !== undefined ? { endpointRegion } : {}),
-      ...(riskClass !== undefined ? { riskClass } : {}),
-      ...(requiresActiveEndpoint !== undefined ? { requiresActiveEndpoint } : {}),
+      ...(endpointRegion === undefined ? {} : { endpointRegion }),
+      ...(riskClass === undefined ? {} : { riskClass }),
+      ...(requiresActiveEndpoint === undefined
+        ? {}
+        : { requiresActiveEndpoint }),
       inputSchema:
         "inputSchema" in tool && tool.inputSchema !== undefined
           ? (tool.inputSchema as import("@tuvren/core/messages").TuvrenJsonSchema)
-          : ({ type: "object" } as import("@tuvren/core/messages").TuvrenJsonSchema),
+          : ({
+              type: "object",
+            } as import("@tuvren/core/messages").TuvrenJsonSchema),
       name: tool.name,
     };
   });
@@ -473,7 +485,9 @@ function applyExposureFilter(
     decisions.filter((d) => !d.exposed).map((d) => d.surfaceName)
   );
 
-  if (deniedNames.size === 0) return registry;
+  if (deniedNames.size === 0) {
+    return registry;
+  }
 
   // Delegate to the base registry for snapshots so frozen/immutable guarantees
   // from createReadonlyDriverToolRegistry are preserved.
@@ -485,7 +499,9 @@ function applyExposureFilter(
     get: (name) => (deniedNames.has(name) ? undefined : registry.get(name)),
     has: (name) => !deniedNames.has(name) && registry.has(name),
     list: () =>
-      registry.list().filter((t) => !deniedNames.has(t.name)) as TuvrenToolDefinition[],
+      registry
+        .list()
+        .filter((t) => !deniedNames.has(t.name)) as TuvrenToolDefinition[],
     register: (tool) => registry.register(tool),
     toDefinitions: () => filteredRendered.map((t) => ({ ...t })),
   };

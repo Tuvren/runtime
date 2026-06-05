@@ -28,19 +28,19 @@ import type {
 // PolicyDimension — extension interface (BB005)
 // ---------------------------------------------------------------------------
 
-type DenyExposure = {
+interface DenyExposure {
   exposed: false;
   reason: string;
   surfaceName: string;
-};
+}
 
-type DenyInvocation = {
+interface DenyInvocation {
   admitted: false;
   capabilityId: string;
   executionClass: ExecutionClass;
   reason: string;
   requiresApproval?: boolean;
-};
+}
 
 /**
  * A single policy dimension evaluated at both decision points. Framework
@@ -71,12 +71,6 @@ export interface PolicyDimension {
  * configuration was supplied or defaults are meaningful.
  */
 export interface CapabilityPolicyEngineOptions {
-  // --- Baseline deny-list (Epic AW) ---
-  /** Capability ids to deny at invocation-time regardless of other context. */
-  deniedCapabilityIds?: Set<string>;
-  /** Surface names to deny at exposure-time regardless of other context. */
-  deniedSurfaceNames?: Set<string>;
-
   // --- BB001: Data-residency ---
   /**
    * Allowed data-residency regions at engine level. When set and non-empty,
@@ -90,25 +84,11 @@ export interface CapabilityPolicyEngineOptions {
    * allowedRegions is configured.
    */
   allowMissingRegion?: boolean;
-
-  // --- BB002: Risk-classification ---
-  /**
-   * Maximum risk class the engine permits globally. Surfaces and bindings
-   * with riskClass exceeding this are withheld or denied.
-   */
-  maxAllowedRiskClass?: "low" | "medium" | "high";
-  /**
-   * When true, high-risk capabilities in compatible contexts produce
-   * admitted:false with requiresApproval:true rather than a hard denial.
-   */
-  highRiskRequiresApproval?: boolean;
-
-  // --- BB004: Credential-boundary ---
-  /**
-   * When true, the engine checks binding.credentialScope against
-   * context.entitledCredentialScopes. Default false.
-   */
-  enforceCredentialBoundary?: boolean;
+  // --- Baseline deny-list (Epic AW) ---
+  /** Capability ids to deny at invocation-time regardless of other context. */
+  deniedCapabilityIds?: Set<string>;
+  /** Surface names to deny at exposure-time regardless of other context. */
+  deniedSurfaceNames?: Set<string>;
 
   // --- BB005: Extension dimensions ---
   /**
@@ -116,6 +96,25 @@ export interface CapabilityPolicyEngineOptions {
    * dimensions in declared order. Cannot override a prior framework denial.
    */
   dimensions?: PolicyDimension[];
+
+  // --- BB004: Credential-boundary ---
+  /**
+   * When true, the engine checks binding.credentialScope against
+   * context.entitledCredentialScopes. Default false.
+   */
+  enforceCredentialBoundary?: boolean;
+  /**
+   * When true, high-risk capabilities in compatible contexts produce
+   * admitted:false with requiresApproval:true rather than a hard denial.
+   */
+  highRiskRequiresApproval?: boolean;
+
+  // --- BB002: Risk-classification ---
+  /**
+   * Maximum risk class the engine permits globally. Surfaces and bindings
+   * with riskClass exceeding this are withheld or denied.
+   */
+  maxAllowedRiskClass?: "low" | "medium" | "high";
 }
 
 // ---------------------------------------------------------------------------
@@ -137,10 +136,12 @@ function riskRank(cls: "low" | "medium" | "high" | undefined): number {
 // ---------------------------------------------------------------------------
 
 class ResidencyDimension implements PolicyDimension {
-  constructor(
-    private readonly allowed: ReadonlySet<string> | undefined,
-    private readonly allowMissing: boolean
-  ) {}
+  private readonly allowed: ReadonlySet<string> | undefined;
+  private readonly allowMissing: boolean;
+  constructor(allowed: ReadonlySet<string> | undefined, allowMissing: boolean) {
+    this.allowed = allowed;
+    this.allowMissing = allowMissing;
+  }
 
   private isAllowed(
     region: string | undefined,
@@ -159,19 +160,30 @@ class ResidencyDimension implements PolicyDimension {
     }
 
     // If engine-level allowedRegions is set, check it
-    if (this.allowed !== undefined && this.allowed.size > 0) {
-      if (!this.allowed.has(region)) return false;
+    if (
+      this.allowed !== undefined &&
+      this.allowed.size > 0 &&
+      !this.allowed.has(region)
+    ) {
+      return false;
     }
 
     // If context narrows further, check it
-    if (contextAllowed !== undefined && contextAllowed.length > 0) {
-      if (!contextAllowed.includes(region)) return false;
+    if (
+      contextAllowed !== undefined &&
+      contextAllowed.length > 0 &&
+      !contextAllowed.includes(region)
+    ) {
+      return false;
     }
 
     return true;
   }
 
-  checkExposure(surface: ToolSurface, context: CapabilityPolicyContext): DenyExposure | null {
+  checkExposure(
+    surface: ToolSurface,
+    context: CapabilityPolicyContext
+  ): DenyExposure | null {
     if (this.isAllowed(surface.endpointRegion, context.allowedRegions)) {
       return null;
     }
@@ -182,7 +194,10 @@ class ResidencyDimension implements PolicyDimension {
     };
   }
 
-  checkInvocation(binding: Binding, context: CapabilityPolicyContext): DenyInvocation | null {
+  checkInvocation(
+    binding: Binding,
+    context: CapabilityPolicyContext
+  ): DenyInvocation | null {
     if (this.isAllowed(binding.endpoint.region, context.allowedRegions)) {
       return null;
     }
@@ -196,37 +211,55 @@ class ResidencyDimension implements PolicyDimension {
 }
 
 class RiskDimension implements PolicyDimension {
+  private readonly maxRiskClass: "low" | "medium" | "high" | undefined;
+  private readonly highRiskRequiresApproval: boolean;
   constructor(
-    private readonly maxRiskClass: "low" | "medium" | "high" | undefined,
-    private readonly highRiskRequiresApproval: boolean
-  ) {}
+    maxRiskClass: "low" | "medium" | "high" | undefined,
+    highRiskRequiresApproval: boolean
+  ) {
+    this.maxRiskClass = maxRiskClass;
+    this.highRiskRequiresApproval = highRiskRequiresApproval;
+  }
 
   private effectiveMax(context: CapabilityPolicyContext): number {
     const engineMax =
-      this.maxRiskClass !== undefined ? RISK_RANK[this.maxRiskClass] : 2;
+      this.maxRiskClass === undefined ? 2 : RISK_RANK[this.maxRiskClass];
     const contextMax =
-      context.maxAllowedRiskClass !== undefined
-        ? RISK_RANK[context.maxAllowedRiskClass]
-        : 2;
+      context.maxAllowedRiskClass === undefined
+        ? 2
+        : RISK_RANK[context.maxAllowedRiskClass];
     return Math.min(engineMax, contextMax);
   }
 
-  checkExposure(surface: ToolSurface, context: CapabilityPolicyContext): DenyExposure | null {
-    if (surface.riskClass === undefined) return null;
+  checkExposure(
+    surface: ToolSurface,
+    context: CapabilityPolicyContext
+  ): DenyExposure | null {
+    if (surface.riskClass === undefined) {
+      return null;
+    }
     const max = this.effectiveMax(context);
-    if (max === 2) return null; // all risk classes permitted
+    if (max === 2) {
+      return null; // all risk classes permitted
+    }
     if (riskRank(surface.riskClass) > max) {
       return {
         exposed: false,
-        reason: "risk-classification policy: capability risk class exceeds permitted level",
+        reason:
+          "risk-classification policy: capability risk class exceeds permitted level",
         surfaceName: surface.name,
       };
     }
     return null;
   }
 
-  checkInvocation(binding: Binding, context: CapabilityPolicyContext): DenyInvocation | null {
-    if (binding.riskClass === undefined) return null;
+  checkInvocation(
+    binding: Binding,
+    context: CapabilityPolicyContext
+  ): DenyInvocation | null {
+    if (binding.riskClass === undefined) {
+      return null;
+    }
     const max = this.effectiveMax(context);
 
     if (max < 2 && riskRank(binding.riskClass) > max) {
@@ -234,7 +267,8 @@ class RiskDimension implements PolicyDimension {
         admitted: false,
         capabilityId: binding.capabilityId,
         executionClass: binding.executionClass,
-        reason: "risk-classification policy: capability risk class exceeds permitted level",
+        reason:
+          "risk-classification policy: capability risk class exceeds permitted level",
       };
     }
 
@@ -248,7 +282,8 @@ class RiskDimension implements PolicyDimension {
         admitted: false,
         capabilityId: binding.capabilityId,
         executionClass: binding.executionClass,
-        reason: "risk-classification policy: high-risk capability requires approval",
+        reason:
+          "risk-classification policy: high-risk capability requires approval",
         requiresApproval: true,
       };
     }
@@ -258,7 +293,10 @@ class RiskDimension implements PolicyDimension {
 }
 
 class PresenceDimension implements PolicyDimension {
-  checkExposure(surface: ToolSurface, context: CapabilityPolicyContext): DenyExposure | null {
+  checkExposure(
+    surface: ToolSurface,
+    context: CapabilityPolicyContext
+  ): DenyExposure | null {
     if (
       surface.requiresActiveEndpoint === true &&
       context.endpointAttached === false
@@ -272,7 +310,10 @@ class PresenceDimension implements PolicyDimension {
     return null;
   }
 
-  checkInvocation(binding: Binding, context: CapabilityPolicyContext): DenyInvocation | null {
+  checkInvocation(
+    binding: Binding,
+    context: CapabilityPolicyContext
+  ): DenyInvocation | null {
     if (
       binding.requiresUserPresence === true &&
       context.userPresent === false
@@ -289,16 +330,29 @@ class PresenceDimension implements PolicyDimension {
 }
 
 class CredentialBoundaryDimension implements PolicyDimension {
-  constructor(private readonly enforce: boolean) {}
+  private readonly enforce: boolean;
+  constructor(enforce: boolean) {
+    this.enforce = enforce;
+  }
 
-  checkExposure(_surface: ToolSurface, _context: CapabilityPolicyContext): DenyExposure | null {
+  checkExposure(
+    _surface: ToolSurface,
+    _context: CapabilityPolicyContext
+  ): DenyExposure | null {
     return null; // credential boundary is an invocation-time gate
   }
 
-  checkInvocation(binding: Binding, context: CapabilityPolicyContext): DenyInvocation | null {
-    if (!this.enforce) return null;
+  checkInvocation(
+    binding: Binding,
+    context: CapabilityPolicyContext
+  ): DenyInvocation | null {
+    if (!this.enforce) {
+      return null;
+    }
     const scope = binding.credentialScope ?? binding.endpoint.credentialScope;
-    if (scope === undefined) return null;
+    if (scope === undefined) {
+      return null;
+    }
 
     const entitled = context.entitledCredentialScopes;
     if (entitled === undefined || !entitled.includes(scope)) {
@@ -306,7 +360,8 @@ class CredentialBoundaryDimension implements PolicyDimension {
         admitted: false,
         capabilityId: binding.capabilityId,
         executionClass: binding.executionClass,
-        reason: "credential-boundary policy: execution edge not entitled to required credential scope",
+        reason:
+          "credential-boundary policy: execution edge not entitled to required credential scope",
       };
     }
     return null;
@@ -314,13 +369,23 @@ class CredentialBoundaryDimension implements PolicyDimension {
 }
 
 class DenyListDimension implements PolicyDimension {
+  private readonly deniedCapabilities: ReadonlySet<string>;
+  private readonly deniedSurfaces: ReadonlySet<string>;
   constructor(
-    private readonly deniedCapabilities: ReadonlySet<string>,
-    private readonly deniedSurfaces: ReadonlySet<string>
-  ) {}
+    deniedCapabilities: ReadonlySet<string>,
+    deniedSurfaces: ReadonlySet<string>
+  ) {
+    this.deniedCapabilities = deniedCapabilities;
+    this.deniedSurfaces = deniedSurfaces;
+  }
 
-  checkExposure(surface: ToolSurface, _context: CapabilityPolicyContext): DenyExposure | null {
-    if (!this.deniedSurfaces.has(surface.name)) return null;
+  checkExposure(
+    surface: ToolSurface,
+    _context: CapabilityPolicyContext
+  ): DenyExposure | null {
+    if (!this.deniedSurfaces.has(surface.name)) {
+      return null;
+    }
     return {
       exposed: false,
       reason: "surface denied by exposure-time policy",
@@ -328,8 +393,13 @@ class DenyListDimension implements PolicyDimension {
     };
   }
 
-  checkInvocation(binding: Binding, _context: CapabilityPolicyContext): DenyInvocation | null {
-    if (!this.deniedCapabilities.has(binding.capabilityId)) return null;
+  checkInvocation(
+    binding: Binding,
+    _context: CapabilityPolicyContext
+  ): DenyInvocation | null {
+    if (!this.deniedCapabilities.has(binding.capabilityId)) {
+      return null;
+    }
     return {
       admitted: false,
       capabilityId: binding.capabilityId,
@@ -344,8 +414,8 @@ class DenyListDimension implements PolicyDimension {
 // ---------------------------------------------------------------------------
 
 class CapabilityPolicyEngineImpl implements CapabilityPolicyEngine {
-  private readonly frameworkDimensions: ReadonlyArray<PolicyDimension>;
-  private readonly extensionDimensions: ReadonlyArray<PolicyDimension>;
+  private readonly frameworkDimensions: readonly PolicyDimension[];
+  private readonly extensionDimensions: readonly PolicyDimension[];
 
   constructor(options: CapabilityPolicyEngineOptions) {
     this.frameworkDimensions = [
@@ -373,11 +443,16 @@ class CapabilityPolicyEngineImpl implements CapabilityPolicyEngine {
     surfaces: ToolSurface[],
     context: CapabilityPolicyContext
   ): ExposureDecision[] {
-    const allDimensions = [...this.frameworkDimensions, ...this.extensionDimensions];
+    const allDimensions = [
+      ...this.frameworkDimensions,
+      ...this.extensionDimensions,
+    ];
     return surfaces.map((surface) => {
       for (const dim of allDimensions) {
         const denial = dim.checkExposure(surface, context);
-        if (denial !== null) return denial;
+        if (denial !== null) {
+          return denial;
+        }
       }
       return { exposed: true, surfaceName: surface.name };
     });
@@ -388,24 +463,29 @@ class CapabilityPolicyEngineImpl implements CapabilityPolicyEngine {
     context: CapabilityPolicyContext
   ): InvocationDecision {
     // Collect idempotency annotation before the gate loop (never denies)
-    const policyCanRetry =
-      binding.idempotencyPolicy === "idempotent"
-        ? true
-        : binding.idempotencyPolicy === "non-idempotent"
-          ? false
-          : undefined;
+    let policyCanRetry: boolean | undefined;
+    if (binding.idempotencyPolicy === "idempotent") {
+      policyCanRetry = true;
+    } else if (binding.idempotencyPolicy === "non-idempotent") {
+      policyCanRetry = false;
+    }
 
-    const allDimensions = [...this.frameworkDimensions, ...this.extensionDimensions];
+    const allDimensions = [
+      ...this.frameworkDimensions,
+      ...this.extensionDimensions,
+    ];
     for (const dim of allDimensions) {
       const denial = dim.checkInvocation(binding, context);
-      if (denial !== null) return denial;
+      if (denial !== null) {
+        return denial;
+      }
     }
 
     return {
       admitted: true,
       capabilityId: binding.capabilityId,
       executionClass: binding.executionClass,
-      ...(policyCanRetry !== undefined ? { policyCanRetry } : {}),
+      ...(policyCanRetry === undefined ? {} : { policyCanRetry }),
     };
   }
 }

@@ -414,7 +414,10 @@ describe("CapabilityPolicyEngine — data-residency dimension (BB001)", () => {
     const engine = createCapabilityPolicyEngine({
       allowedRegions: new Set(["US", "EU"]),
     });
-    const surface = { ...makeSurface("search", "web.search"), endpointRegion: "US" };
+    const surface = {
+      ...makeSurface("search", "web.search"),
+      endpointRegion: "US",
+    };
 
     const decisions = engine.evaluateExposure([surface], defaultContext);
 
@@ -425,7 +428,10 @@ describe("CapabilityPolicyEngine — data-residency dimension (BB001)", () => {
     const engine = createCapabilityPolicyEngine({
       allowedRegions: new Set(["US"]),
     });
-    const surface = { ...makeSurface("search", "web.search"), endpointRegion: "EU" };
+    const surface = {
+      ...makeSurface("search", "web.search"),
+      endpointRegion: "EU",
+    };
 
     const decisions = engine.evaluateExposure([surface], defaultContext);
 
@@ -463,7 +469,11 @@ describe("CapabilityPolicyEngine — data-residency dimension (BB001)", () => {
     });
     const binding = {
       ...makeBinding("web.search"),
-      endpoint: { id: "local", kind: "tuvren-in-process" as const, region: "US" },
+      endpoint: {
+        id: "local",
+        kind: "tuvren-in-process" as const,
+        region: "US",
+      },
     };
 
     const decision = engine.evaluateInvocation(binding, defaultContext);
@@ -477,7 +487,11 @@ describe("CapabilityPolicyEngine — data-residency dimension (BB001)", () => {
     });
     const binding = {
       ...makeBinding("web.search"),
-      endpoint: { id: "eu-server", kind: "tuvren-server" as const, region: "EU" },
+      endpoint: {
+        id: "eu-server",
+        kind: "tuvren-server" as const,
+        region: "EU",
+      },
     };
 
     const decision = engine.evaluateInvocation(binding, defaultContext);
@@ -493,7 +507,11 @@ describe("CapabilityPolicyEngine — data-residency dimension (BB001)", () => {
     });
     const binding = {
       ...makeBinding("web.search"),
-      endpoint: { id: "eu-server", kind: "tuvren-server" as const, region: "EU" },
+      endpoint: {
+        id: "eu-server",
+        kind: "tuvren-server" as const,
+        region: "EU",
+      },
     };
 
     const decision = engine.evaluateInvocation(binding, defaultContext);
@@ -512,8 +530,14 @@ describe("CapabilityPolicyEngine — data-residency dimension (BB001)", () => {
       endpoint: { id: "eu", kind: "tuvren-in-process" as const, region: "EU" },
     };
 
-    const exposureDecisions = engine.evaluateExposure([surface], defaultContext);
-    const invocationDecision = engine.evaluateInvocation(binding, defaultContext);
+    const exposureDecisions = engine.evaluateExposure(
+      [surface],
+      defaultContext
+    );
+    const invocationDecision = engine.evaluateInvocation(
+      binding,
+      defaultContext
+    );
 
     expect(exposureDecisions[0]?.exposed).toBe(true);
     expect(invocationDecision.admitted).toBe(true);
@@ -529,7 +553,11 @@ describe("CapabilityPolicyEngine — data-residency dimension (BB001)", () => {
     };
     const binding = {
       ...makeBinding("web.search"),
-      endpoint: { id: "eu-server", kind: "tuvren-server" as const, region: "EU" },
+      endpoint: {
+        id: "eu-server",
+        kind: "tuvren-server" as const,
+        region: "EU",
+      },
     };
 
     const decision = engine.evaluateInvocation(binding, contextWithRestriction);
@@ -557,7 +585,10 @@ describe("CapabilityPolicyEngine — data-residency dimension (BB001)", () => {
 describe("CapabilityPolicyEngine — risk-classification dimension (BB002)", () => {
   test("low-risk surface is exposed normally with no risk config", () => {
     const engine = createCapabilityPolicyEngine();
-    const surface = { ...makeSurface("tool", "cap"), riskClass: "low" as const };
+    const surface = {
+      ...makeSurface("tool", "cap"),
+      riskClass: "low" as const,
+    };
 
     const decisions = engine.evaluateExposure([surface], defaultContext);
 
@@ -565,8 +596,13 @@ describe("CapabilityPolicyEngine — risk-classification dimension (BB002)", () 
   });
 
   test("high-risk surface is withheld when maxAllowedRiskClass is medium", () => {
-    const engine = createCapabilityPolicyEngine({ maxAllowedRiskClass: "medium" });
-    const surface = { ...makeSurface("risky", "cap"), riskClass: "high" as const };
+    const engine = createCapabilityPolicyEngine({
+      maxAllowedRiskClass: "medium",
+    });
+    const surface = {
+      ...makeSurface("risky", "cap"),
+      riskClass: "high" as const,
+    };
 
     const decisions = engine.evaluateExposure([surface], defaultContext);
 
@@ -584,7 +620,10 @@ describe("CapabilityPolicyEngine — risk-classification dimension (BB002)", () 
 
   test("high-risk exposure denial carries non-secret reason", () => {
     const engine = createCapabilityPolicyEngine({ maxAllowedRiskClass: "low" });
-    const surface = { ...makeSurface("risky", "cap"), riskClass: "high" as const };
+    const surface = {
+      ...makeSurface("risky", "cap"),
+      riskClass: "high" as const,
+    };
 
     const decisions = engine.evaluateExposure([surface], defaultContext);
 
@@ -594,9 +633,17 @@ describe("CapabilityPolicyEngine — risk-classification dimension (BB002)", () 
   });
 
   test("context maxAllowedRiskClass further restricts beyond engine config", () => {
-    const engine = createCapabilityPolicyEngine({ maxAllowedRiskClass: "high" });
-    const contextMedium = { ...defaultContext, maxAllowedRiskClass: "low" as const };
-    const surface = { ...makeSurface("risky", "cap"), riskClass: "medium" as const };
+    const engine = createCapabilityPolicyEngine({
+      maxAllowedRiskClass: "high",
+    });
+    const contextMedium = {
+      ...defaultContext,
+      maxAllowedRiskClass: "low" as const,
+    };
+    const surface = {
+      ...makeSurface("risky", "cap"),
+      riskClass: "medium" as const,
+    };
 
     const decisions = engine.evaluateExposure([surface], contextMedium);
 
@@ -604,7 +651,9 @@ describe("CapabilityPolicyEngine — risk-classification dimension (BB002)", () 
   });
 
   test("high-risk binding sets requiresApproval when highRiskRequiresApproval is true", () => {
-    const engine = createCapabilityPolicyEngine({ highRiskRequiresApproval: true });
+    const engine = createCapabilityPolicyEngine({
+      highRiskRequiresApproval: true,
+    });
     const binding = { ...makeBinding("cap"), riskClass: "high" as const };
 
     const decision = engine.evaluateInvocation(binding, defaultContext);
@@ -615,7 +664,9 @@ describe("CapabilityPolicyEngine — risk-classification dimension (BB002)", () 
   });
 
   test("low-risk binding is admitted and unaffected by highRiskRequiresApproval", () => {
-    const engine = createCapabilityPolicyEngine({ highRiskRequiresApproval: true });
+    const engine = createCapabilityPolicyEngine({
+      highRiskRequiresApproval: true,
+    });
     const binding = { ...makeBinding("cap"), riskClass: "low" as const };
 
     const decision = engine.evaluateInvocation(binding, defaultContext);
@@ -625,7 +676,9 @@ describe("CapabilityPolicyEngine — risk-classification dimension (BB002)", () 
   });
 
   test("medium-risk binding admitted when maxAllowedRiskClass is high", () => {
-    const engine = createCapabilityPolicyEngine({ maxAllowedRiskClass: "high" });
+    const engine = createCapabilityPolicyEngine({
+      maxAllowedRiskClass: "high",
+    });
     const binding = { ...makeBinding("cap"), riskClass: "medium" as const };
 
     const decision = engine.evaluateInvocation(binding, defaultContext);
@@ -659,7 +712,10 @@ describe("CapabilityPolicyEngine — risk-classification dimension (BB002)", () 
 describe("CapabilityPolicyEngine — user-presence and endpoint requirement (BB003)", () => {
   test("surface with requiresActiveEndpoint is withheld when endpointAttached is false", () => {
     const engine = createCapabilityPolicyEngine();
-    const surface = { ...makeSurface("tool", "cap"), requiresActiveEndpoint: true };
+    const surface = {
+      ...makeSurface("tool", "cap"),
+      requiresActiveEndpoint: true,
+    };
     const noEndpointCtx = { ...defaultContext, endpointAttached: false };
 
     const decisions = engine.evaluateExposure([surface], noEndpointCtx);
@@ -671,7 +727,10 @@ describe("CapabilityPolicyEngine — user-presence and endpoint requirement (BB0
 
   test("surface with requiresActiveEndpoint is exposed when endpointAttached is true", () => {
     const engine = createCapabilityPolicyEngine();
-    const surface = { ...makeSurface("tool", "cap"), requiresActiveEndpoint: true };
+    const surface = {
+      ...makeSurface("tool", "cap"),
+      requiresActiveEndpoint: true,
+    };
     const withEndpointCtx = { ...defaultContext, endpointAttached: true };
 
     const decisions = engine.evaluateExposure([surface], withEndpointCtx);
@@ -723,9 +782,16 @@ describe("CapabilityPolicyEngine — user-presence and endpoint requirement (BB0
 
   test("requirements-met capability passes both decision points", () => {
     const engine = createCapabilityPolicyEngine();
-    const surface = { ...makeSurface("tool", "cap"), requiresActiveEndpoint: true };
+    const surface = {
+      ...makeSurface("tool", "cap"),
+      requiresActiveEndpoint: true,
+    };
     const binding = { ...makeBinding("cap"), requiresUserPresence: true };
-    const fullCtx = { ...defaultContext, endpointAttached: true, userPresent: true };
+    const fullCtx = {
+      ...defaultContext,
+      endpointAttached: true,
+      userPresent: true,
+    };
 
     const exposureDecisions = engine.evaluateExposure([surface], fullCtx);
     const invocationDecision = engine.evaluateInvocation(binding, fullCtx);
@@ -752,7 +818,10 @@ describe("CapabilityPolicyEngine — idempotency/retry dimension (BB004)", () =>
 
   test("idempotent binding annotates policyCanRetry: true on admitted decision", () => {
     const engine = createCapabilityPolicyEngine();
-    const binding = { ...makeBinding("cap"), idempotencyPolicy: "idempotent" as const };
+    const binding = {
+      ...makeBinding("cap"),
+      idempotencyPolicy: "idempotent" as const,
+    };
 
     const decision = engine.evaluateInvocation(binding, defaultContext);
 
@@ -762,7 +831,10 @@ describe("CapabilityPolicyEngine — idempotency/retry dimension (BB004)", () =>
 
   test("non-idempotent binding annotates policyCanRetry: false on admitted decision", () => {
     const engine = createCapabilityPolicyEngine();
-    const binding = { ...makeBinding("cap"), idempotencyPolicy: "non-idempotent" as const };
+    const binding = {
+      ...makeBinding("cap"),
+      idempotencyPolicy: "non-idempotent" as const,
+    };
 
     const decision = engine.evaluateInvocation(binding, defaultContext);
 
@@ -774,7 +846,10 @@ describe("CapabilityPolicyEngine — idempotency/retry dimension (BB004)", () =>
     const engine = createCapabilityPolicyEngine({
       deniedCapabilityIds: new Set(["cap"]),
     });
-    const binding = { ...makeBinding("cap"), idempotencyPolicy: "idempotent" as const };
+    const binding = {
+      ...makeBinding("cap"),
+      idempotencyPolicy: "idempotent" as const,
+    };
 
     const decision = engine.evaluateInvocation(binding, defaultContext);
 
@@ -808,10 +883,7 @@ describe("CapabilityPolicyEngine — wired idempotency/retry (BB004)", () => {
     const harness = createFakeKernelHarness();
     let attemptCount = 0;
 
-    const engineOptions =
-      idempotencyPolicy !== undefined
-        ? { }
-        : {};
+    const _engineOptions = idempotencyPolicy === undefined ? {} : {};
     const engine = createCapabilityPolicyEngine();
 
     const runtime = createTuvrenRuntime({
@@ -855,13 +927,15 @@ describe("CapabilityPolicyEngine — wired idempotency/retry (BB004)", () => {
             description: "a retryable tool",
             execute() {
               attemptCount += 1;
-              if (attemptCount <= throwCount) throw new Error("transient");
+              if (attemptCount <= throwCount) {
+                throw new Error("transient");
+              }
               return { ok: true };
             },
             idempotent: toolIdempotent,
-            ...(idempotencyPolicy !== undefined
-              ? { metadata: { idempotencyPolicy } }
-              : {}),
+            ...(idempotencyPolicy === undefined
+              ? {}
+              : { metadata: { idempotencyPolicy } }),
             inputSchema: { type: "object" },
             name: retryToolName,
           },
@@ -872,9 +946,12 @@ describe("CapabilityPolicyEngine — wired idempotency/retry (BB004)", () => {
     });
 
     const events = await collectEvents(handle.events());
-    const toolResult = events.find((e) => (e as unknown as Record<string, unknown>).type === "tool.result");
+    const toolResult = events.find(
+      (e) => (e as unknown as Record<string, unknown>).type === "tool.result"
+    );
     const succeeded =
-      (toolResult as unknown as Record<string, unknown> | undefined)?.isError !== true;
+      (toolResult as unknown as Record<string, unknown> | undefined)
+        ?.isError !== true;
 
     return { attemptCount, succeeded };
   }
@@ -882,14 +959,22 @@ describe("CapabilityPolicyEngine — wired idempotency/retry (BB004)", () => {
   test("non-idempotent policy suppresses retry even when tool.idempotent is true", async () => {
     // tool.idempotent:true would normally allow retry, but policyCanRetry:false
     // (from idempotencyPolicy:"non-idempotent") must override it.
-    const { attemptCount } = await runWithRetryPolicy("non-idempotent", true, 1);
+    const { attemptCount } = await runWithRetryPolicy(
+      "non-idempotent",
+      true,
+      1
+    );
     // Only 1 attempt: policy suppresses the retry.
     expect(attemptCount).toBe(1);
   });
 
   test("idempotent policy enables retry for a tool that does not declare idempotent", async () => {
     // tool.idempotent not set, but policyCanRetry:true enables retry.
-    const { attemptCount, succeeded } = await runWithRetryPolicy("idempotent", false, 1);
+    const { attemptCount, succeeded } = await runWithRetryPolicy(
+      "idempotent",
+      false,
+      1
+    );
     // 2 attempts: first throws, second succeeds.
     expect(attemptCount).toBe(2);
     expect(succeeded).toBe(true);
@@ -977,7 +1062,10 @@ describe("CapabilityPolicyEngine — credential-boundary dimension (BB004)", () 
   });
 
   test("credential denial carries admitted: false with capabilityId and executionClass", () => {
-    const binding = { ...makeBinding("web.search"), credentialScope: "search.api" };
+    const binding = {
+      ...makeBinding("web.search"),
+      credentialScope: "search.api",
+    };
 
     const decision = engineWithCred.evaluateInvocation(binding, {
       ...defaultContext,
@@ -992,7 +1080,11 @@ describe("CapabilityPolicyEngine — credential-boundary dimension (BB004)", () 
   test("endpoint-level credentialScope is also enforced", () => {
     const binding = {
       ...makeBinding("cap"),
-      endpoint: { id: "secure-endpoint", kind: "tuvren-server" as const, credentialScope: "endpoint.cred" },
+      endpoint: {
+        id: "secure-endpoint",
+        kind: "tuvren-server" as const,
+        credentialScope: "endpoint.cred",
+      },
     };
 
     const decision = engineWithCred.evaluateInvocation(binding, {
@@ -1053,7 +1145,9 @@ describe("CapabilityPolicyEngine — composition and precedence (BB005)", () => 
   });
 
   test("deny from credential-boundary honored even when all others pass", () => {
-    const engine = createCapabilityPolicyEngine({ enforceCredentialBoundary: true });
+    const engine = createCapabilityPolicyEngine({
+      enforceCredentialBoundary: true,
+    });
     const binding = { ...makeBinding("cap"), credentialScope: "secret.scope" };
     const ctx = { ...defaultContext, entitledCredentialScopes: [] };
 
@@ -1084,7 +1178,9 @@ describe("CapabilityPolicyEngine — composition and precedence (BB005)", () => 
         reason: "extension-policy: custom denial",
       }),
     };
-    const engine = createCapabilityPolicyEngine({ dimensions: [extensionDimension] });
+    const engine = createCapabilityPolicyEngine({
+      dimensions: [extensionDimension],
+    });
     const binding = makeBinding("cap");
 
     const decision = engine.evaluateInvocation(binding, defaultContext);
@@ -1133,7 +1229,10 @@ describe("CapabilityPolicyEngine — composition and precedence (BB005)", () => 
       dimensions: [firstDimension, secondDimension],
     });
 
-    const decision = engine.evaluateInvocation(makeBinding("cap"), defaultContext);
+    const decision = engine.evaluateInvocation(
+      makeBinding("cap"),
+      defaultContext
+    );
 
     expect(decision.admitted).toBe(false);
     expect(decision.reason).toBe("first-extension denial");
@@ -1163,7 +1262,10 @@ describe("CapabilityPolicyEngine — composition and precedence (BB005)", () => 
       createCapabilityPolicyEngine({ deniedCapabilityIds: new Set(["cap"]) }),
     ];
     const bindings = [
-      { ...makeBinding("cap"), endpoint: { id: "eu", kind: "tuvren-server" as const, region: "EU" } },
+      {
+        ...makeBinding("cap"),
+        endpoint: { id: "eu", kind: "tuvren-server" as const, region: "EU" },
+      },
       { ...makeBinding("cap"), riskClass: "high" as const },
       { ...makeBinding("cap"), credentialScope: "secret" },
       makeBinding("cap"),
@@ -1176,7 +1278,13 @@ describe("CapabilityPolicyEngine — composition and precedence (BB005)", () => 
     ];
 
     for (let i = 0; i < cases.length; i++) {
-      const decision = cases[i]!.evaluateInvocation(bindings[i]!, contexts[i]!);
+      const engine = cases[i];
+      const binding = bindings[i];
+      const ctx = contexts[i];
+      if (!(engine && binding && ctx)) {
+        continue;
+      }
+      const decision = engine.evaluateInvocation(binding, ctx);
       expect(decision.admitted).toBe(false);
       expect(typeof decision.reason).toBe("string");
       expect((decision.reason ?? "").length).toBeGreaterThan(0);
@@ -1185,7 +1293,10 @@ describe("CapabilityPolicyEngine — composition and precedence (BB005)", () => 
 
   test("admitted decision has no reason field", () => {
     const engine = createCapabilityPolicyEngine();
-    const decision = engine.evaluateInvocation(makeBinding("cap"), defaultContext);
+    const decision = engine.evaluateInvocation(
+      makeBinding("cap"),
+      defaultContext
+    );
 
     expect(decision.admitted).toBe(true);
     expect(decision.reason).toBeUndefined();
@@ -1193,8 +1304,8 @@ describe("CapabilityPolicyEngine — composition and precedence (BB005)", () => 
 
   test("when two dimensions deny, first dimension's reason is used", () => {
     const engine = createCapabilityPolicyEngine({
-      allowedRegions: new Set(["US"]),   // residency → denies first
-      maxAllowedRiskClass: "low",         // risk → would also deny
+      allowedRegions: new Set(["US"]), // residency → denies first
+      maxAllowedRiskClass: "low", // risk → would also deny
     });
     const binding = {
       ...makeBinding("cap"),
