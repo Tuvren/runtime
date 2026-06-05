@@ -118,6 +118,8 @@ class BasicBindingResolver implements BindingResolver {
 
     // Developer-defined execute tool → tuvren-server / tuvren-in-process
     const region = extractEndpointRegion(tool);
+    const riskClass = extractRiskClass(tool);
+    const requiresUserPresence = extractRequiresUserPresence(tool);
     return {
       capabilityId: tool.name,
       endpoint: {
@@ -126,6 +128,8 @@ class BasicBindingResolver implements BindingResolver {
         ...(region !== undefined ? { region } : {}),
       },
       executionClass: "tuvren-server",
+      ...(riskClass !== undefined ? { riskClass } : {}),
+      ...(requiresUserPresence !== undefined ? { requiresUserPresence } : {}),
     };
   }
 
@@ -213,4 +217,29 @@ function extractEndpointRegion(
   const meta = tool.metadata as { endpointRegion?: string } | undefined;
   const region = meta?.endpointRegion;
   return typeof region === "string" && region.length > 0 ? region : undefined;
+}
+
+/**
+ * Extract the optional riskClass from a tool definition's metadata.
+ * Used by the risk-classification policy dimension (BB002).
+ */
+function extractRiskClass(
+  tool: TuvrenToolDefinition
+): "low" | "medium" | "high" | undefined {
+  const meta = tool.metadata as { riskClass?: string } | undefined;
+  const rc = meta?.riskClass;
+  if (rc === "low" || rc === "medium" || rc === "high") return rc;
+  return undefined;
+}
+
+/**
+ * Extract the optional requiresUserPresence flag from a tool definition's metadata.
+ * Used by the user-presence policy dimension (BB003).
+ */
+function extractRequiresUserPresence(
+  tool: TuvrenToolDefinition
+): boolean | undefined {
+  const meta = tool.metadata as { requiresUserPresence?: boolean } | undefined;
+  const v = meta?.requiresUserPresence;
+  return typeof v === "boolean" ? v : undefined;
 }

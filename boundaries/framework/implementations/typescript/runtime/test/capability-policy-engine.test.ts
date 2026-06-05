@@ -631,6 +631,24 @@ describe("CapabilityPolicyEngine — risk-classification dimension (BB002)", () 
 
     expect(decision.admitted).toBe(true);
   });
+
+  test("risk dimension composes: residency denial is not overridden by risk pass", () => {
+    // A low-risk surface in a disallowed region must still be withheld —
+    // risk pass does not override a prior framework denial.
+    const engine = createCapabilityPolicyEngine({
+      allowedRegions: new Set(["US"]),
+      maxAllowedRiskClass: "high",
+    });
+    const surface = {
+      ...makeSurface("tool", "cap"),
+      riskClass: "low" as const,
+      endpointRegion: "EU",
+    };
+
+    const decisions = engine.evaluateExposure([surface], defaultContext);
+
+    expect(decisions[0]?.exposed).toBe(false);
+  });
 });
 
 // ---------------------------------------------------------------------------

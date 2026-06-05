@@ -426,17 +426,33 @@ function applyExposureFilter(
   if (engine === undefined) return registry;
 
   const allTools = registry.list();
-  // Derive ToolSurface from each TuvrenToolDefinition. endpointRegion is
-  // threaded from metadata.endpointRegion so the residency dimension can
-  // evaluate it at exposure time (BB001).
+  // Derive ToolSurface from each TuvrenToolDefinition. Policy-relevant fields
+  // are threaded from tool metadata so all exposure-time dimensions can
+  // evaluate them: endpointRegion (BB001), riskClass (BB002),
+  // requiresActiveEndpoint (BB003).
   const surfaces = allTools.map((tool) => {
-    const meta = tool.metadata as { endpointRegion?: string } | undefined;
+    const meta = tool.metadata as {
+      endpointRegion?: string;
+      riskClass?: string;
+      requiresActiveEndpoint?: boolean;
+    } | undefined;
     const endpointRegion =
       typeof meta?.endpointRegion === "string" ? meta.endpointRegion : undefined;
+    const riskClassVal = meta?.riskClass;
+    const riskClass: "low" | "medium" | "high" | undefined =
+      riskClassVal === "low" || riskClassVal === "medium" || riskClassVal === "high"
+        ? riskClassVal
+        : undefined;
+    const requiresActiveEndpoint =
+      typeof meta?.requiresActiveEndpoint === "boolean"
+        ? meta.requiresActiveEndpoint
+        : undefined;
     return {
       capabilityId: tool.name,
       description: tool.description,
       ...(endpointRegion !== undefined ? { endpointRegion } : {}),
+      ...(riskClass !== undefined ? { riskClass } : {}),
+      ...(requiresActiveEndpoint !== undefined ? { requiresActiveEndpoint } : {}),
       inputSchema:
         "inputSchema" in tool && tool.inputSchema !== undefined
           ? (tool.inputSchema as import("@tuvren/core/messages").TuvrenJsonSchema)
