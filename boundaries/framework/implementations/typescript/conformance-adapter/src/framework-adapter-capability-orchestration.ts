@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+import type { PolicyDimension } from "@tuvren/runtime";
 import {
   createCapabilityPolicyEngine,
   createDriverRegistry,
@@ -325,5 +326,252 @@ export async function runCapabilityOrchestrationPolicyDecisions(): Promise<Adapt
     },
   };
 
+  return { evidence, result: evidence };
+}
+
+// ---------------------------------------------------------------------------
+// BB006: capability-policy conformance adapter operations
+// ---------------------------------------------------------------------------
+
+function makeSurface(name: string, capabilityId: string, extra?: Record<string, unknown>) {
+  return {
+    capabilityId,
+    description: `conformance surface ${name}`,
+    inputSchema: { type: "object" as const },
+    name,
+    ...extra,
+  };
+}
+
+function makeBinding(capabilityId: string, extra?: Record<string, unknown>) {
+  return {
+    capabilityId,
+    endpoint: { id: "conformance-in-process", kind: "tuvren-in-process" as const },
+    executionClass: "tuvren-server" as const,
+    ...extra,
+  };
+}
+
+const baseContext = {
+  modelId: "conformance-model",
+  permissions: [] as string[],
+  providerId: "conformance-provider",
+};
+
+/**
+ * BB001: Data-residency dimension checks at both decision points.
+ */
+export async function runCapabilityPolicyResidency(): Promise<AdapterProjection> {
+  const engine = createCapabilityPolicyEngine({ allowedRegions: new Set(["US"]) });
+
+  const disallowedSurface = makeSurface("disallowed-surface", "cap.disallowed", { endpointRegion: "EU" });
+  const allowedSurface = makeSurface("allowed-surface", "cap.allowed", { endpointRegion: "US" });
+  const exposureDecisions = engine.evaluateExposure([disallowedSurface, allowedSurface], baseContext);
+  const disallowedExposure = exposureDecisions.find((d) => d.surfaceName === "disallowed-surface");
+  const allowedExposure = exposureDecisions.find((d) => d.surfaceName === "allowed-surface");
+
+  const disallowedBinding = {
+    capabilityId: "cap.disallowed",
+    endpoint: { id: "eu-endpoint", kind: "tuvren-server" as const, region: "EU" },
+    executionClass: "tuvren-server" as const,
+  };
+  const allowedBinding = {
+    capabilityId: "cap.allowed",
+    endpoint: { id: "us-endpoint", kind: "tuvren-in-process" as const, region: "US" },
+    executionClass: "tuvren-server" as const,
+  };
+  const disallowedInvocation = engine.evaluateInvocation(disallowedBinding, baseContext);
+  const allowedInvocation = engine.evaluateInvocation(allowedBinding, baseContext);
+
+  const evidence = {
+    residency: {
+      exposure: {
+        disallowedRegion: {
+          exposed: disallowedExposure?.exposed,
+          hasReason: typeof disallowedExposure?.reason === "string" && (disallowedExposure.reason ?? "").length > 0,
+        },
+        allowedRegion: { exposed: allowedExposure?.exposed },
+      },
+      invocation: {
+        disallowedRegion: {
+          admitted: disallowedInvocation.admitted,
+          hasReason: typeof disallowedInvocation.reason === "string" && (disallowedInvocation.reason ?? "").length > 0,
+        },
+        allowedRegion: { admitted: allowedInvocation.admitted },
+      },
+    },
+  };
+  return { evidence, result: evidence };
+}
+
+/**
+ * BB002: Risk-classification dimension checks at both decision points.
+ */
+export async function runCapabilityPolicyRiskClassification(): Promise<AdapterProjection> {
+  const engineMediumMax = createCapabilityPolicyEngine({ maxAllowedRiskClass: "medium" });
+  const engineApproval = createCapabilityPolicyEngine({ highRiskRequiresApproval: true });
+  const enginePermissive = createCapabilityPolicyEngine();
+
+  const highRiskSurface = makeSurface("high-risk-tool", "cap.high", { riskClass: "high" });
+  const lowRiskSurface = makeSurface("low-risk-tool", "cap.low", { riskClass: "low" });
+  const highInMedium = engineMediumMax.evaluateExposure([highRiskSurface], baseContext);
+  const lowInPermissive = enginePermissive.evaluateExposure([lowRiskSurface], baseContext);
+
+  const highBinding = { ...makeBinding("cap.high"), riskClass: "high" as const };
+  const lowBinding = { ...makeBinding("cap.low"), riskClass: "low" as const };
+  const highApproval = engineApproval.evaluateInvocation(highBinding, baseContext);
+  const lowPermissive = enginePermissive.evaluateInvocation(lowBinding, baseContext);
+
+  const evidence = {
+    riskClassification: {
+      exposure: {
+        highRiskInMediumContext: {
+          exposed: highInMedium[0]?.exposed,
+          hasReason: typeof highInMedium[0]?.reason === "string" && (highInMedium[0]?.reason ?? "").length > 0,
+        },
+        lowRisk: { exposed: lowInPermissive[0]?.exposed },
+      },
+      invocation: {
+        highRiskApproval: { requiresApproval: highApproval.requiresApproval },
+        lowRisk: { admitted: lowPermissive.admitted },
+      },
+    },
+  };
+  return { evidence, result: evidence };
+}
+
+/**
+ * BB003: User-presence and active-endpoint checks at both decision points.
+ */
+export async function runCapabilityPolicyPresenceAndEndpoint(): Promise<AdapterProjection> {
+  const engine = createCapabilityPolicyEngine();
+
+  const endpointSurface = makeSurface("endpoint-required", "cap.endpoint", { requiresActiveEndpoint: true });
+  const noEndpointCtx = { ...baseContext, endpointAttached: false };
+  const withEndpointCtx = { ...baseContext, endpointAttached: true };
+  const noEndpoint = engine.evaluateExposure([endpointSurface], noEndpointCtx);
+  const withEndpoint = engine.evaluateExposure([endpointSurface], withEndpointCtx);
+
+  const presenceBinding = { ...makeBinding("cap.presence"), requiresUserPresence: true };
+  const noUserCtx = { ...baseContext, userPresent: false };
+  const withUserCtx = { ...baseContext, userPresent: true };
+  const noUser = engine.evaluateInvocation(presenceBinding, noUserCtx);
+  const withUser = engine.evaluateInvocation(presenceBinding, withUserCtx);
+
+  const evidence = {
+    presence: {
+      exposure: {
+        noEndpoint: { exposed: noEndpoint[0]?.exposed },
+        endpointPresent: { exposed: withEndpoint[0]?.exposed },
+      },
+      invocation: {
+        noUser: {
+          admitted: noUser.admitted,
+          hasReason: typeof noUser.reason === "string" && (noUser.reason ?? "").length > 0,
+        },
+        userPresent: { admitted: withUser.admitted },
+      },
+    },
+  };
+  return { evidence, result: evidence };
+}
+
+/**
+ * BB004: Credential-boundary and idempotency annotation checks.
+ */
+export async function runCapabilityPolicyCredentialBoundary(): Promise<AdapterProjection> {
+  const engine = createCapabilityPolicyEngine({ enforceCredentialBoundary: true });
+
+  const scopedBinding = { ...makeBinding("cap.scoped"), credentialScope: "files.read" };
+  const noScopeBinding = makeBinding("cap.noscope");
+  const idempotentBinding = { ...makeBinding("cap.idempotent"), idempotencyPolicy: "idempotent" as const };
+  const nonIdempotentBinding = { ...makeBinding("cap.nonidempotent"), idempotencyPolicy: "non-idempotent" as const };
+
+  const missingScopeCtx = { ...baseContext, entitledCredentialScopes: [] as string[] };
+  const entitledCtx = { ...baseContext, entitledCredentialScopes: ["files.read"] };
+
+  const missingScope = engine.evaluateInvocation(scopedBinding, missingScopeCtx);
+  const entitled = engine.evaluateInvocation(scopedBinding, entitledCtx);
+  const noScope = engine.evaluateInvocation(noScopeBinding, missingScopeCtx);
+  const idempotent = engine.evaluateInvocation(idempotentBinding, entitledCtx);
+  const nonIdempotent = engine.evaluateInvocation(nonIdempotentBinding, entitledCtx);
+
+  const evidence = {
+    credentialBoundary: {
+      invocation: {
+        missingScope: {
+          admitted: missingScope.admitted,
+          reasonExposesScope: (missingScope.reason ?? "").includes("files.read"),
+        },
+        entitledScope: { admitted: entitled.admitted },
+        noScope: { admitted: noScope.admitted },
+        idempotentBinding: { policyCanRetry: idempotent.policyCanRetry },
+        nonIdempotentBinding: { policyCanRetry: nonIdempotent.policyCanRetry },
+      },
+    },
+  };
+  return { evidence, result: evidence };
+}
+
+/**
+ * BB005: Composition and precedence — deny from any dimension, determinism,
+ * extension dimensions compose after framework.
+ */
+export async function runCapabilityPolicyComposition(): Promise<AdapterProjection> {
+  const engineResidencyFirst = createCapabilityPolicyEngine({
+    allowedRegions: new Set(["US"]),
+    maxAllowedRiskClass: "low",
+  });
+  const multiBinding = {
+    capabilityId: "cap.multi",
+    endpoint: { id: "eu", kind: "tuvren-server" as const, region: "EU" },
+    executionClass: "tuvren-server" as const,
+    riskClass: "high" as const,
+  };
+
+  const residencyFirst = engineResidencyFirst.evaluateInvocation(multiBinding, baseContext);
+  const run1 = engineResidencyFirst.evaluateInvocation(multiBinding, baseContext);
+  const run2 = engineResidencyFirst.evaluateInvocation(multiBinding, baseContext);
+
+  const extensionDimension: PolicyDimension = {
+    checkExposure: () => null,
+    checkInvocation: (b) => ({
+      admitted: false as const,
+      capabilityId: b.capabilityId,
+      executionClass: b.executionClass,
+      reason: "extension-policy: conformance denial",
+    }),
+  };
+  const engineWithExt = createCapabilityPolicyEngine({ dimensions: [extensionDimension] });
+  const extBinding = makeBinding("cap.extension");
+  const extensionDenial = engineWithExt.evaluateInvocation(extBinding, baseContext);
+
+  const passExtension: PolicyDimension = { checkExposure: () => null, checkInvocation: () => null };
+  const engineFrameworkFirst = createCapabilityPolicyEngine({
+    deniedCapabilityIds: new Set(["cap.framework-denied"]),
+    dimensions: [passExtension],
+  });
+  const frameworkDenied = engineFrameworkFirst.evaluateInvocation(
+    makeBinding("cap.framework-denied"), baseContext
+  );
+
+  const evidence = {
+    composition: {
+      firstDimensionDenialHonored:
+        residencyFirst.admitted === false &&
+        typeof residencyFirst.reason === "string" &&
+        residencyFirst.reason.includes("residency"),
+      deterministicRuns: {
+        run1Admitted: run1.admitted,
+        run2Admitted: run2.admitted,
+      },
+      denialHasReason:
+        typeof residencyFirst.reason === "string" && (residencyFirst.reason ?? "").length > 0,
+      extensionDimensionDenial: { admitted: extensionDenial.admitted },
+      frameworkDenialNotOverridden: frameworkDenied.admitted === false,
+      reasonIdentifiesDimension:
+        typeof residencyFirst.reason === "string" && residencyFirst.reason.includes("residency"),
+    },
+  };
   return { evidence, result: evidence };
 }

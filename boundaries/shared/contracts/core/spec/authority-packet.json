@@ -101,6 +101,10 @@
     {
       "path": "boundaries/framework/conformance/plans/invocation-lifecycle-observation.json",
       "format": "conformance-plan"
+    },
+    {
+      "path": "boundaries/framework/conformance/plans/capability-policy.json",
+      "format": "conformance-plan"
     }
   ],
   "generatedArtifacts": [
@@ -186,6 +190,11 @@
       "planId": "tuvren.framework.invocation-lifecycle-observation",
       "planVersion": "0.1.0",
       "path": "boundaries/framework/conformance/plans/invocation-lifecycle-observation.json"
+    },
+    {
+      "planId": "tuvren.framework.capability-policy",
+      "planVersion": "0.1.0",
+      "path": "boundaries/framework/conformance/plans/capability-policy.json"
     }
   ],
   "bindingSections": {

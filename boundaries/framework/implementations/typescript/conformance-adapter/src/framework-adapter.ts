@@ -37,6 +37,11 @@ import { createFrameworkAdapterBatteriesIncluded } from "./framework-adapter-bat
 import {
   runCapabilityOrchestrationFoundation,
   runCapabilityOrchestrationPolicyDecisions,
+  runCapabilityPolicyComposition,
+  runCapabilityPolicyCredentialBoundary,
+  runCapabilityPolicyPresenceAndEndpoint,
+  runCapabilityPolicyResidency,
+  runCapabilityPolicyRiskClassification,
 } from "./framework-adapter-capability-orchestration.ts";
 import { createFrameworkAdapterDriver } from "./framework-adapter-driver.ts";
 import { createFrameworkAdapterEventStream } from "./framework-adapter-event-stream.ts";
@@ -379,6 +384,16 @@ export class TypeScriptFrameworkAdapter implements ImplementationAdapter {
         );
       case "runtime.capability-orchestration.policy-decisions":
         return runCapabilityOrchestrationPolicyDecisions();
+      case "runtime.capability-policy.residency":
+        return runCapabilityPolicyResidency();
+      case "runtime.capability-policy.risk-classification":
+        return runCapabilityPolicyRiskClassification();
+      case "runtime.capability-policy.presence-and-endpoint":
+        return runCapabilityPolicyPresenceAndEndpoint();
+      case "runtime.capability-policy.credential-boundary":
+        return runCapabilityPolicyCredentialBoundary();
+      case "runtime.capability-policy.composition":
+        return runCapabilityPolicyComposition();
       case "runtime.invocation-lifecycle.cross-class":
         return runInvocationLifecycleCrossClass();
       case "runtime.tuvren-client.lifecycle":

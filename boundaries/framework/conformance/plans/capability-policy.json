@@ -1,0 +1,346 @@
+{
+  "planId": "tuvren.framework.capability-policy",
+  "planVersion": "0.1.0",
+  "packetId": "tuvren.shared.core",
+  "applicability": {
+    "capabilities": ["framework.runtime-api"]
+  },
+  "checks": [
+    {
+      "checkId": "bb.bb001.residency-withheld-at-exposure",
+      "evidence": ["result.residency.exposure.disallowedRegion.exposed"],
+      "operation": "runtime.capability-policy.residency",
+      "assertions": [
+        {
+          "kind": "resultField",
+          "field": "$.residency.exposure.disallowedRegion.exposed",
+          "equals": false
+        }
+      ]
+    },
+    {
+      "checkId": "bb.bb001.residency-exposure-denial-has-reason",
+      "evidence": ["result.residency.exposure.disallowedRegion.hasReason"],
+      "operation": "runtime.capability-policy.residency",
+      "assertions": [
+        {
+          "kind": "resultField",
+          "field": "$.residency.exposure.disallowedRegion.hasReason",
+          "equals": true
+        }
+      ]
+    },
+    {
+      "checkId": "bb.bb001.residency-denied-at-invocation",
+      "evidence": ["result.residency.invocation.disallowedRegion.admitted"],
+      "operation": "runtime.capability-policy.residency",
+      "assertions": [
+        {
+          "kind": "resultField",
+          "field": "$.residency.invocation.disallowedRegion.admitted",
+          "equals": false
+        }
+      ]
+    },
+    {
+      "checkId": "bb.bb001.residency-invocation-denial-has-reason",
+      "evidence": ["result.residency.invocation.disallowedRegion.hasReason"],
+      "operation": "runtime.capability-policy.residency",
+      "assertions": [
+        {
+          "kind": "resultField",
+          "field": "$.residency.invocation.disallowedRegion.hasReason",
+          "equals": true
+        }
+      ]
+    },
+    {
+      "checkId": "bb.bb001.compliant-residency-passes-exposure",
+      "evidence": ["result.residency.exposure.allowedRegion.exposed"],
+      "operation": "runtime.capability-policy.residency",
+      "assertions": [
+        {
+          "kind": "resultField",
+          "field": "$.residency.exposure.allowedRegion.exposed",
+          "equals": true
+        }
+      ]
+    },
+    {
+      "checkId": "bb.bb001.compliant-residency-passes-invocation",
+      "evidence": ["result.residency.invocation.allowedRegion.admitted"],
+      "operation": "runtime.capability-policy.residency",
+      "assertions": [
+        {
+          "kind": "resultField",
+          "field": "$.residency.invocation.allowedRegion.admitted",
+          "equals": true
+        }
+      ]
+    },
+    {
+      "checkId": "bb.bb002.high-risk-withheld-in-medium-context",
+      "evidence": ["result.riskClassification.exposure.highRiskInMediumContext.exposed"],
+      "operation": "runtime.capability-policy.risk-classification",
+      "assertions": [
+        {
+          "kind": "resultField",
+          "field": "$.riskClassification.exposure.highRiskInMediumContext.exposed",
+          "equals": false
+        }
+      ]
+    },
+    {
+      "checkId": "bb.bb002.high-risk-exposure-denial-has-reason",
+      "evidence": ["result.riskClassification.exposure.highRiskInMediumContext.hasReason"],
+      "operation": "runtime.capability-policy.risk-classification",
+      "assertions": [
+        {
+          "kind": "resultField",
+          "field": "$.riskClassification.exposure.highRiskInMediumContext.hasReason",
+          "equals": true
+        }
+      ]
+    },
+    {
+      "checkId": "bb.bb002.high-risk-requires-approval-when-configured",
+      "evidence": ["result.riskClassification.invocation.highRiskApproval.requiresApproval"],
+      "operation": "runtime.capability-policy.risk-classification",
+      "assertions": [
+        {
+          "kind": "resultField",
+          "field": "$.riskClassification.invocation.highRiskApproval.requiresApproval",
+          "equals": true
+        }
+      ]
+    },
+    {
+      "checkId": "bb.bb002.low-risk-passes-both-decision-points",
+      "evidence": [
+        "result.riskClassification.exposure.lowRisk.exposed",
+        "result.riskClassification.invocation.lowRisk.admitted"
+      ],
+      "operation": "runtime.capability-policy.risk-classification",
+      "assertions": [
+        {
+          "kind": "resultField",
+          "field": "$.riskClassification.exposure.lowRisk.exposed",
+          "equals": true
+        },
+        {
+          "kind": "resultField",
+          "field": "$.riskClassification.invocation.lowRisk.admitted",
+          "equals": true
+        }
+      ]
+    },
+    {
+      "checkId": "bb.bb003.requires-active-endpoint-withheld-when-absent",
+      "evidence": ["result.presence.exposure.noEndpoint.exposed"],
+      "operation": "runtime.capability-policy.presence-and-endpoint",
+      "assertions": [
+        {
+          "kind": "resultField",
+          "field": "$.presence.exposure.noEndpoint.exposed",
+          "equals": false
+        }
+      ]
+    },
+    {
+      "checkId": "bb.bb003.requires-user-presence-denied-when-absent",
+      "evidence": ["result.presence.invocation.noUser.admitted"],
+      "operation": "runtime.capability-policy.presence-and-endpoint",
+      "assertions": [
+        {
+          "kind": "resultField",
+          "field": "$.presence.invocation.noUser.admitted",
+          "equals": false
+        }
+      ]
+    },
+    {
+      "checkId": "bb.bb003.presence-denial-has-reason",
+      "evidence": ["result.presence.invocation.noUser.hasReason"],
+      "operation": "runtime.capability-policy.presence-and-endpoint",
+      "assertions": [
+        {
+          "kind": "resultField",
+          "field": "$.presence.invocation.noUser.hasReason",
+          "equals": true
+        }
+      ]
+    },
+    {
+      "checkId": "bb.bb003.requirements-met-capability-passes",
+      "evidence": [
+        "result.presence.exposure.endpointPresent.exposed",
+        "result.presence.invocation.userPresent.admitted"
+      ],
+      "operation": "runtime.capability-policy.presence-and-endpoint",
+      "assertions": [
+        {
+          "kind": "resultField",
+          "field": "$.presence.exposure.endpointPresent.exposed",
+          "equals": true
+        },
+        {
+          "kind": "resultField",
+          "field": "$.presence.invocation.userPresent.admitted",
+          "equals": true
+        }
+      ]
+    },
+    {
+      "checkId": "bb.bb004.credential-denied-when-scope-absent",
+      "evidence": ["result.credentialBoundary.invocation.missingScope.admitted"],
+      "operation": "runtime.capability-policy.credential-boundary",
+      "assertions": [
+        {
+          "kind": "resultField",
+          "field": "$.credentialBoundary.invocation.missingScope.admitted",
+          "equals": false
+        }
+      ]
+    },
+    {
+      "checkId": "bb.bb004.credential-denial-reason-is-non-secret",
+      "evidence": ["result.credentialBoundary.invocation.missingScope.reasonExposesScope"],
+      "operation": "runtime.capability-policy.credential-boundary",
+      "assertions": [
+        {
+          "kind": "resultField",
+          "field": "$.credentialBoundary.invocation.missingScope.reasonExposesScope",
+          "equals": false
+        }
+      ]
+    },
+    {
+      "checkId": "bb.bb004.entitled-scope-admitted",
+      "evidence": ["result.credentialBoundary.invocation.entitledScope.admitted"],
+      "operation": "runtime.capability-policy.credential-boundary",
+      "assertions": [
+        {
+          "kind": "resultField",
+          "field": "$.credentialBoundary.invocation.entitledScope.admitted",
+          "equals": true
+        }
+      ]
+    },
+    {
+      "checkId": "bb.bb004.idempotent-binding-policyCanRetry-true",
+      "evidence": ["result.credentialBoundary.invocation.idempotentBinding.policyCanRetry"],
+      "operation": "runtime.capability-policy.credential-boundary",
+      "assertions": [
+        {
+          "kind": "resultField",
+          "field": "$.credentialBoundary.invocation.idempotentBinding.policyCanRetry",
+          "equals": true
+        }
+      ]
+    },
+    {
+      "checkId": "bb.bb004.non-idempotent-binding-policyCanRetry-false",
+      "evidence": ["result.credentialBoundary.invocation.nonIdempotentBinding.policyCanRetry"],
+      "operation": "runtime.capability-policy.credential-boundary",
+      "assertions": [
+        {
+          "kind": "resultField",
+          "field": "$.credentialBoundary.invocation.nonIdempotentBinding.policyCanRetry",
+          "equals": false
+        }
+      ]
+    },
+    {
+      "checkId": "bb.bb004.no-credential-scope-always-admitted",
+      "evidence": ["result.credentialBoundary.invocation.noScope.admitted"],
+      "operation": "runtime.capability-policy.credential-boundary",
+      "assertions": [
+        {
+          "kind": "resultField",
+          "field": "$.credentialBoundary.invocation.noScope.admitted",
+          "equals": true
+        }
+      ]
+    },
+    {
+      "checkId": "bb.bb005.first-dimension-denial-honored",
+      "evidence": ["result.composition.firstDimensionDenialHonored"],
+      "operation": "runtime.capability-policy.composition",
+      "assertions": [
+        {
+          "kind": "resultField",
+          "field": "$.composition.firstDimensionDenialHonored",
+          "equals": true
+        }
+      ]
+    },
+    {
+      "checkId": "bb.bb005.composed-decision-is-deterministic",
+      "evidence": [
+        "result.composition.deterministicRuns.run1Admitted",
+        "result.composition.deterministicRuns.run2Admitted"
+      ],
+      "operation": "runtime.capability-policy.composition",
+      "assertions": [
+        {
+          "kind": "resultField",
+          "field": "$.composition.deterministicRuns.run1Admitted",
+          "equals": false
+        },
+        {
+          "kind": "resultField",
+          "field": "$.composition.deterministicRuns.run2Admitted",
+          "equals": false
+        }
+      ]
+    },
+    {
+      "checkId": "bb.bb005.denial-reason-is-non-empty",
+      "evidence": ["result.composition.denialHasReason"],
+      "operation": "runtime.capability-policy.composition",
+      "assertions": [
+        {
+          "kind": "resultField",
+          "field": "$.composition.denialHasReason",
+          "equals": true
+        }
+      ]
+    },
+    {
+      "checkId": "bb.bb005.extension-dimension-honored-after-framework-pass",
+      "evidence": ["result.composition.extensionDimensionDenial.admitted"],
+      "operation": "runtime.capability-policy.composition",
+      "assertions": [
+        {
+          "kind": "resultField",
+          "field": "$.composition.extensionDimensionDenial.admitted",
+          "equals": false
+        }
+      ]
+    },
+    {
+      "checkId": "bb.bb005.framework-denial-not-overridable-by-extension",
+      "evidence": ["result.composition.frameworkDenialNotOverridden"],
+      "operation": "runtime.capability-policy.composition",
+      "assertions": [
+        {
+          "kind": "resultField",
+          "field": "$.composition.frameworkDenialNotOverridden",
+          "equals": true
+        }
+      ]
+    },
+    {
+      "checkId": "bb.bb005.reason-identifies-denying-dimension",
+      "evidence": ["result.composition.reasonIdentifiesDimension"],
+      "operation": "runtime.capability-policy.composition",
+      "assertions": [
+        {
+          "kind": "resultField",
+          "field": "$.composition.reasonIdentifiesDimension",
+          "equals": true
+        }
+      ]
+    }
+  ]
+}
