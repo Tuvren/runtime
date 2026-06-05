@@ -22,6 +22,7 @@ import type {
   ToolSurface,
 } from "@tuvren/core/capabilities";
 import type { RuntimeDriver } from "@tuvren/core/driver";
+import type { PolicyDimension } from "../src/index.ts";
 import {
   createDriverRegistry as createBaseDriverRegistry,
   createCapabilityPolicyEngine,
@@ -1074,7 +1075,7 @@ describe("CapabilityPolicyEngine — composition and precedence (BB005)", () => 
   });
 
   test("extension dimension denial is honored after all framework dimensions pass", () => {
-    const extensionDimension: import("../src/lib/capability-policy-engine.ts").PolicyDimension = {
+    const extensionDimension: PolicyDimension = {
       checkExposure: () => null,
       checkInvocation: (binding) => ({
         admitted: false,
@@ -1093,7 +1094,7 @@ describe("CapabilityPolicyEngine — composition and precedence (BB005)", () => 
   });
 
   test("extension dimension cannot override a prior framework denial", () => {
-    const extensionDimension: import("../src/lib/capability-policy-engine.ts").PolicyDimension = {
+    const extensionDimension: PolicyDimension = {
       checkExposure: () => null,
       checkInvocation: () => null, // would pass
     };
@@ -1110,7 +1111,7 @@ describe("CapabilityPolicyEngine — composition and precedence (BB005)", () => 
   });
 
   test("multiple extension dimensions compose in declared order, first denial wins", () => {
-    const firstDimension: import("../src/lib/capability-policy-engine.ts").PolicyDimension = {
+    const firstDimension: PolicyDimension = {
       checkExposure: () => null,
       checkInvocation: (binding) => ({
         admitted: false,
@@ -1119,7 +1120,7 @@ describe("CapabilityPolicyEngine — composition and precedence (BB005)", () => 
         reason: "first-extension denial",
       }),
     };
-    const secondDimension: import("../src/lib/capability-policy-engine.ts").PolicyDimension = {
+    const secondDimension: PolicyDimension = {
       checkExposure: () => null,
       checkInvocation: (binding) => ({
         admitted: false,
