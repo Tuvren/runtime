@@ -461,7 +461,10 @@ export async function runCapabilityPolicyPresenceAndEndpoint(): Promise<AdapterP
   const evidence = {
     presence: {
       exposure: {
-        noEndpoint: { exposed: noEndpoint[0]?.exposed },
+        noEndpoint: {
+          exposed: noEndpoint[0]?.exposed,
+          hasReason: typeof noEndpoint[0]?.reason === "string" && (noEndpoint[0]?.reason ?? "").length > 0,
+        },
         endpointPresent: { exposed: withEndpoint[0]?.exposed },
       },
       invocation: {
@@ -501,6 +504,7 @@ export async function runCapabilityPolicyCredentialBoundary(): Promise<AdapterPr
       invocation: {
         missingScope: {
           admitted: missingScope.admitted,
+          hasReason: typeof missingScope.reason === "string" && (missingScope.reason ?? "").length > 0,
           reasonExposesScope: (missingScope.reason ?? "").includes("files.read"),
         },
         entitledScope: { admitted: entitled.admitted },
@@ -563,7 +567,10 @@ export async function runCapabilityPolicyComposition(): Promise<AdapterProjectio
         residencyFirst.reason.includes("residency"),
       deterministicRuns: {
         run1Admitted: run1.admitted,
+        run1Reason: run1.reason,
         run2Admitted: run2.admitted,
+        run2Reason: run2.reason,
+        reasonsMatch: run1.reason === run2.reason,
       },
       denialHasReason:
         typeof residencyFirst.reason === "string" && (residencyFirst.reason ?? "").length > 0,

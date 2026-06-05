@@ -136,13 +136,21 @@
     },
     {
       "checkId": "bb.bb003.requires-active-endpoint-withheld-when-absent",
-      "evidence": ["result.presence.exposure.noEndpoint.exposed"],
+      "evidence": [
+        "result.presence.exposure.noEndpoint.exposed",
+        "result.presence.exposure.noEndpoint.hasReason"
+      ],
       "operation": "runtime.capability-policy.presence-and-endpoint",
       "assertions": [
         {
           "kind": "resultField",
           "field": "$.presence.exposure.noEndpoint.exposed",
           "equals": false
+        },
+        {
+          "kind": "resultField",
+          "field": "$.presence.exposure.noEndpoint.hasReason",
+          "equals": true
         }
       ]
     },
@@ -203,10 +211,18 @@
       ]
     },
     {
-      "checkId": "bb.bb004.credential-denial-reason-is-non-secret",
-      "evidence": ["result.credentialBoundary.invocation.missingScope.reasonExposesScope"],
+      "checkId": "bb.bb004.credential-denial-has-non-empty-non-secret-reason",
+      "evidence": [
+        "result.credentialBoundary.invocation.missingScope.hasReason",
+        "result.credentialBoundary.invocation.missingScope.reasonExposesScope"
+      ],
       "operation": "runtime.capability-policy.credential-boundary",
       "assertions": [
+        {
+          "kind": "resultField",
+          "field": "$.credentialBoundary.invocation.missingScope.hasReason",
+          "equals": true
+        },
         {
           "kind": "resultField",
           "field": "$.credentialBoundary.invocation.missingScope.reasonExposesScope",
@@ -278,7 +294,8 @@
       "checkId": "bb.bb005.composed-decision-is-deterministic",
       "evidence": [
         "result.composition.deterministicRuns.run1Admitted",
-        "result.composition.deterministicRuns.run2Admitted"
+        "result.composition.deterministicRuns.run2Admitted",
+        "result.composition.deterministicRuns.reasonsMatch"
       ],
       "operation": "runtime.capability-policy.composition",
       "assertions": [
@@ -291,6 +308,11 @@
           "kind": "resultField",
           "field": "$.composition.deterministicRuns.run2Admitted",
           "equals": false
+        },
+        {
+          "kind": "resultField",
+          "field": "$.composition.deterministicRuns.reasonsMatch",
+          "equals": true
         }
       ]
     },
