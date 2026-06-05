@@ -28,8 +28,8 @@ import type {
   ToolResultPart,
   TuvrenMessage,
 } from "@tuvren/core/messages";
+import type { TuvrenToolDefinition, ToolRegistry } from "@tuvren/core/tools";
 import type { TuvrenModelResponse } from "@tuvren/core/provider";
-import type { ToolRegistry } from "@tuvren/core/tools";
 import { runAfterIterationHooks } from "./extension-runtime.js";
 import type { HeadState, LoopState } from "./runtime-core-loop.js";
 import type { LoopOutcome } from "./runtime-core-recovery.js";
@@ -141,9 +141,10 @@ export function createDriverExecutionContext(
   iterationCount: number,
   emittedDriverEvents: TuvrenStreamEvent[]
 ): DriverExecutionContext {
-  const toolRegistrySnapshot = host.createReadonlyDriverToolRegistry(
+  const baseRegistry = host.createReadonlyDriverToolRegistry(
     loopState.activeToolRegistry
   );
+  const toolRegistrySnapshot = applyExposureFilter(baseRegistry, loopState);
 
   return {
     branchId: handle.request.branchId,
@@ -405,4 +406,60 @@ export async function applyAfterIterationResolution(
   }
 
   return nextResolution;
+}
+
+// ---------------------------------------------------------------------------
+// Exposure-time filtering (BB001)
+// ---------------------------------------------------------------------------
+
+/**
+ * Apply exposure-time policy to the driver's tool registry snapshot.
+ * When a policy engine is configured, evaluates each tool surface and returns
+ * a filtered registry that excludes denied surfaces.
+ * When no policy engine is configured, returns the original registry unchanged.
+ */
+function applyExposureFilter(
+  registry: ToolRegistry,
+  loopState: LoopState
+): ToolRegistry {
+  const engine = loopState.activeConfig.capabilityPolicyEngine;
+  if (engine === undefined) return registry;
+
+  const allTools = registry.list();
+  const surfaces = allTools.map((tool) => ({
+    capabilityId: tool.name,
+    description: tool.description,
+    inputSchema:
+      "inputSchema" in tool && tool.inputSchema !== undefined
+        ? (tool.inputSchema as import("@tuvren/core/messages").TuvrenJsonSchema)
+        : ({ type: "object" } as import("@tuvren/core/messages").TuvrenJsonSchema),
+    name: tool.name,
+  }));
+
+  const policyContext = {
+    modelId: loopState.activeDriverId,
+    permissions: [] as string[],
+    providerId: loopState.activeDriverId,
+  };
+
+  const decisions = engine.evaluateExposure(surfaces, policyContext);
+  const deniedNames = new Set(
+    decisions.filter((d) => !d.exposed).map((d) => d.surfaceName)
+  );
+
+  if (deniedNames.size === 0) return registry;
+
+  const filteredTools = allTools.filter((t) => !deniedNames.has(t.name));
+  const toolsByName = new Map(filteredTools.map((t) => [t.name, t]));
+  const filteredRendered = registry
+    .toDefinitions()
+    .filter((t) => !deniedNames.has(t.name));
+
+  return {
+    get: (name) => (deniedNames.has(name) ? undefined : registry.get(name)),
+    has: (name) => !deniedNames.has(name) && registry.has(name),
+    list: () => filteredTools.map((t) => ({ ...t }) as TuvrenToolDefinition),
+    register: (tool) => registry.register(tool),
+    toDefinitions: () => filteredRendered.map((t) => ({ ...t })),
+  };
 }

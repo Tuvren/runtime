@@ -92,6 +92,11 @@ export interface ToolBatchEnvironment {
    * being executed. When absent, all invocations are admitted (default).
    */
   capabilityPolicyEngine?: CapabilityPolicyEngine;
+  /**
+   * Policy context for the current turn, supplied to the policy engine at
+   * both decision points. Populated from the active loop state (BB001).
+   */
+  policyContext?: import("@tuvren/core/capabilities").CapabilityPolicyContext;
   extensions: TuvrenExtension[];
   iterationCount: number;
   manifest: ContextManifest;
@@ -493,10 +498,7 @@ async function resolveExecutableToolCall(
   if (environment.capabilityPolicyEngine !== undefined) {
     const resolver = createBindingResolver();
     const binding = resolver.resolveFromToolDefinition(tool);
-    // Context dimensions (modelId, providerId, permissions) are populated in
-    // Epic BB. The baseline engine is context-insensitive; a context-sensitive
-    // engine wired before Epic BB would receive empty values here.
-    const policyContext = {
+    const policyContext = environment.policyContext ?? {
       modelId: "",
       permissions: [] as string[],
       providerId: "",

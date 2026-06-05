@@ -403,3 +403,148 @@ describe("CapabilityPolicyEngine — wired invocation-time denial", () => {
     expect(permittedExecuted.value).toBe(true);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Data-residency policy dimension (BB001)
+// ---------------------------------------------------------------------------
+
+describe("CapabilityPolicyEngine — data-residency dimension (BB001)", () => {
+  test("surface with allowed region is exposed normally", () => {
+    const engine = createCapabilityPolicyEngine({
+      allowedRegions: new Set(["US", "EU"]),
+    });
+    const surface = { ...makeSurface("search", "web.search"), endpointRegion: "US" };
+
+    const decisions = engine.evaluateExposure([surface], defaultContext);
+
+    expect(decisions[0]?.exposed).toBe(true);
+  });
+
+  test("surface with disallowed region is withheld at exposure", () => {
+    const engine = createCapabilityPolicyEngine({
+      allowedRegions: new Set(["US"]),
+    });
+    const surface = { ...makeSurface("search", "web.search"), endpointRegion: "EU" };
+
+    const decisions = engine.evaluateExposure([surface], defaultContext);
+
+    expect(decisions[0]?.exposed).toBe(false);
+    expect(typeof decisions[0]?.reason).toBe("string");
+    expect((decisions[0]?.reason ?? "").length).toBeGreaterThan(0);
+  });
+
+  test("surface without region is withheld when allowedRegions is set (strict default)", () => {
+    const engine = createCapabilityPolicyEngine({
+      allowedRegions: new Set(["US"]),
+    });
+    const surface = makeSurface("search", "web.search"); // no endpointRegion
+
+    const decisions = engine.evaluateExposure([surface], defaultContext);
+
+    expect(decisions[0]?.exposed).toBe(false);
+  });
+
+  test("surface without region is exposed when allowMissingRegion is true", () => {
+    const engine = createCapabilityPolicyEngine({
+      allowedRegions: new Set(["US"]),
+      allowMissingRegion: true,
+    });
+    const surface = makeSurface("search", "web.search"); // no endpointRegion
+
+    const decisions = engine.evaluateExposure([surface], defaultContext);
+
+    expect(decisions[0]?.exposed).toBe(true);
+  });
+
+  test("invocation with allowed endpoint region is admitted", () => {
+    const engine = createCapabilityPolicyEngine({
+      allowedRegions: new Set(["US", "EU"]),
+    });
+    const binding = {
+      ...makeBinding("web.search"),
+      endpoint: { id: "local", kind: "tuvren-in-process" as const, region: "US" },
+    };
+
+    const decision = engine.evaluateInvocation(binding, defaultContext);
+
+    expect(decision.admitted).toBe(true);
+  });
+
+  test("invocation with disallowed endpoint region is denied with non-secret reason", () => {
+    const engine = createCapabilityPolicyEngine({
+      allowedRegions: new Set(["US"]),
+    });
+    const binding = {
+      ...makeBinding("web.search"),
+      endpoint: { id: "eu-server", kind: "tuvren-server" as const, region: "EU" },
+    };
+
+    const decision = engine.evaluateInvocation(binding, defaultContext);
+
+    expect(decision.admitted).toBe(false);
+    expect(typeof decision.reason).toBe("string");
+    expect((decision.reason ?? "").length).toBeGreaterThan(0);
+  });
+
+  test("residency denial carries capabilityId and executionClass", () => {
+    const engine = createCapabilityPolicyEngine({
+      allowedRegions: new Set(["US"]),
+    });
+    const binding = {
+      ...makeBinding("web.search"),
+      endpoint: { id: "eu-server", kind: "tuvren-server" as const, region: "EU" },
+    };
+
+    const decision = engine.evaluateInvocation(binding, defaultContext);
+
+    expect(decision.capabilityId).toBe("web.search");
+    expect(decision.executionClass).toBe("tuvren-server");
+  });
+
+  test("compliant capability passes both exposure and invocation decision points", () => {
+    const engine = createCapabilityPolicyEngine({
+      allowedRegions: new Set(["EU"]),
+    });
+    const surface = { ...makeSurface("tool", "cap"), endpointRegion: "EU" };
+    const binding = {
+      ...makeBinding("cap"),
+      endpoint: { id: "eu", kind: "tuvren-in-process" as const, region: "EU" },
+    };
+
+    const exposureDecisions = engine.evaluateExposure([surface], defaultContext);
+    const invocationDecision = engine.evaluateInvocation(binding, defaultContext);
+
+    expect(exposureDecisions[0]?.exposed).toBe(true);
+    expect(invocationDecision.admitted).toBe(true);
+  });
+
+  test("context-level allowedRegions restrict when more restrictive than engine options", () => {
+    const engine = createCapabilityPolicyEngine({
+      allowedRegions: new Set(["US", "EU"]),
+    });
+    const contextWithRestriction = {
+      ...defaultContext,
+      allowedRegions: ["US"],
+    };
+    const binding = {
+      ...makeBinding("web.search"),
+      endpoint: { id: "eu-server", kind: "tuvren-server" as const, region: "EU" },
+    };
+
+    const decision = engine.evaluateInvocation(binding, contextWithRestriction);
+
+    expect(decision.admitted).toBe(false);
+  });
+
+  test("no residency check when allowedRegions is not configured", () => {
+    const engine = createCapabilityPolicyEngine(); // no allowedRegions
+    const binding = {
+      ...makeBinding("web.search"),
+      endpoint: { id: "remote", kind: "tuvren-server" as const, region: "CN" },
+    };
+
+    const decision = engine.evaluateInvocation(binding, defaultContext);
+
+    expect(decision.admitted).toBe(true);
+  });
+});

@@ -107,6 +107,11 @@ export function createToolBatchEnvironment(
     branchId: handle.request.branchId,
     capabilityPolicyEngine:
       loopState.activeConfig.capabilityPolicyEngine ?? undefined,
+    policyContext: {
+      modelId: loopState.activeDriverId,
+      permissions: [],
+      providerId: loopState.activeDriverId,
+    },
     extensions: loopState.activeConfig.extensions ?? [],
     iterationCount,
     manifest,

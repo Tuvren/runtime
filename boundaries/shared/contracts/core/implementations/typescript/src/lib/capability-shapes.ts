@@ -111,6 +111,27 @@ export interface ToolSurface {
   name: string;
   /** Provider-specific rendering constraints (non-secret). */
   providerRendering?: Record<string, unknown>;
+  /**
+   * Non-secret region tag for the endpoint this surface is backed by.
+   * Used by the data-residency policy dimension at exposure time (BB001).
+   */
+  endpointRegion?: string;
+  /**
+   * Risk classification of the underlying capability, denormalized here for
+   * exposure-time policy evaluation without a registry lookup (BB002).
+   */
+  riskClass?: "low" | "medium" | "high";
+  /**
+   * When true, the surface is withheld at exposure time if the policy context
+   * signals no active endpoint is attached (BB003).
+   */
+  requiresActiveEndpoint?: boolean;
+  /**
+   * When true, invocations of this capability are denied if the policy context
+   * signals no user is present. Populated on the Binding for invocation-time
+   * enforcement; mirrored here for exposure-time surface metadata (BB003).
+   */
+  requiresUserPresence?: boolean;
 }
 
 /**
@@ -121,6 +142,16 @@ export interface Endpoint {
   /** Stable, non-secret endpoint identifier. */
   id: string;
   kind: EndpointKind;
+  /**
+   * Non-secret ISO 3166-1 alpha-2 region code for the execution location.
+   * Used by the data-residency policy dimension (BB001).
+   */
+  region?: string;
+  /**
+   * Credential scope required to invoke capabilities through this endpoint.
+   * Used by the credential-boundary policy dimension (BB004).
+   */
+  credentialScope?: string;
 }
 
 /**
@@ -132,6 +163,29 @@ export interface Binding {
   capabilityId: string;
   endpoint: Endpoint;
   executionClass: ExecutionClass;
+  /**
+   * Risk classification of the underlying capability, denormalized for
+   * invocation-time policy evaluation without a registry lookup (BB002).
+   */
+  riskClass?: "low" | "medium" | "high";
+  /**
+   * When true, the invocation is denied if the policy context signals
+   * no user is present (BB003).
+   */
+  requiresUserPresence?: boolean;
+  /**
+   * Idempotency policy for this binding at the framework policy level.
+   * "idempotent": the framework may retry on retriable failure.
+   * "non-idempotent": the framework must not retry.
+   * When absent, the tool-definition-level idempotent flag governs (BB004).
+   */
+  idempotencyPolicy?: "idempotent" | "non-idempotent";
+  /**
+   * Credential scope required to invoke this capability. When set and
+   * credential-boundary enforcement is active, the invoking context must
+   * include this scope in entitledCredentialScopes (BB004).
+   */
+  credentialScope?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -176,6 +230,12 @@ export interface InvocationDecision {
   reason?: string;
   /** True when the invocation requires an explicit approval decision first. */
   requiresApproval?: boolean;
+  /**
+   * Whether the framework policy permits retrying this invocation on failure.
+   * Populated when the binding carries an idempotencyPolicy. When absent, the
+   * tool-definition-level idempotent flag governs retry (BB004).
+   */
+  policyCanRetry?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -207,14 +267,43 @@ export interface CapabilityInvocationAttribution {
 
 /**
  * Context provided to the Capability Policy Engine at each decision point.
- * Covers the dimensions named in §4.21. Full depth (data-residency, risk,
- * presence, credential boundary, idempotency/retry) lands in Epic BB.
+ * Covers all policy dimensions per §4.21 / ADR-046. All dimension-specific
+ * fields are optional — when absent the corresponding dimension is not
+ * evaluated from the context side.
  */
 export interface CapabilityPolicyContext {
   modelId: string;
   /** User/org permission tokens present for this invocation. */
   permissions: string[];
   providerId: string;
+  /**
+   * Allowed data-residency regions for this context. When set and non-empty,
+   * capabilities bound to endpoints whose region is not in this set are
+   * withheld or denied (BB001). Combined with engine-level allowedRegions via
+   * intersection (most restrictive wins).
+   */
+  allowedRegions?: string[];
+  /**
+   * Maximum risk class permitted in this context. Surfaces and bindings with
+   * a riskClass that exceeds this limit are withheld or denied (BB002).
+   */
+  maxAllowedRiskClass?: "low" | "medium" | "high";
+  /**
+   * Whether an active user is present for this invocation. When false,
+   * capabilities that requiresUserPresence are denied (BB003).
+   */
+  userPresent?: boolean;
+  /**
+   * Whether the required execution endpoint is currently attached. When false,
+   * surfaces that requiresActiveEndpoint are withheld (BB003).
+   */
+  endpointAttached?: boolean;
+  /**
+   * Credential scopes the invoker is entitled to. Used by the
+   * credential-boundary dimension: a binding whose credentialScope is absent
+   * from this set is denied (BB004).
+   */
+  entitledCredentialScopes?: string[];
 }
 
 /**
@@ -242,10 +331,8 @@ export interface CapabilityPolicyEngine {
    * Evaluate exposure-time policy over candidate surfaces. Returns decisions
    * indicating which surfaces may be included in the model-visible set.
    *
-   * The runtime must filter denied surfaces before presenting the tool list
-   * to the model. This enforcement wiring lands in Epic BB; for the foundation
-   * phase (Epic AW), the baseline engine returns correct decisions but the
-   * runtime does not yet act on them during tool-set construction.
+   * The runtime filters denied surfaces before presenting the tool list to the
+   * model. Denial suppresses the surface entirely — the model never sees it.
    */
   evaluateExposure(
     surfaces: ToolSurface[],
