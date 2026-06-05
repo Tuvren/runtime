@@ -793,6 +793,109 @@ describe("CapabilityPolicyEngine — idempotency/retry dimension (BB004)", () =>
 });
 
 // ---------------------------------------------------------------------------
+// Wired idempotency/retry: policyCanRetry governs attempt count (BB004)
+// ---------------------------------------------------------------------------
+
+describe("CapabilityPolicyEngine — wired idempotency/retry (BB004)", () => {
+  const retryToolName = "retryable-op";
+
+  async function runWithRetryPolicy(
+    idempotencyPolicy: "idempotent" | "non-idempotent" | undefined,
+    toolIdempotent: boolean,
+    throwCount: number
+  ): Promise<{ attemptCount: number; succeeded: boolean }> {
+    const harness = createFakeKernelHarness();
+    let attemptCount = 0;
+
+    const engineOptions =
+      idempotencyPolicy !== undefined
+        ? { }
+        : {};
+    const engine = createCapabilityPolicyEngine();
+
+    const runtime = createTuvrenRuntime({
+      defaultDriverId: "retry-driver",
+      driverRegistry: createBaseDriverRegistry([
+        {
+          id: "retry-driver",
+          async execute(context) {
+            if (!context.messages.some((m) => m.role === "tool")) {
+              return {
+                messages: [
+                  assistantToolCalls([
+                    { callId: "retry-call-1", input: {}, name: retryToolName },
+                  ]),
+                ],
+                resolution: { type: "continue_iteration" },
+                toolExecutionMode: "parallel",
+              };
+            }
+            return {
+              messages: [assistantText("done")],
+              resolution: { reason: "done", type: "end_turn" },
+            };
+          },
+          async resume() {
+            throw new Error("unexpected");
+          },
+        },
+      ]),
+      kernel: harness.kernel,
+    });
+
+    const thread = await runtime.createThread({});
+    const handle = runtime.executeTurn({
+      branchId: thread.branchId,
+      config: {
+        capabilityPolicyEngine: engine,
+        name: "primary",
+        tools: [
+          {
+            description: "a retryable tool",
+            execute() {
+              attemptCount += 1;
+              if (attemptCount <= throwCount) throw new Error("transient");
+              return { ok: true };
+            },
+            idempotent: toolIdempotent,
+            ...(idempotencyPolicy !== undefined
+              ? { metadata: { idempotencyPolicy } }
+              : {}),
+            inputSchema: { type: "object" },
+            name: retryToolName,
+          },
+        ],
+      },
+      signal: textSignal("retry test"),
+      threadId: thread.threadId,
+    });
+
+    const events = await collectEvents(handle.events());
+    const toolResult = events.find((e) => (e as unknown as Record<string, unknown>).type === "tool.result");
+    const succeeded =
+      (toolResult as unknown as Record<string, unknown> | undefined)?.isError !== true;
+
+    return { attemptCount, succeeded };
+  }
+
+  test("non-idempotent policy suppresses retry even when tool.idempotent is true", async () => {
+    // tool.idempotent:true would normally allow retry, but policyCanRetry:false
+    // (from idempotencyPolicy:"non-idempotent") must override it.
+    const { attemptCount } = await runWithRetryPolicy("non-idempotent", true, 1);
+    // Only 1 attempt: policy suppresses the retry.
+    expect(attemptCount).toBe(1);
+  });
+
+  test("idempotent policy enables retry for a tool that does not declare idempotent", async () => {
+    // tool.idempotent not set, but policyCanRetry:true enables retry.
+    const { attemptCount, succeeded } = await runWithRetryPolicy("idempotent", false, 1);
+    // 2 attempts: first throws, second succeeds.
+    expect(attemptCount).toBe(2);
+    expect(succeeded).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Credential-boundary policy dimension (BB004)
 // ---------------------------------------------------------------------------
 

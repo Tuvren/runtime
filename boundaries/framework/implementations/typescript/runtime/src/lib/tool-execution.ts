@@ -143,6 +143,13 @@ export interface ExecutableToolCall {
   approvalAudit?: EditedApprovalAudit;
   approvalDecision?: ApprovalDecision;
   input: unknown;
+  /**
+   * Framework-level retry permission from the capability policy engine (BB004).
+   * When false, suppresses retry regardless of tool.idempotent. When true,
+   * participates in the maxAttempts computation alongside tool.idempotent. When
+   * undefined, the tool-definition-level idempotent flag governs exclusively.
+   */
+  policyCanRetry?: boolean;
   /** Sandbox executor resolved from metadata.sandbox.endpointId. (AX004) */
   sandboxExecutor?: TuvrenSandboxExecutor;
   tool: TuvrenToolDefinition;
@@ -495,6 +502,7 @@ async function resolveExecutableToolCall(
   }
 
   // Invocation-time policy check per ADR-046 §4.21.
+  let policyCanRetry: boolean | undefined;
   if (environment.capabilityPolicyEngine !== undefined) {
     const resolver = createBindingResolver();
     const binding = resolver.resolveFromToolDefinition(tool);
@@ -515,6 +523,7 @@ async function resolveExecutableToolCall(
         ),
       };
     }
+    policyCanRetry = decision.policyCanRetry;
   }
 
   // Rate-limit check for Tuvren-server execution class per §4.21 / AX003.
@@ -576,6 +585,7 @@ async function resolveExecutableToolCall(
   return {
     executable: {
       input: validation.value,
+      ...(policyCanRetry !== undefined ? { policyCanRetry } : {}),
       sandboxExecutor,
       tool,
       toolCall,
@@ -743,10 +753,15 @@ async function executeSingleTool(
     },
   }
 ): Promise<SingleToolOutcome> {
-  // Idempotent retry per §4.21 / AX002. Non-idempotent tools are never
-  // retried. maxRetries defaults to 1 when idempotent is true and unset.
-  const maxAttempts =
-    toolCall.tool.idempotent === true ? 1 + (toolCall.tool.maxRetries ?? 1) : 1;
+  // Idempotent retry per §4.21 / AX002 + BB004. policyCanRetry:false suppresses
+  // retry regardless of tool.idempotent. policyCanRetry:true participates with
+  // tool.idempotent. When policyCanRetry is absent, tool.idempotent governs
+  // exclusively (back-compat). maxRetries defaults to 1 when idempotent is true.
+  const retryPermitted =
+    toolCall.policyCanRetry === false
+      ? false
+      : toolCall.tool.idempotent === true || toolCall.policyCanRetry === true;
+  const maxAttempts = retryPermitted ? 1 + (toolCall.tool.maxRetries ?? 1) : 1;
 
   let lastError: unknown;
 
