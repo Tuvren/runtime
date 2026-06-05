@@ -117,11 +117,13 @@ class BasicBindingResolver implements BindingResolver {
     }
 
     // Developer-defined execute tool → tuvren-server / tuvren-in-process
+    const region = extractEndpointRegion(tool);
     return {
       capabilityId: tool.name,
       endpoint: {
         id: TUVREN_IN_PROCESS_ENDPOINT_ID,
         kind: "tuvren-in-process",
+        ...(region !== undefined ? { region } : {}),
       },
       executionClass: "tuvren-server",
     };
@@ -199,4 +201,16 @@ function extractClientMcpServerName(
  */
 export function isClientEndpointTool(tool: TuvrenToolDefinition): boolean {
   return extractClientEndpointId(tool) !== undefined;
+}
+
+/**
+ * Extract the optional endpoint region tag from a tool definition's metadata.
+ * Used by the data-residency policy dimension (BB001).
+ */
+function extractEndpointRegion(
+  tool: TuvrenToolDefinition
+): string | undefined {
+  const meta = tool.metadata as { endpointRegion?: string } | undefined;
+  const region = meta?.endpointRegion;
+  return typeof region === "string" && region.length > 0 ? region : undefined;
 }

@@ -426,16 +426,26 @@ function applyExposureFilter(
   if (engine === undefined) return registry;
 
   const allTools = registry.list();
-  const surfaces = allTools.map((tool) => ({
-    capabilityId: tool.name,
-    description: tool.description,
-    inputSchema:
-      "inputSchema" in tool && tool.inputSchema !== undefined
-        ? (tool.inputSchema as import("@tuvren/core/messages").TuvrenJsonSchema)
-        : ({ type: "object" } as import("@tuvren/core/messages").TuvrenJsonSchema),
-    name: tool.name,
-  }));
+  // Derive ToolSurface from each TuvrenToolDefinition. endpointRegion is
+  // threaded from metadata.endpointRegion so the residency dimension can
+  // evaluate it at exposure time (BB001).
+  const surfaces = allTools.map((tool) => {
+    const meta = tool.metadata as { endpointRegion?: string } | undefined;
+    const endpointRegion =
+      typeof meta?.endpointRegion === "string" ? meta.endpointRegion : undefined;
+    return {
+      capabilityId: tool.name,
+      description: tool.description,
+      ...(endpointRegion !== undefined ? { endpointRegion } : {}),
+      inputSchema:
+        "inputSchema" in tool && tool.inputSchema !== undefined
+          ? (tool.inputSchema as import("@tuvren/core/messages").TuvrenJsonSchema)
+          : ({ type: "object" } as import("@tuvren/core/messages").TuvrenJsonSchema),
+      name: tool.name,
+    };
+  });
 
+  // Reuse the same placeholder policyContext as the invocation path.
   const policyContext = {
     modelId: loopState.activeDriverId,
     permissions: [] as string[],
@@ -449,8 +459,8 @@ function applyExposureFilter(
 
   if (deniedNames.size === 0) return registry;
 
-  const filteredTools = allTools.filter((t) => !deniedNames.has(t.name));
-  const toolsByName = new Map(filteredTools.map((t) => [t.name, t]));
+  // Delegate to the base registry for snapshots so frozen/immutable guarantees
+  // from createReadonlyDriverToolRegistry are preserved.
   const filteredRendered = registry
     .toDefinitions()
     .filter((t) => !deniedNames.has(t.name));
@@ -458,7 +468,8 @@ function applyExposureFilter(
   return {
     get: (name) => (deniedNames.has(name) ? undefined : registry.get(name)),
     has: (name) => !deniedNames.has(name) && registry.has(name),
-    list: () => filteredTools.map((t) => ({ ...t }) as TuvrenToolDefinition),
+    list: () =>
+      registry.list().filter((t) => !deniedNames.has(t.name)) as TuvrenToolDefinition[],
     register: (tool) => registry.register(tool),
     toDefinitions: () => filteredRendered.map((t) => ({ ...t })),
   };
