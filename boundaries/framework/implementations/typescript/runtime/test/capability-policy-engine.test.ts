@@ -1002,3 +1002,225 @@ describe("CapabilityPolicyEngine — credential-boundary dimension (BB004)", () 
     expect(decision.admitted).toBe(false);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Policy composition and precedence (BB005)
+// ---------------------------------------------------------------------------
+
+describe("CapabilityPolicyEngine — composition and precedence (BB005)", () => {
+  test("deny from residency honored even when risk and presence would pass", () => {
+    const engine = createCapabilityPolicyEngine({
+      allowedRegions: new Set(["US"]),
+      maxAllowedRiskClass: "high", // risk: pass
+    });
+    const binding = {
+      ...makeBinding("cap"),
+      endpoint: { id: "eu", kind: "tuvren-server" as const, region: "EU" },
+      riskClass: "low" as const, // risk: pass
+    };
+    const ctx = { ...defaultContext, userPresent: true }; // presence: pass
+
+    const decision = engine.evaluateInvocation(binding, ctx);
+
+    expect(decision.admitted).toBe(false);
+    expect(decision.reason).toContain("residency");
+  });
+
+  test("deny from risk honored even when residency and presence pass", () => {
+    const engine = createCapabilityPolicyEngine({ maxAllowedRiskClass: "low" });
+    const binding = {
+      ...makeBinding("cap"),
+      endpoint: { id: "us", kind: "tuvren-in-process" as const, region: "US" },
+      riskClass: "high" as const,
+    };
+    // No allowedRegions → residency passes; userPresent not required → presence passes
+    const decision = engine.evaluateInvocation(binding, defaultContext);
+
+    expect(decision.admitted).toBe(false);
+    expect(decision.reason).toContain("risk");
+  });
+
+  test("deny from presence honored even when residency and risk pass", () => {
+    const engine = createCapabilityPolicyEngine();
+    const binding = { ...makeBinding("cap"), requiresUserPresence: true };
+    const noUserCtx = { ...defaultContext, userPresent: false };
+
+    const decision = engine.evaluateInvocation(binding, noUserCtx);
+
+    expect(decision.admitted).toBe(false);
+    expect(decision.reason).toContain("presence");
+  });
+
+  test("deny from credential-boundary honored even when all others pass", () => {
+    const engine = createCapabilityPolicyEngine({ enforceCredentialBoundary: true });
+    const binding = { ...makeBinding("cap"), credentialScope: "secret.scope" };
+    const ctx = { ...defaultContext, entitledCredentialScopes: [] };
+
+    const decision = engine.evaluateInvocation(binding, ctx);
+
+    expect(decision.admitted).toBe(false);
+    expect(decision.reason).toContain("credential");
+  });
+
+  test("deny from deny-list honored even after all framework dimensions pass", () => {
+    const engine = createCapabilityPolicyEngine({
+      deniedCapabilityIds: new Set(["cap"]),
+    });
+    const binding = makeBinding("cap");
+
+    const decision = engine.evaluateInvocation(binding, defaultContext);
+
+    expect(decision.admitted).toBe(false);
+  });
+
+  test("extension dimension denial is honored after all framework dimensions pass", () => {
+    const extensionDimension: import("../src/lib/capability-policy-engine.ts").PolicyDimension = {
+      checkExposure: () => null,
+      checkInvocation: (binding) => ({
+        admitted: false,
+        capabilityId: binding.capabilityId,
+        executionClass: binding.executionClass,
+        reason: "extension-policy: custom denial",
+      }),
+    };
+    const engine = createCapabilityPolicyEngine({ dimensions: [extensionDimension] });
+    const binding = makeBinding("cap");
+
+    const decision = engine.evaluateInvocation(binding, defaultContext);
+
+    expect(decision.admitted).toBe(false);
+    expect(decision.reason).toContain("extension-policy");
+  });
+
+  test("extension dimension cannot override a prior framework denial", () => {
+    const extensionDimension: import("../src/lib/capability-policy-engine.ts").PolicyDimension = {
+      checkExposure: () => null,
+      checkInvocation: () => null, // would pass
+    };
+    const engine = createCapabilityPolicyEngine({
+      deniedCapabilityIds: new Set(["cap"]),
+      dimensions: [extensionDimension],
+    });
+    const binding = makeBinding("cap");
+
+    const decision = engine.evaluateInvocation(binding, defaultContext);
+
+    // Framework deny-list denial stands; extension pass does not override it.
+    expect(decision.admitted).toBe(false);
+  });
+
+  test("multiple extension dimensions compose in declared order, first denial wins", () => {
+    const firstDimension: import("../src/lib/capability-policy-engine.ts").PolicyDimension = {
+      checkExposure: () => null,
+      checkInvocation: (binding) => ({
+        admitted: false,
+        capabilityId: binding.capabilityId,
+        executionClass: binding.executionClass,
+        reason: "first-extension denial",
+      }),
+    };
+    const secondDimension: import("../src/lib/capability-policy-engine.ts").PolicyDimension = {
+      checkExposure: () => null,
+      checkInvocation: (binding) => ({
+        admitted: false,
+        capabilityId: binding.capabilityId,
+        executionClass: binding.executionClass,
+        reason: "second-extension denial",
+      }),
+    };
+    const engine = createCapabilityPolicyEngine({
+      dimensions: [firstDimension, secondDimension],
+    });
+
+    const decision = engine.evaluateInvocation(makeBinding("cap"), defaultContext);
+
+    expect(decision.admitted).toBe(false);
+    expect(decision.reason).toBe("first-extension denial");
+  });
+
+  test("composed decision is deterministic across identical inputs", () => {
+    const engine = createCapabilityPolicyEngine({
+      allowedRegions: new Set(["US"]),
+    });
+    const binding = {
+      ...makeBinding("cap"),
+      endpoint: { id: "eu", kind: "tuvren-server" as const, region: "EU" },
+    };
+
+    const d1 = engine.evaluateInvocation(binding, defaultContext);
+    const d2 = engine.evaluateInvocation(binding, defaultContext);
+
+    expect(d1.admitted).toBe(d2.admitted);
+    expect(d1.reason).toBe(d2.reason);
+  });
+
+  test("denial reason is non-empty on any framework denial", () => {
+    const cases = [
+      createCapabilityPolicyEngine({ allowedRegions: new Set(["US"]) }),
+      createCapabilityPolicyEngine({ maxAllowedRiskClass: "low" }),
+      createCapabilityPolicyEngine({ enforceCredentialBoundary: true }),
+      createCapabilityPolicyEngine({ deniedCapabilityIds: new Set(["cap"]) }),
+    ];
+    const bindings = [
+      { ...makeBinding("cap"), endpoint: { id: "eu", kind: "tuvren-server" as const, region: "EU" } },
+      { ...makeBinding("cap"), riskClass: "high" as const },
+      { ...makeBinding("cap"), credentialScope: "secret" },
+      makeBinding("cap"),
+    ];
+    const contexts = [
+      defaultContext,
+      defaultContext,
+      { ...defaultContext, entitledCredentialScopes: [] },
+      defaultContext,
+    ];
+
+    for (let i = 0; i < cases.length; i++) {
+      const decision = cases[i]!.evaluateInvocation(bindings[i]!, contexts[i]!);
+      expect(decision.admitted).toBe(false);
+      expect(typeof decision.reason).toBe("string");
+      expect((decision.reason ?? "").length).toBeGreaterThan(0);
+    }
+  });
+
+  test("admitted decision has no reason field", () => {
+    const engine = createCapabilityPolicyEngine();
+    const decision = engine.evaluateInvocation(makeBinding("cap"), defaultContext);
+
+    expect(decision.admitted).toBe(true);
+    expect(decision.reason).toBeUndefined();
+  });
+
+  test("when two dimensions deny, first dimension's reason is used", () => {
+    const engine = createCapabilityPolicyEngine({
+      allowedRegions: new Set(["US"]),   // residency → denies first
+      maxAllowedRiskClass: "low",         // risk → would also deny
+    });
+    const binding = {
+      ...makeBinding("cap"),
+      endpoint: { id: "eu", kind: "tuvren-server" as const, region: "EU" },
+      riskClass: "high" as const,
+    };
+
+    const decision = engine.evaluateInvocation(binding, defaultContext);
+
+    expect(decision.admitted).toBe(false);
+    expect(decision.reason).toContain("residency"); // first dimension wins
+  });
+
+  test("exposure: deny from residency honored even when risk would pass", () => {
+    const engine = createCapabilityPolicyEngine({
+      allowedRegions: new Set(["US"]),
+      maxAllowedRiskClass: "high",
+    });
+    const surface = {
+      ...makeSurface("tool", "cap"),
+      endpointRegion: "EU",
+      riskClass: "low" as const,
+    };
+
+    const decisions = engine.evaluateExposure([surface], defaultContext);
+
+    expect(decisions[0]?.exposed).toBe(false);
+    expect(decisions[0]?.reason).toContain("residency");
+  });
+});
