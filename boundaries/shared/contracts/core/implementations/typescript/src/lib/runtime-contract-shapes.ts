@@ -936,15 +936,29 @@ export interface ServerExecutionConfig {
 export interface AgentConfig {
   /**
    * Optional capability policy engine per ADR-046 §4.21. When set, the
-   * framework evaluates invocation-time policy before each tool call; denied
-   * invocations surface as `tool.result` with `isError: true` rather than
-   * executing. When absent, all invocations are admitted.
+   * framework evaluates exposure-time and invocation-time policy; denied
+   * surfaces are withheld from the model, denied invocations surface as
+   * `tool.result` with `isError: true`. When absent, all surfaces are
+   * exposed and all invocations are admitted.
    *
-   * Note: the policy context passed to the engine (modelId, providerId,
-   * permissions) is not yet populated — those dimensions land in Epic BB.
-   * The baseline `createCapabilityPolicyEngine` is context-insensitive and
-   * works correctly; a context-sensitive engine wired here before Epic BB
-   * will receive empty values for those fields.
+   * Runtime context wiring: the policy context passed to the engine carries
+   * `modelId` and `providerId` (both sourced from the active driver ID) and
+   * `permissions: []`. Engine-creation-time options — `allowedRegions`,
+   * `maxAllowedRiskClass`, `deniedCapabilityIds`, `enforceCredentialBoundary`
+   * — work fully because the engine resolves them at construction.
+   *
+   * Turn-level context signals — `userPresent`, `endpointAttached`, and
+   * `entitledCredentialScopes` — are NOT automatically populated by the
+   * runtime. Presence and credential-boundary dimensions that depend on
+   * these fields require either a custom `CapabilityPolicyEngine`
+   * implementation that reads from a host-supplied source, or a future
+   * `AgentConfig` extension that threads per-turn signals.
+   *
+   * Policy metadata (`endpointRegion`, `riskClass`, `requiresUserPresence`,
+   * `idempotencyPolicy`, `credentialScope`) is threaded through
+   * `resolveFromToolDefinition` for developer-defined in-process tools only;
+   * MCP-server, sandbox, and client-endpoint bindings do not yet carry
+   * policy metadata fields.
    */
   capabilityPolicyEngine?: CapabilityPolicyEngine;
   /**

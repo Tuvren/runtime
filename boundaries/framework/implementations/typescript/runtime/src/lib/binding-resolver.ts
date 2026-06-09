@@ -116,7 +116,11 @@ class BasicBindingResolver implements BindingResolver {
       };
     }
 
-    // Developer-defined execute tool → tuvren-server / tuvren-in-process
+    // Developer-defined execute tool → tuvren-server / tuvren-in-process.
+    // Policy metadata fields (region, riskClass, requiresUserPresence,
+    // idempotencyPolicy, credentialScope) are threaded here only; the
+    // MCP-server, sandbox, and client-endpoint branches above do not yet
+    // carry policy metadata.
     const region = extractEndpointRegion(tool);
     const credentialScope = extractCredentialScope(tool);
     const riskClass = extractRiskClass(tool);

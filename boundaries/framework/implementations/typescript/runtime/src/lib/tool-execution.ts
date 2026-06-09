@@ -516,6 +516,10 @@ async function resolveExecutableToolCall(
       policyContext
     );
     if (!decision.admitted) {
+      // Note: decision.requiresApproval (from RiskDimension highRiskRequiresApproval)
+      // is treated as a hard denial here — routing it to the tool.approval queue
+      // is deferred. A host that needs soft-gate approval for high-risk tools
+      // should wire a custom CapabilityPolicyEngine instead of using this flag.
       return {
         result: createErrorToolResult(
           toolCall,

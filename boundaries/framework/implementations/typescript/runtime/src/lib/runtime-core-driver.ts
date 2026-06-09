@@ -473,7 +473,11 @@ function applyExposureFilter(
     };
   });
 
-  // Reuse the same placeholder policyContext as the invocation path.
+  // Policy context carries driver identity fields. Turn-level signals
+  // (userPresent, endpointAttached, entitledCredentialScopes) are not
+  // populated here; engine-creation-time options cover residency and
+  // risk; presence/credential-boundary require a custom engine or a
+  // future AgentConfig extension to thread per-turn context.
   const policyContext = {
     modelId: loopState.activeDriverId,
     permissions: [] as string[],
