@@ -27,7 +27,7 @@ import type {
 /**
  * Extension interface for custom policy dimensions. Implementations are
  * appended after the built-in framework dimensions and participate in the
- * same deny-from-any composition: returning a non-null string adds a denial
+ * same deny-from-any composition: returning a non-empty string adds a denial
  * reason; returning null passes. Use `options.dimensions` on
  * `createCapabilityPolicyEngine` to register extension dimensions. (Epic BB+, follows BB005 composition/precedence)
  */

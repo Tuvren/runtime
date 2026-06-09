@@ -1614,10 +1614,10 @@ describe("CapabilityPolicyEngine — BB005 resume-path policy check", () => {
 });
 
 // ---------------------------------------------------------------------------
-// BB005 — PolicyDimension extension interface
+// BB+ — PolicyDimension extension interface
 // ---------------------------------------------------------------------------
 
-describe("CapabilityPolicyEngine — BB005 extension dimension interface", () => {
+describe("CapabilityPolicyEngine — BB+ extension dimension interface", () => {
   function makeDenyExposureDimension(reason: string): PolicyDimension {
     return {
       checkExposure: () => reason,
@@ -1805,5 +1805,107 @@ describe("CapabilityPolicyEngine — BB+ extension dimension boundary robustness
     expect(
       (receivedMetadata as PolicyCapabilityMetadata | undefined)?.riskClass
     ).toBe("medium");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// BB+ — extension dimension resume-path integration
+// ---------------------------------------------------------------------------
+
+describe("CapabilityPolicyEngine — BB+ extension dimension resume-path", () => {
+  test("wired: extension dimension denial on resume path blocks execution after approval", async () => {
+    // Use BB002 risk-approval to trigger the pause (riskClass:high +
+    // requireApprovalForRiskClass:high), then flip the extension dimension
+    // to deny before resolving approval. The resume path re-runs
+    // evaluateInvocation, so the extension denial wins.
+    const toolName = "resume.ext-denied";
+    let toolExecuted = false;
+    let denyOnResume = false;
+
+    const harness = createFakeKernelHarness();
+
+    const extensionDimension: PolicyDimension = {
+      checkExposure: () => null,
+      checkInvocation: () =>
+        denyOnResume ? "extension dimension denied after pause" : null,
+    };
+
+    const engine = createCapabilityPolicyEngine({
+      requireApprovalForRiskClass: "high",
+      dimensions: [extensionDimension],
+    });
+
+    const driver = {
+      id: "resume-ext-driver",
+      async execute(context: Parameters<RuntimeDriver["execute"]>[0]) {
+        if (!context.messages.some((m) => m.role === "tool")) {
+          return {
+            messages: [
+              assistantToolCalls([
+                { callId: "ext-resume-call", input: {}, name: toolName },
+              ]),
+            ],
+            resolution: { type: "continue_iteration" as const },
+            toolExecutionMode: "parallel",
+          };
+        }
+        return {
+          messages: [assistantText("done")],
+          resolution: { reason: "done", type: "end_turn" as const },
+        };
+      },
+      async resume() {
+        throw new Error("not expected");
+      },
+    } satisfies RuntimeDriver;
+
+    const runtime = createTuvrenRuntime({
+      defaultDriverId: "resume-ext-driver",
+      driverRegistry: createBaseDriverRegistry([driver]),
+      kernel: harness.kernel,
+    });
+
+    const thread = await runtime.createThread({});
+    const handle = runtime.executeTurn({
+      branchId: thread.branchId,
+      config: {
+        capabilityPolicyEngine: engine,
+        name: "primary",
+        tools: [
+          {
+            description: "high-risk tool paused by policy",
+            execute() {
+              toolExecuted = true;
+              return { ok: true };
+            },
+            inputSchema: { type: "object" },
+            name: toolName,
+            riskClass: "high",
+          },
+        ],
+      },
+      signal: textSignal("ext resume test"),
+      threadId: thread.threadId,
+    });
+
+    await collectEvents(handle.events());
+    // Confirm the turn paused for approval (via requireApprovalForRiskClass)
+    expect(handle.status().phase).toBe("paused");
+
+    // Flip extension dimension to deny before resolving approval
+    denyOnResume = true;
+
+    const resumedHandle = handle.resolveApproval({
+      decisions: [{ callId: "ext-resume-call", type: "approve" }],
+    });
+    const resumeEvents = await collectEvents(resumedHandle.events());
+
+    expect(toolExecuted).toBe(false);
+    const toolResultEvent = resumeEvents.find((e) => e.type === "tool.result");
+    expect(toolResultEvent).toBeDefined();
+    expect(
+      (toolResultEvent as Record<string, unknown> | undefined)?.isError
+    ).toBe(true);
+    expect(resumedHandle.status().phase).not.toBe("paused");
   });
 });
