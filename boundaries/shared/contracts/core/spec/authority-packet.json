@@ -105,6 +105,10 @@
     {
       "path": "boundaries/framework/conformance/plans/capability-policy.json",
       "format": "conformance-plan"
+    },
+    {
+      "path": "boundaries/framework/conformance/plans/capability-orchestration-integration.json",
+      "format": "conformance-plan"
     }
   ],
   "generatedArtifacts": [
@@ -195,6 +199,11 @@
       "planId": "tuvren.framework.capability-policy",
       "planVersion": "0.1.0",
       "path": "boundaries/framework/conformance/plans/capability-policy.json"
+    },
+    {
+      "planId": "tuvren.framework.capability-orchestration-integration",
+      "planVersion": "0.1.0",
+      "path": "boundaries/framework/conformance/plans/capability-orchestration-integration.json"
     }
   ],
   "bindingSections": {

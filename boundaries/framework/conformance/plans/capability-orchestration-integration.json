@@ -1,0 +1,238 @@
+{
+  "planId": "tuvren.framework.capability-orchestration-integration",
+  "planVersion": "0.1.0",
+  "packetId": "tuvren.shared.core",
+  "applicability": {
+    "capabilities": ["framework.runtime-api"]
+  },
+  "checks": [
+    {
+      "checkId": "bc.bc001.tuvren-server-start-emitted",
+      "evidence": ["result.integration.tuvrenServer.toolStartCount"],
+      "assertions": [
+        {
+          "kind": "resultField",
+          "field": "$.integration.tuvrenServer.toolStartCount",
+          "equals": 1
+        }
+      ],
+      "operation": "runtime.capability-orchestration.integration"
+    },
+    {
+      "checkId": "bc.bc001.tuvren-server-result-emitted",
+      "evidence": ["result.integration.tuvrenServer.toolResultCount"],
+      "assertions": [
+        {
+          "kind": "resultField",
+          "field": "$.integration.tuvrenServer.toolResultCount",
+          "equals": 1
+        }
+      ],
+      "operation": "runtime.capability-orchestration.integration"
+    },
+    {
+      "checkId": "bc.bc001.tuvren-client-start-emitted",
+      "evidence": ["result.integration.tuvrenClient.toolStartCount"],
+      "assertions": [
+        {
+          "kind": "resultField",
+          "field": "$.integration.tuvrenClient.toolStartCount",
+          "equals": 1
+        }
+      ],
+      "operation": "runtime.capability-orchestration.integration"
+    },
+    {
+      "checkId": "bc.bc001.tuvren-client-result-emitted",
+      "evidence": ["result.integration.tuvrenClient.toolResultCount"],
+      "assertions": [
+        {
+          "kind": "resultField",
+          "field": "$.integration.tuvrenClient.toolResultCount",
+          "equals": 1
+        }
+      ],
+      "operation": "runtime.capability-orchestration.integration"
+    },
+    {
+      "checkId": "bc.bc001.provider-native-start-emitted",
+      "evidence": ["result.integration.providerNative.toolStartCount"],
+      "assertions": [
+        {
+          "kind": "resultField",
+          "field": "$.integration.providerNative.toolStartCount",
+          "equals": 1
+        }
+      ],
+      "operation": "runtime.capability-orchestration.integration"
+    },
+    {
+      "checkId": "bc.bc001.provider-native-result-emitted",
+      "evidence": ["result.integration.providerNative.toolResultCount"],
+      "assertions": [
+        {
+          "kind": "resultField",
+          "field": "$.integration.providerNative.toolResultCount",
+          "equals": 1
+        }
+      ],
+      "operation": "runtime.capability-orchestration.integration"
+    },
+    {
+      "checkId": "bc.bc001.provider-mediated-start-emitted",
+      "evidence": ["result.integration.providerMediated.toolStartCount"],
+      "assertions": [
+        {
+          "kind": "resultField",
+          "field": "$.integration.providerMediated.toolStartCount",
+          "equals": 1
+        }
+      ],
+      "operation": "runtime.capability-orchestration.integration"
+    },
+    {
+      "checkId": "bc.bc001.provider-mediated-result-emitted",
+      "evidence": ["result.integration.providerMediated.toolResultCount"],
+      "assertions": [
+        {
+          "kind": "resultField",
+          "field": "$.integration.providerMediated.toolResultCount",
+          "equals": 1
+        }
+      ],
+      "operation": "runtime.capability-orchestration.integration"
+    },
+    {
+      "checkId": "bc.bc001.invariant-tuvren-server-execution-class",
+      "evidence": ["result.integration.tuvrenServer.executionClass"],
+      "assertions": [
+        {
+          "kind": "resultField",
+          "field": "$.integration.tuvrenServer.executionClass",
+          "equals": "tuvren-server"
+        }
+      ],
+      "operation": "runtime.capability-orchestration.integration"
+    },
+    {
+      "checkId": "bc.bc001.invariant-tuvren-client-execution-class",
+      "evidence": ["result.integration.tuvrenClient.executionClass"],
+      "assertions": [
+        {
+          "kind": "resultField",
+          "field": "$.integration.tuvrenClient.executionClass",
+          "equals": "tuvren-client"
+        }
+      ],
+      "operation": "runtime.capability-orchestration.integration"
+    },
+    {
+      "checkId": "bc.bc001.invariant-provider-native-execution-class",
+      "evidence": ["result.integration.providerNative.executionClass"],
+      "assertions": [
+        {
+          "kind": "resultField",
+          "field": "$.integration.providerNative.executionClass",
+          "equals": "provider-native"
+        }
+      ],
+      "operation": "runtime.capability-orchestration.integration"
+    },
+    {
+      "checkId": "bc.bc001.invariant-provider-mediated-execution-class",
+      "evidence": ["result.integration.providerMediated.executionClass"],
+      "assertions": [
+        {
+          "kind": "resultField",
+          "field": "$.integration.providerMediated.executionClass",
+          "equals": "provider-mediated"
+        }
+      ],
+      "operation": "runtime.capability-orchestration.integration"
+    },
+    {
+      "checkId": "bc.bc001.exposure-policy-withheld-tool-hidden",
+      "evidence": ["result.integration.policy.withheldToolReachedModel"],
+      "assertions": [
+        {
+          "kind": "resultField",
+          "field": "$.integration.policy.withheldToolReachedModel",
+          "equals": false
+        }
+      ],
+      "operation": "runtime.capability-orchestration.integration"
+    },
+    {
+      "checkId": "bc.bc001.invocation-policy-denied-is-error",
+      "evidence": ["result.integration.policy.deniedToolResultIsError"],
+      "assertions": [
+        {
+          "kind": "resultField",
+          "field": "$.integration.policy.deniedToolResultIsError",
+          "equals": true
+        }
+      ],
+      "operation": "runtime.capability-orchestration.integration"
+    },
+    {
+      "checkId": "bc.bc001.observation-tuvren-server-can-audit",
+      "evidence": ["result.integration.tuvrenServer.observation.canAudit"],
+      "assertions": [
+        {
+          "kind": "resultField",
+          "field": "$.integration.tuvrenServer.observation.canAudit",
+          "equals": true
+        }
+      ],
+      "operation": "runtime.capability-orchestration.integration"
+    },
+    {
+      "checkId": "bc.bc001.observation-provider-native-no-audit",
+      "evidence": ["result.integration.providerNative.observation.canAudit"],
+      "assertions": [
+        {
+          "kind": "resultField",
+          "field": "$.integration.providerNative.observation.canAudit",
+          "equals": false
+        }
+      ],
+      "operation": "runtime.capability-orchestration.integration"
+    },
+    {
+      "checkId": "bc.bc001.observation-provider-mediated-no-audit",
+      "evidence": ["result.integration.providerMediated.observation.canAudit"],
+      "assertions": [
+        {
+          "kind": "resultField",
+          "field": "$.integration.providerMediated.observation.canAudit",
+          "equals": false
+        }
+      ],
+      "operation": "runtime.capability-orchestration.integration"
+    },
+    {
+      "checkId": "bc.bc001.observation-tuvren-client-no-audit",
+      "evidence": ["result.integration.tuvrenClient.observation.canAudit"],
+      "assertions": [
+        {
+          "kind": "resultField",
+          "field": "$.integration.tuvrenClient.observation.canAudit",
+          "equals": false
+        }
+      ],
+      "operation": "runtime.capability-orchestration.integration"
+    },
+    {
+      "checkId": "bc.bc001.mcp-binding-endpoint-kind",
+      "evidence": ["result.integration.tuvrenServer.mcpEndpointKind"],
+      "assertions": [
+        {
+          "kind": "resultField",
+          "field": "$.integration.tuvrenServer.mcpEndpointKind",
+          "equals": "mcp-server"
+        }
+      ],
+      "operation": "runtime.capability-orchestration.integration"
+    }
+  ]
+}
