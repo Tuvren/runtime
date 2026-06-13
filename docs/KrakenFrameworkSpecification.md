@@ -1,6 +1,6 @@
 # Kraken Framework Specification
 
-**Version**: v0.18
+**Version**: v0.19
 **Status**: Human semantic authority; machine portability classified by Epic AD
 **Basis**: Kernel Specification v0.9 (frozen)
 
@@ -2239,4 +2239,94 @@ This specification does not define:
 
 ---
 
-_v0.17. This is the human semantic framework specification. Epic AD classifies portability and freeze coverage through `.constitution/reports/epic-ad-docs-to-authority-coverage-matrix.json`. Companion rationale is explanatory and non-contract._
+## 11. Capability Orchestration
+
+The capability-orchestration model (ADR-046, §3.13, §4.21) classifies every model-visible tool call as a **capability invocation** against a known **execution class**, governed by a two-stage policy gate and carried by attribution metadata on every event. This section is normative: any future Kraken driver built on the shared framework inherits the model and must honour all invariants described here.
+
+### 11.1 Tool Surface vs. Capability
+
+A **Capability** is a persistent unit of intent identified by a `capabilityId`. It carries a `riskClass` and optional policy metadata (residency, user-presence, credential scope requirements, non-retryability).
+
+A **ToolSurface** is the model-visible projection of a capability: a `name`, `description`, and `inputSchema` that the model uses to call the capability. Tool surfaces and capability IDs are separate concerns — a capability may be surfaced under a different name, or the same surface may be backed by different capabilities across configurations.
+
+The `defineTool` API is back-compat sugar: it registers a Tuvren-server binding and derives a tool surface whose name equals the capability ID.
+
+### 11.2 Four Execution Classes
+
+Every resolved capability invocation belongs to exactly one execution class:
+
+| Class | Who executes | Runtime locus |
+|---|---|---|
+| `provider-native` | AI provider runs the tool natively | Provider controls fully; no Tuvren-side executor |
+| `provider-mediated` | Provider calls a developer-supplied HTTP endpoint | Provider orchestrates; developer endpoint provides the result |
+| `tuvren-server` | Tuvren runtime dispatches to a server-side executor | Full framework lifecycle ownership |
+| `tuvren-client` | Tuvren runtime forwards to an attached client endpoint | Client controls execution; runtime brokers via leased token |
+
+Back-compat rule: `defineTool` resolves to the `tuvren-server` class. `@tuvren/mcp-client` is a binding mechanism classified by the execution class of its host (see §7.3), not a class of its own.
+
+### 11.3 Bindings and Endpoints
+
+A **Binding** links a `capabilityId` to an execution class and an **Endpoint**. The `Endpoint` carries a `kind` and an `id`.
+
+Legal `EndpointKind` values:
+
+| Kind | Meaning |
+|---|---|
+| `provider-runtime` | Provider-owned runtime (provider-native/mediated classes) |
+| `tuvren-in-process` | In-process executor within the Tuvren runtime process |
+| `tuvren-server` | Out-of-process server executor (separate process, long-lived) |
+| `tuvren-worker` | Ephemeral worker process |
+| `tuvren-sandbox` | Isolated sandbox executor (host-supplied `TuvrenSandboxExecutor`) |
+| `client-endpoint` | Attached client endpoint via leased boundary |
+| `mcp-server` | MCP protocol server — endpoint kind only; never an execution class |
+
+**MCP classification rule:** MCP is a binding mechanism, not an execution class. The execution class is determined by who invokes or hosts the MCP server:
+
+- Server-side MCP (runtime owns the MCP client): `tuvren-server` class + `mcp-server` endpoint kind.
+- Client-side MCP (developer client owns the MCP client): `tuvren-client` class + `mcp-server` endpoint kind.
+
+A binding with `endpoint.kind = "mcp-server"` is never reclassified to a provider class.
+
+### 11.4 Exposure-Time and Invocation-Time Policy
+
+The **Capability Policy Engine** enforces a two-stage policy gate before any capability invocation reaches a tool executor.
+
+**Stage 1 — Exposure time:** `evaluateExposure` runs before the framework presents the tool list to the driver. Surfaces whose policy evaluation returns `exposed: false` are removed from the tool list. The model never sees withheld surfaces; no tool call for a withheld surface can be issued.
+
+**Stage 2 — Invocation time:** `evaluateInvocation` runs at dispatch time, after the driver emits a tool call. A binding whose evaluation returns `admitted: false` is denied without calling the executor. The result surfaces as `tool.result { isError: true }` with a non-secret denial reason. The executor is never invoked.
+
+Both stages use a `CapabilityPolicyContext` that carries the five policy dimensions (data residency, risk class, active endpoint, user presence, credential boundary) plus per-capability metadata. Dimensions compose as deny-from-any: a capability is denied if any dimension denies it.
+
+Policy decisions are deterministic and stateless — the same context always produces the same decision.
+
+### 11.5 Per-Class Observation Limits
+
+Each execution class declares its `CapabilityObservation`, a set of boolean capabilities the framework is permitted to exercise for invocations under that class:
+
+| Field | `tuvren-server` | `tuvren-client` | `provider-native` | `provider-mediated` |
+|---|---|---|---|---|
+| `canAudit` | true | false | false | false |
+| `canCancel` | true | false | false | false |
+| `canRetry` | true | false | false | false |
+| `canResume` | true | false | false | false |
+| `canPersistResult` | true | false | false | false |
+
+The `tuvren-server` class has full observation. For the `tuvren-client` class, the client endpoint controls execution and the framework cannot audit, cancel, retry, or resume on its behalf. Provider classes are fully opaque: the provider owns execution and the framework observes results only through the event stream attribution.
+
+These limits are normative: a runtime that attempts an audit, cancel, retry, or resume for a class whose limit is `false` is out of conformance.
+
+### 11.6 Conceptual Invariant
+
+> **Every model-visible tool call resolves to a policy-checked capability invocation against a known execution class.**
+
+Formally:
+- Every `tool.start` event carries a `CapabilityInvocationAttribution` with a non-null `executionClass`, `capabilityId`, `observation`, and `owner`.
+- Every `tool.result` event carries the same attribution (at minimum `executionClass` and `owner`).
+- No invocation reaches a tool executor without first passing both policy stages.
+- No invocation may mutate durable state after the turn is cancelled (tuvren-server late-completion rule).
+
+The invariant holds simultaneously across all execution classes in a single agent segment. Conformance is verified by the `capability-orchestration-integration` check set in the `tuvren.framework.capability-orchestration-integration` plan.
+
+---
+
+_v0.19. This is the human semantic framework specification. Epic AD classifies portability and freeze coverage through `.constitution/reports/epic-ad-docs-to-authority-coverage-matrix.json`. Companion rationale is explanatory and non-contract._
