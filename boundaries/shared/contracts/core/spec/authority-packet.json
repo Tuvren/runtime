@@ -336,6 +336,10 @@
       "target": "boundaries/framework/conformance/plans/capability-policy.json"
     },
     {
+      "kind": "conformance-plan",
+      "target": "boundaries/framework/conformance/plans/capability-orchestration-integration.json"
+    },
+    {
       "kind": "freshness-check",
       "target": "boundaries/shared/contracts/core/artifacts/json-schema"
     }
