@@ -39,12 +39,15 @@ for those secrets and their common encoded variants.
 ```ts
 import { createMcpToolSource } from "@tuvren/mcp-client";
 
-await using source = await createMcpToolSource({
+const source = await createMcpToolSource({
   name: "docs",
   transport: "http-sse",
   endpoint: "https://mcp.example.com/sse",
   auth: { kind: "bearer", token: process.env.MCP_TOKEN! },
 });
-
-// source.tools are Tuvren tool definitions; credentials stay at this edge.
+try {
+  // source.tools are Tuvren tool definitions; credentials stay at this edge.
+} finally {
+  await source.close();
+}
 ```
