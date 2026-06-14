@@ -289,7 +289,6 @@ export async function runCapabilityOrchestrationIntegration(): Promise<AdapterPr
   // === 6. Policy: exposure-time (standalone API) + invocation-time (wired turn) ===
   const WITHHELD_SURFACE = "bc001-withheld";
   const DENIED_CAP = "bc001-denied";
-  const PERMITTED_TOOL = "bc001-permitted";
 
   const policyEngine = createCapabilityPolicyEngine({
     deniedCapabilityIds: new Set([DENIED_CAP]),
@@ -335,12 +334,6 @@ export async function runCapabilityOrchestrationIntegration(): Promise<AdapterPr
         {
           name: DENIED_CAP,
           description: "bc001 invocation-denied capability",
-          inputSchema: { type: "object" },
-          execute: async () => ({ ok: true }),
-        },
-        {
-          name: PERMITTED_TOOL,
-          description: "bc001 permitted capability",
           inputSchema: { type: "object" },
           execute: async () => ({ ok: true }),
         },
