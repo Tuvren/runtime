@@ -60,6 +60,10 @@ import {
   runExecutionBoundsWithinBounds,
 } from "./framework-adapter-execution-bounds.ts";
 import { runInvocationLifecycleCrossClass } from "./framework-adapter-invocation-lifecycle.ts";
+import {
+  runSecretIsolationRuntimeApi,
+  runSecretIsolationTelemetry,
+} from "./framework-adapter-secret-isolation.ts";
 import { createFrameworkAdapterOrchestration } from "./framework-adapter-orchestration.ts";
 import { createFrameworkAdapterProvingHost } from "./framework-adapter-proving-host.ts";
 import type {
@@ -415,6 +419,10 @@ export class TypeScriptFrameworkAdapter implements ImplementationAdapter {
         return runExecutionBoundsInvalidConfig();
       case "runtime.execution-bounds.within-bounds":
         return runExecutionBoundsWithinBounds();
+      case "runtime.secret-isolation.surfaces":
+        return runSecretIsolationRuntimeApi(input);
+      case "runtime.secret-isolation.telemetry":
+        return runSecretIsolationTelemetry(input);
       case "runtime.tuvren-client.lifecycle":
         return runTuvrenClientLifecycle();
       case "runtime.tuvren-server.lifecycle":

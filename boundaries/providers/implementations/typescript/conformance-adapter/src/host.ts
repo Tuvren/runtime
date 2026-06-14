@@ -72,7 +72,7 @@ class TypeScriptProviderAdapter {
 
   async dispatch(
     operation: string,
-    _input: unknown,
+    input: unknown,
     _controls: AdapterControls
   ): Promise<OperationOutcome> {
     try {
@@ -101,6 +101,8 @@ class TypeScriptProviderAdapter {
           return result(await mcpClientValidationErrors());
         case "providers.mcp-client.transport-error-normalization":
           return result(await mcpClientTransportErrorNormalization());
+        case "providers.mcp-client.secret-isolation":
+          return result(await mcpClientSecretIsolation(input));
         case "providers.provider-native.attribution":
           return result(await runProviderNativeAttribution());
         case "providers.provider-mediated.attribution":
@@ -590,6 +592,101 @@ async function mcpClientAuthHeaders(): Promise<Record<string, unknown>> {
     await source.close();
     await server.close();
   }
+}
+
+// ---------------------------------------------------------------------------
+// Operation: providers.mcp-client.secret-isolation
+//
+// Configures bearer-auth and header-auth credentials at the MCP transport edge
+// (ADR-044, KRT-BD004). The mock server requires the credentials, so the
+// session only succeeds because they reached the transport. The op then
+// captures the TRANSLATED tool surface — the credential-free zone that flows
+// into the runtime and model: tool names, descriptions, input schemas,
+// metadata, and an executed tool result. Transport headers (where credentials
+// legitimately live) are deliberately excluded; they are the edge, not a
+// credential-free zone. The shared runner-owned `secretAbsence` assertion owns
+// the verdict — this adapter performs no scanning or grading.
+// ---------------------------------------------------------------------------
+
+async function mcpClientSecretIsolation(
+  input: unknown
+): Promise<Record<string, unknown>> {
+  const fixture = readMcpSecretFixture(input);
+  const server = await startMockMcpHttpServer({
+    requireHeaders: {
+      authorization: `Bearer ${fixture.mcpBearerToken}`,
+      [fixture.mcpHeaderAuth.name]: fixture.mcpHeaderAuth.value,
+    },
+  });
+  const source = await createMcpToolSource({
+    auth: { kind: "bearer", token: fixture.mcpBearerToken },
+    endpoint: server.endpoint,
+    headers: { [fixture.mcpHeaderAuth.name]: fixture.mcpHeaderAuth.value },
+    name: "secretiso",
+    transport: "http-sse",
+  });
+
+  try {
+    const echo = requireMcpTool(source.tools, "secretiso.echo");
+    const toolOutput = await echo.execute(
+      { message: "translated-surface" },
+      createToolContext("mcp-secretiso", "secretiso.echo")
+    );
+    const toolDefinitions = source.tools.map((tool) => ({
+      description: tool.description,
+      inputSchema: readToolInputJsonSchema(tool.inputSchema),
+      metadata: tool.metadata ?? null,
+      name: tool.name,
+    }));
+
+    return createProjection({
+      mcpToolSurface: {
+        sessionEstablished: true,
+        toolDefinitions,
+        toolNames: source.tools.map((tool) => tool.name).sort(),
+        toolOutput,
+      },
+    });
+  } finally {
+    await source.close();
+    await server.close();
+  }
+}
+
+interface McpSecretFixture {
+  mcpBearerToken: string;
+  mcpHeaderAuth: { name: string; value: string };
+}
+
+function readMcpSecretFixture(input: unknown): McpSecretFixture {
+  const fixture =
+    isRecord(input) && isRecord(input.fixture) ? input.fixture : {};
+  const headerAuth = isRecord(fixture.mcpHeaderAuth)
+    ? fixture.mcpHeaderAuth
+    : {};
+  const readString = (value: unknown, fallback: string): string =>
+    typeof value === "string" && value.length > 0 ? value : fallback;
+
+  return {
+    mcpBearerToken: readString(fixture.mcpBearerToken, "missing-mcp-bearer"),
+    mcpHeaderAuth: {
+      name: readString(headerAuth.name, "x-missing"),
+      value: readString(headerAuth.value, "missing-mcp-header"),
+    },
+  };
+}
+
+function readToolInputJsonSchema(schema: unknown): unknown {
+  if (
+    typeof schema === "object" &&
+    schema !== null &&
+    "toJSONSchema" in schema &&
+    typeof schema.toJSONSchema === "function"
+  ) {
+    return schema.toJSONSchema();
+  }
+
+  return isRecord(schema) ? schema : null;
 }
 
 async function mcpClientValidationErrors(): Promise<Record<string, unknown>> {

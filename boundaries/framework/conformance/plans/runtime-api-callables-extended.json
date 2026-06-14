@@ -1828,11 +1828,41 @@
       "checkId": "runtime-api-execution-bounds.within-bounds-completes",
       "evidence": ["result.status", "result.terminalTurnEndStatus"],
       "operation": "runtime.execution-bounds.within-bounds"
+    },
+    {
+      "assertions": [
+        {
+          "field": "$.persistedRecords",
+          "kind": "secretAbsence",
+          "secretsPath": "$.fixture.secretValues"
+        },
+        {
+          "field": "$.streamEvents",
+          "kind": "secretAbsence",
+          "secretsPath": "$.fixture.secretValues"
+        },
+        {
+          "field": "$.transcript",
+          "kind": "secretAbsence",
+          "secretsPath": "$.fixture.secretValues"
+        }
+      ],
+      "checkId": "secret-isolation.runtime-api-surfaces",
+      "evidence": [
+        "result.persistedRecords",
+        "result.streamEvents",
+        "result.transcript"
+      ],
+      "fixture": "secret-isolation",
+      "operation": "runtime.secret-isolation.surfaces"
     }
   ],
+  "fixtures": {
+    "secret-isolation": "../../../providers/conformance/fixtures/secret-isolation-fixtures.json"
+  },
   "packetId": "tuvren.shared.core",
   "planId": "tuvren.framework.runtime-api.callables-extended",
-  "planVersion": "0.5.0",
+  "planVersion": "0.6.0",
   "scenarios": {
     "runtime-api-scenarios": "../scenarios/runtime-api-scenarios.json"
   }

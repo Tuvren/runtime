@@ -1,9 +1,12 @@
 {
   "planId": "tuvren.providers.mcp-client",
-  "planVersion": "0.1.0",
+  "planVersion": "0.2.0",
   "packetId": "tuvren.providers.mcp",
   "applicability": {
     "capabilities": ["providers.mcp-client"]
+  },
+  "fixtures": {
+    "secret-isolation": "../fixtures/secret-isolation-fixtures.json"
   },
   "checks": [
     {
@@ -130,6 +133,24 @@
         "mcpClient.transportFailure.errorCode",
         "mcpClient.transportFailure.observedErrorCount"
       ]
+    },
+    {
+      "checkId": "secret-isolation.mcp-translated-tool-surface",
+      "operation": "providers.mcp-client.secret-isolation",
+      "fixture": "secret-isolation",
+      "assertions": [
+        {
+          "kind": "resultField",
+          "field": "$.mcpToolSurface.sessionEstablished",
+          "equals": true
+        },
+        {
+          "kind": "secretAbsence",
+          "field": "$.mcpToolSurface",
+          "secretsPath": "$.fixture.secretValues"
+        }
+      ],
+      "evidence": ["mcpToolSurface.sessionEstablished", "result.mcpToolSurface"]
     }
   ]
 }
