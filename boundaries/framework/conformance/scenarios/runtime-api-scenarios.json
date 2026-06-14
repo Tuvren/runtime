@@ -3,6 +3,9 @@
     "operation": "runtime.capability-orchestration.foundation",
     "toolName": "conformance-tool"
   },
+  "capability-orchestration-integration": {
+    "operation": "runtime.capability-orchestration.integration"
+  },
   "tuvren-server-lifecycle": {
     "operation": "runtime.tuvren-server.lifecycle"
   },

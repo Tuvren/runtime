@@ -38,6 +38,7 @@ import {
   runCapabilityOrchestrationFoundation,
   runCapabilityOrchestrationPolicyDecisions,
 } from "./framework-adapter-capability-orchestration.ts";
+import { runCapabilityOrchestrationIntegration } from "./framework-adapter-capability-orchestration-integration.ts";
 import {
   runCapabilityPolicyComposition,
   runCapabilityPolicyExposureDimensions,
@@ -387,6 +388,8 @@ export class TypeScriptFrameworkAdapter implements ImplementationAdapter {
         );
       case "runtime.capability-orchestration.policy-decisions":
         return runCapabilityOrchestrationPolicyDecisions();
+      case "runtime.capability-orchestration.integration":
+        return runCapabilityOrchestrationIntegration();
       case "runtime.invocation-lifecycle.cross-class":
         return runInvocationLifecycleCrossClass();
       case "runtime.tuvren-client.lifecycle":
