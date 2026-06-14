@@ -17,15 +17,19 @@
 /**
  * Framework-enforced execution bounds guard (ADR-043, KRT-BD006).
  *
- * These helpers resolve and validate the per-runtime {@link ExecutionBounds},
- * build the stable `execution_bound_exceeded` terminal error, and classify the
- * terminal invocation lifecycle of work that completes after a bounded abort.
- * The guard lives above the driver's `LoopPolicy` so a misbehaving or
- * adversarial driver cannot raise or disable a bound.
+ * These helpers resolve and validate the per-runtime {@link ExecutionBounds} and
+ * build the stable `execution_bound_exceeded` terminal error. The guard lives
+ * above the driver's `LoopPolicy` so a misbehaving or adversarial driver cannot
+ * raise or disable a bound.
+ *
+ * Model or tool work whose completion arrives after the framework has stopped
+ * awaiting it at a bounded abort reaches the `"ignored"` `InvocationLifecycleState`
+ * (forward-declared in Epic BA): the late result is discarded by the terminal
+ * settle guard and cannot reopen or mutate the bounded turn. See
+ * `RuntimeExecutionHandle.settleResult`.
  */
 
 import { TuvrenRuntimeError } from "@tuvren/core";
-import type { InvocationLifecycleState } from "@tuvren/core/capabilities";
 import { EXECUTION_BOUND_EXCEEDED } from "@tuvren/core/errors";
 import type {
   ExecutionBoundExceededDetails,
@@ -48,16 +52,6 @@ export const DEFAULT_EXECUTION_BOUNDS: ResolvedExecutionBounds = {
   maxToolCalls: 256,
   maxWallClockMs: 600_000,
 };
-
-/**
- * Terminal invocation lifecycle state for model or tool work whose completion
- * arrives after the framework has stopped awaiting it at a bounded abort. The
- * late result is discarded and cannot reopen or mutate the bounded turn. This
- * anchors the `"ignored"` value forward-declared in Epic BA (KRT-BA001) to its
- * first observable terminal path (KRT-BD006).
- */
-export const BOUNDED_LATE_COMPLETION_LIFECYCLE: InvocationLifecycleState =
-  "ignored";
 
 /**
  * Resolve host-supplied bounds against the §3.11 safe defaults, validating that

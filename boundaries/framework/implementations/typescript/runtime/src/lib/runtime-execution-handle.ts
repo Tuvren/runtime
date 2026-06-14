@@ -289,6 +289,10 @@ export class RuntimeExecutionHandle implements ExecutionHandle {
   }
 
   private settleResult(turnEndStatus: "completed" | "paused" | "failed"): void {
+    // Terminal late-completion guard: once the result is settled, a model/tool
+    // completion that lost the race to a bounded (or cancelled) abort is ignored
+    // — its invocation reaches the "ignored" InvocationLifecycleState and cannot
+    // reopen or mutate the turn. (ADR-043, KRT-BD006)
     if (turnEndStatus === "paused" || this.resultSettled) {
       return;
     }

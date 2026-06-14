@@ -717,12 +717,26 @@ class RuntimeCore implements TuvrenRuntime {
     pauseContext: PauseContext,
     response: ApprovalResponse
   ): RuntimeExecutionHandle {
-    return createRuntimeResumedExecutionHandle(
+    const resumedHandle = createRuntimeResumedExecutionHandle(
       this,
       previousHandle,
       pauseContext,
       response
     );
+    // Execution bounds are per logical turn. A resumed handle continues the same
+    // turn, so carry the cumulative tool-call count and the end-to-end wall-clock
+    // deadline forward; otherwise a driver could reset two hard-stop budgets on
+    // every approval pause. The per-loop-run abort timer is re-armed against the
+    // carried deadline when the resumed loop enters. (ADR-043, BD006)
+    const previousBounds = this.boundsTurnStates.get(previousHandle);
+    if (previousBounds !== undefined) {
+      this.boundsTurnStates.set(resumedHandle, {
+        boundedTelemetryEmitted: previousBounds.boundedTelemetryEmitted,
+        deadlineMs: previousBounds.deadlineMs,
+        toolCallCount: previousBounds.toolCallCount,
+      });
+    }
+    return resumedHandle;
   }
 
   cancelPausedExecution(handle: RuntimeExecutionHandle): void {

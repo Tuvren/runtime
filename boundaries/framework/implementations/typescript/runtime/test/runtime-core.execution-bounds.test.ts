@@ -43,6 +43,7 @@ import {
   collectEvents,
   delay,
   textSignal,
+  waitForAbort,
 } from "./runtime-core-test-helpers.ts";
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -262,6 +263,48 @@ describe("framework execution bounds (KRT-BD006)", () => {
     const result = await handle.awaitResult();
     const details = expectBoundsFailure(result, "maxWallClockMs");
     expect(details.limit).toBe(100);
+  });
+
+  test("the real wall-clock timer aborts in-flight work and ignores its late completion", async () => {
+    // No mock clock: a small real maxWallClockMs lets the out-of-band abort
+    // timer fire while the driver is awaiting its cooperative cancellation
+    // signal (standing in for in-flight model/tool work).
+    let lateCompletion = false;
+    const hangingDriver = {
+      async execute(context) {
+        await waitForAbort(context.signal);
+        // The interrupted work completes only AFTER the bounded abort. Its
+        // end_turn must be ignored and cannot reopen the failed turn.
+        lateCompletion = true;
+        return {
+          messages: [assistantText("late completion")],
+          resolution: { reason: "done", type: "end_turn" as const },
+        };
+      },
+      id: "hanging",
+      async resume() {
+        throw new Error("resume was not expected");
+      },
+    } satisfies KrakenDriver;
+    const { runtime } = createBoundsRuntime({
+      bounds: { maxWallClockMs: 25 },
+      driver: hangingDriver,
+    });
+    const thread = await runtime.createThread({});
+    const handle = runtime.executeTurn({
+      branchId: thread.branchId,
+      config: { name: AGENT },
+      signal: textSignal("run"),
+      threadId: thread.threadId,
+    });
+    const result = await handle.awaitResult();
+
+    const details = expectBoundsFailure(result, "maxWallClockMs");
+    expect(details.limit).toBe(25);
+    // The in-flight work did complete late, but its terminal resolution was
+    // ignored: the turn is the bounds failure, not a completed turn.
+    expect(lateCompletion).toBe(true);
+    expect(result.status).toBe("failed");
   });
 
   test("emits an execution.bounded telemetry event on a hard-stop breach", async () => {
