@@ -656,8 +656,8 @@ export interface Binding {
   capabilityId: string;
   executionClass: ExecutionClass;
   endpoint: Endpoint;
-  // MCP appears here as endpoint.kind === "mcp-server" under provider-mediated,
-  // tuvren-server, or tuvren-client — never as its own execution class.
+  // MCP appears here as endpoint.kind === "mcp-server" under tuvren-server
+  // or tuvren-client — never as its own execution class (§11.3).
 }
 
 export interface CapabilityObservation {

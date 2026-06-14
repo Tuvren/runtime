@@ -1,6 +1,6 @@
 {
   "planId": "tuvren.framework.capability-orchestration-integration",
-  "planVersion": "0.1.0",
+  "planVersion": "0.2.0",
   "packetId": "tuvren.shared.core",
   "applicability": {
     "capabilities": ["framework.runtime-api"]
@@ -230,6 +230,62 @@
           "kind": "resultField",
           "field": "$.integration.tuvrenServer.mcpEndpointKind",
           "equals": "mcp-server"
+        }
+      ],
+      "operation": "runtime.capability-orchestration.integration"
+    },
+    {
+      "checkId": "bc.bc001.observation-tuvren-server-persist-result",
+      "evidence": [
+        "result.integration.tuvrenServer.observation.canPersistResult"
+      ],
+      "assertions": [
+        {
+          "kind": "resultField",
+          "field": "$.integration.tuvrenServer.observation.canPersistResult",
+          "equals": true
+        }
+      ],
+      "operation": "runtime.capability-orchestration.integration"
+    },
+    {
+      "checkId": "bc.bc001.observation-tuvren-client-persist-result",
+      "evidence": [
+        "result.integration.tuvrenClient.observation.canPersistResult"
+      ],
+      "assertions": [
+        {
+          "kind": "resultField",
+          "field": "$.integration.tuvrenClient.observation.canPersistResult",
+          "equals": true
+        }
+      ],
+      "operation": "runtime.capability-orchestration.integration"
+    },
+    {
+      "checkId": "bc.bc001.observation-provider-native-persist-result",
+      "evidence": [
+        "result.integration.providerNative.observation.canPersistResult"
+      ],
+      "assertions": [
+        {
+          "kind": "resultField",
+          "field": "$.integration.providerNative.observation.canPersistResult",
+          "equals": true
+        }
+      ],
+      "operation": "runtime.capability-orchestration.integration"
+    },
+    {
+      "checkId": "bc.bc001.observation-provider-mediated-persist-result",
+      "evidence": [
+        "result.integration.providerMediated.observation.canPersistResult"
+      ],
+      "assertions": [
+        {
+          "kind": "resultField",
+          "field": "$.integration.providerMediated.observation.canPersistResult",
+          "equals": true
         }
       ],
       "operation": "runtime.capability-orchestration.integration"

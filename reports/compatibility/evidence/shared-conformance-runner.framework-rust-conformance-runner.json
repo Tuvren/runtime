@@ -20,9 +20,13 @@
     "bc.bc001.invocation-policy-denied-is-error",
     "bc.bc001.mcp-binding-endpoint-kind",
     "bc.bc001.observation-provider-mediated-no-audit",
+    "bc.bc001.observation-provider-mediated-persist-result",
     "bc.bc001.observation-provider-native-no-audit",
+    "bc.bc001.observation-provider-native-persist-result",
     "bc.bc001.observation-tuvren-client-no-audit",
+    "bc.bc001.observation-tuvren-client-persist-result",
     "bc.bc001.observation-tuvren-server-can-audit",
+    "bc.bc001.observation-tuvren-server-persist-result",
     "bc.bc001.provider-mediated-result-emitted",
     "bc.bc001.provider-mediated-start-emitted",
     "bc.bc001.provider-native-result-emitted",
@@ -478,9 +482,9 @@
   "summary": {
     "failedChecks": 0,
     "passedChecks": 0,
-    "totalChecks": 458,
+    "totalChecks": 462,
     "applicableChecks": 0,
-    "nonApplicableChecks": 458
+    "nonApplicableChecks": 462
   },
   "suiteId": "tuvren.framework.promoted-authority",
   "suiteVersion": "0.1.0"

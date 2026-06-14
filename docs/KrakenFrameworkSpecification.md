@@ -2310,9 +2310,9 @@ Each execution class declares its `CapabilityObservation`, a set of boolean capa
 | `canCancel` | true | false | false | false |
 | `canRetry` | true | false | false | false |
 | `canResume` | true | false | false | false |
-| `canPersistResult` | true | false | false | false |
+| `canPersistResult` | true | true | true | true |
 
-The `tuvren-server` class has full observation: it may observe intermediate invocation state, audit lifecycle events, cancel in-flight invocations, retry after failure, resume across turn boundaries, and persist results. For the `tuvren-client` class, the client endpoint controls execution and the framework cannot observe intermediate state, audit, cancel, retry, or resume on its behalf. Provider classes are fully opaque: the provider owns execution and the framework observes results only through the event stream attribution.
+The `tuvren-server` class has full observation: it may observe intermediate invocation state, audit lifecycle events, cancel in-flight invocations, retry after failure, resume across turn boundaries, and persist results. `canPersistResult` is uniformly `true` across all classes — the framework always persists the result record (so the execution history is durable regardless of who controlled execution). What differs is whether the framework can additionally audit, cancel, retry, resume, or observe intermediate state. For the `tuvren-client` class, the client endpoint controls execution and the framework cannot observe intermediate state, audit, cancel, retry, or resume on its behalf. Provider classes are fully opaque: the provider owns execution and the framework observes results only through the event stream attribution, but the result itself is persisted.
 
 These limits are normative: a runtime that exercises `canObserveIntermediate`, audit, cancel, retry, or resume for a class whose limit is `false` is out of conformance.
 

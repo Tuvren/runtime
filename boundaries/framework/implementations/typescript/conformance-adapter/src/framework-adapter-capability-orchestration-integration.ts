@@ -66,7 +66,10 @@ function extractAttr(event: Record<string, unknown> | undefined) {
   const obs = attr?.observation as Record<string, unknown> | undefined;
   return {
     executionClass: attr?.executionClass as string | undefined,
-    observation: { canAudit: obs?.canAudit as boolean | undefined },
+    observation: {
+      canAudit: obs?.canAudit as boolean | undefined,
+      canPersistResult: obs?.canPersistResult as boolean | undefined,
+    },
   };
 }
 
@@ -361,26 +364,38 @@ export async function runCapabilityOrchestrationIntegration(): Promise<AdapterPr
           toolStartCount: serverStarts.length,
           toolResultCount: serverResults.length,
           executionClass: serverAttr.executionClass,
-          observation: { canAudit: serverAttr.observation.canAudit },
+          observation: {
+            canAudit: serverAttr.observation.canAudit,
+            canPersistResult: serverAttr.observation.canPersistResult,
+          },
           mcpEndpointKind: mcpBinding.endpoint.kind,
         },
         providerNative: {
           toolStartCount: pnStarts.length,
           toolResultCount: pnResults.length,
           executionClass: pnAttr.executionClass,
-          observation: { canAudit: pnAttr.observation.canAudit },
+          observation: {
+            canAudit: pnAttr.observation.canAudit,
+            canPersistResult: pnAttr.observation.canPersistResult,
+          },
         },
         providerMediated: {
           toolStartCount: pmStarts.length,
           toolResultCount: pmResults.length,
           executionClass: pmAttr.executionClass,
-          observation: { canAudit: pmAttr.observation.canAudit },
+          observation: {
+            canAudit: pmAttr.observation.canAudit,
+            canPersistResult: pmAttr.observation.canPersistResult,
+          },
         },
         tuvrenClient: {
           toolStartCount: clientStarts.length,
           toolResultCount: clientResults.length,
           executionClass: clientAttr.executionClass,
-          observation: { canAudit: clientAttr.observation.canAudit },
+          observation: {
+            canAudit: clientAttr.observation.canAudit,
+            canPersistResult: clientAttr.observation.canPersistResult,
+          },
         },
         policy: {
           // false when exposure-time policy correctly withholds the surface

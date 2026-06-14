@@ -162,6 +162,24 @@
     {
       "assertionResults": [
         {
+          "assertionId": "bc.bc001.observation-provider-mediated-persist-result.1.resultField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "bc.bc001.observation-provider-mediated-persist-result.requiredEvidence.result.integration.providerMediated.observation.canPersistResult",
+          "status": "pass"
+        }
+      ],
+      "checkId": "bc.bc001.observation-provider-mediated-persist-result",
+      "details": {
+        "adapterId": "typescript-framework",
+        "planId": "tuvren.framework.capability-orchestration-integration"
+      },
+      "status": "pass"
+    },
+    {
+      "assertionResults": [
+        {
           "assertionId": "bc.bc001.observation-provider-native-no-audit.1.resultField",
           "status": "pass"
         },
@@ -171,6 +189,24 @@
         }
       ],
       "checkId": "bc.bc001.observation-provider-native-no-audit",
+      "details": {
+        "adapterId": "typescript-framework",
+        "planId": "tuvren.framework.capability-orchestration-integration"
+      },
+      "status": "pass"
+    },
+    {
+      "assertionResults": [
+        {
+          "assertionId": "bc.bc001.observation-provider-native-persist-result.1.resultField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "bc.bc001.observation-provider-native-persist-result.requiredEvidence.result.integration.providerNative.observation.canPersistResult",
+          "status": "pass"
+        }
+      ],
+      "checkId": "bc.bc001.observation-provider-native-persist-result",
       "details": {
         "adapterId": "typescript-framework",
         "planId": "tuvren.framework.capability-orchestration-integration"
@@ -198,6 +234,24 @@
     {
       "assertionResults": [
         {
+          "assertionId": "bc.bc001.observation-tuvren-client-persist-result.1.resultField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "bc.bc001.observation-tuvren-client-persist-result.requiredEvidence.result.integration.tuvrenClient.observation.canPersistResult",
+          "status": "pass"
+        }
+      ],
+      "checkId": "bc.bc001.observation-tuvren-client-persist-result",
+      "details": {
+        "adapterId": "typescript-framework",
+        "planId": "tuvren.framework.capability-orchestration-integration"
+      },
+      "status": "pass"
+    },
+    {
+      "assertionResults": [
+        {
           "assertionId": "bc.bc001.observation-tuvren-server-can-audit.1.resultField",
           "status": "pass"
         },
@@ -207,6 +261,24 @@
         }
       ],
       "checkId": "bc.bc001.observation-tuvren-server-can-audit",
+      "details": {
+        "adapterId": "typescript-framework",
+        "planId": "tuvren.framework.capability-orchestration-integration"
+      },
+      "status": "pass"
+    },
+    {
+      "assertionResults": [
+        {
+          "assertionId": "bc.bc001.observation-tuvren-server-persist-result.1.resultField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "bc.bc001.observation-tuvren-server-persist-result.requiredEvidence.result.integration.tuvrenServer.observation.canPersistResult",
+          "status": "pass"
+        }
+      ],
+      "checkId": "bc.bc001.observation-tuvren-server-persist-result",
       "details": {
         "adapterId": "typescript-framework",
         "planId": "tuvren.framework.capability-orchestration-integration"
@@ -9649,9 +9721,9 @@
   "status": "pass",
   "summary": {
     "failedChecks": 0,
-    "passedChecks": 446,
-    "totalChecks": 458,
-    "applicableChecks": 446,
+    "passedChecks": 450,
+    "totalChecks": 462,
+    "applicableChecks": 450,
     "nonApplicableChecks": 12
   },
   "suiteId": "tuvren.framework.promoted-authority",
