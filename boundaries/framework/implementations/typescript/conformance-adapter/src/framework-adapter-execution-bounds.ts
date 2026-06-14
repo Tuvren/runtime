@@ -252,10 +252,11 @@ export async function runExecutionBoundsMaxToolCalls(): Promise<AdapterProjectio
 // ---------------------------------------------------------------------------
 // Operation: runtime.execution-bounds.max-wall-clock
 //
-// Exercises signal delivery and late-completion ignoring through the OWNED tool
-// path. The tool awaits its cooperative cancellation signal; the real wall-clock
-// abort timer fires, the tool observes the abort and completes late, and the
-// turn finalizes as the bounds failure rather than the driver's later end_turn.
+// Deterministic loop-boundary breach: a runaway driver under a clock that
+// advances past the deadline trips the wall-clock check at an iteration
+// boundary, finalizing cleanly (fatal error event before the failed turn.end)
+// with a bounded-execution telemetry event. The in-flight tool-abort and
+// late-completion path is covered separately by wall-clock-signal-delivery.
 // ---------------------------------------------------------------------------
 
 export async function runExecutionBoundsMaxWallClock(): Promise<AdapterProjection> {

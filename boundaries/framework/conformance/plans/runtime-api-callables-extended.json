@@ -1796,11 +1796,22 @@
           "equals": true,
           "field": "$.rejections.4.rejected",
           "kind": "resultField"
+        },
+        {
+          "equals": "invalid_runtime_options",
+          "field": "$.rejections.0.code",
+          "kind": "resultField"
+        },
+        {
+          "equals": "invalid_runtime_options",
+          "field": "$.rejections.2.code",
+          "kind": "resultField"
         }
       ],
       "checkId": "runtime-api-execution-bounds.invalid-config-rejected",
       "evidence": [
         "result.rejections.0.rejected",
+        "result.rejections.0.code",
         "result.rejections.4.rejected"
       ],
       "operation": "runtime.execution-bounds.invalid-config"
