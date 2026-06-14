@@ -69,15 +69,22 @@ describe("repl transcript backend-options redaction (KRT-BD002)", () => {
 
   test("masks any credential-shaped key and embedded-URL credential values", () => {
     const redacted = redactReplTranscriptBackendOptions({
+      accessKey: "AKIA...",
       apiKey: "sk-secret",
       authToken: "bearer-xyz",
       dsn: "mysql://root:rootpw@127.0.0.1/db",
       host: "db.internal",
       port: 5432,
+      pwd: "p1",
+      passwd: "p2",
     }) as Record<string, unknown>;
+    expect(redacted.accessKey).toBe("***");
     expect(redacted.apiKey).toBe("***");
     expect(redacted.authToken).toBe("***");
     expect(redacted.dsn).toBe("***");
+    expect(redacted.pwd).toBe("***");
+    expect(redacted.passwd).toBe("***");
+    // Topology fields, including the URL "authority", are not over-masked.
     expect(redacted.host).toBe("db.internal");
     expect(redacted.port).toBe(5432);
   });

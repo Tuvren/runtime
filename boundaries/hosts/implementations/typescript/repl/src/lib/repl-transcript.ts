@@ -111,7 +111,7 @@ const TRANSCRIPT_DURABLE_READ_OPERATIONS = new Set([
 // for authentication; replay supplies credentials from the environment.
 const TRANSCRIPT_REDACTION_PLACEHOLDER = "***";
 const CREDENTIAL_OPTION_KEY_PATTERN =
-  /(?:authorization|api[-_]?key|bearer|client[-_]?secret|connection[-_]?string|credential|passphrase|password|private[-_]?key|secret|token)/iu;
+  /(?:access[-_]?key|api[-_]?key|authorization|bearer|client[-_]?secret|connection[-_]?string|credential|passphrase|passwd|password|private[-_]?key|pwd|secret|token)/iu;
 // A string carrying embedded URL credentials (e.g. postgres://user:pass@host/db)
 // is masked even when it appears under an unexpected option key.
 const URL_CREDENTIAL_VALUE_PATTERN = /\/\/[^/\s:@]+:[^/\s@]+@/u;
