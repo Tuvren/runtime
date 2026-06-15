@@ -251,7 +251,11 @@ function assertSecretAbsence(
   }
 
   const surface = readPath(context.result, assertion.field);
-  if (surface === undefined) {
+  // A secret-absence check must fail loud on a missing surface: absence cannot
+  // be proven on something that was never scanned. `null` is treated the same
+  // as `undefined` so a surface that resolves to an explicit null fails rather
+  // than passing vacuously (which would silently report "secret-free").
+  if (surface === undefined || surface === null) {
     throw new Error(
       `secretAbsence surface ${assertion.field} is missing from the result`
     );

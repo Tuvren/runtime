@@ -204,4 +204,21 @@ describe("secretAbsence assertion (KRT-BD004)", () => {
     );
     expect(evaluation?.status).toBe("fail");
   });
+
+  test("fails loud when the declared surface is explicitly null", () => {
+    // A null surface must not pass vacuously: absence cannot be proven on a
+    // surface that was never scanned, so an explicit null fails like a missing
+    // surface rather than silently reporting "secret-free".
+    const [evaluation] = evaluateAssertions(
+      buildCheck([
+        {
+          field: "$.surface",
+          kind: "secretAbsence",
+          secretsPath: "$.fixture.secretValues",
+        },
+      ]),
+      { fixture: { secretValues: [SECRET] }, result: { surface: null } }
+    );
+    expect(evaluation?.status).toBe("fail");
+  });
 });
