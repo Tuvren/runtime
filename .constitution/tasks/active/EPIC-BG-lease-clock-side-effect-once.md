@@ -6,11 +6,11 @@
 - **Type:** Chore
 - **Effort:** 3
 - **Dependencies:** KRT-BE001
-- **Capability / Contract Mapping:** PRD `CAP-P0-068`; TechSpec ADR-050, ADR-052; `docs/KrakenKernelSpecification.md` §5.2; `docs/KrakenFrameworkSpecification.md` §989
-- **Description:** Classify the new kernel §5.2 backend-authoritative lease-clock note and the framework §989 side-effect-once / client-result-as-proposal notes in the docs-to-authority coverage matrix, and register the run-liveness authority-packet plus conformance-plan entries for the backend-clock and side-effect-once surfaces.
+- **Capability / Contract Mapping:** PRD `CAP-P0-068`; TechSpec ADR-050, ADR-052; `docs/KrakenKernelSpecification.md` §5.2; `docs/KrakenFrameworkSpecification.md` "Running Lease Ownership"
+- **Description:** Classify the new kernel §5.2 backend-authoritative lease-clock note and the framework "Running Lease Ownership" side-effect-once / client-result-as-proposal notes in the docs-to-authority coverage matrix, and register the run-liveness authority-packet plus conformance-plan entries for the backend-clock and side-effect-once surfaces.
 - **Acceptance Criteria (Gherkin):**
 ```gherkin
-Given kernel §5.2 and framework §989 add backend-clock and side-effect-once semantics
+Given kernel §5.2 and framework "Running Lease Ownership" add backend-clock and side-effect-once semantics
 When the freeze gate runs
 Then both spec additions are classified in the coverage matrix
 And the run-liveness authority packet references the new conformance entries
@@ -49,7 +49,7 @@ And the same logical call re-dispatched after recovery presents the same identit
 - **Type:** Feature
 - **Effort:** 5
 - **Dependencies:** KRT-BG002, KRT-BG003
-- **Capability / Contract Mapping:** PRD `CAP-P0-068`; TechSpec ADR-052; `docs/KrakenFrameworkSpecification.md` §989
+- **Capability / Contract Mapping:** PRD `CAP-P0-068`; TechSpec ADR-052; `docs/KrakenFrameworkSpecification.md` "Running Lease Ownership"
 - **Description:** On loss of execution authority, do not retry an in-flight `nonRetryable` invocation; treat a client-reported result as a proposal that commits only under a valid run fencing token, so a stale or late client report cannot mutate committed history.
 - **Acceptance Criteria (Gherkin):**
 ```gherkin
