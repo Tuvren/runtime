@@ -220,6 +220,28 @@ const EVIDENCE = {
     generatedArtifact:
       "N/A - kernel protocol behavior is fixture/conformance-backed; grammar source is boundaries/kernel/contracts/protocol/spec/cddl/kernel-records.cddl",
   },
+  // KRT-BE001: scope-resolved object identity (kernel spec §2.3, ADR-048/049).
+  // The surface and its conformance-plan reference are declared in the
+  // kernel-protocol authority packet (bindingSections.scope-isolation) and the
+  // cross-scope isolation conformance contract lives at
+  // kernel-scope-isolation.json. The claim stays missing-conformance-follow-up
+  // tracked to KRT-BE007, which promotes the plan to runnable, registered,
+  // evidence-backed conformance once memory/SQLite/PostgreSQL realize the
+  // scope binding — so the freeze gate asserts no scope-isolation coverage
+  // before it actually exists.
+  scopeIsolation: {
+    adapterCapability: "kernel.scope-isolation",
+    authorityPacket:
+      "boundaries/kernel/contracts/protocol/spec/authority-packet.json",
+    compatibilityEvidence:
+      "reports/compatibility/evidence/shared-conformance-runner.kernel-typescript-conformance-runner.json; reports/compatibility/evidence/shared-conformance-runner.kernel-typescript-sqlite-conformance-runner.json; reports/compatibility/evidence/shared-conformance-runner.kernel-typescript-postgres-conformance-runner.json",
+    conformancePlan:
+      "boundaries/kernel/conformance/plans/kernel-scope-isolation.json",
+    fixture:
+      "boundaries/kernel/conformance/fixtures/kernel-protocol-logical.json",
+    generatedArtifact:
+      "N/A - scope isolation is conformance-plan authority without generated schema artifacts",
+  },
   providerApi: {
     adapterCapability: "providers.provider-api; providers.ai-sdk-bridge",
     authorityPacket:
@@ -950,9 +972,9 @@ function classifySaaSReadinessTargetClaim(
   if (text.includes("scope-resolved identity (v0.12)")) {
     return missingConformanceDecision(
       "kernel scope-resolved identity",
-      EVIDENCE.kernelProtocol,
-      "KRT-BE001",
-      "Scope-confined object resolution and isolation-by-construction are SaaS-readiness target semantics; portable conformance lands when EPIC-BE promotes kernel spec §2.3."
+      EVIDENCE.scopeIsolation,
+      "KRT-BE007",
+      "KRT-BE001 declared the scope-isolation surface and its conformance-plan reference (kernel-protocol authority packet bindingSections.scope-isolation; boundaries/kernel/conformance/plans/kernel-scope-isolation.json). Scope-confined object resolution and isolation-by-construction stay missing-conformance-follow-up until KRT-BE007 promotes the plan to runnable, registered, evidence-backed conformance across memory, SQLite, and PostgreSQL."
     );
   }
 
