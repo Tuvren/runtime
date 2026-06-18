@@ -16,7 +16,11 @@
 
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { DEFAULT_SCOPE } from "@tuvren/core";
-import type { RuntimeBackend, StoredThread } from "@tuvren/kernel-protocol";
+import type {
+  RuntimeBackend,
+  StoredBranch,
+  StoredThread,
+} from "@tuvren/kernel-protocol";
 import {
   createCanonicalKernelTestSchema,
   createCanonicalTurnTreePaths,
@@ -99,6 +103,77 @@ async function seedThread(
   });
 
   return threadId;
+}
+
+// The full record set the Durable-Read Surface composes over (KRT-BE006): a
+// branch and its genesis turn node, turn tree, ordered message path, and the
+// message object itself, so a co-tenant scope can be proven blind to all of it.
+interface SeededBranch {
+  branchId: string;
+  headTurnNodeHash: string;
+  messageHash: string;
+  threadId: string;
+  turnTreeHash: string;
+}
+
+async function seedBranchWithMessage(
+  backend: RuntimeBackend,
+  threadId: string,
+  branchId: string,
+  base: number
+): Promise<SeededBranch> {
+  const schema = createCanonicalKernelTestSchema();
+  const schemaRecord = createStoredSchemaRecord(schema, base);
+  const messageObject = await createStoredObjectRecord(
+    new Uint8Array([1, 2, 3, 4]),
+    base + 1
+  );
+  const manifest = {
+    "context.manifest": null,
+    messages: [messageObject.hash],
+  };
+  const turnTree = await createStoredTurnTreeRecord(schema, manifest, base + 2);
+  const turnNode = await createStoredTurnNodeRecord({
+    consumedStagedResults: [],
+    createdAtMs: base + 3,
+    eventHash: null,
+    previousTurnNodeHash: null,
+    schemaId: schema.schemaId,
+    turnTreeHash: turnTree.hash,
+  });
+  const thread: StoredThread = {
+    createdAtMs: base + 4,
+    rootTurnNodeHash: turnNode.hash,
+    schemaId: schema.schemaId,
+    threadId,
+  };
+  const branch: StoredBranch = {
+    branchId,
+    createdAtMs: base + 5,
+    headTurnNodeHash: turnNode.hash,
+    threadId,
+    updatedAtMs: base + 5,
+  };
+
+  await backend.transact(async (tx) => {
+    await tx.schemas.put(schemaRecord);
+    await tx.objects.put(messageObject);
+    await tx.turnTrees.put(turnTree);
+    await tx.turnTreePaths.putMany(
+      createCanonicalTurnTreePaths(turnTree, manifest)
+    );
+    await tx.turnNodes.put(turnNode);
+    await tx.threads.put(thread);
+    await tx.branches.set(branch);
+  });
+
+  return {
+    branchId,
+    headTurnNodeHash: turnNode.hash,
+    messageHash: messageObject.hash,
+    threadId,
+    turnTreeHash: turnTree.hash,
+  };
 }
 
 beforeAll(async () => {
@@ -339,6 +414,60 @@ describe("@tuvren/backend-postgres scope isolation (KRT-BE005)", () => {
     } finally {
       await verify.end({ timeout: 0 });
     }
+  });
+
+  test("every durable-identity record the Durable-Read Surface reads is scope-confined (KRT-BE006)", async () => {
+    const baseOptions = createPostgresTestBackendOptions();
+    const scopeA = createPostgresBackend({ ...baseOptions, scope: "tenant-a" });
+    const scopeB = createPostgresBackend({ ...baseOptions, scope: "tenant-b" });
+
+    const seeded = await seedBranchWithMessage(
+      scopeA,
+      "thread_a",
+      "branch_a",
+      1
+    );
+
+    // Scope B observes none of the thread, branch, node, tree, path, or
+    // message records.
+    await scopeB.transact(async (tx) => {
+      expect(await tx.threads.get(seeded.threadId)).toBeNull();
+      expect(await tx.branches.get(seeded.branchId)).toBeNull();
+      expect(await tx.branches.listByThread(seeded.threadId)).toEqual([]);
+      expect(await tx.turnNodes.get(seeded.headTurnNodeHash)).toBeNull();
+      expect(await tx.turnTrees.get(seeded.turnTreeHash)).toBeNull();
+      expect(
+        await tx.turnTreePaths.listByTurnTree(seeded.turnTreeHash)
+      ).toEqual([]);
+      expect(await tx.objects.has(seeded.messageHash)).toBe(false);
+      expect(await tx.objects.get(seeded.messageHash)).toBeNull();
+    });
+
+    // Scope A observes its own complete record set.
+    await scopeA.transact(async (tx) => {
+      expect((await tx.threads.get(seeded.threadId))?.threadId).toBe(
+        "thread_a"
+      );
+      expect((await tx.branches.get(seeded.branchId))?.branchId).toBe(
+        "branch_a"
+      );
+      expect(
+        (await tx.branches.listByThread(seeded.threadId)).map((b) => b.branchId)
+      ).toEqual(["branch_a"]);
+      expect((await tx.turnNodes.get(seeded.headTurnNodeHash))?.hash).toBe(
+        seeded.headTurnNodeHash
+      );
+      expect((await tx.turnTrees.get(seeded.turnTreeHash))?.hash).toBe(
+        seeded.turnTreeHash
+      );
+      expect(
+        (await tx.turnTreePaths.listByTurnTree(seeded.turnTreeHash)).length
+      ).toBeGreaterThan(0);
+      expect(await tx.objects.has(seeded.messageHash)).toBe(true);
+    });
+
+    await closeBackend(scopeA);
+    await closeBackend(scopeB);
   });
 
   test("rejects an empty scope binding at construction", () => {

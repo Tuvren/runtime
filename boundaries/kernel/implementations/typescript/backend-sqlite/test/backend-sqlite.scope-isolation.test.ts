@@ -18,7 +18,11 @@ import { deepStrictEqual, ok, strictEqual, throws } from "node:assert/strict";
 import { readdirSync } from "node:fs";
 import { basename, dirname } from "node:path";
 import { describe, test } from "node:test";
-import type { RuntimeBackend, StoredThread } from "@tuvren/kernel-protocol";
+import type {
+  RuntimeBackend,
+  StoredBranch,
+  StoredThread,
+} from "@tuvren/kernel-protocol";
 import {
   createCanonicalKernelTestSchema,
   createCanonicalTurnTreePaths,
@@ -71,6 +75,77 @@ async function seedThread(
   });
 
   return threadId;
+}
+
+// The full record set the Durable-Read Surface composes over (KRT-BE006): a
+// branch and its genesis turn node, turn tree, ordered message path, and the
+// message object itself, so a co-tenant scope can be proven blind to all of it.
+interface SeededBranch {
+  branchId: string;
+  headTurnNodeHash: string;
+  messageHash: string;
+  threadId: string;
+  turnTreeHash: string;
+}
+
+async function seedBranchWithMessage(
+  backend: RuntimeBackend,
+  threadId: string,
+  branchId: string,
+  base: number
+): Promise<SeededBranch> {
+  const schema = createCanonicalKernelTestSchema();
+  const schemaRecord = createStoredSchemaRecord(schema, base);
+  const messageObject = await createStoredObjectRecord(
+    new Uint8Array([1, 2, 3, 4]),
+    base + 1
+  );
+  const manifest = {
+    "context.manifest": null,
+    messages: [messageObject.hash],
+  };
+  const turnTree = await createStoredTurnTreeRecord(schema, manifest, base + 2);
+  const turnNode = await createStoredTurnNodeRecord({
+    consumedStagedResults: [],
+    createdAtMs: base + 3,
+    eventHash: null,
+    previousTurnNodeHash: null,
+    schemaId: schema.schemaId,
+    turnTreeHash: turnTree.hash,
+  });
+  const thread: StoredThread = {
+    createdAtMs: base + 4,
+    rootTurnNodeHash: turnNode.hash,
+    schemaId: schema.schemaId,
+    threadId,
+  };
+  const branch: StoredBranch = {
+    branchId,
+    createdAtMs: base + 5,
+    headTurnNodeHash: turnNode.hash,
+    threadId,
+    updatedAtMs: base + 5,
+  };
+
+  await backend.transact(async (tx) => {
+    await tx.schemas.put(schemaRecord);
+    await tx.objects.put(messageObject);
+    await tx.turnTrees.put(turnTree);
+    await tx.turnTreePaths.putMany(
+      createCanonicalTurnTreePaths(turnTree, manifest)
+    );
+    await tx.turnNodes.put(turnNode);
+    await tx.threads.put(thread);
+    await tx.branches.set(branch);
+  });
+
+  return {
+    branchId,
+    headTurnNodeHash: turnNode.hash,
+    messageHash: messageObject.hash,
+    threadId,
+    turnTreeHash: turnTree.hash,
+  };
 }
 
 describe("@tuvren/backend-sqlite scope isolation (KRT-BE004)", () => {
@@ -226,6 +301,68 @@ describe("@tuvren/backend-sqlite scope isolation (KRT-BE004)", () => {
 
     await defaultBackend.close();
     await scopedBackend.close();
+  });
+
+  test("every durable-identity record the Durable-Read Surface reads is scope-confined (KRT-BE006)", async () => {
+    const databasePath = createTempDatabasePath();
+    const scopeA = createSqliteBackend({ databasePath, scope: "tenant-a" });
+    const scopeB = createSqliteBackend({ databasePath, scope: "tenant-b" });
+
+    const seeded = await seedBranchWithMessage(
+      scopeA,
+      "thread_a",
+      "branch_a",
+      1
+    );
+
+    // Scope B observes none of the thread, branch, node, tree, path, or
+    // message records.
+    await scopeB.transact(async (tx) => {
+      strictEqual(await tx.threads.get(seeded.threadId), null);
+      strictEqual(await tx.branches.get(seeded.branchId), null);
+      deepStrictEqual(await tx.branches.listByThread(seeded.threadId), []);
+      strictEqual(await tx.turnNodes.get(seeded.headTurnNodeHash), null);
+      strictEqual(await tx.turnTrees.get(seeded.turnTreeHash), null);
+      deepStrictEqual(
+        await tx.turnTreePaths.listByTurnTree(seeded.turnTreeHash),
+        []
+      );
+      strictEqual(await tx.objects.has(seeded.messageHash), false);
+      strictEqual(await tx.objects.get(seeded.messageHash), null);
+    });
+
+    // Scope A observes its own complete record set.
+    await scopeA.transact(async (tx) => {
+      strictEqual(
+        (await tx.threads.get(seeded.threadId))?.threadId,
+        "thread_a"
+      );
+      strictEqual(
+        (await tx.branches.get(seeded.branchId))?.branchId,
+        "branch_a"
+      );
+      deepStrictEqual(
+        (await tx.branches.listByThread(seeded.threadId)).map(
+          (b) => b.branchId
+        ),
+        ["branch_a"]
+      );
+      strictEqual(
+        (await tx.turnNodes.get(seeded.headTurnNodeHash))?.hash,
+        seeded.headTurnNodeHash
+      );
+      strictEqual(
+        (await tx.turnTrees.get(seeded.turnTreeHash))?.hash,
+        seeded.turnTreeHash
+      );
+      ok(
+        (await tx.turnTreePaths.listByTurnTree(seeded.turnTreeHash)).length > 0
+      );
+      strictEqual(await tx.objects.has(seeded.messageHash), true);
+    });
+
+    await scopeA.close();
+    await scopeB.close();
   });
 
   test("rejects an empty scope binding at construction", () => {
