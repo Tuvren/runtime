@@ -396,6 +396,7 @@
             "runtime-api-operational-telemetry.error-path",
             "runtime-api-operational-telemetry.recovery-records",
             "runtime-api-operational-telemetry.tool-spans",
+            "scope-isolation.telemetry-and-transcript-correlation",
             "secret-isolation.telemetry-attributes-and-error-summaries",
             "runtime-orchestration-af.handoff-last-output-only-builder",
             "runtime-orchestration-af.handoff-rejects-multiple-intents",
@@ -471,9 +472,9 @@
           ],
           "checkSummary": {
             "failedChecks": 0,
-            "passedChecks": 461,
-            "totalChecks": 473,
-            "applicableChecks": 461,
+            "passedChecks": 462,
+            "totalChecks": 474,
+            "applicableChecks": 462,
             "nonApplicableChecks": 12
           },
           "declaredCapabilities": [
@@ -514,9 +515,9 @@
           "checkSummary": {
             "failedChecks": 0,
             "passedChecks": 12,
-            "totalChecks": 473,
+            "totalChecks": 474,
             "applicableChecks": 12,
-            "nonApplicableChecks": 461
+            "nonApplicableChecks": 462
           },
           "declaredCapabilities": ["framework.batteries-included"],
           "evidencePath": "reports/compatibility/evidence/shared-conformance-runner.framework-batteries-included-conformance-runner.json",
@@ -981,9 +982,9 @@
           "checkSummary": {
             "failedChecks": 0,
             "passedChecks": 0,
-            "totalChecks": 473,
+            "totalChecks": 474,
             "applicableChecks": 0,
-            "nonApplicableChecks": 473
+            "nonApplicableChecks": 474
           },
           "declaredCapabilities": [],
           "evidencePath": "reports/compatibility/evidence/shared-conformance-runner.framework-rust-conformance-runner.json",
