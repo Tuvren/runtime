@@ -133,11 +133,15 @@ describe("runtime operational telemetry", () => {
     expect(
       capture.spans.every((span) => span.lineage.scope === "tenant-a")
     ).toBe(true);
+    // Load-bearing leak guard: had the runtime ignored the "tenant-a" binding,
+    // its surfaces would carry the default scope, so asserting that the default
+    // scope is absent proves the bound scope actually displaced the fallback
+    // rather than a never-bound literal that could never appear regardless.
     const serialized = JSON.stringify({
       events: capture.events,
       spans: capture.spans,
     });
-    expect(serialized).not.toContain("tenant-b");
+    expect(serialized).not.toContain("tuvren.scope.default");
   });
 
   test("defaults telemetry correlation to the default scope when the host binds none", async () => {

@@ -266,7 +266,12 @@ interface ScopeSurfaceObservation {
 function readScopePair(input: unknown): { scopeA: string; scopeB: string } {
   // Defaults diverge within the secret-absence partial-token prefix window so a
   // legitimately different Scope never trips the scanner's prefix heuristic.
-  const record = isRecord(input) ? input : {};
+  // The runner wraps the plan's `input` in a `{ checkInput }` envelope, so honor
+  // the plan's declared Scopes by reading through `checkInput` rather than the
+  // top level — otherwise the handler silently ignores the plan and the
+  // resultField/secretAbsence assertions only agree with the defaults by chance.
+  const envelope = isRecord(input) ? input : {};
+  const record = isRecord(envelope.checkInput) ? envelope.checkInput : {};
   return {
     scopeA: readString(record.scopeA, "tuvren.scope.alpha"),
     scopeB: readString(record.scopeB, "tuvren.scope.bravo"),
