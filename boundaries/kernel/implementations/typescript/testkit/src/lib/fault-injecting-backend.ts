@@ -76,6 +76,7 @@ export function createFaultInjectingBackend(
   plan: FaultPlan
 ): RuntimeBackend {
   const control = readFaultInjectionControl(inner);
+  const innerReclaim = inner.reclaim?.bind(inner);
   let consumed = false;
 
   const decorated: RuntimeBackend & {
@@ -88,6 +89,10 @@ export function createFaultInjectingBackend(
     health() {
       return inner.health();
     },
+    // Forward the optional reclamation backing operation so a wrapped backend
+    // that advertises maintenance.reclamation can still be reclaimed through the
+    // decorator; fault injection targets transactions, not maintenance sweeps.
+    ...(innerReclaim === undefined ? {} : { reclaim: innerReclaim }),
     async transact<T>(work: (tx: RuntimeBackendTx) => Promise<T>): Promise<T> {
       const concurrentWriterSnapshot =
         plan.concurrentWriter === undefined

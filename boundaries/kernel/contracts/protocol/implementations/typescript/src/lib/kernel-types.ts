@@ -481,11 +481,6 @@ export interface RuntimeBackendTx {
  */
 export interface BackendCapability {
   /**
-   * Backend supports efficient thread enumeration via ThreadRepository.list.
-   * Required for hosts that consume TuvrenRuntime.listThreads.
-   */
-  readonly "thread.enumeration": boolean;
-  /**
    * Backend supports the capability-gated reachability reclamation primitive
    * (KrakenKernelSpecification §9.4). When `true`, the backend implements the
    * reclamation backing operation the kernel drives to mark durable state
@@ -498,13 +493,60 @@ export interface BackendCapability {
    * is a semver-minor change (§9.1).
    */
   readonly "maintenance.reclamation"?: boolean;
+  /**
+   * Backend supports efficient thread enumeration via ThreadRepository.list.
+   * Required for hosts that consume TuvrenRuntime.listThreads.
+   */
+  readonly "thread.enumeration": boolean;
   /** Reserved for future capability bits. */
   readonly [extraCapability: string]: boolean | undefined;
+}
+
+/**
+ * Options for the capability-gated reachability reclamation primitive (§9.4).
+ */
+export interface ReclamationOptions {
+  /**
+   * Backend clock reference (epoch ms) used for the grace-window comparison.
+   * The kernel supplies its own `now()` so reclamation evaluates the grace
+   * window against the same clock as the rest of the syscall surface. Backends
+   * derive the grace horizon (the oldest active execution lease / in-flight
+   * write horizon) from their own active runs.
+   */
+  nowMs?: EpochMs;
+}
+
+/**
+ * Result of a reclamation sweep (§9.4). Counts the durable state released and
+ * retained within the constructing Scope. Released state is unreachable from
+ * live roots (non-archived branch heads, thread roots, active-run staged work)
+ * and older than the grace horizon; everything reachable or within the grace
+ * window is retained.
+ */
+export interface ReclamationSummary {
+  releasedArchivedBranchCount: number;
+  releasedObjectCount: number;
+  releasedOrderedPathChunkCount: number;
+  releasedRunCount: number;
+  releasedTurnCount: number;
+  releasedTurnNodeCount: number;
+  releasedTurnTreeCount: number;
+  retainedObjectCount: number;
 }
 
 export interface RuntimeBackend {
   capabilities(): BackendCapability;
   health(): Promise<{ ok: true } | { ok: false; reason: string }>;
+  /**
+   * Optional reachability reclamation backing operation (§9.4). Implemented
+   * only by backends advertising `maintenance.reclamation: true`; backends that
+   * advertise non-support must not implement it (§9.1). Marks durable state
+   * reachable from live roots within the constructing Scope and atomically
+   * sweeps only the unreachable remainder, grace-windowed against the oldest
+   * active execution lease so reclamation can never race recovery. Never edits
+   * committed lineage or alters a reachable Object.
+   */
+  reclaim?(options?: ReclamationOptions): Promise<ReclamationSummary>;
   transact<T>(work: (tx: RuntimeBackendTx) => Promise<T>): Promise<T>;
 }
 
@@ -525,6 +567,18 @@ export interface RuntimeKernel {
     get(branchId: string): Promise<BranchRecord | null>;
     setHead(branchId: string, turnNodeHash: HashString): Promise<SetHeadResult>;
     list(threadId: string): Promise<BranchHeadListEntry[]>;
+  };
+  maintenance: {
+    /**
+     * §9.4: capability-gated reachability reclamation. Rejects with
+     * TuvrenPersistenceError code "kernel_capability_unsupported" when the
+     * backend does not advertise maintenance.reclamation. Releases durable
+     * state unreachable from live roots (non-archived branch heads, thread
+     * roots, active-run staged work) within the constructing Scope, sweeping
+     * only the unreachable remainder and never releasing state newer than the
+     * oldest active execution lease.
+     */
+    reclaim(options?: ReclamationOptions): Promise<ReclamationSummary>;
   };
   node: {
     get(hash: HashString): Promise<TurnNode | null>;
