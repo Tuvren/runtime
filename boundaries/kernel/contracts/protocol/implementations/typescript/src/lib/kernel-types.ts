@@ -507,11 +507,14 @@ export interface BackendCapability {
  */
 export interface ReclamationOptions {
   /**
-   * Backend clock reference (epoch ms) used for the grace-window comparison.
-   * The kernel supplies its own `now()` so reclamation evaluates the grace
-   * window against the same clock as the rest of the syscall surface. Backends
-   * derive the grace horizon (the oldest active execution lease / in-flight
-   * write horizon) from their own active runs.
+   * Optional clock reference (epoch ms) a backend MAY consult while evaluating
+   * the grace window. The kernel supplies its own `now()` so any wall-clock
+   * comparison stays consistent with the rest of the syscall surface. The grace
+   * horizon itself is derived structurally from the constructing Scope's own
+   * active runs (the oldest active execution lease / in-flight write horizon):
+   * the reference memory backend retains everything at or after that horizon and
+   * therefore does not consult `nowMs`. The field is reserved for backends that
+   * additionally impose a wall-clock floor on releasable state.
    */
   nowMs?: EpochMs;
 }

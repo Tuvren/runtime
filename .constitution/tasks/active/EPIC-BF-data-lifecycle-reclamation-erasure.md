@@ -102,3 +102,7 @@ When it runs against the reclamation-capable backends
 Then it proves no reachable state is released and the grace window holds under an active lease
 And it proves an erased payload is unrecoverable while the referencing lineage remains structurally intact
 ```
+- **Carried-forward review follow-ups (from the BF003 milestone review; non-blocking there, addressed here):**
+  - Add reclamation coverage for a *structurally shared Object* — one Object referenced by both a swept (archived) node and a kept (live) node must be retained (proves the keep-closure set-union, not just exclusive-lineage release). Construct the divergent lineages with the fork pattern (`branch.create` + `parentTurnId` chaining from a shared non-root ancestor) so the two referencing nodes are distinct content-addressed hashes and the rollback rewind does not collide turn-parent chains at the root.
+  - Add reclamation coverage for an Object *older than the grace horizon* that is referenced by a node *newer than the horizon* (exercises the grace-window reference closure across the horizon, not only reachability with an unbounded horizon).
+  - Harden `validateCommittedState`: add an observe-annotation referential check so the sweep's safety for `observeAnnotations.turnNodeHash` is enforced by an invariant rather than argued from `sweepRuns` deleting annotations with their run. Pre-existing validator gap (the only reference class it does not check); currently safe by construction.
