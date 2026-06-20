@@ -208,6 +208,17 @@ class MemoryBackend implements KrakenBackend {
     });
   }
 
+  purgeScope(): Promise<void> {
+    // Full tenant offboarding (§9.4): drop the bound Scope's entire partition.
+    // Serialize against this Scope exactly like a transaction so the drop never
+    // races an in-flight commit; distinct Scopes sharing this store are left
+    // untouched, so offboarding one tenant is invisible to every other.
+    return this.store.runExclusive(this.scope, () => {
+      this.store.dropScope(this.scope);
+      return Promise.resolve();
+    });
+  }
+
   transact<T>(work: (tx: KrakenBackendTx) => Promise<T>): Promise<T> {
     if (this.transactionContext.getStore() === true) {
       throw persistenceError(

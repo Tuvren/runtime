@@ -541,6 +541,19 @@ export interface RuntimeBackend {
   capabilities(): BackendCapability;
   health(): Promise<{ ok: true } | { ok: false; reason: string }>;
   /**
+   * Optional substrate partition drop for full tenant offboarding (§9.4: "full
+   * tenant offboarding is dropping the Scope partition ... a substrate/edge
+   * concern outside the kernel"). Removes the constructing Scope's entire
+   * durable partition — not only the unreachable remainder a reclamation sweep
+   * releases. This is deliberately NOT a kernel syscall and has no
+   * `RuntimeKernel` projection or operation-count contribution; the framework
+   * maintenance surface invokes it directly against the durable backend.
+   * Crypto-shredding erasure remains a separate host action (destroying the
+   * Scope's payload keys); this drops the residual ciphertext partition.
+   * Backends that cannot drop a partition omit it.
+   */
+  purgeScope?(): Promise<void>;
+  /**
    * Optional reachability reclamation backing operation (§9.4). Implemented
    * only by backends advertising `maintenance.reclamation: true`; backends that
    * advertise non-support must not implement it (§9.1). Marks durable state

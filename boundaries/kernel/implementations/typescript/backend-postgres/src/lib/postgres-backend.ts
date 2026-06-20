@@ -108,6 +108,7 @@ import {
 import type { BackendState } from "./memory-backend-types.js";
 import {
   createPostgresClient,
+  deletePersistedStateSnapshot,
   ensurePostgresSchemaInitialized,
   loadPersistedStateForUpdate,
   normalizeSchemaName,
@@ -399,6 +400,36 @@ class PostgresBackend implements KrakenBackend {
       } finally {
         await reserved.release();
       }
+    } finally {
+      releaseQueue?.();
+    }
+  }
+
+  async purgeScope(): Promise<void> {
+    if (this.transactionContext.getStore() === true) {
+      throw persistenceError(
+        "postgres backend scope purge must not run inside a transaction",
+        "postgres_backend_nested_transaction"
+      );
+    }
+
+    await this.ensureInitialized();
+
+    const priorTransaction = this.transactionQueue;
+    let releaseQueue: (() => void) | undefined;
+
+    this.transactionQueue = new Promise<void>((resolve) => {
+      releaseQueue = resolve;
+    });
+
+    await priorTransaction;
+
+    try {
+      // Full tenant offboarding (§9.4): under the row-level isolation model the
+      // Scope owns exactly one snapshot row, so dropping the partition is
+      // deleting that row. Every other Scope's row in the shared table is
+      // untouched, so offboarding one tenant is invisible to the rest.
+      await deletePersistedStateSnapshot(this.sql, this.schemaName, this.scope);
     } finally {
       releaseQueue?.();
     }

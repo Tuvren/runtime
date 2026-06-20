@@ -38,6 +38,8 @@ import type {
   ExecutionHandle,
   HandoffContextBuilder,
   ListThreadsCursor,
+  ReclamationSummary,
+  RuntimeMaintenance,
   RuntimeResolution,
   ThreadSummary,
   TurnHistoryCursor,
@@ -250,6 +252,13 @@ export interface RuntimeCoreOptions {
    * intact. Defaults to a plaintext identity codec, so unset hosts are unchanged.
    */
   payloadCodec?: PayloadCodec;
+  /**
+   * Substrate partition-drop callback for full tenant offboarding (ADR-051,
+   * §4.17). Wired by `createTuvren` from the owned backend's `purgeScope`; left
+   * unset when the runtime is constructed against an externally-supplied kernel
+   * (no owned substrate), in which case `maintenance.purgeScope()` rejects.
+   */
+  purgeScope?: () => Promise<void>;
   resolveAgentConfig?: (agentName: string) => AgentConfig | undefined;
   resolveParentTurnId?: (
     threadId: string,
@@ -279,6 +288,7 @@ interface ResolvedRuntimeCoreOptions {
   now: () => EpochMs;
   onWarning?: (warning: RuntimeWarning) => void;
   payloadCodec: PayloadCodec;
+  purgeScope?: () => Promise<void>;
   resolveAgentConfig?: (agentName: string) => AgentConfig | undefined;
   resolveParentTurnId?: (
     threadId: string,
@@ -374,6 +384,7 @@ class RuntimeCore implements TuvrenRuntime {
       now: options.now ?? Date.now,
       onWarning: options.onWarning,
       payloadCodec: options.payloadCodec ?? IDENTITY_PAYLOAD_CODEC,
+      purgeScope: options.purgeScope,
       resolveAgentConfig: options.resolveAgentConfig,
       resolveParentTurnId: options.resolveParentTurnId,
       runLiveness:
@@ -679,6 +690,28 @@ class RuntimeCore implements TuvrenRuntime {
 
   listBranches(input: { threadId: string }): Promise<BranchSummary[]> {
     return listBranches(this.options.kernel, input);
+  }
+
+  // ── Data-Lifecycle Maintenance Surface (ADR-051, §4.17) ────────────────
+  get maintenance(): RuntimeMaintenance {
+    return {
+      reclaim: (options?: { nowMs?: EpochMs }): Promise<ReclamationSummary> =>
+        // The kernel reclamation summary is structurally the host-facing
+        // ReclamationSummary; capability gating + grace-windowing live in the
+        // kernel/backend, so the runtime only forwards the mechanism call.
+        this.options.kernel.maintenance.reclaim(options),
+      purgeScope: (): Promise<void> => this.purgeBoundScope(),
+    };
+  }
+
+  private async purgeBoundScope(): Promise<void> {
+    if (this.options.purgeScope === undefined) {
+      throw new TuvrenRuntimeError(
+        "maintenance.purgeScope is unavailable: the runtime does not own a backend that supports dropping a Scope partition (for example when constructed with an externally-supplied kernel)",
+        { code: "scope_purge_unsupported" }
+      );
+    }
+    await this.options.purgeScope();
   }
 
   getTurnState(input: {

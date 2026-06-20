@@ -16,7 +16,7 @@
 
 import { AsyncLocalStorage } from "node:async_hooks";
 import { createHash } from "node:crypto";
-import { mkdirSync, readFileSync } from "node:fs";
+import { mkdirSync, readFileSync, rmSync } from "node:fs";
 import { dirname, format, parse } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
@@ -158,6 +158,12 @@ import { TransactionWriteTracker } from "./sqlite-write-tracker.js";
 const ORDERED_PATH_CHUNK_THRESHOLD = 32;
 const ORDERED_PATH_CHUNK_SIZE = 32;
 const SQLITE_BUSY_TIMEOUT_MS = 5000;
+/**
+ * The on-disk artifacts a WAL-mode SQLite database leaves behind: the database
+ * file itself and its write-ahead-log / shared-memory sidecars. `purgeScope`
+ * removes all three so dropping a Scope partition leaves nothing on disk.
+ */
+const SQLITE_PARTITION_FILE_SUFFIXES = ["", "-wal", "-shm"] as const;
 const FAULT_INJECTION_CONTROL = Symbol(
   "tuvren.kernel.testkit.fault-injection-control"
 );
@@ -229,6 +235,12 @@ class SqliteBackend implements KrakenBackend {
     hooks: null,
   };
   private readonly now: () => number;
+  /**
+   * The concrete per-Scope database file backing this backend (file-per-scope
+   * isolation, ADR-049). Retained so `purgeScope` can drop the partition by
+   * removing exactly this Scope's file and its WAL/SHM sidecars.
+   */
+  private readonly scopedDatabasePath: string;
   private readonly transactionContext = new AsyncLocalStorage<boolean>();
   private transactionQueue: Promise<void> = Promise.resolve();
 
@@ -236,7 +248,11 @@ class SqliteBackend implements KrakenBackend {
     this.now = options.now ?? Date.now;
     const scope = options.scope ?? DEFAULT_SCOPE;
     assertScope(scope);
-    this.db = openConfiguredDatabase(options.databasePath, scope);
+    this.scopedDatabasePath = resolveScopedDatabasePath(
+      normalizePersistentDatabasePath(options.databasePath),
+      scope
+    );
+    this.db = openConfiguredDatabase(this.scopedDatabasePath);
     runMigrations(this.db, this.now);
   }
 
@@ -282,8 +298,36 @@ class SqliteBackend implements KrakenBackend {
   }
 
   close(): Promise<void> {
-    this.db.close();
+    // Idempotent: `purgeScope` already closes the handle when it drops the
+    // partition file, and host disposal may still call `close` afterward.
+    if (this.db.open) {
+      this.db.close();
+    }
     return Promise.resolve();
+  }
+
+  purgeScope(): Promise<void> {
+    if (this.transactionContext.getStore() === true) {
+      throw persistenceError(
+        "sqlite backend scope purge must not run inside a transaction",
+        "sqlite_backend_nested_transaction"
+      );
+    }
+
+    // Full tenant offboarding (§9.4): the Scope is realized as its own database
+    // file (file-per-scope, ADR-049), so dropping the partition is closing the
+    // handle and removing that file plus its WAL/SHM sidecars. Other Scopes live
+    // in sibling files and are untouched. The backend is unusable afterward,
+    // exactly like `close`.
+    return this.queueConnectionWork(() => {
+      if (this.db.open) {
+        this.db.close();
+      }
+      for (const suffix of SQLITE_PARTITION_FILE_SUFFIXES) {
+        rmSync(`${this.scopedDatabasePath}${suffix}`, { force: true });
+      }
+      return Promise.resolve();
+    });
   }
 
   transact<T>(work: (tx: KrakenBackendTx) => Promise<T>): Promise<T> {
@@ -662,16 +706,7 @@ function configureDatabase(db: Database.Database): void {
   }
 }
 
-function openConfiguredDatabase(
-  databasePath: string,
-  scope: Scope
-): Database.Database {
-  const normalizedDatabasePath = normalizePersistentDatabasePath(databasePath);
-  const scopedDatabasePath = resolveScopedDatabasePath(
-    normalizedDatabasePath,
-    scope
-  );
-
+function openConfiguredDatabase(scopedDatabasePath: string): Database.Database {
   try {
     ensureDatabaseDirectory(scopedDatabasePath);
     const db = new Database(scopedDatabasePath, {

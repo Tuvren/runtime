@@ -153,7 +153,8 @@ export function createTuvren(
   // When a pre-built kernel is supplied, skip backend construction entirely.
   // The kernel already owns its backend; constructing a second one would open
   // an idle connection pool / file handle that is immediately discarded.
-  const { kernel, disposeBackend } = resolveKernelAndDispose(options);
+  const { kernel, disposeBackend, purgeScope } =
+    resolveKernelAndDispose(options);
 
   const driver = buildDriver(options.driver);
   const driverRegistry = createDriverRegistry([driver]);
@@ -177,6 +178,7 @@ export function createTuvren(
     driverRegistry,
     kernel,
     payloadCodec: options.payloadCodec ?? options.runtimeOptions?.payloadCodec,
+    ...(purgeScope === undefined ? {} : { purgeScope }),
     telemetry: options.telemetry ?? options.runtimeOptions?.telemetry,
   });
 
@@ -222,12 +224,28 @@ export function createTuvren(
 function resolveKernelAndDispose(options: CreateTuvrenOptions): {
   kernel: RuntimeKernel;
   disposeBackend: () => Promise<void>;
+  purgeScope?: () => Promise<void>;
 } {
   if (options.kernel !== undefined) {
+    // An externally-supplied kernel owns its substrate; `createTuvren` has no
+    // backend handle to drive a partition drop, so `maintenance.purgeScope`
+    // stays unavailable on the resulting runtime.
     return { kernel: options.kernel, disposeBackend: () => Promise.resolve() };
   }
   const { backend, disposeBackend } = buildBackend(options.backend);
-  return { kernel: createRuntimeKernel({ backend }), disposeBackend };
+  return {
+    kernel: createRuntimeKernel({ backend }),
+    disposeBackend,
+    // Surface the substrate partition-drop (ADR-051, §4.17) only when the owned
+    // backend implements it; otherwise the runtime maintenance surface reports
+    // it as unsupported.
+    ...(typeof backend.purgeScope === "function"
+      ? {
+          purgeScope: (): Promise<void> =>
+            backend.purgeScope?.() ?? Promise.resolve(),
+        }
+      : {}),
+  };
 }
 
 function buildBackend(spec: CreateTuvrenOptions["backend"]): {

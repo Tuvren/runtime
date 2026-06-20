@@ -1239,6 +1239,56 @@ export type ListThreadsCursor = string; // opaque to host; see TechSpec §3.8
 export type TurnHistoryCursor = string; // opaque to host; see TechSpec §3.8
 export type BranchMessagesCursor = string; // opaque to host; see TechSpec §3.8
 
+/**
+ * Host-facing projection of the kernel reclamation summary (kernel spec §9.4;
+ * cross-language authority: `@tuvren/kernel-protocol` `ReclamationSummary`).
+ * Counts the durable state released and retained within the runtime's bound
+ * Scope by a reachability reclamation sweep. The framework returns the kernel's
+ * summary unchanged, so the two shapes are intentionally identical.
+ */
+export interface ReclamationSummary {
+  releasedArchivedBranchCount: number;
+  releasedObjectCount: number;
+  releasedOrderedPathChunkCount: number;
+  releasedRunCount: number;
+  releasedTurnCount: number;
+  releasedTurnNodeCount: number;
+  releasedTurnTreeCount: number;
+  retainedObjectCount: number;
+}
+
+/**
+ * Host-facing data-lifecycle maintenance surface (ADR-051; architecture flow
+ * §4.17). The runtime owns the mechanism only; the host owns retention policy
+ * and key custody. Erasure (right-to-erasure / crypto-shredding) is the host
+ * destroying a Scope's payload-encryption keys on its own keyring — never a
+ * runtime call, since the runtime never holds keys.
+ */
+export interface RuntimeMaintenance {
+  /**
+   * Drops the bound Scope's entire durable partition for full tenant
+   * offboarding (architecture flow §4.17). Unlike `reclaim`, this removes all of
+   * the Scope's state, not only the unreachable remainder. Per kernel spec §9.4
+   * this is a substrate concern outside the kernel syscall surface, so it is
+   * driven directly against the durable backend rather than through a kernel
+   * operation. Crypto-shredding erasure remains the host destroying the Scope's
+   * payload keys; this call removes the residual ciphertext partition. Rejects
+   * when the runtime does not own a backend that supports partition drop (for
+   * example when constructed with an externally-supplied kernel).
+   */
+  purgeScope(): Promise<void>;
+  /**
+   * Drives capability-gated reachability reclamation (kernel spec §9.4) for the
+   * runtime's bound Scope: releases durable state unreachable from live roots
+   * (non-archived branch heads, thread roots, active-run staged work),
+   * grace-windowed against the oldest active execution lease so it can never
+   * race recovery. Rejects with a persistence error when the backend does not
+   * advertise `maintenance.reclamation`. The host decides when (and whether) to
+   * call it; the runtime supplies no retention policy.
+   */
+  reclaim(options?: { nowMs?: EpochMs }): Promise<ReclamationSummary>;
+}
+
 export interface TuvrenRuntime {
   createBranch(input: {
     branchId?: string;
@@ -1296,6 +1346,11 @@ export interface TuvrenRuntime {
     cursor?: ListThreadsCursor;
     filter?: { schemaId?: string };
   }): Promise<{ threads: ThreadSummary[]; nextCursor?: ListThreadsCursor }>;
+
+  // ── Data-Lifecycle Maintenance Surface (ADR-051, §4.17) ─────────────────
+  // Host-facing reclamation + tenant-offboarding mechanism. Retention policy
+  // and key custody stay host-owned.
+  maintenance: RuntimeMaintenance;
 
   // A reclaimed/crypto-shredded message (ADR-051, KRT-BF005) surfaces as a typed
   // `ErasedPayload` marker (distinguished by `kind: "erased"`) instead of a

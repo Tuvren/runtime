@@ -75,6 +75,8 @@ export type {
   LoopPolicy,
   OrchestrationHandle,
   OrchestrationRuntime,
+  ReclamationSummary,
+  RuntimeMaintenance,
   RuntimeResolution,
   TuvrenRuntime,
 } from "@tuvren/core/execution";
