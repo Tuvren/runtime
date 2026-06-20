@@ -91,6 +91,62 @@ async function checkpointEventIntoBranchHead(
   return completed.turnNodeHash;
 }
 
+/**
+ * Runs a single checkpoint step that stages `messageBytes` as a `message`, so the
+ * schema incorporates it into the checkpoint's turn tree `messages` path (and a
+ * checkpoint chained on top of this node inherits it). Returns the checkpoint
+ * turn node, its owning turn id, and the stored message object hash so callers
+ * can build genuinely shared objects across divergent lineage.
+ */
+async function checkpointMessageIntoBranchHead(
+  fixture: ReclamationFixture,
+  input: {
+    messageBytes: Uint8Array;
+    parentTurnId: string | null;
+    runId: string;
+    startTurnNodeHash: string;
+    taskId: string;
+    turnId: string;
+  }
+): Promise<{ objectHash: string; turnId: string; turnNodeHash: string }> {
+  const turn = await fixture.kernel.turn.create(
+    input.turnId,
+    fixture.threadId,
+    fixture.branchId,
+    input.parentTurnId,
+    input.startTurnNodeHash
+  );
+  await fixture.kernel.run.create(
+    input.runId,
+    turn.turnId,
+    fixture.branchId,
+    fixture.schemaId,
+    input.startTurnNodeHash,
+    [{ deterministic: false, id: "checkpoint", sideEffects: false }]
+  );
+  await fixture.kernel.run.beginStep(input.runId, "checkpoint");
+  const staged = await fixture.kernel.staging.stage(
+    input.runId,
+    input.messageBytes,
+    input.taskId,
+    "message",
+    "completed"
+  );
+  const completed = await fixture.kernel.run.completeStep(
+    input.runId,
+    "checkpoint"
+  );
+  if (completed.turnNodeHash === undefined) {
+    throw new Error("expected checkpoint turn node");
+  }
+  await fixture.kernel.run.complete(input.runId, "completed");
+  return {
+    objectHash: staged.objectHash,
+    turnId: turn.turnId,
+    turnNodeHash: completed.turnNodeHash,
+  };
+}
+
 describe("createRuntimeKernel maintenance.reclamation", () => {
   test("releases objects unreachable from live roots and retains reachable lineage", async () => {
     const fixture = await createReclamationFixture();
@@ -207,6 +263,126 @@ describe("createRuntimeKernel maintenance.reclamation", () => {
     );
     expect(
       await fixture.kernel.node.get(fixture.rootTurnNodeHash)
+    ).not.toBeNull();
+  });
+
+  test("retains a structurally shared object referenced by both a live and an archived node", async () => {
+    const fixture = await createReclamationFixture();
+
+    // A shared message staged at the live ancestor checkpoint.
+    const shared = await checkpointMessageIntoBranchHead(fixture, {
+      messageBytes: new Uint8Array([5, 5, 5]),
+      parentTurnId: null,
+      runId: "run_shared",
+      startTurnNodeHash: fixture.rootTurnNodeHash,
+      taskId: "msg_shared",
+      turnId: "turn_shared",
+    });
+    // A forward checkpoint whose tree inherits the shared message and adds an
+    // archive-exclusive one, so the shared object is referenced by both nodes.
+    const archived = await checkpointMessageIntoBranchHead(fixture, {
+      messageBytes: new Uint8Array([7, 7, 7]),
+      parentTurnId: shared.turnId,
+      runId: "run_archived",
+      startTurnNodeHash: shared.turnNodeHash,
+      taskId: "msg_archived",
+      turnId: "turn_archived",
+    });
+
+    const archivedNode = await fixture.kernel.node.get(archived.turnNodeHash);
+    const archivedManifest = await fixture.kernel.tree.manifest(
+      (archivedNode as { turnTreeHash: string }).turnTreeHash
+    );
+    expect(archivedManifest.messages).toContain(shared.objectHash);
+    expect(archivedManifest.messages).toContain(archived.objectHash);
+
+    // Roll the live head back to the shared ancestor: the forward node is
+    // archived and becomes the only referrer of the archive-exclusive object.
+    const rollback = await fixture.kernel.branch.setHead(
+      fixture.branchId,
+      shared.turnNodeHash
+    );
+    expect(rollback.archiveBranch?.headTurnNodeHash).toBe(
+      archived.turnNodeHash
+    );
+
+    await fixture.kernel.maintenance.reclaim();
+
+    // The shared object survives via the live branch (keep is a set-union over
+    // live roots); the archive-exclusive object and its node are released.
+    expect(await fixture.kernel.store.has(shared.objectHash)).toBe(true);
+    expect(await fixture.kernel.store.has(archived.objectHash)).toBe(false);
+    expect(await fixture.kernel.node.get(archived.turnNodeHash)).toBeNull();
+    expect(await fixture.kernel.node.get(shared.turnNodeHash)).not.toBeNull();
+  });
+
+  test("retains an object older than the grace horizon referenced by a newer-than-horizon node", async () => {
+    const fixture = await createReclamationFixture(10);
+
+    // An object and an equally-old orphan, both created before the lease horizon.
+    const orphanOld = await fixture.kernel.store.put(new Uint8Array([1]));
+    const oldCheckpoint = await checkpointMessageIntoBranchHead(fixture, {
+      messageBytes: new Uint8Array([9, 9, 9]),
+      parentTurnId: null,
+      runId: "run_old",
+      startTurnNodeHash: fixture.rootTurnNodeHash,
+      taskId: "msg_old",
+      turnId: "turn_old",
+    });
+    const oldObjectHash = oldCheckpoint.objectHash;
+
+    // An active execution lease on a second thread sets the grace horizon at 20.
+    fixture.setClock(20);
+    const leaseThread = await fixture.kernel.thread.create(
+      "thread_lease",
+      fixture.schemaId,
+      "branch_lease"
+    );
+    const leaseTurn = await fixture.kernel.turn.create(
+      "turn_lease",
+      leaseThread.threadId,
+      leaseThread.branchId,
+      null,
+      leaseThread.rootTurnNodeHash
+    );
+    await fixture.kernel.run.create(
+      "run_lease",
+      leaseTurn.turnId,
+      leaseThread.branchId,
+      fixture.schemaId,
+      leaseThread.rootTurnNodeHash,
+      [{ deterministic: true, id: "work", sideEffects: false }]
+    );
+
+    // A node created AFTER the horizon that inherits the old object, then is
+    // archived (rolled off the live branch) so it is not itself a live root.
+    fixture.setClock(30);
+    const newerCheckpoint = await checkpointMessageIntoBranchHead(fixture, {
+      messageBytes: new Uint8Array([2, 2, 2]),
+      parentTurnId: oldCheckpoint.turnId,
+      runId: "run_new",
+      startTurnNodeHash: oldCheckpoint.turnNodeHash,
+      taskId: "msg_new",
+      turnId: "turn_new",
+    });
+    const rollback = await fixture.kernel.branch.setHead(
+      fixture.branchId,
+      fixture.rootTurnNodeHash
+    );
+    expect(rollback.archiveBranch?.headTurnNodeHash).toBe(
+      newerCheckpoint.turnNodeHash
+    );
+
+    fixture.setClock(40);
+    await fixture.kernel.maintenance.reclaim();
+
+    // The old object is retained via the newer-than-horizon node's reference
+    // closure across the grace horizon — proven decisively by the equally-old
+    // orphan (no such reference) being released.
+    expect(await fixture.kernel.store.has(oldObjectHash)).toBe(true);
+    expect(await fixture.kernel.store.has(orphanOld)).toBe(false);
+    expect(
+      await fixture.kernel.node.get(newerCheckpoint.turnNodeHash)
     ).not.toBeNull();
   });
 

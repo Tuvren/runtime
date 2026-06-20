@@ -242,6 +242,28 @@ const EVIDENCE = {
     generatedArtifact:
       "N/A - scope isolation is conformance-plan authority without generated schema artifacts",
   },
+  // Data-lifecycle reclamation + crypto-shredding erasure (kernel spec §9.4,
+  // ADR-051). KRT-BF001 declared the maintenance.reclamation surface and its
+  // conformance-plan reference; KRT-BF003/BF004 realize the primitive across the
+  // memory, SQLite, and PostgreSQL backends. KRT-BF007 promoted the plan to
+  // runnable, registered, evidence-backed conformance: the plan is registered in
+  // the kernel-protocol packet, the three adapters advertise kernel.reclamation
+  // and answer the reclaim-probe and erasure-probe operations, and the
+  // compatibility evidence below records both across all three backends, so the
+  // §9.4 claim is now authority-backed-conformance-covered.
+  reclamation: {
+    adapterCapability: "kernel.reclamation",
+    authorityPacket:
+      "boundaries/kernel/contracts/protocol/spec/authority-packet.json",
+    compatibilityEvidence:
+      "reports/compatibility/evidence/shared-conformance-runner.kernel-typescript-conformance-runner.json; reports/compatibility/evidence/shared-conformance-runner.kernel-typescript-sqlite-conformance-runner.json; reports/compatibility/evidence/shared-conformance-runner.kernel-typescript-postgres-conformance-runner.json",
+    conformancePlan:
+      "boundaries/kernel/conformance/plans/kernel-reclamation.json",
+    fixture:
+      "boundaries/kernel/conformance/fixtures/kernel-protocol-logical.json",
+    generatedArtifact:
+      "N/A - data-lifecycle reclamation and crypto-shredding erasure are conformance-plan authority without generated schema artifacts",
+  },
   providerApi: {
     adapterCapability: "providers.provider-api; providers.ai-sdk-bridge",
     authorityPacket:
@@ -1012,19 +1034,20 @@ function classifySaaSReadinessTargetClaim(
     );
   }
 
-  // §9.4 carries the new reclamation primitive directly; the appendix capability
-  // index also summarizes "Reachability reclamation". Both are the same deferred
-  // target surface, so neither may inherit conformance coverage.
+  // §9.4 carries the reclamation primitive directly; the appendix capability
+  // index also summarizes "Reachability reclamation". Both are the same surface.
+  // KRT-BF007 promoted the data-lifecycle conformance plan to runnable,
+  // registered, evidence-backed coverage (reclaim-probe + erasure-probe across
+  // the memory, SQLite, and PostgreSQL adapters), so both are now
+  // authority-backed-conformance-covered.
   if (
     (isSection(section, "9.4") ||
       (section === "appendix" && text.includes("reachab"))) &&
     text.includes("reclamation")
   ) {
-    return missingConformanceDecision(
+    return authorityDecision(
       "kernel reachability reclamation",
-      EVIDENCE.kernelProtocol,
-      "KRT-BF007",
-      "The capability-gated, grace-windowed reachability reclamation primitive (kernel spec §9.4) is a SaaS-readiness target semantic. KRT-BF001 declared the maintenance.reclamation surface and its conformance-plan reference (boundaries/kernel/conformance/plans/kernel-reclamation.json) in the kernel-protocol authority packet bindingSections.reclamation; KRT-BF003/BF004 realize the primitive; portable conformance lands when KRT-BF007 promotes the plan to runnable, registered, evidence-backed coverage."
+      EVIDENCE.reclamation
     );
   }
 

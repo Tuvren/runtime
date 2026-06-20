@@ -1,6 +1,6 @@
 {
   "planId": "tuvren.kernel.reclamation",
-  "planVersion": "0.1.0",
+  "planVersion": "0.2.0",
   "packetId": "tuvren.kernel.protocol",
   "applicability": {
     "capabilities": ["kernel.reclamation"]
@@ -57,6 +57,38 @@
         }
       ],
       "evidence": ["reclaim.graceWindowHeldUnderActiveLease"]
+    },
+    {
+      "checkId": "kernel.reclamation.erasure_payload_unrecoverable_after_key_destruction",
+      "operation": "kernel.reclamation.erasure-probe",
+      "assertions": [
+        {
+          "kind": "resultField",
+          "field": "$.erasure.recoverableBeforeErasure",
+          "equals": true
+        },
+        {
+          "kind": "resultField",
+          "field": "$.erasure.unrecoverableAfterErasure",
+          "equals": true
+        }
+      ],
+      "evidence": [
+        "erasure.recoverableBeforeErasure",
+        "erasure.unrecoverableAfterErasure"
+      ]
+    },
+    {
+      "checkId": "kernel.reclamation.erasure_preserves_referencing_lineage",
+      "operation": "kernel.reclamation.erasure-probe",
+      "assertions": [
+        {
+          "kind": "resultField",
+          "field": "$.erasure.lineageStructurallyIntactAfterErasure",
+          "equals": true
+        }
+      ],
+      "evidence": ["erasure.lineageStructurallyIntactAfterErasure"]
     }
   ]
 }
