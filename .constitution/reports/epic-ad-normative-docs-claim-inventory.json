@@ -5218,7 +5218,7 @@
     },
     {
       "affectedBoundary": "kernel",
-      "adapterCapability": "kernel.reclamation",
+      "adapterCapability": "kernel.protocol; kernel.logical",
       "claimFingerprint": "b0c587b879e0a52e8ae5f4203b8a1c3591f9b48a3ec25195a471a0e295e8bd7a",
       "claimId": "KER-B0C587B879E0",
       "duplicateOf": null,
@@ -5228,7 +5228,7 @@
       "sectionHeading": "9.4 `maintenance.reclamation` Capability (v0.12)",
       "sectionKey": "9.4",
       "sourceFile": "docs/KrakenKernelSpecification.md",
-      "surface": "kernel reachability reclamation",
+      "surface": "kernel capability-gated syscalls",
       "text": "**`false`**: Backend does not implement reclamation; any reclamation invocation is rejected with `TuvrenPersistenceError` code `kernel_capability_unsupported`. Object-store-style substrates may reclaim out of band and advertise non-support."
     },
     {

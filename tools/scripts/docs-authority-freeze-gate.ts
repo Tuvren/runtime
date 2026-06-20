@@ -1038,12 +1038,26 @@ function classifySaaSReadinessTargetClaim(
   // index also summarizes "Reachability reclamation". Both are the same surface.
   // KRT-BF007 promoted the data-lifecycle conformance plan to runnable,
   // registered, evidence-backed coverage (reclaim-probe + erasure-probe across
-  // the memory, SQLite, and PostgreSQL adapters), so both are now
-  // authority-backed-conformance-covered.
+  // the memory, SQLite, and PostgreSQL adapters), so the reclamation *mechanism*
+  // is authority-backed-conformance-covered.
+  //
+  // The promoted plan's applicability is `kernel.reclamation`, so it only ever
+  // runs against capability-bearing backends; it does NOT exercise the §9.4
+  // `false` non-support row (a backend advertising maintenance.reclamation=false
+  // rejecting with the `kernel_capability_unsupported` typed error). That row is
+  // governed by the capability-gate contract (ADR-034), not the reclamation
+  // mechanism, so it is deliberately excluded here and left to the canonical
+  // capability-gating classifier (classifyKernelCoreSection, §9 → KRT-AM010).
+  // Letting the single ADR-034 rule own that decision keeps this branch from
+  // re-asserting coverage the capable-path evidence never produced. The
+  // discriminator is the `kernel_capability_unsupported` typed-error code — a
+  // stable contract token (kernel-types.ts / the kernel-protocol authority
+  // packet), not incidental prose.
   if (
     (isSection(section, "9.4") ||
       (section === "appendix" && text.includes("reachab"))) &&
-    text.includes("reclamation")
+    text.includes("reclamation") &&
+    !text.includes("kernel_capability_unsupported")
   ) {
     return authorityDecision(
       "kernel reachability reclamation",
