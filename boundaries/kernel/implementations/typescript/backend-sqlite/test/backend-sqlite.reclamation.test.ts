@@ -30,6 +30,9 @@ const TEST_SCHEMA = {
   schemaId: "schema_sqlite_reclamation",
 } satisfies TurnTreeSchema;
 
+const UNSUPPORTED_RECLAMATION_PATTERN =
+  /maintenance\.reclamation is not supported by this backend/;
+
 const openBackends: { close(): Promise<void> }[] = [];
 
 async function createReclamationKernel() {
@@ -151,7 +154,7 @@ describe("createSqliteBackend maintenance.reclamation", () => {
 
     await rejects(
       kernel.maintenance.reclaim(),
-      /maintenance\.reclamation is not supported by this backend/
+      UNSUPPORTED_RECLAMATION_PATTERN
     );
   });
 });

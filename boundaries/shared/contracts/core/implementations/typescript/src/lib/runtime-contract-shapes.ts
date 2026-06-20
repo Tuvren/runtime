@@ -22,6 +22,7 @@ import type {
   ExecutionClass,
 } from "./capability-shapes.js";
 import type { EpochMs, HashString } from "./kernel-records.js";
+import type { ErasedPayload } from "./payload-codec.js";
 import type { TuvrenError } from "./tuvren-error.js";
 
 export type TuvrenJsonValue =
@@ -1296,11 +1297,18 @@ export interface TuvrenRuntime {
     filter?: { schemaId?: string };
   }): Promise<{ threads: ThreadSummary[]; nextCursor?: ListThreadsCursor }>;
 
+  // A reclaimed/crypto-shredded message (ADR-051, KRT-BF005) surfaces as a typed
+  // `ErasedPayload` marker (distinguished by `kind: "erased"`) instead of a
+  // decoded message, so the read stays total and the lineage hash structure
+  // referencing it is unchanged.
   readBranchMessages(input: {
     branchId: string;
     limit?: number;
     after?: BranchMessagesCursor;
-  }): Promise<{ messages: TuvrenMessage[]; nextCursor?: BranchMessagesCursor }>;
+  }): Promise<{
+    messages: (ErasedPayload | TuvrenMessage)[];
+    nextCursor?: BranchMessagesCursor;
+  }>;
   setBranchHead(input: {
     branchId: string;
     turnNodeHash: HashString;

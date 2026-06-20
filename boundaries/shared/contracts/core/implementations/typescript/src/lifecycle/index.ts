@@ -14,28 +14,19 @@
  * limitations under the License.
  */
 
-import { defineConfig } from "tsup";
-
-export default defineConfig({
-  clean: true,
-  dts: false,
-  entry: [
-    "src/index.ts",
-    "src/errors/index.ts",
-    "src/messages/index.ts",
-    "src/events/index.ts",
-    "src/execution/index.ts",
-    "src/tools/index.ts",
-    "src/driver/index.ts",
-    "src/provider/index.ts",
-    "src/extensions/index.ts",
-    "src/telemetry/index.ts",
-    "src/capabilities/index.ts",
-    "src/lifecycle/index.ts",
-  ],
-  format: ["esm"],
-  outDir: "dist",
-  sourcemap: false,
-  tsconfig: "tsconfig.tsup.json",
-  target: "esnext",
-});
+// biome-ignore-all lint/performance/noBarrelFile: This package subpath is the intentional focused contract surface.
+// Data-lifecycle: crypto-shredding payload codec contract + default AES-256-GCM
+// codec (ADR-051, SPK-BF002 / KRT-BF005).
+export {
+  type AesGcmPayloadCodecOptions,
+  createAesGcmPayloadCodec,
+  createIdentityPayloadCodec,
+  type ErasedPayload,
+  IDENTITY_PAYLOAD_CODEC,
+  isErasedPayload,
+  isPayloadEnvelope,
+  type PayloadCodec,
+  type PayloadCodecContext,
+  type PayloadDecryptResult,
+  type PayloadKeyring,
+} from "../lib/payload-codec.js";

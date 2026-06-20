@@ -44,6 +44,11 @@ import type {
   TurnSnapshot,
   TuvrenRuntime,
 } from "@tuvren/core/execution";
+import {
+  type ErasedPayload,
+  IDENTITY_PAYLOAD_CODEC,
+  type PayloadCodec,
+} from "@tuvren/core/lifecycle";
 import type {
   ToolCallPart,
   ToolResultPart,
@@ -64,6 +69,7 @@ import {
   listThreads,
   readBranchMessages,
 } from "./durable-reads.js";
+import type { PayloadCodecBinding } from "./payload-codec-seam.js";
 import {
   createBoundExceededError,
   getBoundExceededDetails,
@@ -236,6 +242,14 @@ export interface RuntimeCoreOptions {
   manifestExtensionStateWarningBudgetBytes?: false | number;
   now?: () => EpochMs;
   onWarning?: (warning: RuntimeWarning) => void;
+  /**
+   * Opt-in crypto-shredding codec (ADR-051, KRT-BF005). When supplied, durable
+   * untrusted-edge message payloads are encrypted under host-held keys before
+   * `store.put`/`staging.stage` and decrypted on durable read; destroying a key
+   * renders the payload unrecoverable while leaving the lineage hash structure
+   * intact. Defaults to a plaintext identity codec, so unset hosts are unchanged.
+   */
+  payloadCodec?: PayloadCodec;
   resolveAgentConfig?: (agentName: string) => AgentConfig | undefined;
   resolveParentTurnId?: (
     threadId: string,
@@ -264,6 +278,7 @@ interface ResolvedRuntimeCoreOptions {
   manifestExtensionStateWarningBudgetBytes: false | number;
   now: () => EpochMs;
   onWarning?: (warning: RuntimeWarning) => void;
+  payloadCodec: PayloadCodec;
   resolveAgentConfig?: (agentName: string) => AgentConfig | undefined;
   resolveParentTurnId?: (
     threadId: string,
@@ -358,6 +373,7 @@ class RuntimeCore implements TuvrenRuntime {
             ),
       now: options.now ?? Date.now,
       onWarning: options.onWarning,
+      payloadCodec: options.payloadCodec ?? IDENTITY_PAYLOAD_CODEC,
       resolveAgentConfig: options.resolveAgentConfig,
       resolveParentTurnId: options.resolveParentTurnId,
       runLiveness:
@@ -398,6 +414,7 @@ class RuntimeCore implements TuvrenRuntime {
           {
             contextOps: this.hosts.contextOps,
             kernel: this.options.kernel,
+            payloadCodecBinding: this.payloadBinding(),
           },
           ...args
         ),
@@ -415,6 +432,7 @@ class RuntimeCore implements TuvrenRuntime {
       createContextEngineeringHelpers: (messageHashes, messages) =>
         createRuntimeCoreContextHelperBundle(
           this.options.kernel,
+          this.payloadBinding(),
           messageHashes,
           messages
         ),
@@ -479,7 +497,12 @@ class RuntimeCore implements TuvrenRuntime {
       },
       kernel: this.options.kernel,
       loadHeadState: (branchId) =>
-        loadHeadStateFacade(this.options.kernel, branchId),
+        loadHeadStateFacade(
+          this.options.kernel,
+          this.payloadBinding(),
+          branchId
+        ),
+      payloadCodecBinding: this.payloadBinding(),
       manifestExtensionStateWarning: (warning) =>
         emitRuntimeWarning(this.options.onWarning, warning),
       materializeContextMessages: (hashes, helpers) =>
@@ -678,10 +701,14 @@ class RuntimeCore implements TuvrenRuntime {
     limit?: number;
     after?: BranchMessagesCursor;
   }): Promise<{
-    messages: TuvrenMessage[];
+    messages: (ErasedPayload | TuvrenMessage)[];
     nextCursor?: BranchMessagesCursor;
   }> {
-    return readBranchMessages(this.options.kernel, input);
+    return readBranchMessages(
+      this.options.kernel,
+      this.payloadBinding(),
+      input
+    );
   }
 
   async getThread(threadId: string): Promise<{
@@ -909,6 +936,7 @@ class RuntimeCore implements TuvrenRuntime {
             {
               contextOps: this.hosts.contextOps,
               kernel: this.options.kernel,
+              payloadCodecBinding: this.payloadBinding(),
             },
             ...args
           ),
@@ -922,7 +950,11 @@ class RuntimeCore implements TuvrenRuntime {
         incorporateQueuedSteeringIfNeeded: (...args) =>
           this.incorporateQueuedSteeringIfNeeded(...args),
         loadHeadState: (branchId) =>
-          loadHeadStateFacade(this.options.kernel, branchId),
+          loadHeadStateFacade(
+            this.options.kernel,
+            this.payloadBinding(),
+            branchId
+          ),
         now: () => this.now(),
         publishCustomEvent: (handle, event, loopState) =>
           publishRuntimeCustomNamedEvent(
@@ -1087,6 +1119,12 @@ class RuntimeCore implements TuvrenRuntime {
 
   private now(): EpochMs {
     return this.options.now();
+  }
+
+  // The crypto-shredding binding (codec + Scope) threaded to every message
+  // write/read seam (KRT-BF005).
+  private payloadBinding(): PayloadCodecBinding {
+    return { codec: this.options.payloadCodec, scope: this.options.scope };
   }
 
   // ── Execution Bounds (ADR-043, KRT-BD006) ───────────────────────────────
