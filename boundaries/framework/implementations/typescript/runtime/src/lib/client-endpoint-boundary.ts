@@ -171,6 +171,14 @@ class BasicClientEndpointBoundary implements ClientEndpointBoundary {
     // this result was produced for a previous invocation and must not mutate
     // the current one. leaseToken already encodes callId, but we validate both
     // explicitly for defense in depth. (KRT-AZ003)
+    //
+    // This is the client-endpoint lease (availability/staleness of THIS
+    // dispatch). It is deliberately distinct from — and composes with, never
+    // conflated with — the run execution lease (write authority): the
+    // client-result-as-proposal run-fencing gate lives at the tool-execution
+    // seam (tool-registry synthetic execute + the commit-under-valid-authority
+    // staging gate), which rejects a result that returns after the run lost
+    // write authority even when this per-dispatch token matches. (KRT-BG004)
     if (reported.leaseToken !== leaseToken || reported.callId !== callId) {
       return null;
     }

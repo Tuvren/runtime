@@ -251,6 +251,35 @@ export function buildClientEndpointTools(
             return makeUnavailableResult(context.callId, capabilityId);
           }
 
+          // Client-result-as-proposal (ADR-052; framework spec "Running Lease
+          // Ownership"): a client-reported result becomes committed history only
+          // through a runtime commit performed under a valid run fencing token.
+          // If the run lost execution authority while the client was producing
+          // the result, the reported result is a stale proposal and MUST NOT be
+          // surfaced as a committed outcome under the dead owner. Loss of
+          // authority aborts context.signal — lease loss aborts it via
+          // createRunLeaseLostError, as do turn cancellation and the wall-clock
+          // deadline (a completion after the deadline is likewise ignored). The
+          // side effect may already have fired on the client; the idempotency
+          // identity on the dispatch envelope lets the client environment
+          // deduplicate it. This run-authority gate is distinct from the
+          // per-dispatch leaseToken staleness guard (the `dispatched === null`
+          // branch below), which only checks that the client echoed the token
+          // minted for THIS dispatch, not whether the run still owns write
+          // authority. (KRT-BG004)
+          if (context.signal?.aborted) {
+            return {
+              callId: context.callId,
+              isError: true,
+              name: capabilityId,
+              output: {
+                code: CAPABILITY_RESULT_STALE,
+                error: `Tuvren-client capability "${capabilityId}" result arrived after the run lost execution authority and was rejected as a stale proposal.`,
+              },
+              type: "tool_result",
+            };
+          }
+
           if (dispatched === null) {
             // Stale late-completion: the endpoint echoed a wrong leaseToken or
             // callId. The result cannot mutate this invocation. Distinct from
