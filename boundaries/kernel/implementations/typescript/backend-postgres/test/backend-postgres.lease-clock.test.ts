@@ -133,6 +133,36 @@ describe("createPostgresBackend backend-authoritative lease clock", () => {
     }
   });
 
+  test("exposes the real PostgreSQL server clock when no clock is injected", async () => {
+    // The skew tests below inject a deterministic backend clock. This test
+    // covers the production path instead: with no injected clock the backend
+    // must read the actual server time via clock_timestamp() once per
+    // transaction. The DB server and the test runner share a host, so the
+    // captured value must sit within the wall-clock window bracketing the
+    // transaction (with a generous tolerance for any host skew).
+    const backend = createPostgresBackend(
+      createPostgresTestBackendOptions()
+    ) as ClosablePostgresBackend;
+
+    try {
+      const beforeMs = Date.now();
+      const backendNowMs = await backend.transact(async (tx) => tx.now?.());
+      const afterMs = Date.now();
+
+      expect(backendNowMs).toBeDefined();
+      if (backendNowMs === undefined) {
+        throw new Error("postgres backend did not expose a transaction clock");
+      }
+      expect(Number.isSafeInteger(backendNowMs)).toBe(true);
+
+      const toleranceMs = 5000;
+      expect(backendNowMs).toBeGreaterThanOrEqual(beforeMs - toleranceMs);
+      expect(backendNowMs).toBeLessThanOrEqual(afterMs + toleranceMs);
+    } finally {
+      await backend.destroy({ dropSchema: true });
+    }
+  });
+
   test("stamps lease expiry in backend time, re-based from the owner duration", async () => {
     const fixture = await createLeaseClockFixture(1000);
 

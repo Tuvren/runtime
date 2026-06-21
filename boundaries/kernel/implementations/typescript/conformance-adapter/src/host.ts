@@ -1259,10 +1259,10 @@ async function runLeaseRenewal(): Promise<Record<string, unknown>> {
           staleTokenCode,
         },
       });
-      // Align the backend's authoritative lease clock with the kernel clock so the
-      // backend-time re-base (ADR-050) is a no-op for shared-lease-clock backends
-      // and the deterministic expected lease values hold across all backends.
     },
+    // Align the backend's authoritative lease clock with the kernel clock so the
+    // backend-time re-base (ADR-050) is a no-op for shared-lease-clock backends
+    // and the deterministic expected lease values hold across all backends.
     { now: () => 10 }
   );
 }
@@ -1363,6 +1363,9 @@ async function runExpiredListing(): Promise<Record<string, unknown>> {
         },
       });
     },
+    // Align the backend's authoritative lease clock with the kernel clock so the
+    // backend-time re-base (ADR-050) is a no-op for shared-lease-clock backends
+    // and the deterministic expected lease values hold across all backends.
     { now: () => 10 }
   );
 }
@@ -1440,6 +1443,9 @@ async function runStalePreemption(): Promise<Record<string, unknown>> {
         },
       });
     },
+    // Align the backend's authoritative lease clock with the kernel clock so the
+    // backend-time re-base (ADR-050) is a no-op for shared-lease-clock backends
+    // and the deterministic expected lease values hold across all backends.
     { now: () => 10 }
   );
 }
