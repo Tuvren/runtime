@@ -122,6 +122,12 @@ if (hasVerificationFailure(results)) {
 }
 
 async function rustChangedSince(ref: string): Promise<boolean> {
+  // Diff the working tree against the base ref directly. This matches how
+  // `nx affected --base=<ref>` selects projects by default — its default head is
+  // the current file system, not a committed SHA — so the Rust gate and the
+  // affected lane react to the same working-tree change set. If a long-diverged
+  // branch ever makes the two disagree, this errs toward over-running the gate
+  // (a `.rs` file already on the base still counts), which is the safe direction.
   const tracked = await gitLines(["git", "diff", "--name-only", ref]);
   const untracked = await gitLines([
     "git",
