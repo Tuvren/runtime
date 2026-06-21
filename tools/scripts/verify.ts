@@ -120,10 +120,68 @@ export const WORKSPACE_EXPORT_SMOKE_PROJECTS: readonly string[] = [
   "host-repl",
 ];
 
+// The read-only constitutional gate: authority/conformance validators that must
+// stay green regardless of which files changed. This is the single source of
+// truth for the gate — the fast `check` inner loop selects a cheap subset of
+// these by ID (see tools/scripts/check.ts), so the two lanes cannot drift
+// apart silently: renaming or removing a step here makes `check`'s subset
+// selection fail loudly instead of quietly dropping a class of drift coverage.
+export const AUTHORITY_GATE_STEPS: readonly VerificationStep[] = [
+  {
+    command: ["bun", "run", "docs:authority-freeze:check"],
+    id: "docs-to-authority freeze gate",
+  },
+  {
+    command: ["bun", "run", "portability:check"],
+    id: "Epic AL portability gate",
+  },
+  {
+    command: ["bun", "run", "docs:af-gap-plan:check"],
+    id: "Epic AF conformance gap plan freshness",
+  },
+  {
+    command: [
+      "bun",
+      "tools/scripts/authority-packet/validate-authority-packets.ts",
+    ],
+    id: "authority packet validation",
+  },
+  {
+    command: ["bun", "tools/conformance/plan-compiler/validate-plans.ts"],
+    id: "conformance plan validation",
+  },
+  {
+    command: [
+      "bun",
+      "tools/conformance/adapter-protocol/validate-adapter-protocol.ts",
+    ],
+    id: "adapter protocol validation",
+  },
+  {
+    command: ["bun", "tools/conformance/meta-conformance/run.ts"],
+    id: "shared conformance runner meta-conformance",
+  },
+  {
+    command: ["bun", "tools/conformance/vocabulary/validate-vocabulary.ts"],
+    id: "vocabulary-check verification",
+  },
+  {
+    command: [
+      "bun",
+      "tools/scripts/authority-guardrails/authority-guardrails.ts",
+    ],
+    id: "machine authority guardrails",
+  },
+];
+
 export const DEFAULT_VERIFICATION_PHASES: readonly VerificationPhase[] = [
   {
     // Read-only static analysis + the constitutional authority/conformance
-    // validators. All independent, so run them concurrently.
+    // validators. All independent, so run them concurrently. Note: parallel
+    // phases do NOT fail-fast — every step runs to completion even after one
+    // fails, so a single `verify` surfaces all static/authority failures at
+    // once instead of stopping at the first (a deliberate change from the old
+    // strictly-serial loop). VERIFY_SERIAL=1 restores first-failure-stops.
     id: "static analysis and authority gates",
     steps: [
       { command: ["bun", "run", "lint"], id: "workspace lint" },
@@ -131,51 +189,7 @@ export const DEFAULT_VERIFICATION_PHASES: readonly VerificationPhase[] = [
         command: ["cargo", "fmt", "--all", "--", "--check"],
         id: "Rust workspace formatting",
       },
-      {
-        command: ["bun", "run", "docs:authority-freeze:check"],
-        id: "docs-to-authority freeze gate",
-      },
-      {
-        command: ["bun", "run", "portability:check"],
-        id: "Epic AL portability gate",
-      },
-      {
-        command: ["bun", "run", "docs:af-gap-plan:check"],
-        id: "Epic AF conformance gap plan freshness",
-      },
-      {
-        command: [
-          "bun",
-          "tools/scripts/authority-packet/validate-authority-packets.ts",
-        ],
-        id: "authority packet validation",
-      },
-      {
-        command: ["bun", "tools/conformance/plan-compiler/validate-plans.ts"],
-        id: "conformance plan validation",
-      },
-      {
-        command: [
-          "bun",
-          "tools/conformance/adapter-protocol/validate-adapter-protocol.ts",
-        ],
-        id: "adapter protocol validation",
-      },
-      {
-        command: ["bun", "tools/conformance/meta-conformance/run.ts"],
-        id: "shared conformance runner meta-conformance",
-      },
-      {
-        command: ["bun", "tools/conformance/vocabulary/validate-vocabulary.ts"],
-        id: "vocabulary-check verification",
-      },
-      {
-        command: [
-          "bun",
-          "tools/scripts/authority-guardrails/authority-guardrails.ts",
-        ],
-        id: "machine authority guardrails",
-      },
+      ...AUTHORITY_GATE_STEPS,
     ],
   },
   {

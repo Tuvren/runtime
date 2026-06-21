@@ -24,6 +24,7 @@
 import process from "node:process";
 import { runCommand } from "./lib/command-runner.js";
 import {
+  AUTHORITY_GATE_STEPS,
   hasVerificationFailure,
   printVerificationSummary,
   runVerification,
@@ -34,37 +35,50 @@ const BASE_FLAG = "--base=";
 const DEFAULT_BASE = "master";
 const CARGO_MANIFEST_PATTERN = /(^|\/)Cargo\.(toml|lock)$/;
 
-// The constitutional gate: fast, read-only validators that keep authority,
-// portability, and conformance plans aligned. Always run, regardless of which
-// files changed — drift here is cheap to detect and expensive to discover late.
-const AUTHORITY_GATE_STEPS: readonly VerificationStep[] = [
-  {
-    command: ["bun", "run", "docs:authority-freeze:check"],
-    id: "docs-to-authority freeze gate",
-  },
-  {
-    command: ["bun", "run", "portability:check"],
-    id: "portability gate",
-  },
-  {
-    command: [
-      "bun",
-      "tools/scripts/authority-packet/validate-authority-packets.ts",
-    ],
-    id: "authority packet validation",
-  },
-  {
-    command: ["bun", "tools/conformance/plan-compiler/validate-plans.ts"],
-    id: "conformance plan validation",
-  },
+// The constitutional gate for the inner loop: the cheap, read-only authority
+// and conformance validators, always run regardless of which files changed —
+// drift here is cheap to detect and expensive to discover late. We select these
+// by ID from verify's shared AUTHORITY_GATE_STEPS rather than re-declaring the
+// commands, so the inner loop cannot silently diverge from `verify`'s gate: if
+// one of these IDs stops matching a verify step, buildInnerLoopAuthorityGate
+// throws instead of quietly dropping that check.
+//
+// `machine authority guardrails` is intentionally omitted: it runs ~4s (vs
+// <500ms for every other gate step) which is too slow for the inner loop, and
+// it is still enforced by `verify` / `verify:kernel`. Every other authority
+// validator is cheap enough to keep here.
+const INNER_LOOP_AUTHORITY_GATE_IDS: readonly string[] = [
+  "docs-to-authority freeze gate",
+  "Epic AL portability gate",
+  "Epic AF conformance gap plan freshness",
+  "authority packet validation",
+  "conformance plan validation",
+  "adapter protocol validation",
+  "shared conformance runner meta-conformance",
+  "vocabulary-check verification",
 ];
+
+function buildInnerLoopAuthorityGate(): VerificationStep[] {
+  return INNER_LOOP_AUTHORITY_GATE_IDS.map((id) => {
+    const step = AUTHORITY_GATE_STEPS.find((candidate) => candidate.id === id);
+
+    if (step === undefined) {
+      throw new Error(
+        `check: authority gate id "${id}" no longer matches a verify gate step. ` +
+          "Update INNER_LOOP_AUTHORITY_GATE_IDS to track tools/scripts/verify.ts."
+      );
+    }
+
+    return step;
+  });
+}
 
 const args = process.argv.slice(2);
 const baseArg = args.find((arg) => arg.startsWith(BASE_FLAG));
 const base = baseArg ? baseArg.slice(BASE_FLAG.length) : DEFAULT_BASE;
 
 const steps: VerificationStep[] = [
-  ...AUTHORITY_GATE_STEPS,
+  ...buildInnerLoopAuthorityGate(),
   {
     command: [
       "bun",
