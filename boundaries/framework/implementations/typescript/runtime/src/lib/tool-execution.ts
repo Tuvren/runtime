@@ -93,6 +93,12 @@ export interface ToolBatchEnvironment {
    */
   capabilityPolicyEngine?: CapabilityPolicyEngine;
   extensions: TuvrenExtension[];
+  /**
+   * Active run lease fencing token, when this batch runs under a run-liveness
+   * lease. Feeds the per-invocation side-effect-once idempotency identity
+   * (ADR-052); absent for runtimes without run-liveness leases.
+   */
+  fencingToken?: string;
   iterationCount: number;
   manifest: ContextManifest;
   maxParallelToolCalls: number;

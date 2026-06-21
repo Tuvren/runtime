@@ -111,7 +111,8 @@ class BasicClientEndpointBoundary implements ClientEndpointBoundary {
   async dispatch(
     capabilityId: string,
     callId: string,
-    input: unknown
+    input: unknown,
+    idempotencyKey?: string
   ): Promise<ClientDispatchResult | null> {
     const entry = this.capabilityIndex.get(capabilityId);
     if (entry === undefined) {
@@ -139,6 +140,10 @@ class BasicClientEndpointBoundary implements ClientEndpointBoundary {
       reported = await entry.endpoint.dispatch({
         callId,
         capabilityId,
+        // Side-effect-once identity (ADR-052): carried on the envelope so the
+        // client environment can deduplicate a retried external effect. Omitted
+        // from the field set when absent so the envelope stays minimal.
+        ...(idempotencyKey === undefined ? {} : { idempotencyKey }),
         input,
         leaseToken,
       });

@@ -188,10 +188,11 @@ async function dispatchToClientEndpoint(
   boundary: ClientEndpointBoundary,
   capabilityId: string,
   callId: string,
-  input: unknown
+  input: unknown,
+  idempotencyKey?: string
 ): Promise<ClientDispatchResult | null | "unavailable"> {
   try {
-    return await boundary.dispatch(capabilityId, callId, input);
+    return await boundary.dispatch(capabilityId, callId, input, idempotencyKey);
   } catch (err) {
     if (
       err instanceof TuvrenRuntimeError &&
@@ -240,7 +241,8 @@ export function buildClientEndpointTools(
             boundary,
             capabilityId,
             context.callId,
-            input
+            input,
+            context.idempotencyKey
           );
 
           if (dispatched === "unavailable") {

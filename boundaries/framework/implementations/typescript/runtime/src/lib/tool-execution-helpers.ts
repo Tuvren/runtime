@@ -34,6 +34,7 @@ import type { ErrorObject, ValidateFunction } from "ajv";
 import Ajv from "ajv";
 import { buildToolAttribution } from "./capability-attribution.js";
 import type { ExtensionStateUpdate } from "./extension-runtime.js";
+import { deriveIdempotencyKey } from "./idempotency-identity.js";
 import { cloneSnapshotPreservingFunctions } from "./runtime-core-shared.js";
 import type {
   EditedApprovalAudit,
@@ -149,6 +150,11 @@ export function createToolExecutionContext(
         source,
       });
     },
+    idempotencyKey: deriveIdempotencyKey(
+      environment.runId,
+      toolCall.callId,
+      environment.fencingToken
+    ),
     metadata:
       tool.metadata === undefined
         ? undefined
