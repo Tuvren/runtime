@@ -11,6 +11,13 @@
   "targets": {
     "conformance": {
       "executor": "nx:run-commands",
+      "inputs": [
+        "default",
+        "^production",
+        "conformanceEngine",
+        "{workspaceRoot}/boundaries/providers/conformance/**/*",
+        "{workspaceRoot}/boundaries/providers/implementations/*/conformance-adapter/**/*"
+      ],
       "options": {
         "cwd": "boundaries/providers/implementations/typescript/conformance-runner",
         "command": "bun ./src/providers-typescript-conformance.ts"

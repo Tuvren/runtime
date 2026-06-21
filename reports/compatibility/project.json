@@ -7,6 +7,15 @@
   "targets": {
     "codegen": {
       "executor": "nx:run-commands",
+      "//": "Cross-boundary aggregator: intentionally broad inputs (every boundary's conformance evidence + adapter manifests). This target stays wide on purpose while per-boundary conformance runners are tightly scoped.",
+      "inputs": [
+        "default",
+        "^production",
+        "{workspaceRoot}/tools/scripts/**/*",
+        "{workspaceRoot}/tools/conformance/**/*",
+        "{workspaceRoot}/boundaries/*/conformance/**/*",
+        "{workspaceRoot}/boundaries/*/implementations/*/conformance-adapter/**/*"
+      ],
       "options": {
         "cwd": ".",
         "command": "bun tools/scripts/compatibility-report.ts --check"
@@ -14,6 +23,14 @@
     },
     "check": {
       "executor": "nx:run-commands",
+      "inputs": [
+        "default",
+        "^production",
+        "{workspaceRoot}/tools/scripts/**/*",
+        "{workspaceRoot}/tools/conformance/**/*",
+        "{workspaceRoot}/boundaries/*/conformance/**/*",
+        "{workspaceRoot}/boundaries/*/implementations/*/conformance-adapter/**/*"
+      ],
       "options": {
         "cwd": ".",
         "command": "bun tools/scripts/compatibility-report.ts --check"
@@ -21,6 +38,14 @@
     },
     "evidence-refresh": {
       "executor": "nx:run-commands",
+      "inputs": [
+        "default",
+        "^production",
+        "{workspaceRoot}/tools/scripts/**/*",
+        "{workspaceRoot}/tools/conformance/**/*",
+        "{workspaceRoot}/boundaries/*/conformance/**/*",
+        "{workspaceRoot}/boundaries/*/implementations/*/conformance-adapter/**/*"
+      ],
       "outputs": [
         "{workspaceRoot}/reports/compatibility/compatibility-matrix.json",
         "{workspaceRoot}/reports/compatibility/evidence"

@@ -11,6 +11,13 @@
   "targets": {
     "conformance": {
       "executor": "nx:run-commands",
+      "inputs": [
+        "default",
+        "^production",
+        "conformanceEngine",
+        "{workspaceRoot}/boundaries/framework/conformance/**/*",
+        "{workspaceRoot}/boundaries/framework/implementations/*/conformance-adapter/**/*"
+      ],
       "dependsOn": [
         {
           "projects": ["kernel-interop-grpc"],

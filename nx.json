@@ -9,43 +9,26 @@
       "!{projectRoot}/coverage/**/*",
       "!{projectRoot}/*.tsbuildinfo"
     ],
-    "production": ["default"]
+    "production": ["default"],
+    "conformanceEngine": ["{workspaceRoot}/tools/conformance/**/*"]
   },
   "targetDefaults": {
     "codegen": {
       "cache": true,
+      "//": "Baseline only. Every codegen target declares its own scoped inputs/outputs in project.json (project-level inputs REPLACE this default, they do not merge). Keep this default free of cross-boundary globs so a future un-scoped codegen target does not silently depend on unrelated boundaries.",
       "inputs": [
         "default",
         "^production",
         "{workspaceRoot}/tools/generators/**/*",
         "{workspaceRoot}/tools/scripts/**/*",
-        "{workspaceRoot}/tools/conformance/**/*",
-        "{workspaceRoot}/boundaries/*/conformance/**/*",
-        "{workspaceRoot}/boundaries/*/interop/**/*",
-        "{workspaceRoot}/boundaries/*/implementations/*/conformance-adapter/**/*",
-        "{workspaceRoot}/boundaries/*/implementations/typescript/conformance-runner/**/*",
-        "{workspaceRoot}/boundaries/*/implementations/typescript/testkit/src/**/*",
-        "{workspaceRoot}/boundaries/*/implementations/typescript/testkit/test/**/*",
-        "{workspaceRoot}/boundaries/*/implementations/typescript/testkit/package.json",
         "{workspaceRoot}/devenv.nix",
         "{workspaceRoot}/devenv.lock"
       ]
     },
     "conformance": {
       "cache": true,
-      "inputs": [
-        "default",
-        "^production",
-        "{workspaceRoot}/tests/**/*",
-        "{workspaceRoot}/tools/conformance/**/*",
-        "{workspaceRoot}/boundaries/*/conformance/**/*",
-        "{workspaceRoot}/boundaries/*/interop/**/*",
-        "{workspaceRoot}/boundaries/*/implementations/*/conformance-adapter/**/*",
-        "{workspaceRoot}/boundaries/*/implementations/typescript/conformance-runner/**/*",
-        "{workspaceRoot}/boundaries/*/implementations/typescript/testkit/src/**/*",
-        "{workspaceRoot}/boundaries/*/implementations/typescript/testkit/test/**/*",
-        "{workspaceRoot}/boundaries/*/implementations/typescript/testkit/package.json"
-      ]
+      "//": "Baseline only. Each conformance runner declares scoped inputs in project.json (own boundary assets + the shared conformanceEngine namedInput). Project-level inputs REPLACE this default. Do not add cross-boundary or root tests/** globs here; that re-introduces cross-boundary cache poisoning.",
+      "inputs": ["default", "^production", "conformanceEngine"]
     },
     "interop-smoke": {
       "cache": false,
