@@ -437,7 +437,10 @@ async function runPhase(
   }
 
   // Capture each step's output so concurrent logs do not interleave; flush them
-  // in phase order once the phase completes.
+  // in phase order once the phase completes. Captured output is held in memory
+  // until the phase finishes — fine for the only parallel phase today (phase 1
+  // is low-volume static analysis + authority validators). If a chatty step
+  // (e.g. a full build) ever moves into a parallel phase, stream it instead.
   const runs = await mapWithConcurrency(phase.steps, limit, (step) =>
     runVerificationStep(step, true)
   );

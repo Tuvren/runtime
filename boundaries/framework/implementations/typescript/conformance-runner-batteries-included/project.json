@@ -8,6 +8,7 @@
     "language:typescript",
     "layer:conformance-runner"
   ],
+  "implicitDependencies": ["framework-typescript-conformance-adapter"],
   "targets": {
     "conformance": {
       "executor": "nx:run-commands",
