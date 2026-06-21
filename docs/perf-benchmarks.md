@@ -25,7 +25,14 @@ providers target. Old config = `nx.json` + providers `project.json` from
 |---|---|---|
 | warm re-run, no edit | CACHE HIT ~478 ms | CACHE HIT ~471 ms |
 | **edit unrelated kernel fixture → providers** | **RAN (miss) 4659 ms** | **CACHE HIT 865 ms** |
-| edit providers' *own* fixture → providers (control) | RAN 4678 ms | RAN 4678 ms |
+| edit providers' *own* fixture → providers (control) | RAN ~4678 ms | RAN ~4678 ms |
+
+The control row is intentionally the same in both columns: an own-boundary edit
+is a cache *miss* under either config, and a miss re-executes the identical
+providers conformance work, so the wall-clock is the cost of that run
+(~4.7 s, input-scoping-independent) rather than two separately interesting
+numbers — it is shown only to confirm own-boundary edits still invalidate. The
+load-bearing column is the unrelated-kernel-fixture row above.
 
 So a foreign-boundary fixture edit went from a **~4.7 s wasted re-run to a
 ~0.9 s cache hit per non-owning runner**, and the new scoping still correctly
