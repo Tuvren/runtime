@@ -16,6 +16,11 @@
     },
     "conformance": {
       "executor": "nx:run-commands",
+      "inputs": [
+        "default",
+        "^production",
+        "{workspaceRoot}/boundaries/kernel/conformance/**/*"
+      ],
       "options": {
         "cwd": "boundaries/kernel/implementations/typescript/testkit",
         "command": "bun test ./test/kernel-conformance.test.ts"

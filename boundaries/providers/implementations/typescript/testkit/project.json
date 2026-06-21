@@ -16,6 +16,11 @@
     },
     "conformance": {
       "executor": "nx:run-commands",
+      "inputs": [
+        "default",
+        "^production",
+        "{workspaceRoot}/boundaries/providers/conformance/**/*"
+      ],
       "options": {
         "cwd": "boundaries/providers/implementations/typescript/testkit",
         "command": "bun test ./test/provider-conformance.test.ts"

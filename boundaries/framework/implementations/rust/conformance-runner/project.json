@@ -15,6 +15,16 @@
     },
     "conformance": {
       "executor": "nx:run-commands",
+      "inputs": [
+        "default",
+        "^production",
+        "conformanceEngine",
+        "{workspaceRoot}/boundaries/framework/conformance/**/*",
+        "{workspaceRoot}/boundaries/framework/implementations/rust/**/*",
+        "{workspaceRoot}/Cargo.toml",
+        "{workspaceRoot}/Cargo.lock",
+        "{workspaceRoot}/rust-toolchain.toml"
+      ],
       "options": {
         "cwd": ".",
         "command": "bun tools/conformance/runner/run.ts --adapter boundaries/framework/implementations/rust/conformance-adapter/adapter.json --summary-only"
