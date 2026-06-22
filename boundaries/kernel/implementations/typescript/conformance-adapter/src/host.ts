@@ -136,6 +136,8 @@ class TypeScriptKernelAdapter {
           return result(await runExpiredListing());
         case "kernel.run-liveness.stale-preemption":
           return result(await runStalePreemption());
+        case "kernel.run-liveness.clock-skew-preemption":
+          return result(await runClockSkewPreemption());
         case "kernel.restart-recovery.close-reopen-checkpoint":
           return result(await runRestartRecovery());
         case "kernel.restart-recovery.crash-recovery-durable":
@@ -219,7 +221,27 @@ function readAdapterConfig(args: readonly string[]): KernelAdapterConfig {
 function defaultCapabilities(
   backend: KernelAdapterConfig["backend"]
 ): string[] {
-  if (backend === "sqlite" || backend === "postgres") {
+  if (backend === "postgres") {
+    return [
+      "kernel.protocol",
+      "kernel.edge-validation",
+      "kernel.logical",
+      "kernel.run-liveness",
+      // Shared multi-owner rendezvous: PostgreSQL is the only backend that
+      // advertises an authoritative shared lease clock (ADR-050, BackendCapability
+      // shared-lease-clock). The clock-skew preemption check is gated on this
+      // capability so it runs only where backend-time lease judgment applies;
+      // single-writer embedded backends keep the in-process clock and are excluded.
+      "kernel.shared-lease-clock",
+      "kernel.persistence.durable",
+      "kernel.restart-recovery",
+      "kernel.scope-isolation",
+      "kernel.reclamation",
+      "kernel-protocol.thread.enumeration",
+    ];
+  }
+
+  if (backend === "sqlite") {
     return [
       "kernel.protocol",
       "kernel.edge-validation",
@@ -1447,6 +1469,158 @@ async function runStalePreemption(): Promise<Record<string, unknown>> {
     // backend-time re-base (ADR-050) is a no-op for shared-lease-clock backends
     // and the deterministic expected lease values hold across all backends.
     { now: () => 10 }
+  );
+}
+
+/**
+ * Preemption under worker clock skew against a backend-authoritative lease clock
+ * (KRT-BG005; ADR-050 composed with ADR-052 side-effect-once).
+ *
+ * Two execution owners share one backend. owner-secondary's wall clock runs
+ * ahead of the backend's own clock, the scenario the SaaS-readiness lease model
+ * must survive: a GC-paused or clock-skewed peer must not be able to preempt a
+ * lease the *backend* still considers live, because backend-authoritative
+ * clocking judges expiry by the backend's clock within the lease transaction,
+ * not by either worker's wall clock.
+ *
+ * Phase 1 proves no split brain: although owner-secondary's local clock is well
+ * past the lease expiry, the backend clock is the authority, so listExpired
+ * (judged by tx.now()) does not surface the still-live lease and the peer cannot
+ * preempt it. Phase 2 advances the backend's own clock past expiry and proves
+ * that genuine preemption then recovers the run, that the completed,
+ * durably-staged side-effecting tool call survives by its callId/taskId so a
+ * resuming owner skips it (the external side effect is therefore driven at most
+ * once, §4.9), and that recovery never advances the branch head (no duplicate
+ * commit). The dead owner's lease is cleared.
+ */
+async function runClockSkewPreemption(): Promise<Record<string, unknown>> {
+  const schema = await loadCanonicalSchema();
+  // Backend-authoritative clock (ADR-050), mutable so the probe can advance the
+  // backend's own clock between phases without relying on wall-clock sleeps.
+  let backendClockMs = 1000;
+  const backendNow = () => backendClockMs;
+  // owner-secondary's wall clock is skewed 300ms ahead of the backend, so by its
+  // own reading the lease (expiry 1100 in backend time) is already expired in
+  // phase 1 — yet the backend clock (1000) says it is not.
+  const secondaryNowMs = 1300;
+  const leaseExpiresAtMs = 1100;
+
+  return await withConfiguredBackend(
+    ADAPTER_CONFIG,
+    async (backend) => {
+      // owner-primary's wall clock is aligned with the backend at grant time, so
+      // the ADR-050 re-base is a no-op and the stored expiry is 1100 in backend
+      // time (supplied 1100 - primary now 1000 = 100ms duration; 1000 + 100).
+      const primaryKernel = createRuntimeKernel({ backend, now: () => 1000 });
+      await primaryKernel.schema.register(schema);
+      const thread = await primaryKernel.thread.create(
+        "thread_clock_skew",
+        schema.schemaId,
+        "branch_clock_skew"
+      );
+      const turn = await primaryKernel.turn.create(
+        "turn_clock_skew",
+        thread.threadId,
+        thread.branchId,
+        null,
+        thread.rootTurnNodeHash
+      );
+      const leasedRun = await primaryKernel.runLiveness.createLeasedRun({
+        branchId: thread.branchId,
+        executionOwnerId: "owner-primary",
+        leaseExpiresAtMs,
+        runId: "run_clock_skew",
+        schemaId: schema.schemaId,
+        startTurnNodeHash: thread.rootTurnNodeHash,
+        steps: [
+          { deterministic: false, id: "side_effect_call", sideEffects: true },
+        ],
+        turnId: turn.turnId,
+      });
+      await primaryKernel.run.beginStep(leasedRun.runId, "side_effect_call");
+      // A completed, durably-staged side-effecting tool result committed as a
+      // tool message and keyed by its callId (the staging taskId §4.9 keys on).
+      // On recovery this completed call is incorporated into committed history,
+      // so a resuming owner skips it by callId rather than re-driving it — the
+      // external side effect happens at most once.
+      await primaryKernel.staging.stage(
+        leasedRun.runId,
+        new TextEncoder().encode("side-effect-result"),
+        "call_side_effect",
+        "message",
+        "completed"
+      );
+
+      const secondaryKernel = createRuntimeKernel({
+        backend,
+        now: () => secondaryNowMs,
+      });
+
+      // Phase 1 — no split brain. The backend clock (1000) is still below the
+      // lease expiry (1100), so the lease is not preemptable even though the
+      // secondary's local clock (1300) is past it.
+      const expiredBeforeBackendExpiry =
+        await secondaryKernel.runLiveness.listExpired(secondaryNowMs);
+      const splitBrainPreemptionBlocked = !expiredBeforeBackendExpiry.some(
+        (run) => run.runId === leasedRun.runId
+      );
+
+      // Phase 2 — genuine expiry by the backend's own clock.
+      backendClockMs = 1200;
+      const expiredAfterBackendExpiry =
+        await secondaryKernel.runLiveness.listExpired(secondaryNowMs);
+      const preemptedAfterBackendExpiry = expiredAfterBackendExpiry.some(
+        (run) => run.runId === leasedRun.runId
+      );
+      const recovery = await secondaryKernel.runLiveness.preemptExpired(
+        leasedRun.runId,
+        "owner-secondary",
+        secondaryNowMs,
+        "stale_running_recovery"
+      );
+
+      const storedRun = await backend.transact(async (tx) => {
+        return await tx.runs.get(leasedRun.runId);
+      });
+      if (storedRun === null) {
+        throw new Error("expected preempted stored run");
+      }
+      const updatedBranch = await primaryKernel.branch.get(thread.branchId);
+      if (updatedBranch === null) {
+        throw new Error("expected preempted branch");
+      }
+
+      return createProjection({
+        clockSkew: {
+          // The backend clock surfaces zero expired leases while it is still
+          // below the expiry, even though the peer's skewed clock would expire it.
+          backendClockExpiredCountBeforeExpiry:
+            expiredBeforeBackendExpiry.length,
+          leaseCleared:
+            storedRun.executionOwnerId === undefined &&
+            storedRun.fencingToken === undefined &&
+            storedRun.leaseExpiresAtMs === undefined,
+          preemptedAfterBackendExpiry,
+          preemptionReason: storedRun.preemptionReason ?? null,
+          // The completed side-effecting call is incorporated into committed
+          // history during recovery, so a resuming owner skips it by callId and
+          // drives the side effect at most once.
+          recoveredStagedResultTaskIds: recovery.consumedStagedResults.map(
+            (staged) => staged.taskId
+          ),
+          recoveryHeadMatchesBranchHead:
+            recovery.lastTurnNodeHash === updatedBranch.headTurnNodeHash,
+          runStatus: storedRun.status,
+          uncommittedStagedResultCount:
+            recovery.uncommittedStagedResults.length,
+          splitBrainPreemptionBlocked,
+          // The skew is real: by its own clock the peer would have expired the
+          // lease in phase 1.
+          workerClockWouldExpire: secondaryNowMs > leaseExpiresAtMs,
+        },
+      });
+    },
+    { now: backendNow }
   );
 }
 
