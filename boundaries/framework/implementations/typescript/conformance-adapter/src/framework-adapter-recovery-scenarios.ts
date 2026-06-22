@@ -408,9 +408,15 @@ export function createFrameworkAdapterRecoveryScenarios(
     });
     const livenessHarness = createConformanceRunLivenessKernelHarness(harness, {
       onRenewLease() {
-        // Release the held dispatch on the next macrotask — after the lease loop
-        // catch has aborted the run handle — so the reported result returns into
-        // a dead-owner context and the client-result-as-proposal gate fires.
+        // Release the held dispatch on a macrotask so the reported result returns
+        // into an already-aborted (dead-owner) context and the
+        // client-result-as-proposal gate fires. This is ordered, not raced: the
+        // event loop drains the whole microtask queue before any macrotask, and
+        // this rejection propagates synchronously through the lease loop's catch
+        // into handle.abortWithError (a microtask chain), so the abort always
+        // lands before this setTimeout. If that abort is ever deferred behind its
+        // own macrotask/await boundary, replace this with an explicit
+        // await-on-abort handshake.
         setTimeout(() => releaseDispatch?.(), 0);
         return Promise.reject(new Error("lease preempted by a peer worker"));
       },

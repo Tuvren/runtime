@@ -223,9 +223,13 @@ async function runClientDispatchWithLeaseLoss(
 
   const livenessHarness = createFakeRunLivenessKernelHarness(harness, {
     onRenewLease: async () => {
-      // Release the held dispatch on the next macrotask — after the lease loop's
-      // catch has aborted the run handle — so the dispatch resolves into an
-      // aborted context and the run-authority gate fires.
+      // Release the held dispatch on a macrotask so it resolves into an aborted
+      // context and the run-authority gate fires. This is ordered, not raced: the
+      // event loop drains all microtasks before any macrotask, and this rejection
+      // propagates synchronously through the lease loop's catch into
+      // handle.abortWithError (a microtask chain), so the abort always lands
+      // first. If that abort is ever deferred behind a macrotask/await boundary,
+      // replace this with an explicit await-on-abort handshake.
       setTimeout(() => releaseDispatch?.(), 0);
       throw new Error("lease preempted by a peer worker");
     },
