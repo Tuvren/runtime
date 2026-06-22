@@ -1490,8 +1490,11 @@ async function runStalePreemption(): Promise<Record<string, unknown>> {
  * that genuine preemption then recovers the run, that the completed,
  * durably-staged side-effecting tool call survives by its callId/taskId so a
  * resuming owner skips it (the external side effect is therefore driven at most
- * once, §4.9), and that recovery never advances the branch head (no duplicate
- * commit). The dead owner's lease is cleared.
+ * once, §4.9), and that recovery's reported head agrees with the durable branch
+ * head read back independently. Preemption does incorporate the staged result in
+ * one transaction (the head advances exactly once); at-most-once is enforced by
+ * the failed run status and the cleared lease, which are asserted separately. The
+ * dead owner's lease is cleared.
  */
 async function runClockSkewPreemption(): Promise<Record<string, unknown>> {
   const schema = await loadCanonicalSchema();
