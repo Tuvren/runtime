@@ -1,0 +1,44 @@
+{
+  "planId": "tuvren.providers.provider-api.conversation-state",
+  "planVersion": "0.1.0",
+  "packetId": "tuvren.providers.provider-api",
+  "applicability": {
+    "capabilities": ["providers.conversation-state-ownership"]
+  },
+  "checks": [
+    {
+      "checkId": "bh.bh001.continuity-carried-as-optimization",
+      "evidence": [
+        "result.continuityCarried",
+        "result.continuityNamespacePresent"
+      ],
+      "assertions": [
+        {
+          "kind": "resultField",
+          "field": "$.continuityCarried",
+          "equals": true
+        },
+        {
+          "kind": "resultField",
+          "field": "$.continuityNamespacePresent",
+          "equals": true
+        }
+      ],
+      "operation": "providers.conversation-state.continuity-carriage",
+      "capabilities": ["providers.conversation-state-ownership"]
+    },
+    {
+      "checkId": "bh.bh001.continuity-non-blocking-response",
+      "evidence": ["result.responseFinishReason"],
+      "assertions": [
+        {
+          "kind": "resultField",
+          "field": "$.responseFinishReason",
+          "equals": "stop"
+        }
+      ],
+      "operation": "providers.conversation-state.continuity-carriage",
+      "capabilities": ["providers.conversation-state-ownership"]
+    }
+  ]
+}

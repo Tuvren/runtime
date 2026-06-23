@@ -1,6 +1,6 @@
 {
   "packetId": "tuvren.providers.provider-api",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "boundary": "providers",
   "surface": "provider-api",
   "humanAuthorityRefs": [
@@ -26,6 +26,10 @@
     },
     {
       "path": "boundaries/providers/conformance/plans/provider-mediated-execution-class.json",
+      "format": "conformance-plan"
+    },
+    {
+      "path": "boundaries/providers/conformance/plans/provider-api-conversation-state.json",
       "format": "conformance-plan"
     },
     {
@@ -65,6 +69,11 @@
       "planId": "tuvren.providers.provider-mediated-execution-class",
       "planVersion": "0.1.0",
       "path": "boundaries/providers/conformance/plans/provider-mediated-execution-class.json"
+    },
+    {
+      "planId": "tuvren.providers.provider-api.conversation-state",
+      "planVersion": "0.1.0",
+      "path": "boundaries/providers/conformance/plans/provider-api-conversation-state.json"
     }
   ],
   "bindingProjections": {
@@ -109,6 +118,10 @@
     {
       "kind": "conformance-plan",
       "target": "boundaries/providers/conformance/plans/provider-mediated-execution-class.json"
+    },
+    {
+      "kind": "conformance-plan",
+      "target": "boundaries/providers/conformance/plans/provider-api-conversation-state.json"
     },
     {
       "kind": "freshness-check",

@@ -64,6 +64,7 @@ class TypeScriptProviderAdapter {
         "providers.rejects-native-strict-structured-output",
         "providers.provider-native-execution-class",
         "providers.provider-mediated-execution-class",
+        "providers.conversation-state-ownership",
       ],
       packetId,
       planVersion,
@@ -81,6 +82,8 @@ class TypeScriptProviderAdapter {
           return result(await generateMapping());
         case "providers.bridge.stream-metadata-continuity":
           return result(await streamMetadataContinuity());
+        case "providers.conversation-state.continuity-carriage":
+          return result(await conversationStateContinuityCarriage());
         case "providers.bridge.structured-output-stream":
           return result(await structuredOutputStream());
         case "providers.bridge.provider-failure-normalization":
@@ -223,6 +226,52 @@ async function streamMetadataContinuity(): Promise<Record<string, unknown>> {
         ? Object.keys(finishChunk.providerMetadata)
         : [],
     },
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Operation: providers.conversation-state.continuity-carriage
+//
+// ADR-053 (Tuvren is the unconditional conversation-state owner): provider
+// continuity artifacts are carried into the next provider request as opaque,
+// provider-namespaced optimizations — never a correctness dependency. Exercises
+// the bridge directly with a carried continuity token and projects observable
+// evidence that the token reaches the provider call's `providerOptions` and the
+// response is produced normally (continuity is non-blocking).
+// ---------------------------------------------------------------------------
+
+async function conversationStateContinuityCarriage(): Promise<
+  Record<string, unknown>
+> {
+  let capturedProviderOptions: Record<string, unknown> | undefined;
+  const bridge = createAiSdkProviderBridge({
+    model: createMockModel({
+      doGenerate(options) {
+        capturedProviderOptions = options.providerOptions as
+          | Record<string, unknown>
+          | undefined;
+        return Promise.resolve(createGenerateResult());
+      },
+    }),
+  });
+
+  const response = await bridge.generate({
+    messages: [{ parts: [{ text: "continue", type: "text" }], role: "user" }],
+    providerContinuity: {
+      anthropic: { sessionId: "bh001-continuity" },
+    },
+  });
+
+  const anthropicOptions =
+    isRecord(capturedProviderOptions) &&
+    isRecord(capturedProviderOptions.anthropic)
+      ? capturedProviderOptions.anthropic
+      : undefined;
+
+  return createProjection({
+    continuityCarried: anthropicOptions?.sessionId === "bh001-continuity",
+    continuityNamespacePresent: anthropicOptions !== undefined,
+    responseFinishReason: response.finishReason,
   });
 }
 
