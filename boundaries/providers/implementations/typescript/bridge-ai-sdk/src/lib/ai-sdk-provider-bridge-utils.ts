@@ -46,6 +46,16 @@ export interface StreamToolState {
   inputBuffer: string;
   name: string;
   providerMetadata?: Record<string, unknown>;
+  /**
+   * True when the streamed tool input belongs to a declared provider-executed
+   * (`providerExecuted`/`dynamic`) tool. Real providers stream provider-executed
+   * tools as `tool-input-start` → `tool-input-delta` → `tool-input-end` →
+   * `tool-call` → `tool-result`; only `tool-input-start` carries the
+   * `providerExecuted`/`dynamic` flags, so the marker is seeded there and read by
+   * the later input parts to keep them out of the client tool_call stream
+   * (KRT-BH005 / ADR-055).
+   */
+  providerOwned?: boolean;
   started: boolean;
 }
 
@@ -599,26 +609,6 @@ export function providerOwnedToolExecutionUnsupportedError(
       toolName,
     }
   );
-}
-
-export function rejectUnsupportedProviderOwnedToolPart(
-  part:
-    | Extract<
-        LanguageModelV3StreamPart,
-        { type: "tool-input-start" | "tool-call" }
-      >
-    | Extract<
-        LanguageModelV3GenerateResult["content"][number],
-        { type: "tool-call" }
-      >,
-  model: {
-    modelId: string;
-    provider: string;
-  }
-): void {
-  if (isProviderOwnedToolPart(part)) {
-    throw providerOwnedToolExecutionUnsupportedError(part.toolName, model);
-  }
 }
 
 export function requireToolState(

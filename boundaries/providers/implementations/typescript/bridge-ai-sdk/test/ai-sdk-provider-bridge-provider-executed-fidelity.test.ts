@@ -342,4 +342,120 @@ describe("KRT-BH005 provider-executed/dynamic fidelity (stream)", () => {
       )
     ).toBe(false);
   });
+
+  test("attributes an INCREMENTALLY-streamed providerExecuted round-trip (tool-input-start → delta → end → tool-call → tool-result) to provider-native without surfacing a client tool_call", async () => {
+    // The shape real providers actually emit. @ai-sdk/openai@3.0.53 streams
+    // provider-executed Responses tools (web_search, code_interpreter,
+    // computer_use, …) as tool-input-start{providerExecuted} → tool-input-delta →
+    // tool-input-end → tool-call{providerExecuted} → tool-result. Only
+    // tool-input-start carries the providerExecuted/dynamic flags, so the bridge
+    // must recognise the declared provider tool at the START of the input stream
+    // and stay silent through the whole prelude — never throwing
+    // provider_owned_tool_execution_unsupported (KRT-BH005 regression guard) and
+    // never emitting a tool_call_start/args_delta/done the runtime would execute.
+    const bridge = createAiSdkProviderBridge({
+      model: createMockModel({
+        provider: "openai",
+        async doStream() {
+          return {
+            stream: streamFromParts([
+              {
+                dynamic: true,
+                id: "ws-1",
+                providerExecuted: true,
+                toolName: "web_search",
+                type: "tool-input-start",
+              },
+              { delta: '{"query":', id: "ws-1", type: "tool-input-delta" },
+              { delta: '"tuvren"}', id: "ws-1", type: "tool-input-delta" },
+              { id: "ws-1", type: "tool-input-end" },
+              {
+                dynamic: true,
+                input: JSON.stringify({ query: "tuvren" }),
+                providerExecuted: true,
+                toolCallId: "ws-1",
+                toolName: "web_search",
+                type: "tool-call",
+              },
+              {
+                result: WEB_SEARCH_RESULT,
+                toolCallId: "ws-1",
+                toolName: "web_search",
+                type: "tool-result",
+              },
+              { delta: "ok", id: "t-1", type: "text-delta" },
+              {
+                finishReason: { raw: "stop", unified: "stop" },
+                type: "finish",
+                usage: createUsage(3, 2),
+              },
+            ]),
+          };
+        },
+      }),
+    });
+
+    const chunks = await collectAsyncIterable(
+      bridge.stream({
+        messages: [{ parts: [{ text: "search", type: "text" }], role: "user" }],
+        tools: USER_FUNCTION_TOOLS,
+        providerNativeTools: [WEB_SEARCH_DECLARATION],
+      })
+    );
+
+    // (1) The provider-executed result is attributed to provider-native.
+    const providerResult = chunks.find(
+      (chunk) => chunk.type === "provider_tool_result"
+    );
+    expect(providerResult).toBeDefined();
+    expect((providerResult as { name: string }).name).toBe("web_search");
+    expect(
+      (providerResult as { providerMetadata?: Record<string, unknown> })
+        .providerMetadata?.executionClass
+    ).toBe("provider-native");
+
+    // (2) The entire provider-executed input prelude stays out of the client tool
+    // stream: no tool_call_start, no tool_call_args_delta, no tool_call_done.
+    expect(
+      chunks.some(
+        (chunk) =>
+          chunk.type === "tool_call_start" ||
+          chunk.type === "tool_call_args_delta" ||
+          chunk.type === "tool_call_done"
+      )
+    ).toBe(false);
+  });
+
+  test("still rejects an UNDECLARED provider-executed tool-input-start (baseline protection on the incremental path)", async () => {
+    // The incremental-path counterpart of the undeclared generate case: a
+    // provider-executed tool-input-start whose tool is NOT declared as a provider
+    // tool is genuinely out of scope and must still be rejected — the new
+    // declared-lookup guard must not become a blanket allow.
+    const bridge = createAiSdkProviderBridge({
+      model: createMockModel({
+        provider: "openai",
+        async doStream() {
+          return {
+            stream: streamFromParts([
+              {
+                dynamic: true,
+                id: "u-1",
+                providerExecuted: true,
+                toolName: "undeclared_tool",
+                type: "tool-input-start",
+              },
+            ]),
+          };
+        },
+      }),
+    });
+
+    await expect(
+      collectAsyncIterable(
+        bridge.stream({
+          messages: [{ parts: [{ text: "go", type: "text" }], role: "user" }],
+        })
+      )
+    ).rejects.toBeInstanceOf(TuvrenProviderError);
+  });
 });

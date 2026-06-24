@@ -568,8 +568,27 @@ async function conversationStateProviderExecutedFidelity(): Promise<
   const streamBridge = createAiSdkProviderBridge({
     model: createMockModel({
       doStream() {
+        // Realistic provider-executed streaming shape — the incremental prelude
+        // real providers emit (e.g. @ai-sdk/openai Responses web_search):
+        // tool-input-start{providerExecuted} → tool-input-delta → tool-input-end →
+        // tool-call{providerExecuted} → tool-result. This exercises the path that
+        // would throw provider_owned_tool_execution_unsupported if the bridge
+        // failed to recognise the declared provider tool at tool-input-start.
         return Promise.resolve({
           stream: streamFromParts([
+            {
+              dynamic: true,
+              id: "ws-1",
+              providerExecuted: true,
+              toolName: "web_search",
+              type: "tool-input-start",
+            },
+            {
+              delta: '{"query":"tuvren"}',
+              id: "ws-1",
+              type: "tool-input-delta",
+            },
+            { id: "ws-1", type: "tool-input-end" },
             {
               dynamic: true,
               input: '{"query":"tuvren"}',
@@ -618,14 +637,17 @@ async function conversationStateProviderExecutedFidelity(): Promise<
       (part) => part.type === "text" && part.text.includes("Tuvren")
     ),
     // The provider-executed call does not contaminate the client-facing parts /
-    // chunks with a function tool_call the runtime would attempt to execute.
+    // chunks with a function tool_call the runtime would attempt to execute —
+    // including the incremental input prelude (tool_call_args_delta).
     providerExecutedCallNotSurfacedAsClientToolCall: !(
       generateResponse.parts.some(
         (part) => part.type === "tool_call" || part.type === "tool_result"
       ) ||
       streamChunks.some(
         (chunk) =>
-          chunk.type === "tool_call_start" || chunk.type === "tool_call_done"
+          chunk.type === "tool_call_start" ||
+          chunk.type === "tool_call_args_delta" ||
+          chunk.type === "tool_call_done"
       )
     ),
     // Generate and stream both attribute the provider-executed result to the
