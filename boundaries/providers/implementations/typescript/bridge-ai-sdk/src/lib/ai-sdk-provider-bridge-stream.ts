@@ -30,8 +30,10 @@ import {
   buildProviderMetadata,
   hasAnthropicRedactedReasoningMetadata,
   isPlainObject,
+  isProviderOwnedToolPart,
   mergeProviderMetadataRecords,
   parseJsonInput,
+  providerOwnedToolExecutionUnsupportedError,
   readReasoningStreamSignature,
   rejectUnsupportedProviderOwnedToolPart,
   requireToolState,
@@ -396,7 +398,20 @@ function handleToolCallStreamPart(
   part: Extract<LanguageModelV3StreamPart, { type: "tool-call" }>,
   state: StreamMappingState
 ): ProviderStreamChunk[] {
-  rejectUnsupportedProviderOwnedToolPart(part, state.model);
+  // KRT-BH005 / ADR-055: a provider-executed (providerExecuted/dynamic) tool-call
+  // declared as provider-native/mediated is the provider's own executed call;
+  // skip it (the matching tool-result yields the provider_tool_result attribution
+  // — AY002/AY004) and emit no client-facing tool_call chunk. Undeclared
+  // provider-owned execution stays out of scope (baseline protection).
+  if (isProviderOwnedToolPart(part)) {
+    if (state.providerToolClassLookup?.(part.toolName) !== undefined) {
+      return [];
+    }
+    throw providerOwnedToolExecutionUnsupportedError(
+      part.toolName,
+      state.model
+    );
+  }
   assertToolCallCorrelation(part, state);
 
   const chunks = createToolCallPreludeChunks(part, state);

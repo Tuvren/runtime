@@ -1130,6 +1130,40 @@
     {
       "assertionResults": [
         {
+          "assertionId": "bh.bh005.provider-executed-fidelity.1.resultField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "bh.bh005.provider-executed-fidelity.2.resultField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "bh.bh005.provider-executed-fidelity.3.resultField",
+          "status": "pass"
+        },
+        {
+          "assertionId": "bh.bh005.provider-executed-fidelity.requiredEvidence.result.assistantContentProduced",
+          "status": "pass"
+        },
+        {
+          "assertionId": "bh.bh005.provider-executed-fidelity.requiredEvidence.result.providerExecutedAttributedNative",
+          "status": "pass"
+        },
+        {
+          "assertionId": "bh.bh005.provider-executed-fidelity.requiredEvidence.result.providerExecutedCallNotSurfacedAsClientToolCall",
+          "status": "pass"
+        }
+      ],
+      "checkId": "bh.bh005.provider-executed-fidelity",
+      "details": {
+        "adapterId": "typescript-providers",
+        "planId": "tuvren.providers.provider-api.conversation-state"
+      },
+      "status": "pass"
+    },
+    {
+      "assertionResults": [
+        {
           "assertionId": "ay.ay007.mediated-attribution-execution-class.1.resultField",
           "status": "pass"
         },
@@ -1503,9 +1537,9 @@
   "status": "pass",
   "summary": {
     "failedChecks": 0,
-    "passedChecks": 59,
-    "totalChecks": 59,
-    "applicableChecks": 59,
+    "passedChecks": 60,
+    "totalChecks": 60,
+    "applicableChecks": 60,
     "nonApplicableChecks": 0
   },
   "suiteId": "tuvren.providers.provider-api",

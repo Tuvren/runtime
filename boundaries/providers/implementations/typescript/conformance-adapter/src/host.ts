@@ -90,6 +90,8 @@ class TypeScriptProviderAdapter {
           return result(await conversationStateContinuityRoundTrip());
         case "providers.conversation-state.cache-correctness-neutral":
           return result(await conversationStateCacheCorrectnessNeutral());
+        case "providers.conversation-state.provider-executed-fidelity":
+          return result(await conversationStateProviderExecutedFidelity());
         case "providers.bridge.structured-output-stream":
           return result(await structuredOutputStream());
         case "providers.bridge.provider-failure-normalization":
@@ -475,15 +477,22 @@ async function conversationStateCacheCorrectnessNeutral(): Promise<
   const miss = await runWithCacheRead(0); // cold cache: nothing read from cache
   const hit = await runWithCacheRead(960); // warm cache: most input from cache
 
-  const canonicalResult = (response: { finishReason: string; parts: unknown }) =>
-    JSON.stringify({ finishReason: response.finishReason, parts: response.parts });
+  const canonicalResult = (response: {
+    finishReason: string;
+    parts: unknown;
+  }) =>
+    JSON.stringify({
+      finishReason: response.finishReason,
+      parts: response.parts,
+    });
 
   return createProjection({
     cacheCostDiffered:
       extractBridgeCacheRead(miss.response.providerMetadata) !==
       extractBridgeCacheRead(hit.response.providerMetadata),
     cacheNeutralRequestIdentical:
-      JSON.stringify(miss.capturedPrompt) === JSON.stringify(hit.capturedPrompt),
+      JSON.stringify(miss.capturedPrompt) ===
+      JSON.stringify(hit.capturedPrompt),
     cacheNeutralResultIdentical:
       canonicalResult(miss.response) === canonicalResult(hit.response),
   });
@@ -498,6 +507,132 @@ function extractBridgeCacheRead(metadata: unknown): unknown {
     return undefined;
   }
   return rawUsage.inputTokens.cacheRead;
+}
+
+async function conversationStateProviderExecutedFidelity(): Promise<
+  Record<string, unknown>
+> {
+  // ADR-055 / KRT-BH005: a realistic AI SDK v6 provider-executed round-trip — a
+  // tool-call carrying providerExecuted + dynamic (the exact vercel/ai #10888
+  // shape) FOLLOWED BY its tool-result — declared to Tuvren as a provider-native
+  // tool. The user function tool map deliberately omits the provider-executed
+  // tool name (the configuration that makes #10888 fire inside generateText),
+  // so a passing op proves the bridge does NOT mis-validate the provider-executed
+  // call against the user tool map. The bridge consumes the low-level
+  // LanguageModelV3 contract, so parseToolCall is never in the path; this op
+  // observes the behavioural consequence at the bridge seam.
+  const declaration = { id: "openai.web_search_preview", name: "web_search" };
+  const userTools = [
+    {
+      description: "a user-owned function tool",
+      inputSchema: { type: "object" as const },
+      name: "my_function",
+    },
+  ];
+
+  const generateBridge = createAiSdkProviderBridge({
+    model: createMockModel({
+      doGenerate() {
+        return Promise.resolve(
+          createGenerateResult({
+            content: [
+              {
+                dynamic: true,
+                input: '{"query":"tuvren"}',
+                providerExecuted: true,
+                toolCallId: "ws-1",
+                toolName: "web_search",
+                type: "tool-call",
+              },
+              {
+                result: { results: [{ title: "Tuvren" }] },
+                toolCallId: "ws-1",
+                toolName: "web_search",
+                type: "tool-result",
+              },
+              { text: "Tuvren is a runtime.", type: "text" },
+            ],
+            finishReason: { raw: "stop", unified: "stop" },
+          })
+        );
+      },
+      provider: "openai",
+    }),
+  });
+  const generateResponse = await generateBridge.generate({
+    messages: [{ parts: [{ text: "search", type: "text" }], role: "user" }],
+    providerNativeTools: [declaration],
+    tools: userTools,
+  });
+
+  const streamBridge = createAiSdkProviderBridge({
+    model: createMockModel({
+      doStream() {
+        return Promise.resolve({
+          stream: streamFromParts([
+            {
+              dynamic: true,
+              input: '{"query":"tuvren"}',
+              providerExecuted: true,
+              toolCallId: "ws-1",
+              toolName: "web_search",
+              type: "tool-call",
+            },
+            {
+              result: { results: [{ title: "Tuvren" }] },
+              toolCallId: "ws-1",
+              toolName: "web_search",
+              type: "tool-result",
+            },
+            { delta: "ok", id: "t-1", type: "text-delta" },
+            {
+              finishReason: { raw: "stop", unified: "stop" },
+              type: "finish",
+              usage: createUsage(3, 2),
+            },
+          ]),
+        });
+      },
+      provider: "openai",
+    }),
+  });
+  const streamChunks = await collectProviderStreamChunks(
+    streamBridge.stream({
+      messages: [{ parts: [{ text: "search", type: "text" }], role: "user" }],
+      providerNativeTools: [declaration],
+      tools: userTools,
+    })
+  );
+
+  const generateNativeClass =
+    generateResponse.providerToolResults?.[0]?.executionClass;
+  const streamNativeChunk = streamChunks.find(
+    (chunk) => chunk.type === "provider_tool_result"
+  ) as { providerMetadata?: Record<string, unknown> } | undefined;
+  const streamNativeClass = streamNativeChunk?.providerMetadata?.executionClass;
+
+  return createProjection({
+    // The assistant content is produced normally — the provider-executed
+    // tool-call neither aborts the turn nor injects an error part.
+    assistantContentProduced: generateResponse.parts.some(
+      (part) => part.type === "text" && part.text.includes("Tuvren")
+    ),
+    // The provider-executed call does not contaminate the client-facing parts /
+    // chunks with a function tool_call the runtime would attempt to execute.
+    providerExecutedCallNotSurfacedAsClientToolCall:
+      !generateResponse.parts.some(
+        (part) => part.type === "tool_call" || part.type === "tool_result"
+      ) &&
+      !streamChunks.some(
+        (chunk) =>
+          chunk.type === "tool_call_start" || chunk.type === "tool_call_done"
+      ),
+    // Generate and stream both attribute the provider-executed result to the
+    // provider-native execution class.
+    providerExecutedAttributedNative:
+      generateNativeClass === "provider-native" &&
+      streamNativeClass === "provider-native",
+  });
 }
 
 async function structuredOutputStream(): Promise<Record<string, unknown>> {

@@ -569,6 +569,38 @@ export function parseJsonInput(
   }
 }
 
+/**
+ * A tool part is "provider-owned" when the provider executed it itself
+ * (`providerExecuted`) or it is a runtime-defined provider tool (`dynamic`, e.g.
+ * an MCP call). AI SDK v6 surfaces both flags on provider-executed tool-calls
+ * (vercel/ai #10888). Client-executed function tools carry neither.
+ */
+export function isProviderOwnedToolPart(part: {
+  dynamic?: boolean;
+  providerExecuted?: boolean;
+}): boolean {
+  return part.providerExecuted === true || part.dynamic === true;
+}
+
+export function providerOwnedToolExecutionUnsupportedError(
+  toolName: string,
+  model: {
+    modelId: string;
+    provider: string;
+  }
+): TuvrenProviderError {
+  return bridgeError(
+    "provider-owned tool execution is out of scope for the baseline AI SDK bridge",
+    "unsupported_ai_sdk_content",
+    {
+      modelId: model.modelId,
+      provider: model.provider,
+      reason: "provider_owned_tool_execution_unsupported",
+      toolName,
+    }
+  );
+}
+
 export function rejectUnsupportedProviderOwnedToolPart(
   part:
     | Extract<
@@ -584,20 +616,8 @@ export function rejectUnsupportedProviderOwnedToolPart(
     provider: string;
   }
 ): void {
-  if (
-    part.providerExecuted === true ||
-    ("dynamic" in part && part.dynamic === true)
-  ) {
-    throw bridgeError(
-      "provider-owned tool execution is out of scope for the baseline AI SDK bridge",
-      "unsupported_ai_sdk_content",
-      {
-        modelId: model.modelId,
-        provider: model.provider,
-        reason: "provider_owned_tool_execution_unsupported",
-        toolName: part.toolName,
-      }
-    );
+  if (isProviderOwnedToolPart(part)) {
+    throw providerOwnedToolExecutionUnsupportedError(part.toolName, model);
   }
 }
 

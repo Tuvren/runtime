@@ -92,6 +92,33 @@
       ],
       "operation": "providers.conversation-state.cache-correctness-neutral",
       "capabilities": ["providers.conversation-state-ownership"]
+    },
+    {
+      "checkId": "bh.bh005.provider-executed-fidelity",
+      "evidence": [
+        "result.providerExecutedAttributedNative",
+        "result.assistantContentProduced",
+        "result.providerExecutedCallNotSurfacedAsClientToolCall"
+      ],
+      "assertions": [
+        {
+          "kind": "resultField",
+          "field": "$.providerExecutedAttributedNative",
+          "equals": true
+        },
+        {
+          "kind": "resultField",
+          "field": "$.assistantContentProduced",
+          "equals": true
+        },
+        {
+          "kind": "resultField",
+          "field": "$.providerExecutedCallNotSurfacedAsClientToolCall",
+          "equals": true
+        }
+      ],
+      "operation": "providers.conversation-state.provider-executed-fidelity",
+      "capabilities": ["providers.conversation-state-ownership"]
     }
   ]
 }
