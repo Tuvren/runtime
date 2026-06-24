@@ -438,6 +438,15 @@ function handleToolCallStreamPart(
   // marked provider-owned by its tool-input-start prelude is decisive even if the
   // tool-call part omits the flags. Undeclared provider-owned execution stays out
   // of scope (baseline protection).
+  //
+  // The seeded-state lookup relies on the AI SDK convention that a tool's
+  // tool-input-start `id` equals its terminal tool-call `toolCallId` (the same
+  // identity the rest of the bridge correlates on, and what real providers —
+  // OpenAI Responses, Anthropic, Google, MCP — emit). If a provider both renamed
+  // the id mid-stream AND dropped the providerExecuted/dynamic flags on the
+  // terminal tool-call, neither this marker nor the flag check below would catch
+  // it; no shipped provider does either, so that doubly-hypothetical shape is out
+  // of the audited contract.
   const seededToolState = state.toolStates.get(part.toolCallId);
   if (seededToolState?.providerOwned === true) {
     return [];
@@ -518,7 +527,15 @@ function assertToolCallCorrelation(
   const correlatedIds = [...state.toolStates.entries()]
     .filter(
       ([, toolState]) =>
-        toolState.inputBuffer === part.input && toolState.name === part.toolName
+        // Provider-owned (provider-executed/dynamic) states are skipped
+        // bookkeeping — they linger with inputBuffer === "" and must never
+        // correlate to a client tool-call. Without this guard a same-named client
+        // tool-call with empty input would spuriously match a provider tool's
+        // lingering state and surface a misleading correlation-mismatch error
+        // instead of the accurate input-validation error (KRT-BH005).
+        toolState.providerOwned !== true &&
+        toolState.inputBuffer === part.input &&
+        toolState.name === part.toolName
     )
     .map(([providerCallId]) => providerCallId);
 

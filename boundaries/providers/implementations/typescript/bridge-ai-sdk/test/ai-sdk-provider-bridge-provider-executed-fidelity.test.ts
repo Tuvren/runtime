@@ -468,4 +468,69 @@ describe("KRT-BH005 provider-executed/dynamic fidelity (stream)", () => {
       )
     ).rejects.toBeInstanceOf(TuvrenProviderError);
   });
+
+  test("a lingering provider-owned tool-state never hijacks the client tool-call correlation scan", async () => {
+    // Regression guard for the lingering-provider-owned-state correlation hazard:
+    // a declared provider-executed tool seeds a tool-state with inputBuffer "" and
+    // name "web_search". A later CLIENT tool-call (no provider flags, its own
+    // toolCallId) sharing that name must never be content-correlated to the
+    // provider tool's bookkeeping. The only input that could collide with the
+    // provider state's always-empty inputBuffer is "" — itself invalid client JSON
+    // — so the correct outcome is the precise input-validation error, NOT the
+    // misleading "mismatched incremental tool-input id" correlation error the
+    // lingering provider-owned state produced before the scan excluded it.
+    const bridge = createAiSdkProviderBridge({
+      model: createMockModel({
+        provider: "openai",
+        async doStream() {
+          return {
+            stream: streamFromParts([
+              // Declared provider-executed tool, incremental — seeds the lingering
+              // providerOwned state (name "web_search", inputBuffer "").
+              {
+                dynamic: true,
+                id: "pv-1",
+                providerExecuted: true,
+                toolName: "web_search",
+                type: "tool-input-start",
+              },
+              { id: "pv-1", type: "tool-input-end" },
+              // A client tool-call sharing the name, with empty input and its own id.
+              {
+                input: "",
+                toolCallId: "cl-1",
+                toolName: "web_search",
+                type: "tool-call",
+              },
+              {
+                finishReason: { raw: "stop", unified: "stop" },
+                type: "finish",
+                usage: createUsage(3, 2),
+              },
+            ]),
+          };
+        },
+      }),
+    });
+
+    let caught: unknown;
+    try {
+      await collectAsyncIterable(
+        bridge.stream({
+          messages: [
+            { parts: [{ text: "search", type: "text" }], role: "user" },
+          ],
+          tools: USER_FUNCTION_TOOLS,
+          providerNativeTools: [WEB_SEARCH_DECLARATION],
+        })
+      );
+    } catch (error: unknown) {
+      caught = error;
+    }
+
+    // The accurate input-validation error — proving the client call reached its
+    // own JSON parse rather than being aborted by the provider tool's lingering
+    // bookkeeping (which would have thrown `unsupported_ai_sdk_stream_part`).
+    expect(caught).toMatchObject({ code: "invalid_ai_sdk_tool_call_input" });
+  });
 });
