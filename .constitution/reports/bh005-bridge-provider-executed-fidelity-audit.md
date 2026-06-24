@@ -42,6 +42,8 @@ This was a genuine fidelity gap against ADR-055 criterion (1): the prior tests f
 
 Scope note: the `tool-input-start` rejection path is intentionally left strict. Verified providers do not stream provider-executed tool inputs incrementally, so that path is never reached for them; keeping it strict preserves baseline protection without adding skip-tracking state for an unobserved shape.
 
+Orphan-call boundary (made explicit after milestone review): skipping a declared provider-executed `tool-call` rests on the matching `tool-result` carrying the attribution. The bridge does **not** assume the result always arrives — it simply treats the call as the provider's own bookkeeping. The **result** is the attributable observation (independently mapped to `provider-native` via the declared lookup, whether or not a preceding call was seen); the **call** carries no observation of its own. So a declared provider-executed call whose result never arrives this turn (truncated/interrupted/multi-step response) yields **no provider-native record and no client-facing function `tool_call`**, and — critically — does **not** throw the way the prior over-broad rejection did. This is pinned by tests (`a DECLARED provider-executed tool-call with no matching result …`, generate + stream). Consistent with the `tool-input-start` minimalism above, the bridge does not add skip-tracking state to emit a degraded/diagnostic record for an orphan call; that is deferred to the ADR-055 native-client phases, where a richer provider-execution lifecycle is in scope. For the baseline bridge the durable-lineage posture (ADR-053) governs: lineage records what actually arrived, and an orphan call contributes nothing to attribute.
+
 ---
 
 ## Finding 3 — Per-class observation limits already hold (no change required)
@@ -66,4 +68,5 @@ Issue #10888 remains **open**. The proposed upstream fix is to have `parseToolCa
 |-----------|-------|
 | Attributed to provider-native; no spurious validation error | `ai-sdk-provider-bridge-provider-executed-fidelity.test.ts` (generate + stream) and conformance check `bh.bh005.provider-executed-fidelity` (`providers.conversation-state.provider-executed-fidelity`) |
 | Undeclared provider-owned execution still rejected (baseline protection) | Same audit test ("still rejects an UNDECLARED providerExecuted tool-call") + existing `providers.bridge.provider-owned-tool-execution-rejection` |
+| Orphan declared provider-executed call (no result) → no observation, no throw | Same audit test ("a DECLARED provider-executed tool-call with no matching result …", generate + stream) |
 | Per-class observation limits (no cancel/retry/audit) | `runtime-core.provider-execution-class.test.ts` (KRT-AY003) |

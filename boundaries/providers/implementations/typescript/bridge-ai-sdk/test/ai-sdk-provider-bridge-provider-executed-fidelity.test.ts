@@ -163,6 +163,60 @@ describe("KRT-BH005 provider-executed/dynamic fidelity (generate)", () => {
       })
     ).rejects.toBeInstanceOf(TuvrenProviderError);
   });
+
+  test("a DECLARED provider-executed tool-call with no matching result yields no observation (provider bookkeeping, not a silent function call)", async () => {
+    const bridge = createAiSdkProviderBridge({
+      model: createMockModel({
+        provider: "openai",
+        async doGenerate() {
+          // A declared provider-executed tool-call WITHOUT its tool-result: a
+          // truncated/interrupted provider turn. The call is the provider's own
+          // bookkeeping — only a tool-result is an attributable observation — so
+          // skipping the call produces no provider-native record and no
+          // client-facing function tool_call the runtime would execute. It must
+          // NOT throw (the prior over-broad rejection did), and assistant text
+          // still flows. An orphan call simply yields no observation; a degraded
+          // diagnostic record is deferred to the ADR-055 native-client phases.
+          return createGenerateResult({
+            content: [
+              {
+                dynamic: true,
+                input: JSON.stringify({ query: "tuvren runtime" }),
+                providerExecuted: true,
+                toolCallId: "ws-orphan",
+                toolName: "web_search",
+                type: "tool-call",
+              },
+              { text: "No results yet.", type: "text" },
+            ],
+            finishReason: { raw: "stop", unified: "stop" },
+          });
+        },
+      }),
+    });
+
+    const response = await bridge.generate({
+      messages: [{ parts: [{ text: "search", type: "text" }], role: "user" }],
+      tools: USER_FUNCTION_TOOLS,
+      providerNativeTools: [WEB_SEARCH_DECLARATION],
+    });
+
+    // No matching tool-result → no provider-native observation is fabricated.
+    expect(response.providerToolResults ?? []).toHaveLength(0);
+    // The orphan call does not contaminate client-facing parts with a function
+    // tool_call/tool_result the runtime would attempt to execute.
+    expect(
+      response.parts.some(
+        (part) => part.type === "tool_call" || part.type === "tool_result"
+      )
+    ).toBe(false);
+    // The turn is not aborted: assistant content still flows.
+    expect(
+      response.parts.some(
+        (part) => part.type === "text" && part.text.length > 0
+      )
+    ).toBe(true);
+  });
 });
 
 describe("KRT-BH005 provider-executed/dynamic fidelity (stream)", () => {
@@ -218,9 +272,69 @@ describe("KRT-BH005 provider-executed/dynamic fidelity (stream)", () => {
       (providerResult as { providerMetadata?: Record<string, unknown> })
         .providerMetadata?.executionClass
     ).toBe("provider-native");
+    // The stream chunk also carries the runtime-facing owner attribution
+    // (AY002/AY004): provider-executed results are owned by the provider, never
+    // the host. (The generate-side record exposes executionClass at the bridge
+    // seam; owner is attached when the runtime maps the result to tool.result.)
+    expect(
+      (providerResult as { providerMetadata?: Record<string, unknown> })
+        .providerMetadata?.owner
+    ).toBe("provider");
 
     // (2) No spurious validation error and no client-facing tool_call chunk for
     // the provider-executed call: only the provider_tool_result carries it.
+    expect(
+      chunks.some(
+        (chunk) =>
+          chunk.type === "tool_call_start" || chunk.type === "tool_call_done"
+      )
+    ).toBe(false);
+  });
+
+  test("a DECLARED streamed provider-executed tool-call with no matching result yields no provider_tool_result and no client tool_call", async () => {
+    const bridge = createAiSdkProviderBridge({
+      model: createMockModel({
+        provider: "openai",
+        async doStream() {
+          // Streamed counterpart of the orphan case: the provider-executed
+          // tool-call streams but its tool-result never arrives this turn. The
+          // skipped call emits no chunk; no provider_tool_result is fabricated;
+          // the stream completes without throwing.
+          return {
+            stream: streamFromParts([
+              {
+                dynamic: true,
+                input: JSON.stringify({ query: "tuvren runtime" }),
+                providerExecuted: true,
+                toolCallId: "ws-orphan",
+                toolName: "web_search",
+                type: "tool-call",
+              },
+              { delta: "ok", id: "t-1", type: "text-delta" },
+              {
+                finishReason: { raw: "stop", unified: "stop" },
+                type: "finish",
+                usage: createUsage(3, 2),
+              },
+            ]),
+          };
+        },
+      }),
+    });
+
+    const chunks = await collectAsyncIterable(
+      bridge.stream({
+        messages: [{ parts: [{ text: "search", type: "text" }], role: "user" }],
+        tools: USER_FUNCTION_TOOLS,
+        providerNativeTools: [WEB_SEARCH_DECLARATION],
+      })
+    );
+
+    // No matching tool-result → no provider_tool_result chunk is fabricated.
+    expect(chunks.some((chunk) => chunk.type === "provider_tool_result")).toBe(
+      false
+    );
+    // The skipped provider-executed call emits no client-facing tool_call chunk.
     expect(
       chunks.some(
         (chunk) =>
