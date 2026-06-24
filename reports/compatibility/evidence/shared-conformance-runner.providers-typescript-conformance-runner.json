@@ -1142,6 +1142,10 @@
           "status": "pass"
         },
         {
+          "assertionId": "bh.bh005.provider-executed-fidelity.4.resultField",
+          "status": "pass"
+        },
+        {
           "assertionId": "bh.bh005.provider-executed-fidelity.requiredEvidence.result.assistantContentProduced",
           "status": "pass"
         },
@@ -1151,6 +1155,10 @@
         },
         {
           "assertionId": "bh.bh005.provider-executed-fidelity.requiredEvidence.result.providerExecutedCallNotSurfacedAsClientToolCall",
+          "status": "pass"
+        },
+        {
+          "assertionId": "bh.bh005.provider-executed-fidelity.requiredEvidence.result.providerExecutedFinishReasonParity",
           "status": "pass"
         }
       ],

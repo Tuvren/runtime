@@ -424,6 +424,16 @@ describe("KRT-BH005 provider-executed/dynamic fidelity (stream)", () => {
           chunk.type === "tool_call_done"
       )
     ).toBe(false);
+
+    // (3) Stream/generate finish-reason parity: the provider finished the turn
+    // with `stop`, and the skipped provider-executed tool — even though it seeds a
+    // providerOwned tool-state — must NOT push the turn through the tool-call
+    // finish-reason normalization. A spurious `tool_call` here would drive a
+    // continue/execute-tools iteration with no client call to run (KRT-BH005).
+    const finishChunk = chunks.find((chunk) => chunk.type === "finish");
+    expect((finishChunk as { finishReason?: string }).finishReason).toBe(
+      "stop"
+    );
   });
 
   test("still rejects an UNDECLARED provider-executed tool-input-start (baseline protection on the incremental path)", async () => {

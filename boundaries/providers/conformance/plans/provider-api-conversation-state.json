@@ -98,7 +98,8 @@
       "evidence": [
         "result.providerExecutedAttributedNative",
         "result.assistantContentProduced",
-        "result.providerExecutedCallNotSurfacedAsClientToolCall"
+        "result.providerExecutedCallNotSurfacedAsClientToolCall",
+        "result.providerExecutedFinishReasonParity"
       ],
       "assertions": [
         {
@@ -114,6 +115,11 @@
         {
           "kind": "resultField",
           "field": "$.providerExecutedCallNotSurfacedAsClientToolCall",
+          "equals": true
+        },
+        {
+          "kind": "resultField",
+          "field": "$.providerExecutedFinishReasonParity",
           "equals": true
         }
       ],

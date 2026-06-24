@@ -662,7 +662,14 @@ function createFinishStreamChunks(
 
   chunks.push({
     finishReason: helpers.mapFinishReason(part.finishReason, {
-      hasToolCalls: state.toolStates.size > 0,
+      // Provider-owned (provider-executed/dynamic) tool states are skipped
+      // bookkeeping, not client tool calls — they must not push a `stop` turn
+      // into the tool-call finish-reason normalization, which would diverge from
+      // the generate path (it counts emitted tool_call parts) and spuriously
+      // drive a continue/execute-tools iteration with no client call (KRT-BH005).
+      hasToolCalls: [...state.toolStates.values()].some(
+        (toolState) => toolState.providerOwned !== true
+      ),
     }),
     ...(providerMetadata === undefined
       ? {}

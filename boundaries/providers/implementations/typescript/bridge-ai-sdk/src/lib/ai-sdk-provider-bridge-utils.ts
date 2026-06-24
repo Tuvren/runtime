@@ -584,6 +584,13 @@ export function parseJsonInput(
  * (`providerExecuted`) or it is a runtime-defined provider tool (`dynamic`, e.g.
  * an MCP call). AI SDK v6 surfaces both flags on provider-executed tool-calls
  * (vercel/ai #10888). Client-executed function tools carry neither.
+ *
+ * Invariant: this predicate only CLASSIFIES; it never decides skip-vs-execute on
+ * its own. The bridge skips a provider-owned tool only when the host ALSO
+ * declared that tool name provider-native/mediated (`ProviderToolClassLookup`
+ * resolves it). A `dynamic` client function tool the host never declared
+ * provider-native therefore can never be silently swallowed — it falls through
+ * to the baseline rejection, exactly as before this seam existed.
  */
 export function isProviderOwnedToolPart(part: {
   dynamic?: boolean;

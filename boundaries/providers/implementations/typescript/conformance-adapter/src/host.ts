@@ -629,6 +629,11 @@ async function conversationStateProviderExecutedFidelity(): Promise<
     (chunk) => chunk.type === "provider_tool_result"
   ) as { providerMetadata?: Record<string, unknown> } | undefined;
   const streamNativeClass = streamNativeChunk?.providerMetadata?.executionClass;
+  const streamFinishReason = (
+    streamChunks.find((chunk) => chunk.type === "finish") as
+      | { finishReason?: string }
+      | undefined
+  )?.finishReason;
 
   return createProjection({
     // The assistant content is produced normally — the provider-executed
@@ -655,6 +660,12 @@ async function conversationStateProviderExecutedFidelity(): Promise<
     providerExecutedAttributedNative:
       generateNativeClass === "provider-native" &&
       streamNativeClass === "provider-native",
+    // Stream/generate finish-reason parity: a provider-executed-only turn that the
+    // provider finished with `stop` reports `stop` on BOTH paths. The skipped
+    // provider-owned tool-state must not push the stream turn through the
+    // tool-call finish-reason normalization the generate path never applies here.
+    providerExecutedFinishReasonParity:
+      generateResponse.finishReason === "stop" && streamFinishReason === "stop",
   });
 }
 
