@@ -39,7 +39,7 @@ The metaphor is the spine, applied faithfully (not as flavor).
 
 | Term | Meaning |
 | --- | --- |
-| **Tuvren** | The OS / framework / distribution. The product brand and host-facing surface. *(The constitution currently names "Tuvren Runtime" as the product; re-centering on "Tuvren" is the M10 constitutional change — see §14.)* |
+| **Tuvren** | The OS / framework / distribution; the host-facing surface. *(Precision: the constitution today defines **Tuvren = the company brand**, **Tuvren Runtime = the product**, **Kraken = the engine** — `vision.md` §1.1. Using "Tuvren" for the framework therefore **repurposes an existing brand term**; that ubiquitous-language change is handled in M10 — see §14.)* |
 | **Kraken** | The **engine / executive** — the hexagon center that owns turn/run lifecycle, execution handles, durable-read, capability orchestration, and worker/handoff process management. |
 | **kernel** | Mechanism only: syscalls, durable objects, TurnTrees, lineage, staging, reclamation, the narrow waist. Interprets no content. |
 | **`spec/`** | The **standard** (Tuvren's POSIX). Authority packets are its normative sections; conformance is its certification suite. |
@@ -140,7 +140,7 @@ Tuvren/framework
 
 ## 8. Driver shipping model — in-tree (the Linux way)
 
-All drivers — first-party **and** curated community — live in the monorepo, and all are **green-gated**.
+All drivers — first-party **and** curated community — live in the monorepo, and all are **green-gated**. *(This is the target taxonomy; the in-tree "driver" set is populated as the `driver→runner` rename and per-port migrations land — today the only execution adapter present is the ReAct runner.)*
 
 - **Not green → not shipped, period.** A contribution that does not certify cannot land.
 - Everything lives under one workspace, so AI agents and contributors reach the source directly rather than chasing other repos.
@@ -192,7 +192,7 @@ The green conformance gate **is** the acceptance bar: the standard is the review
 ## 12. Living artifacts
 
 - **Status** lives in **this issue** (milestone checklist + running notes). There is no separate `EPIC_STATUS.md` — the issue *is* the status surface.
-- **`MIGRATION_INVENTORY.md`** (machine-checkable) lives at repo root during the migration: the authoritative 100%-coverage ledger of every contract, driver, runner, hook, script, and implementation as `old path → new path → status → content hash`. It must explicitly enumerate the **known multi-home / ambiguous cases** before the milestones that touch them — at minimum: every `@tuvren/core/*` subpath and its destination tier (M2); the two interop trees (M1/M8); telemetry's three current homes (M8); the plural `boundaries/hosts/` vs singular `spec/host` (M9). It is **deleted at cutover** so it does not become durable cruft.
+- **`MIGRATION_INVENTORY.md`** (machine-checkable) lives at repo root during the migration: the authoritative 100%-coverage ledger of every contract, driver, runner, hook, script, and implementation as `old path → new path → status → content hash`. It must explicitly enumerate the **known multi-home / ambiguous cases** before the milestones that touch them — at minimum: every `@tuvren/core/*` subpath **plus the sibling `@tuvren/core-types` package and the deprecated compatibility shims (`@tuvren/runtime-api`, `@tuvren/driver-api`, `@tuvren/event-stream`, `@tuvren/tool-contracts`, `@tuvren/runtime-core`)** and their destination tiers (M2/M3); the two interop trees (M1/M8); telemetry's three current homes (M8); the plural `boundaries/hosts/` vs singular `spec/host` (M9). It is **deleted at cutover** so it does not become durable cruft.
 
 ---
 
@@ -213,7 +213,7 @@ Each milestone migrates a port's authority into `spec/`, its adapters into the r
 - `spec/kernel` + `spec/conformance/kernel` exist and are authoritative.
 - The Rust kernel and the TypeScript kernel adapter build and **certify under Bazel**.
 - The IPC (gRPC) kernel transport from `boundaries/kernel/interop/grpc/` is mapped to `spec/interop/`; the conformance list is updated to exercise the moved projects.
-- **Decide how the stateful PostgreSQL conformance lane (devenv-managed, non-idempotent) reconciles with Bazel's hermeticity** — the kernel's postgres certification is the first place this tension bites, and it must be resolved within M1 rather than discovered later.
+- **Decide how the stateful PostgreSQL conformance lane (devenv-managed, non-idempotent) reconciles with Bazel's hermeticity** — the kernel's postgres certification is the first place this tension bites. Resolve it within M1; an acceptable fallback is keeping the postgres lane **Nx-driven transitionally** (outside the hermetic graph) so an unresolved hermeticity answer does not block the tracer bullet.
 - Old and new paths produce equivalent results; inventory updated.
 
 ### M2 — core (ABI)
@@ -221,7 +221,7 @@ Each milestone migrates a port's authority into `spec/`, its adapters into the r
 **Definition of Done (gate):**
 - `spec/core` owns the canonical, behavior-free vocabulary (messages/content, events, errors, execution-result types, schema shapes).
 - The existing TypeScript `@tuvren/core` (the consolidated shared-primitive package, with 11 named subpaths plus root — incl. `./tools`, `./capabilities`, `./telemetry`, and lifecycle/extension/provider type surfaces) is **sorted**, not merely "split": pure data/types → `spec/core` (as neutral contracts); executable helpers (`defineTool` schema-authoring, payload codecs) → the TypeScript **libc/SDK tier**, never `spec/core`. (The batteries-included `createTuvren` already lives in `@tuvren/runtime`, not `@tuvren/core`.)
-- The inventory enumerates **every `@tuvren/core/*` subpath → destination tier** before this milestone starts (this is a wide cut consumed across every package — see §12).
+- The inventory enumerates **every `@tuvren/core/*` subpath — plus the sibling `@tuvren/core-types` package and the deprecated `@tuvren/{runtime-api,driver-api,event-stream,tool-contracts}` shims — → destination tier** before this milestone starts (this is a wide cut consumed across every package — see §12).
 - TypeScript certifies against `spec/core`; conformance list updated; green; inventory updated.
 
 ### M3 — engine (Kraken) + libc
@@ -236,20 +236,20 @@ Each milestone migrates a port's authority into `spec/`, its adapters into the r
 **Definition of Done (gate):** `spec/providers` authoritative; the AI SDK bridge migrated as a provider driver and certifying; conformance list updated; green; inventory updated.
 
 ### M5 — tools + capabilities + MCP
-**Objective:** Tool port (including execution classes / binding / policy) + tool drivers.
-**Definition of Done (gate):** `spec/tools` authoritative; tool drivers and **MCP (bus-driver)** migrated and certifying; conformance list updated; green; inventory updated.
+**Objective:** Tool port (including execution classes / binding / policy) + the MCP driver.
+**Definition of Done (gate):** `spec/tools` **consolidates the existing tool-contracts / capability authority** (today split across the `@tuvren/core` tool/capability subpaths and logic inside `@tuvren/runtime`) into a port; **MCP** (`@tuvren/mcp-client`, the bus-driver) migrated and certifying. Note: **no standalone tool-driver packages exist today** — `drivers/` contains only the ReAct runner (`@tuvren/driver-react`) — so Exa/Slack-style tool drivers (§4) are *illustrative future* adapters, not part of this move. Conformance list updated; green; inventory updated.
 
 ### M6 — runners
 **Objective:** Runner port + ReAct. **The `driver → runner` rename lands here** (and "runner" is reserved for execution models — see §14).
-**Definition of Done (gate):** `spec/runners` authoritative; ReAct migrated as a runner; the repo-wide `driver→runner` rename (code, docs, glossary, conformance) complete and consistent; the conformance machinery renamed off "runner" to avoid collision (§14); conformance list updated; green; inventory updated.
+**Definition of Done (gate):** `spec/runners` **consolidates today's split execution-model authority** — both `boundaries/framework/contracts/driver-api/` (the neutral execution-model contract) and `boundaries/framework/contracts/react-driver/` (the ReAct-specific plans) fold into it. The ReAct implementation (today `@tuvren/driver-react`, under `drivers/react`) migrates as a runner; the repo-wide `driver→runner` rename (code, docs, glossary, conformance) is complete and consistent; the conformance machinery is renamed off "runner" to avoid collision (§14). Conformance list updated; green; inventory updated.
 
 ### M7 — extensions
-**Objective:** Hook/extension port + first-party extensions.
-**Definition of Done (gate):** `spec/extensions` authoritative; first-party extensions migrated and certifying; conformance list updated; green; inventory updated.
+**Objective:** Extract the existing extension surface into a port — **no new behavioral coverage** (that would exceed §9 scope).
+**Definition of Done (gate):** `spec/extensions` is authored by **extracting what exists today**: the extension type-surface (`@tuvren/core/extensions`), the runtime facade (`runtime/src/lib/extension-runtime.ts`), and the REPL proof shim (`repl/src/lib/proof-extension.ts`). There is no standalone extension package, authority-packet, or conformance plan today, so this milestone *authors the port from existing material* and lifts only the coverage those artifacts already imply — it does **not** invent new extension behavior or new conformance. Conformance list updated; green; inventory updated.
 
 ### M8 — streaming + telemetry
 **Objective:** Output drivers.
-**Definition of Done (gate):** `spec/streaming` + `spec/telemetry` authoritative; tty drivers (SSE/AG-UI) and the syslog driver (OTel) migrated and certifying. **Telemetry today has three homes the inventory must reconcile into one port + driver:** the top-level `telemetry/` semconv project (which generates helpers into `…/typescript/runtime-core/src/lib/generated/` and a Rust helper under the kernel tree), `boundaries/telemetry/semconv/spec/authority-packet.json` (the vocabulary authority), and `boundaries/framework/implementations/typescript/telemetry-otel` (the OTel syslog driver). The `boundaries/framework/interop/rust-kernel/` cross-language interop suite moves to `spec/conformance/interop/` (it is conformance, not transport). Conformance list updated; green; inventory updated.
+**Definition of Done (gate):** `spec/streaming` + `spec/telemetry` authoritative; tty drivers (SSE/AG-UI) and the syslog driver (OTel) migrated and certifying. **Telemetry today has three homes the inventory must reconcile into one port + driver:** the top-level `telemetry/` semconv project (which generates helpers into `…/typescript/runtime-core/src/lib/generated/` and a Rust helper under the kernel tree), `boundaries/telemetry/semconv/spec/authority-packet.json` (the vocabulary authority), and `boundaries/framework/implementations/typescript/telemetry-otel` (the OTel syslog driver). Because M3 retires `runtime-core`, M8 also relocates that generated-telemetry sink into the new TypeScript telemetry layout. The `boundaries/framework/interop/rust-kernel/` cross-language interop suite moves to `spec/conformance/interop/` (it is conformance, not transport). Conformance list updated; green; inventory updated.
 
 ### M9 — host (shell)
 **Objective:** Host port + the reference REPL host.
@@ -270,10 +270,10 @@ Each milestone migrates a port's authority into `spec/`, its adapters into the r
 ## 14. Naming migration & known risks
 
 - **`driver` inverts meaning repo-wide.** Today every "driver" means ReAct-the-execution-strategy; after this work, "driver" means a resource adapter and ReAct is a **runner**. This is a sweeping, mechanical rename across code, docs, glossary, and conformance, and it lands at **M6** with real collision risk. It is a first-class tracked task, not a footnote.
-- **`runner` is already a loaded term — reserve it.** The repo already uses "runner" pervasively for the **conformance** machinery — five `conformance-runner` directories, plus additional runner-named conformance project IDs (the batteries-included variant and the per-backend sqlite/postgres lanes; **eight** project IDs total in the `conformance` script), plus the shared engine `tools/conformance/runner/`. Once `driver→runner` (M6) makes "runner" *also* mean execution model, the word is ambiguous. Resolution: **reserve "runner" for execution models**, and rename the conformance machinery to the **certification harness** ("the harness" / "generic harness"). This rename is tracked alongside the M6 sweep.
+- **`runner` is already a loaded term — reserve it.** The repo already uses "runner" pervasively for the **conformance** machinery — **eight** runner-named directories (`conformance-runner`, plus the `…-batteries-included`, `…-sqlite`, and `…-postgres` variants), matching the eight project IDs in the `conformance` script, plus the shared engine `tools/conformance/runner/`. Once `driver→runner` (M6) makes "runner" *also* mean execution model, the word is ambiguous. Resolution: **reserve "runner" for execution models**, and rename the conformance machinery to the **certification harness** ("the harness" / "generic harness"). This rename is tracked alongside the M6 sweep.
 - **`spec/` is already a directory name *inside* the repo.** Every contract/interop area currently has its own nested `spec/` authority dir. The new root `spec/` **subsumes** these — they relocate into `spec/<port>/`, leaving exactly one `spec/`. Called out so the central term is held to the same discipline as `driver`/`runner` (resolution in §5/§15).
 - **`Thread` / `Branch` collide with OS threads.** In a strict OS metaphor, the domain `Thread` is really a long-lived session/job and `Branch` is a fork of it. Renaming reaches deep into the kernel spec, so it is **parked** and flagged for a future decision — not done here.
-- **Renaming "Tuvren Runtime" is a constitutional change, not just a repo rename.** The product is named "Tuvren Runtime" throughout `.constitution/prd/` (the glossary's ubiquitous-language table even lists "engine / wrapper" under *Do Not Use*). Re-centering the product name on **Tuvren** (the framework/OS) and away from "Runtime" is a ubiquitous-language change handled in M10's `.constitution/` rewrite — not a side effect of the `Tuvren/runtime → Tuvren/framework` repo rename.
+- **Renaming "Tuvren Runtime" is a constitutional change, not just a repo rename.** Today `.constitution/prd/vision.md` §1.1 defines **Tuvren = the company brand**, **Tuvren Runtime = the product**, **Kraken = the engine**. Using "Tuvren" for the framework therefore does two things at once: it drops "Runtime" *and* repurposes the company-brand term — a real ubiquitous-language collision, not a trim. It is handled in M10's `.constitution/` rewrite, not as a side effect of the `Tuvren/runtime → Tuvren/framework` repo rename.
 - **Conformance drift during reorganization** is the #1 risk. It is mitigated by the M1 tracer-bullet, the restructure-only scope, the per-milestone green gate (incl. updating the conformance list), and the in-tree certification requirement.
 
 ---
