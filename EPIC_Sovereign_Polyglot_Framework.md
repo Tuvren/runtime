@@ -39,7 +39,7 @@ The metaphor is the spine, applied faithfully (not as flavor).
 
 | Term | Meaning |
 | --- | --- |
-| **Tuvren** | The OS / framework / distribution; the host-facing surface. *(Precision: the constitution today defines **Tuvren = the company brand**, **Tuvren Runtime = the product**, **Kraken = the engine** — `vision.md` §1.1. Using "Tuvren" for the framework therefore **repurposes an existing brand term**; that ubiquitous-language change is handled in M10 — see §14.)* |
+| **Tuvren** | The OS / framework / distribution; the host-facing surface. *(Precision: the constitution today defines **Tuvren = the company brand**, **Tuvren Runtime = the runtime product**, **Kraken = the engine** — `vision.md` §1.1. Using "Tuvren" for the framework therefore **repurposes an existing brand term**; that ubiquitous-language change is handled in M10 — see §14.)* |
 | **Kraken** | The **engine / executive** — the hexagon center that owns turn/run lifecycle, execution handles, durable-read, capability orchestration, and worker/handoff process management. |
 | **kernel** | Mechanism only: syscalls, durable objects, TurnTrees, lineage, staging, reclamation, the narrow waist. Interprets no content. |
 | **`spec/`** | The **standard** (Tuvren's POSIX). Authority packets are its normative sections; conformance is its certification suite. |
@@ -192,7 +192,7 @@ The green conformance gate **is** the acceptance bar: the standard is the review
 ## 12. Living artifacts
 
 - **Status** lives in **this issue** (milestone checklist + running notes). There is no separate `EPIC_STATUS.md` — the issue *is* the status surface.
-- **`MIGRATION_INVENTORY.md`** (machine-checkable) lives at repo root during the migration: the authoritative 100%-coverage ledger of every contract, driver, runner, hook, script, and implementation as `old path → new path → status → content hash`. It must explicitly enumerate the **known multi-home / ambiguous cases** before the milestones that touch them — at minimum: every `@tuvren/core/*` subpath **plus the sibling `@tuvren/core-types` package and the deprecated compatibility shims (`@tuvren/runtime-api`, `@tuvren/driver-api`, `@tuvren/event-stream`, `@tuvren/tool-contracts`, `@tuvren/runtime-core`)** and their destination tiers (M2/M3); the two interop trees (M1/M8); telemetry's three current homes (M8); the plural `boundaries/hosts/` vs singular `spec/host` (M9). It is **deleted at cutover** so it does not become durable cruft.
+- **`MIGRATION_INVENTORY.md`** (machine-checkable) lives at repo root during the migration: the authoritative 100%-coverage ledger of every contract, driver, runner, hook, script, and implementation as `old path → new path → status → content hash`. It must explicitly enumerate the **known multi-home / ambiguous cases** before the milestones that touch them — at minimum: every `@tuvren/core/*` subpath **plus the sibling `@tuvren/core-types` package and the deprecated compatibility shims (`@tuvren/runtime-api`, `@tuvren/driver-api`, `@tuvren/event-stream`, `@tuvren/tool-contracts`, `@tuvren/runtime-core`)** and their destination tiers (M2/M3); the streaming contracts `event-stream` **and** `event-stream-sse` (M8); the two interop trees (M1/M8); the **shared generated sink `runtime-core/src/lib/generated/`, which hosts _both_ the telemetry and the gRPC kernel-interop bindings** and must be re-homed when M3 retires that package — baseline the *actual* current generated layout, which has drifted across codegen configs vs. source imports; telemetry's three current homes (M8); the `reports/compatibility/` evidence tree (compatibility matrix + evidence — destination plausibly `spec/conformance/`; M8/M10); and the plural `boundaries/hosts/` vs singular `spec/host` (M9). It is **deleted at cutover** so it does not become durable cruft.
 
 ---
 
@@ -212,7 +212,7 @@ Each milestone migrates a port's authority into `spec/`, its adapters into the r
 **Definition of Done (gate):**
 - `spec/kernel` + `spec/conformance/kernel` exist and are authoritative.
 - The Rust kernel and the TypeScript kernel adapter build and **certify under Bazel**.
-- The IPC (gRPC) kernel transport from `boundaries/kernel/interop/grpc/` is mapped to `spec/interop/`; the conformance list is updated to exercise the moved projects.
+- The IPC (gRPC) kernel transport from `boundaries/kernel/interop/grpc/` is mapped to `spec/interop/`; the **generated** TypeScript kernel-interop bindings (today co-located with telemetry under `runtime-core/src/lib/generated/`, a package M3 retires) relocate to the `typescript/` generated area; the conformance list is updated to exercise the moved projects.
 - **Decide how the stateful PostgreSQL conformance lane (devenv-managed, non-idempotent) reconciles with Bazel's hermeticity** — the kernel's postgres certification is the first place this tension bites. Resolve it within M1; an acceptable fallback is keeping the postgres lane **Nx-driven transitionally** (outside the hermetic graph) so an unresolved hermeticity answer does not block the tracer bullet.
 - Old and new paths produce equivalent results; inventory updated.
 
@@ -273,7 +273,7 @@ Each milestone migrates a port's authority into `spec/`, its adapters into the r
 - **`runner` is already a loaded term — reserve it.** The repo already uses "runner" pervasively for the **conformance** machinery — **eight** runner-named directories (`conformance-runner`, plus the `…-batteries-included`, `…-sqlite`, and `…-postgres` variants), matching the eight project IDs in the `conformance` script, plus the shared engine `tools/conformance/runner/`. Once `driver→runner` (M6) makes "runner" *also* mean execution model, the word is ambiguous. Resolution: **reserve "runner" for execution models**, and rename the conformance machinery to the **certification harness** ("the harness" / "generic harness"). This rename is tracked alongside the M6 sweep.
 - **`spec/` is already a directory name *inside* the repo.** Every contract/interop area currently has its own nested `spec/` authority dir. The new root `spec/` **subsumes** these — they relocate into `spec/<port>/`, leaving exactly one `spec/`. Called out so the central term is held to the same discipline as `driver`/`runner` (resolution in §5/§15).
 - **`Thread` / `Branch` collide with OS threads.** In a strict OS metaphor, the domain `Thread` is really a long-lived session/job and `Branch` is a fork of it. Renaming reaches deep into the kernel spec, so it is **parked** and flagged for a future decision — not done here.
-- **Renaming "Tuvren Runtime" is a constitutional change, not just a repo rename.** Today `.constitution/prd/vision.md` §1.1 defines **Tuvren = the company brand**, **Tuvren Runtime = the product**, **Kraken = the engine**. Using "Tuvren" for the framework therefore does two things at once: it drops "Runtime" *and* repurposes the company-brand term — a real ubiquitous-language collision, not a trim. It is handled in M10's `.constitution/` rewrite, not as a side effect of the `Tuvren/runtime → Tuvren/framework` repo rename.
+- **Renaming "Tuvren Runtime" is a constitutional change, not just a repo rename.** Today `.constitution/prd/vision.md` §1.1 defines **Tuvren = the company brand**, **Tuvren Runtime = the runtime product**, **Kraken = the engine**. Using "Tuvren" for the framework therefore does two things at once: it drops "Runtime" *and* repurposes the company-brand term — a real ubiquitous-language collision, not a trim. It is handled in M10's `.constitution/` rewrite, not as a side effect of the `Tuvren/runtime → Tuvren/framework` repo rename.
 - **Conformance drift during reorganization** is the #1 risk. It is mitigated by the M1 tracer-bullet, the restructure-only scope, the per-milestone green gate (incl. updating the conformance list), and the in-tree certification requirement.
 
 ---
@@ -287,6 +287,7 @@ Each milestone migrates a port's authority into `spec/`, its adapters into the r
 | boundary-owned `conformance/` | `spec/conformance/` (unified certification suite) |
 | `boundaries/kernel/interop/grpc/` | `spec/interop/` (IPC — gRPC kernel transport contract) |
 | `boundaries/framework/interop/rust-kernel/` (cross-language interop **conformance** suite) | `spec/conformance/interop/` |
+| `reports/compatibility/` (compatibility matrix + evidence) | `spec/conformance/` (evidence; or a top-level evidence tree) |
 | "driver" (ReAct and other strategies) | **runner** |
 | backends / provider bridges / MCP / stream + telemetry adapters | **drivers** (resource adapters) |
 | `conformance-runner` / `tools/conformance/runner/` (the conformance machinery) | **certification harness** (reserve "runner" for execution models) |
