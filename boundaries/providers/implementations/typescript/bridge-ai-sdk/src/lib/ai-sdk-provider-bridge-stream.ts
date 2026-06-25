@@ -30,10 +30,11 @@ import {
   buildProviderMetadata,
   hasAnthropicRedactedReasoningMetadata,
   isPlainObject,
+  isProviderOwnedToolPart,
   mergeProviderMetadataRecords,
   parseJsonInput,
+  providerOwnedToolExecutionUnsupportedError,
   readReasoningStreamSignature,
-  rejectUnsupportedProviderOwnedToolPart,
   requireToolState,
   type StreamToolState,
   sanitizeMetadataValue,
@@ -330,15 +331,40 @@ function handleToolInputStartPart(
   part: Extract<LanguageModelV3StreamPart, { type: "tool-input-start" }>,
   state: StreamMappingState
 ): ProviderStreamChunk[] {
-  rejectUnsupportedProviderOwnedToolPart(part, state.model);
+  // KRT-BH005 / ADR-055: real providers stream a provider-executed
+  // (providerExecuted/dynamic) tool as tool-input-start → tool-input-delta →
+  // tool-input-end → tool-call → tool-result (e.g. @ai-sdk/openai Responses
+  // web_search / code_interpreter). Only tool-input-start carries the
+  // providerExecuted/dynamic flags, so a declared provider-native/mediated tool is
+  // recognised here, marked provider-owned, and emits no client-facing
+  // tool_call_start — the matching tool-result yields the provider_tool_result
+  // attribution (AY002/AY004) and the subsequent input/tool-call parts are skipped
+  // via the marker. Undeclared provider-owned execution stays rejected (baseline
+  // protection).
+  const providerOwned = isProviderOwnedToolPart(part);
+  if (
+    providerOwned &&
+    state.providerToolClassLookup?.(part.toolName) === undefined
+  ) {
+    throw providerOwnedToolExecutionUnsupportedError(
+      part.toolName,
+      state.model
+    );
+  }
+
   state.toolStates.set(part.id, {
     doneEmitted: false,
     ended: false,
     inputBuffer: "",
     name: part.toolName,
     providerMetadata: readStreamToolPartProviderMetadata(part),
+    ...(providerOwned ? { providerOwned: true } : {}),
     started: true,
   });
+
+  if (providerOwned) {
+    return [];
+  }
 
   return [
     {
@@ -359,6 +385,11 @@ function handleToolInputDeltaPart(
     state.model,
     part
   );
+  if (toolState.providerOwned === true) {
+    // Provider-executed tool input is the provider's own bookkeeping; never surface
+    // an args delta the runtime would attribute to a client tool call (KRT-BH005).
+    return [];
+  }
   toolState.inputBuffer += part.delta;
   toolState.providerMetadata = mergeProviderMetadataRecords(
     toolState.providerMetadata,
@@ -384,6 +415,10 @@ function handleToolInputEndPart(
     state.model,
     part
   );
+  if (toolState.providerOwned === true) {
+    // Provider-executed tool input end carries no client-facing signal (KRT-BH005).
+    return [];
+  }
   toolState.ended = true;
   toolState.providerMetadata = mergeProviderMetadataRecords(
     toolState.providerMetadata,
@@ -396,7 +431,35 @@ function handleToolCallStreamPart(
   part: Extract<LanguageModelV3StreamPart, { type: "tool-call" }>,
   state: StreamMappingState
 ): ProviderStreamChunk[] {
-  rejectUnsupportedProviderOwnedToolPart(part, state.model);
+  // KRT-BH005 / ADR-055: a provider-executed (providerExecuted/dynamic) tool-call
+  // declared as provider-native/mediated is the provider's own executed call;
+  // skip it (the matching tool-result yields the provider_tool_result attribution
+  // — AY002/AY004) and emit no client-facing tool_call chunk. A tool-state already
+  // marked provider-owned by its tool-input-start prelude is decisive even if the
+  // tool-call part omits the flags. Undeclared provider-owned execution stays out
+  // of scope (baseline protection).
+  //
+  // The seeded-state lookup relies on the AI SDK convention that a tool's
+  // tool-input-start `id` equals its terminal tool-call `toolCallId` (the same
+  // identity the rest of the bridge correlates on, and what real providers —
+  // OpenAI Responses, Anthropic, Google, MCP — emit). If a provider both renamed
+  // the id mid-stream AND dropped the providerExecuted/dynamic flags on the
+  // terminal tool-call, neither this marker nor the flag check below would catch
+  // it; no shipped provider does either, so that doubly-hypothetical shape is out
+  // of the audited contract.
+  const seededToolState = state.toolStates.get(part.toolCallId);
+  if (seededToolState?.providerOwned === true) {
+    return [];
+  }
+  if (isProviderOwnedToolPart(part)) {
+    if (state.providerToolClassLookup?.(part.toolName) !== undefined) {
+      return [];
+    }
+    throw providerOwnedToolExecutionUnsupportedError(
+      part.toolName,
+      state.model
+    );
+  }
   assertToolCallCorrelation(part, state);
 
   const chunks = createToolCallPreludeChunks(part, state);
@@ -464,7 +527,15 @@ function assertToolCallCorrelation(
   const correlatedIds = [...state.toolStates.entries()]
     .filter(
       ([, toolState]) =>
-        toolState.inputBuffer === part.input && toolState.name === part.toolName
+        // Provider-owned (provider-executed/dynamic) states are skipped
+        // bookkeeping — they linger with inputBuffer === "" and must never
+        // correlate to a client tool-call. Without this guard a same-named client
+        // tool-call with empty input would spuriously match a provider tool's
+        // lingering state and surface a misleading correlation-mismatch error
+        // instead of the accurate input-validation error (KRT-BH005).
+        toolState.providerOwned !== true &&
+        toolState.inputBuffer === part.input &&
+        toolState.name === part.toolName
     )
     .map(([providerCallId]) => providerCallId);
 
@@ -608,7 +679,14 @@ function createFinishStreamChunks(
 
   chunks.push({
     finishReason: helpers.mapFinishReason(part.finishReason, {
-      hasToolCalls: state.toolStates.size > 0,
+      // Provider-owned (provider-executed/dynamic) tool states are skipped
+      // bookkeeping, not client tool calls — they must not push a `stop` turn
+      // into the tool-call finish-reason normalization, which would diverge from
+      // the generate path (it counts emitted tool_call parts) and spuriously
+      // drive a continue/execute-tools iteration with no client call (KRT-BH005).
+      hasToolCalls: [...state.toolStates.values()].some(
+        (toolState) => toolState.providerOwned !== true
+      ),
     }),
     ...(providerMetadata === undefined
       ? {}
@@ -757,6 +835,11 @@ function canOmitStructuredStreamOutput(
   }
 
   for (const toolState of state.toolStates.values()) {
+    // Provider-owned tool inputs never emit a client tool_call_done; they do not
+    // gate client tool-call completion (KRT-BH005).
+    if (toolState.providerOwned === true) {
+      continue;
+    }
     if (!toolState.doneEmitted) {
       return false;
     }
@@ -767,7 +850,10 @@ function canOmitStructuredStreamOutput(
 
 function ensureToolCallsCompleted(state: StreamMappingState): void {
   for (const [providerCallId, toolState] of state.toolStates.entries()) {
-    if (toolState.doneEmitted) {
+    // Provider-owned tool inputs never emit a client-facing tool_call_done — they
+    // are skipped bookkeeping for the provider's own executed call (KRT-BH005), so
+    // they are not subject to the client tool-call completeness invariant.
+    if (toolState.doneEmitted || toolState.providerOwned === true) {
       continue;
     }
 

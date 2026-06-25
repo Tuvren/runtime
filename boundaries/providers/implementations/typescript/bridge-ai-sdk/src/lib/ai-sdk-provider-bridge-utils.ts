@@ -46,6 +46,16 @@ export interface StreamToolState {
   inputBuffer: string;
   name: string;
   providerMetadata?: Record<string, unknown>;
+  /**
+   * True when the streamed tool input belongs to a declared provider-executed
+   * (`providerExecuted`/`dynamic`) tool. Real providers stream provider-executed
+   * tools as `tool-input-start` → `tool-input-delta` → `tool-input-end` →
+   * `tool-call` → `tool-result`; only `tool-input-start` carries the
+   * `providerExecuted`/`dynamic` flags, so the marker is seeded there and read by
+   * the later input parts to keep them out of the client tool_call stream
+   * (KRT-BH005 / ADR-055).
+   */
+  providerOwned?: boolean;
   started: boolean;
 }
 
@@ -569,36 +579,43 @@ export function parseJsonInput(
   }
 }
 
-export function rejectUnsupportedProviderOwnedToolPart(
-  part:
-    | Extract<
-        LanguageModelV3StreamPart,
-        { type: "tool-input-start" | "tool-call" }
-      >
-    | Extract<
-        LanguageModelV3GenerateResult["content"][number],
-        { type: "tool-call" }
-      >,
+/**
+ * A tool part is "provider-owned" when the provider executed it itself
+ * (`providerExecuted`) or it is a runtime-defined provider tool (`dynamic`, e.g.
+ * an MCP call). AI SDK v6 surfaces both flags on provider-executed tool-calls
+ * (vercel/ai #10888). Client-executed function tools carry neither.
+ *
+ * Invariant: this predicate only CLASSIFIES; it never decides skip-vs-execute on
+ * its own. The bridge skips a provider-owned tool only when the host ALSO
+ * declared that tool name provider-native/mediated (`ProviderToolClassLookup`
+ * resolves it). A `dynamic` client function tool the host never declared
+ * provider-native therefore can never be silently swallowed — it falls through
+ * to the baseline rejection, exactly as before this seam existed.
+ */
+export function isProviderOwnedToolPart(part: {
+  dynamic?: boolean;
+  providerExecuted?: boolean;
+}): boolean {
+  return part.providerExecuted === true || part.dynamic === true;
+}
+
+export function providerOwnedToolExecutionUnsupportedError(
+  toolName: string,
   model: {
     modelId: string;
     provider: string;
   }
-): void {
-  if (
-    part.providerExecuted === true ||
-    ("dynamic" in part && part.dynamic === true)
-  ) {
-    throw bridgeError(
-      "provider-owned tool execution is out of scope for the baseline AI SDK bridge",
-      "unsupported_ai_sdk_content",
-      {
-        modelId: model.modelId,
-        provider: model.provider,
-        reason: "provider_owned_tool_execution_unsupported",
-        toolName: part.toolName,
-      }
-    );
-  }
+): TuvrenProviderError {
+  return bridgeError(
+    "provider-owned tool execution is out of scope for the baseline AI SDK bridge",
+    "unsupported_ai_sdk_content",
+    {
+      modelId: model.modelId,
+      provider: model.provider,
+      reason: "provider_owned_tool_execution_unsupported",
+      toolName,
+    }
+  );
 }
 
 export function requireToolState(

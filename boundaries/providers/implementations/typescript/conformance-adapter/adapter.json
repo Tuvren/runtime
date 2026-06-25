@@ -20,7 +20,8 @@
     "providers.mcp-client",
     "providers.rejects-native-strict-structured-output",
     "providers.provider-native-execution-class",
-    "providers.provider-mediated-execution-class"
+    "providers.provider-mediated-execution-class",
+    "providers.conversation-state-ownership"
   ],
   "authorityPackets": [
     "boundaries/providers/contracts/provider-api/spec/authority-packet.json",

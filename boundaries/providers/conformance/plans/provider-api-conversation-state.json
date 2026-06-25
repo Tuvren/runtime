@@ -1,0 +1,130 @@
+{
+  "planId": "tuvren.providers.provider-api.conversation-state",
+  "planVersion": "0.1.0",
+  "packetId": "tuvren.providers.provider-api",
+  "applicability": {
+    "capabilities": ["providers.conversation-state-ownership"]
+  },
+  "checks": [
+    {
+      "checkId": "bh.bh001.continuity-carried-as-optimization",
+      "evidence": [
+        "result.continuityCarried",
+        "result.continuityNamespacePresent"
+      ],
+      "assertions": [
+        {
+          "kind": "resultField",
+          "field": "$.continuityCarried",
+          "equals": true
+        },
+        {
+          "kind": "resultField",
+          "field": "$.continuityNamespacePresent",
+          "equals": true
+        }
+      ],
+      "operation": "providers.conversation-state.continuity-carriage",
+      "capabilities": ["providers.conversation-state-ownership"]
+    },
+    {
+      "checkId": "bh.bh001.continuity-non-blocking-response",
+      "evidence": ["result.responseFinishReason"],
+      "assertions": [
+        {
+          "kind": "resultField",
+          "field": "$.responseFinishReason",
+          "equals": "stop"
+        }
+      ],
+      "operation": "providers.conversation-state.continuity-carriage",
+      "capabilities": ["providers.conversation-state-ownership"]
+    },
+    {
+      "checkId": "bh.bh002.continuity-replayed-from-history",
+      "evidence": ["result.continuityReplayedFromHistory"],
+      "assertions": [
+        {
+          "kind": "resultField",
+          "field": "$.continuityReplayedFromHistory",
+          "equals": true
+        }
+      ],
+      "operation": "providers.conversation-state.continuity-replay",
+      "capabilities": ["providers.conversation-state-ownership"]
+    },
+    {
+      "checkId": "bh.bh003.continuity-roundtrip-across-turns",
+      "evidence": ["result.continuityRoundTrippedAcrossTurns"],
+      "assertions": [
+        {
+          "kind": "resultField",
+          "field": "$.continuityRoundTrippedAcrossTurns",
+          "equals": true
+        }
+      ],
+      "operation": "providers.conversation-state.continuity-roundtrip",
+      "capabilities": ["providers.conversation-state-ownership"]
+    },
+    {
+      "checkId": "bh.bh004.caching-correctness-neutral",
+      "evidence": [
+        "result.cacheNeutralResultIdentical",
+        "result.cacheNeutralRequestIdentical",
+        "result.cacheCostDiffered"
+      ],
+      "assertions": [
+        {
+          "kind": "resultField",
+          "field": "$.cacheNeutralResultIdentical",
+          "equals": true
+        },
+        {
+          "kind": "resultField",
+          "field": "$.cacheNeutralRequestIdentical",
+          "equals": true
+        },
+        {
+          "kind": "resultField",
+          "field": "$.cacheCostDiffered",
+          "equals": true
+        }
+      ],
+      "operation": "providers.conversation-state.cache-correctness-neutral",
+      "capabilities": ["providers.conversation-state-ownership"]
+    },
+    {
+      "checkId": "bh.bh005.provider-executed-fidelity",
+      "evidence": [
+        "result.providerExecutedAttributedNative",
+        "result.assistantContentProduced",
+        "result.providerExecutedCallNotSurfacedAsClientToolCall",
+        "result.providerExecutedFinishReasonParity"
+      ],
+      "assertions": [
+        {
+          "kind": "resultField",
+          "field": "$.providerExecutedAttributedNative",
+          "equals": true
+        },
+        {
+          "kind": "resultField",
+          "field": "$.assistantContentProduced",
+          "equals": true
+        },
+        {
+          "kind": "resultField",
+          "field": "$.providerExecutedCallNotSurfacedAsClientToolCall",
+          "equals": true
+        },
+        {
+          "kind": "resultField",
+          "field": "$.providerExecutedFinishReasonParity",
+          "equals": true
+        }
+      ],
+      "operation": "providers.conversation-state.provider-executed-fidelity",
+      "capabilities": ["providers.conversation-state-ownership"]
+    }
+  ]
+}

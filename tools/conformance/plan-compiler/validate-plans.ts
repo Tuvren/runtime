@@ -54,6 +54,7 @@ const OPERATION_SOURCE_BY_PACKET = new Map<string, readonly string[]>([
       "boundaries/providers/conformance/plans/provider-api-bridge.json",
       "boundaries/providers/conformance/plans/provider-native-execution-class.json",
       "boundaries/providers/conformance/plans/provider-mediated-execution-class.json",
+      "boundaries/providers/conformance/plans/provider-api-conversation-state.json",
     ],
   ],
 ]);

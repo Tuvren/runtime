@@ -28,9 +28,10 @@ import {
   buildProviderMetadata,
   cloneFileData,
   isPlainObject,
+  isProviderOwnedToolPart,
   mergeProviderMetadataRecords,
   parseJsonInput,
-  rejectUnsupportedProviderOwnedToolPart,
+  providerOwnedToolExecutionUnsupportedError,
   sanitizeGenerateResponseMetadata,
   sanitizeMetadataValue,
   sanitizeRecord,
@@ -146,9 +147,17 @@ function appendGenerateContentPart(
     case "file":
       state.parts.push(mapGeneratedFilePart(contentPart));
       return;
-    case "tool-call":
-      state.parts.push(mapGeneratedToolCallPart(contentPart, result));
+    case "tool-call": {
+      const toolCallPart = mapGeneratedToolCallPart(
+        contentPart,
+        result,
+        providerToolClassLookup
+      );
+      if (toolCallPart !== undefined) {
+        state.parts.push(toolCallPart);
+      }
       return;
+    }
     case "tool-result": {
       if (providerToolClassLookup !== undefined) {
         const executionClass = providerToolClassLookup(contentPart.toolName);
@@ -233,12 +242,27 @@ function mapGeneratedToolCallPart(
     LanguageModelV3GenerateResult["content"][number],
     { type: "tool-call" }
   >,
-  result: LanguageModelV3GenerateResult
-): Extract<TuvrenModelResponse["parts"][number], { type: "tool_call" }> {
-  rejectUnsupportedProviderOwnedToolPart(contentPart, {
-    modelId: result.response?.modelId ?? "unknown",
-    provider: "unknown",
-  });
+  result: LanguageModelV3GenerateResult,
+  providerToolClassLookup?: ProviderToolClassLookup
+):
+  | Extract<TuvrenModelResponse["parts"][number], { type: "tool_call" }>
+  | undefined {
+  // KRT-BH005 / ADR-055: a provider-executed (providerExecuted/dynamic) tool-call
+  // is the provider's own record of a tool IT ran. When the host declared that
+  // tool as provider-native/mediated, skip the call here — the matching
+  // tool-result carries the provider-native attribution (AY002/AY004) and the
+  // call must NOT contaminate the client-facing parts with a function tool_call
+  // the runtime would try to execute. Undeclared provider-owned execution stays
+  // out of scope for the baseline bridge (baseline protection).
+  if (isProviderOwnedToolPart(contentPart)) {
+    if (providerToolClassLookup?.(contentPart.toolName) !== undefined) {
+      return undefined;
+    }
+    throw providerOwnedToolExecutionUnsupportedError(contentPart.toolName, {
+      modelId: result.response?.modelId ?? "unknown",
+      provider: "unknown",
+    });
+  }
   const providerMetadata = sanitizeRecord(contentPart.providerMetadata);
 
   return {

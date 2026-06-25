@@ -64,6 +64,7 @@ class TypeScriptProviderAdapter {
         "providers.rejects-native-strict-structured-output",
         "providers.provider-native-execution-class",
         "providers.provider-mediated-execution-class",
+        "providers.conversation-state-ownership",
       ],
       packetId,
       planVersion,
@@ -81,6 +82,16 @@ class TypeScriptProviderAdapter {
           return result(await generateMapping());
         case "providers.bridge.stream-metadata-continuity":
           return result(await streamMetadataContinuity());
+        case "providers.conversation-state.continuity-carriage":
+          return result(await conversationStateContinuityCarriage());
+        case "providers.conversation-state.continuity-replay":
+          return result(await conversationStateContinuityReplay());
+        case "providers.conversation-state.continuity-roundtrip":
+          return result(await conversationStateContinuityRoundTrip());
+        case "providers.conversation-state.cache-correctness-neutral":
+          return result(await conversationStateCacheCorrectnessNeutral());
+        case "providers.conversation-state.provider-executed-fidelity":
+          return result(await conversationStateProviderExecutedFidelity());
         case "providers.bridge.structured-output-stream":
           return result(await structuredOutputStream());
         case "providers.bridge.provider-failure-normalization":
@@ -223,6 +234,438 @@ async function streamMetadataContinuity(): Promise<Record<string, unknown>> {
         ? Object.keys(finishChunk.providerMetadata)
         : [],
     },
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Operation: providers.conversation-state.continuity-carriage
+//
+// ADR-053 (Tuvren is the unconditional conversation-state owner): provider
+// continuity artifacts are carried into the next provider request as opaque,
+// provider-namespaced optimizations — never a correctness dependency. Exercises
+// the bridge directly with a carried continuity token and projects observable
+// evidence that the token reaches the provider call's `providerOptions` and the
+// response is produced normally (continuity is non-blocking).
+// ---------------------------------------------------------------------------
+
+async function conversationStateContinuityCarriage(): Promise<
+  Record<string, unknown>
+> {
+  let capturedProviderOptions: Record<string, unknown> | undefined;
+  const bridge = createAiSdkProviderBridge({
+    model: createMockModel({
+      doGenerate(options) {
+        capturedProviderOptions = options.providerOptions as
+          | Record<string, unknown>
+          | undefined;
+        return Promise.resolve(createGenerateResult());
+      },
+    }),
+  });
+
+  const response = await bridge.generate({
+    messages: [{ parts: [{ text: "continue", type: "text" }], role: "user" }],
+    providerContinuity: {
+      anthropic: { sessionId: "bh001-continuity" },
+    },
+  });
+
+  const anthropicOptions =
+    isRecord(capturedProviderOptions) &&
+    isRecord(capturedProviderOptions.anthropic)
+      ? capturedProviderOptions.anthropic
+      : undefined;
+
+  return createProjection({
+    continuityCarried: anthropicOptions?.sessionId === "bh001-continuity",
+    continuityNamespacePresent: anthropicOptions !== undefined,
+    responseFinishReason: response.finishReason,
+  });
+}
+
+// KRT-BH002: a carried continuity artifact persisted on a prior assistant
+// message is reconstructed from durable history and replayed into the next
+// provider request's providerOptions — the bridge-level expression of ADR-053's
+// "the next provider request is rebuilt from durable lineage, not provider-held
+// state". The continuity rides only on the supplied prompt; the bridge consults
+// no out-of-band provider session.
+async function conversationStateContinuityReplay(): Promise<
+  Record<string, unknown>
+> {
+  let capturedPrompt: LanguageModelV3CallOptions["prompt"] | undefined;
+  const bridge = createAiSdkProviderBridge({
+    model: createMockModel({
+      doGenerate(options) {
+        capturedPrompt = options.prompt;
+        return Promise.resolve(createGenerateResult());
+      },
+      provider: "google",
+    }),
+  });
+
+  await bridge.generate({
+    messages: [
+      {
+        parts: [
+          {
+            providerMetadata: {
+              google: { thoughtSignature: "bh002-continuity" },
+            },
+            redacted: false,
+            text: "prior reasoning",
+            type: "reasoning",
+          },
+        ],
+        role: "assistant",
+      },
+      { parts: [{ text: "continue", type: "text" }], role: "user" },
+    ],
+  });
+
+  return createProjection({
+    continuityReplayedFromHistory:
+      extractReplayedThoughtSignature(capturedPrompt) === "bh002-continuity",
+  });
+}
+
+function extractReplayedThoughtSignature(prompt: unknown): string | undefined {
+  if (!Array.isArray(prompt)) {
+    return undefined;
+  }
+  for (const message of prompt) {
+    if (!isRecord(message) || message.role !== "assistant") {
+      continue;
+    }
+    const content = message.content;
+    if (!Array.isArray(content)) {
+      continue;
+    }
+    for (const part of content) {
+      if (!(isRecord(part) && isRecord(part.providerOptions))) {
+        continue;
+      }
+      const google = part.providerOptions.google;
+      if (isRecord(google) && typeof google.thoughtSignature === "string") {
+        return google.thoughtSignature;
+      }
+    }
+  }
+  return undefined;
+}
+
+// Operation: providers.conversation-state.continuity-roundtrip
+//
+// The provider-boundary expression of the AY005 multi-turn round-trip
+// (KRT-BH003): turn 1's response *produces* a continuity artifact, and turn 2's
+// request must carry it forward — reconstructed only from the prior turn's
+// assistant output in history, never from a provider-held session. This drives
+// two real bridge calls: turn 1's model issues a continuity artifact on its
+// reasoning output; that assistant output becomes part of turn 2's history; and
+// the bridge replays it into turn 2's request providerOptions. The continuity
+// rides only through the reconstructed history (ADR-053 source of truth).
+async function conversationStateContinuityRoundTrip(): Promise<
+  Record<string, unknown>
+> {
+  const signature = "bh003-roundtrip-thought";
+
+  // Turn 1 — the model emits a continuity artifact on its reasoning output.
+  const turnOneBridge = createAiSdkProviderBridge({
+    model: createMockModel({
+      doGenerate() {
+        return Promise.resolve(
+          createGenerateResult({
+            content: [
+              {
+                providerMetadata: { google: { thoughtSignature: signature } },
+                text: "prior reasoning",
+                type: "reasoning",
+              },
+            ],
+          })
+        );
+      },
+      provider: "google",
+    }),
+  });
+  const turnOneResponse = await turnOneBridge.generate({
+    messages: [{ parts: [{ text: "start", type: "text" }], role: "user" }],
+  });
+  const [firstPart, ...restParts] = turnOneResponse.parts;
+  if (firstPart === undefined) {
+    throw new Error("expected turn 1 to produce assistant output");
+  }
+
+  // Turn 2 — the prior turn's assistant output is the only carrier of the
+  // continuity; the bridge replays it into the next request from history alone.
+  let capturedPrompt: LanguageModelV3CallOptions["prompt"] | undefined;
+  const turnTwoBridge = createAiSdkProviderBridge({
+    model: createMockModel({
+      doGenerate(options) {
+        capturedPrompt = options.prompt;
+        return Promise.resolve(createGenerateResult());
+      },
+      provider: "google",
+    }),
+  });
+  await turnTwoBridge.generate({
+    messages: [
+      { parts: [{ text: "start", type: "text" }], role: "user" },
+      { parts: [firstPart, ...restParts], role: "assistant" },
+      { parts: [{ text: "continue", type: "text" }], role: "user" },
+    ],
+  });
+
+  return createProjection({
+    continuityRoundTrippedAcrossTurns:
+      extractReplayedThoughtSignature(capturedPrompt) === signature,
+  });
+}
+
+// Operation: providers.conversation-state.cache-correctness-neutral
+//
+// ADR-053 (provider-side caching is correctness-neutral): a provider cache miss
+// and a cache hit for the same request must produce an identical model-facing
+// result; only the reported cost may differ. This drives two real bridge calls
+// with an identical request — identical messages and an identical opaque cache
+// hint threaded through providerOptions — against two mock models that return
+// byte-identical produced content but report different input-token cost: a cold
+// miss (nothing read from cache) versus a warm hit (most of the prompt served
+// from cache). It then projects that the produced result and the reconstructed
+// provider request are identical across the two calls, while the cost (the
+// bridge's `cacheRead` usage breakdown) genuinely differs.
+async function conversationStateCacheCorrectnessNeutral(): Promise<
+  Record<string, unknown>
+> {
+  // Drive one bridge call with a fixed cache-read cost. The request and the
+  // produced content are byte-identical across calls; only `cacheRead` varies.
+  const runWithCacheRead = async (cacheReadTokens: number) => {
+    let capturedPrompt: LanguageModelV3CallOptions["prompt"] | undefined;
+    const bridge = createAiSdkProviderBridge({
+      model: createMockModel({
+        doGenerate(options) {
+          capturedPrompt = options.prompt;
+          return Promise.resolve(
+            createGenerateResult({
+              content: [{ text: "the cached answer", type: "text" }],
+              usage: {
+                inputTokens: {
+                  cacheRead: cacheReadTokens,
+                  cacheWrite: 0,
+                  noCache: 1024 - cacheReadTokens,
+                  total: 1024,
+                },
+                outputTokens: { reasoning: 0, text: 40, total: 40 },
+                raw: { provider: "anthropic" },
+              },
+            })
+          );
+        },
+        provider: "anthropic",
+      }),
+    });
+    const response = await bridge.generate({
+      messages: [
+        { parts: [{ text: "summarize the doc", type: "text" }], role: "user" },
+      ],
+      providerContinuity: {
+        anthropic: { cacheControl: { type: "ephemeral" } },
+      },
+    });
+    return { capturedPrompt, response };
+  };
+
+  const miss = await runWithCacheRead(0); // cold cache: nothing read from cache
+  const hit = await runWithCacheRead(960); // warm cache: most input from cache
+
+  const canonicalResult = (response: {
+    finishReason: string;
+    parts: unknown;
+  }) =>
+    JSON.stringify({
+      finishReason: response.finishReason,
+      parts: response.parts,
+    });
+
+  return createProjection({
+    cacheCostDiffered:
+      extractBridgeCacheRead(miss.response.providerMetadata) !==
+      extractBridgeCacheRead(hit.response.providerMetadata),
+    cacheNeutralRequestIdentical:
+      JSON.stringify(miss.capturedPrompt) ===
+      JSON.stringify(hit.capturedPrompt),
+    cacheNeutralResultIdentical:
+      canonicalResult(miss.response) === canonicalResult(hit.response),
+  });
+}
+
+function extractBridgeCacheRead(metadata: unknown): unknown {
+  if (!(isRecord(metadata) && isRecord(metadata.aiSdkBridge))) {
+    return undefined;
+  }
+  const rawUsage = metadata.aiSdkBridge.rawUsage;
+  if (!(isRecord(rawUsage) && isRecord(rawUsage.inputTokens))) {
+    return undefined;
+  }
+  return rawUsage.inputTokens.cacheRead;
+}
+
+async function conversationStateProviderExecutedFidelity(): Promise<
+  Record<string, unknown>
+> {
+  // ADR-055 / KRT-BH005: a realistic AI SDK v6 provider-executed round-trip — a
+  // tool-call carrying providerExecuted + dynamic (the exact vercel/ai #10888
+  // shape) FOLLOWED BY its tool-result — declared to Tuvren as a provider-native
+  // tool. The user function tool map deliberately omits the provider-executed
+  // tool name (the configuration that makes #10888 fire inside generateText),
+  // so a passing op proves the bridge does NOT mis-validate the provider-executed
+  // call against the user tool map. The bridge consumes the low-level
+  // LanguageModelV3 contract, so parseToolCall is never in the path; this op
+  // observes the behavioural consequence at the bridge seam.
+  const declaration = { id: "openai.web_search_preview", name: "web_search" };
+  const userTools = [
+    {
+      description: "a user-owned function tool",
+      inputSchema: { type: "object" as const },
+      name: "my_function",
+    },
+  ];
+
+  const generateBridge = createAiSdkProviderBridge({
+    model: createMockModel({
+      doGenerate() {
+        return Promise.resolve(
+          createGenerateResult({
+            content: [
+              {
+                dynamic: true,
+                input: '{"query":"tuvren"}',
+                providerExecuted: true,
+                toolCallId: "ws-1",
+                toolName: "web_search",
+                type: "tool-call",
+              },
+              {
+                result: { results: [{ title: "Tuvren" }] },
+                toolCallId: "ws-1",
+                toolName: "web_search",
+                type: "tool-result",
+              },
+              { text: "Tuvren is a runtime.", type: "text" },
+            ],
+            finishReason: { raw: "stop", unified: "stop" },
+          })
+        );
+      },
+      provider: "openai",
+    }),
+  });
+  const generateResponse = await generateBridge.generate({
+    messages: [{ parts: [{ text: "search", type: "text" }], role: "user" }],
+    providerNativeTools: [declaration],
+    tools: userTools,
+  });
+
+  const streamBridge = createAiSdkProviderBridge({
+    model: createMockModel({
+      doStream() {
+        // Realistic provider-executed streaming shape — the incremental prelude
+        // real providers emit (e.g. @ai-sdk/openai Responses web_search):
+        // tool-input-start{providerExecuted} → tool-input-delta → tool-input-end →
+        // tool-call{providerExecuted} → tool-result. This exercises the path that
+        // would throw provider_owned_tool_execution_unsupported if the bridge
+        // failed to recognise the declared provider tool at tool-input-start.
+        return Promise.resolve({
+          stream: streamFromParts([
+            {
+              dynamic: true,
+              id: "ws-1",
+              providerExecuted: true,
+              toolName: "web_search",
+              type: "tool-input-start",
+            },
+            {
+              delta: '{"query":"tuvren"}',
+              id: "ws-1",
+              type: "tool-input-delta",
+            },
+            { id: "ws-1", type: "tool-input-end" },
+            {
+              dynamic: true,
+              input: '{"query":"tuvren"}',
+              providerExecuted: true,
+              toolCallId: "ws-1",
+              toolName: "web_search",
+              type: "tool-call",
+            },
+            {
+              result: { results: [{ title: "Tuvren" }] },
+              toolCallId: "ws-1",
+              toolName: "web_search",
+              type: "tool-result",
+            },
+            { delta: "ok", id: "t-1", type: "text-delta" },
+            {
+              finishReason: { raw: "stop", unified: "stop" },
+              type: "finish",
+              usage: createUsage(3, 2),
+            },
+          ]),
+        });
+      },
+      provider: "openai",
+    }),
+  });
+  const streamChunks = await collectProviderStreamChunks(
+    streamBridge.stream({
+      messages: [{ parts: [{ text: "search", type: "text" }], role: "user" }],
+      providerNativeTools: [declaration],
+      tools: userTools,
+    })
+  );
+
+  const generateNativeClass =
+    generateResponse.providerToolResults?.[0]?.executionClass;
+  const streamNativeChunk = streamChunks.find(
+    (chunk) => chunk.type === "provider_tool_result"
+  ) as { providerMetadata?: Record<string, unknown> } | undefined;
+  const streamNativeClass = streamNativeChunk?.providerMetadata?.executionClass;
+  const streamFinishReason = (
+    streamChunks.find((chunk) => chunk.type === "finish") as
+      | { finishReason?: string }
+      | undefined
+  )?.finishReason;
+
+  return createProjection({
+    // The assistant content is produced normally — the provider-executed
+    // tool-call neither aborts the turn nor injects an error part.
+    assistantContentProduced: generateResponse.parts.some(
+      (part) => part.type === "text" && part.text.includes("Tuvren")
+    ),
+    // The provider-executed call does not contaminate the client-facing parts /
+    // chunks with a function tool_call the runtime would attempt to execute —
+    // including the incremental input prelude (tool_call_args_delta).
+    providerExecutedCallNotSurfacedAsClientToolCall: !(
+      generateResponse.parts.some(
+        (part) => part.type === "tool_call" || part.type === "tool_result"
+      ) ||
+      streamChunks.some(
+        (chunk) =>
+          chunk.type === "tool_call_start" ||
+          chunk.type === "tool_call_args_delta" ||
+          chunk.type === "tool_call_done"
+      )
+    ),
+    // Generate and stream both attribute the provider-executed result to the
+    // provider-native execution class.
+    providerExecutedAttributedNative:
+      generateNativeClass === "provider-native" &&
+      streamNativeClass === "provider-native",
+    // Stream/generate finish-reason parity: a provider-executed-only turn that the
+    // provider finished with `stop` reports `stop` on BOTH paths. The skipped
+    // provider-owned tool-state must not push the stream turn through the
+    // tool-call finish-reason normalization the generate path never applies here.
+    providerExecutedFinishReasonParity:
+      generateResponse.finishReason === "stop" && streamFinishReason === "stop",
   });
 }
 
